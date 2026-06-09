@@ -351,6 +351,19 @@ needs no special engineering (ADR 0001 scope).
 **Plan banked (this document).** The build order (ARCHITECTURE.md §4) now advances
 from a 100 %-complete Steel to Chip.
 
+> **Phase 1a — BUILT (2026-06-09).** `projects/chip/` created: `diffusion_dopant.py`
+> (predep `erfc` Dirichlet / drive-in Gaussian Neumann(0), cited Fair `D(T)` for B/P, in
+> **CGS-semiconductor units** — the advisor-confirmed departure from Steel's SI, since the
+> engine is unit-agnostic and the cited data is native cm/cm²·s⁻¹/cm⁻³), `junction.py`
+> (junction depth + **Masetti `μ(N)`** sheet-resistance conductance integral, Irvin
+> cross-check), `plots.py` + `demo_junction.py` (the banked two-step boron pn-junction:
+> `x_j` ≈ 1.05 µm, `R_s` ≈ 135 Ω/sq into a 1e15 n-type wafer → `docs/figures/chip-junction.png`).
+> Triad sealed by 27 tests (whole-repo fast gate **267 green**): the exact `erfc`/`Gaussian`
+> anchors on their idealizations (constant-D), dose conservation + the predep flux identity, and
+> a **deep-tail (z≈3) numeric-vs-analytic `x_j` certification** that licenses the realistic demo's
+> numeric junction. Masetti coefficients pinned online (IUE-Vienna + allpix²/CERN). **Next = Phase 2
+> (Deal–Grove oxidation).**
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **frozen
 `engines/diffusion`** in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**
