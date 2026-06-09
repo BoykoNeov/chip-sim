@@ -363,3 +363,35 @@ identity, and the **junction-depth / sheet-resistance benchmark** vs Irvin/SUPRE
 This is **low-risk spine reuse** — `projects/steel/carburize.py` already exercised the
 identical mass-mode instantiation — so it is a fast validated win that proves the
 program's core thesis: the spine reuses.
+
+**Phase 1a reference sources — pinned at build (gathered 2026-06-09).** Per the
+program discipline (cited reference facts, not carried from memory — the
+`[[…-source]]` memory-note pattern), the three Phase-1a constants are pinned:
+
+- **Dopant Arrhenius `D(T) = D0·exp(−Ea/kT)`** — `[[dopant-diffusivity-source]]`.
+  **Fair (1981)** intrinsic model, reproduced in **Plummer–Deal–Griffin** (same text
+  Phase 2's Deal–Grove constants cite — one coherent lineage). **B: 0.76 cm²/s,
+  3.46 eV; P: 3.85 cm²/s, 3.66 eV** (both confirmed; they cover the pn-junction
+  demo); Sb 0.214/3.65; As is the widest-spread case (pin at build, the
+  multi-mechanism scope-edge example). Units: **eV + cm²/s**, convert to engine m²/s
+  at the boundary. erfc/Gaussian forms + the predep dose identity
+  `Q = (2/√π)·C_s·√(Dt) ≈ 1.13·C_s·√(Dt)` are from a directly-read teaching chapter
+  (CityU AP6120 Ch. 8).
+- **Predep surface concentration `N_s` (solid-solubility limit)** —
+  `[[dopant-solid-solubility-source]]`. **Trumbore (1960), BSTJ 39:205–233** (B
+  retrograde ~5×10²⁰ peak; P ~1.2–1.3×10²¹; As ~1.5–2×10²¹).
+- **Sheet-resistance benchmark `R_s·x_j`** — `[[irvin-sheet-resistance-source]]`.
+  **Irvin (1962), BSTJ 41:387–410.** *Graphical, not callable:* the benchmark **cites**
+  Irvin's `R_s·x_j` chart; `junction.py` **computes** `R_s = 1/∫q·μ(N)·N dx`.
+- **Mobility model `μ(N)` (the R_s integrand)** — `[[dopant-mobility-source]]`.
+  **Masetti, Severi & Solmi (1983), IEEE TED 30(7):764–769** — per-dopant As/P/B over
+  the high-doping range (the predep solubility regime), kept **independent** of Irvin so
+  the R_s cross-check stays non-circular.
+
+**The named scope edge, sharpened by these sources.** Predep runs *at* the
+solid-solubility limit = high concentration = exactly where the frozen engine's
+**constant-D** erfc is weakest (real `D(N)` is concentration-enhanced — the P
+kink-and-tail; the engine's flagged-unbuilt v1.1 case). So the constant-D-vs-`D(N)`
+edge (carburize's Tibbetts analogue) **bites the predep leg specifically harder** than
+it did for carburizing — the exact erfc/Gaussian legs are validated on their
+*idealizations*, and the realistic predep→drive-in demo's job is the *junction*.
