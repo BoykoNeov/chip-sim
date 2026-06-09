@@ -42,11 +42,14 @@ Validation triad (plan §4) — what is asserted tight vs loose
   vs :func:`depletion_charge`). The body-effect √-law (:func:`threshold_voltage` vs ``γ`` form) is kept
   only as a **cheap γ-consistency check** — it catches a ``γ`` typo but anchors no physics (it is the
   same formula rearranged), so it is *not* billed as the anchor.
-* **Conservation (tight) — MOS charge neutrality / Gauss's law.** The gate charge balances the
+* **Conservation — MOS charge neutrality / Gauss's law.** The gate charge balances the
   semiconductor charge, ``Q_g = −(Q_dep + Q_inv)`` (:func:`gate_charge`, :func:`inversion_charge`):
   above threshold every extra volt of ``V_GB − V_t`` goes entirely into inversion charge,
-  ``Q_inv = −C_ox·(V_GB − V_t)``, and Gauss's law sets the oxide field ``E_ox = Q_g/ε_ox``. The two
-  bookkeepings of ``Q_inv`` (``−C_ox(V_GB−V_t)`` vs ``C_ox(V_GB−V_FB−2φ_F) − Q_dep``) close identically.
+  ``Q_inv = −C_ox·(V_GB − V_t)``, and Gauss's law sets the oxide field ``E_ox = Q_g/ε_ox``. This leg is
+  the model's **own charge accounting** — neutrality and Gauss hold *by construction*, so it is a
+  self-consistency check (the genuinely-independent verification is the Poisson anchor above). What it
+  externally anchors is the MIT P2b,c arithmetic: ``V_GB ≈ 4.9 V`` for ``Q_inv = −1e-6 C/cm²``, and
+  ``1e-6/ε_ox ≈ 2.9e6 V/cm`` — which mainly re-check the already-pinned ``C_ox``/``ε_ox``.
 * **Benchmark (loose) — V_t vs process knobs, vs the cited worked example.** The reference is **MIT
   6.012 PS3 (Spring 2007), Problem 2** ([[mos-threshold-voltage-source]]): an n⁺-poly / p-substrate
   ``N_A = 1e17`` / ``t_ox = 15 nm`` device gives ``V_FB = −0.97 V``, ``C_ox = 2.3e-7 F/cm²``,

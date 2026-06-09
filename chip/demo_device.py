@@ -38,8 +38,8 @@ from .diffusion_dopant import DopantProfile
 # --- The coherent n-MOSFET recipe (one device through every step) ----------- #
 CHANNEL_N_A = 1.0e17            # cm⁻³ — p-type boron channel/substrate doping (the Phase-1 wafer)
 SD_DOPANT = "P"                # n⁺ phosphorus source/drain (types flipped from the Phase-1a banked demo)
-SD_PREDEP = (950.0, 15.0)      # S/D predep: °C, minutes
-SD_DRIVEIN = (1000.0, 30.0)    # S/D drive-in: °C, minutes
+SD_PREDEP = (950.0, 10.0)      # S/D predep: °C, minutes
+SD_DRIVEIN = (950.0, 8.0)      # S/D drive-in: °C, minutes → shallow x_j ≈ 0.10 µm < gate length (coherent)
 SUBSTRATE_LENGTH_UM = 2.0
 
 GATE_OX_AMBIENT = "dry"        # dry O₂ — the controllable gate-oxide ambient (thin, reaction-limited)

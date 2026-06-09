@@ -88,8 +88,9 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   long-channel `I_Dsat` — a chip-local model, **not** the engine) + `demo_device.py` +
   `plots.device_figure`. Banked artifact: the **whole process→device flow on one figure** — a coherent
   n-MOSFET chained diffusion → oxidation → litho → `V_t` (`docs/figures/chip-device.png`); channel
-  `N_A` = 1e17, dry-O₂ 14 nm gate oxide, 167 nm litho gate → **`V_t` ≈ 0.55 V** (cf. the cited MIT
-  6.012 worked example at exactly 15 nm → 0.58 V). 15-test triad green: the **independent
+  `N_A` = 1e17, dry-O₂ 14 nm gate oxide, 167 nm litho gate, shallow n⁺ S/D (`x_j` ≈ 0.10 µm <
+  gate length → coherent cross-section) → **`V_t` ≈ 0.55 V** (cf. the cited MIT 6.012 worked example
+  at exactly 15 nm → 0.58 V). 20-test triad green (15 device + 5 demo): the **independent
   depletion-Poisson anchor** (not the √-law), charge-neutrality/Gauss conservation, the MIT benchmark.
 
 ## Test runner (tiered gate, ADR 0003)

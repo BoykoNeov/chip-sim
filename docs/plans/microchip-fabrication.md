@@ -423,8 +423,10 @@ from a 100 %-complete Steel to Chip.
 > field oxide), and the gate CD (a Phase-3 litho feature → channel length ``L``). With `demo_device.py` +
 > `plots.device_figure` (the banked artifact: the **whole forward flow on one figure** — diffusion →
 > oxidation → litho → the ``V_t`` *waterfall* → `docs/figures/chip-device.png`; channel ``N_A``=1e17,
-> dry-O₂ 1000 °C/20 min → 14 nm gate oxide, 193 nm-ArF litho → 167 nm gate → **``V_t`` ≈ 0.55 V**,
-> ``I_Dsat`` ≈ 3.3 mA). **15-test triad** sealed; whole-repo fast gate **331 green** (+15). Triad:
+> dry-O₂ 1000 °C/20 min → 14 nm gate oxide, 193 nm-ArF litho → 167 nm gate, shallow n⁺ S/D
+> (``x_j`` ≈ 0.10 µm < the gate length → a coherent cross-section, not punchthrough) → **``V_t`` ≈ 0.55 V**,
+> ``I_Dsat`` ≈ 3.3 mA). **20-test triad** sealed (15 device + 5 demo-integration); whole-repo fast gate
+> **336 green** (+20). Triad:
 > *analytic* = an **INDEPENDENT depletion-Poisson integration** — ``solve_ivp`` on ``ψ″=q·N_A/ε_Si`` +
 > ``brentq`` root-find of the depletion width where ``ψ_s=2φ_F``, recovering ``Q_dep=√(2qε_Si N_A·2φ_F)``
 > to ~1e-9 (the **Phase-2 solve_ivp analogue** — *not* the body-effect √-law, which is the same formula
