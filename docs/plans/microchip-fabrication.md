@@ -274,19 +274,29 @@ recipes or targeting.*
 
 ## 7. Test runner
 
-Single command, fast, runs the whole suite (engines + steel + chip) so any session
-verifies cheaply (ARCHITECTURE.md §6):
+The **tiered gate** (ADR 0003): the routine commit gate is the whole-repo fast lane,
+the full gate is exceptional.
 
 ```powershell
 # from repo root
-./run_tests.ps1          # wraps:  pytest -q
+./run_tests.ps1 -m "not slow"   # routine commit gate (fast lane, ~8 s)
+./run_tests.ps1                 # full gate — EXCEPTIONAL: a shared engines/ edit,
+                                #   root-config, a release, or CI
 ```
 
 `pyproject.toml`'s `testpaths` gains `projects/chip` (it already carries `engines`
 and `projects`); the existing `pythonpath = ["."]` lets chip tests import the frozen
-engine as `engines.diffusion…` with no install step. The frozen
-`engines/diffusion/tests/` seal must stay green for any chip change (it is the
-contract Chip relies on).
+engine as `engines.diffusion…` with no install step. Any new chip test that drives a
+live external solver / kernel / subprocess gets the `slow` marker. Editing the frozen
+`engines/diffusion` is the cross-cutting case that *triggers the full gate* — its
+`tests/` seal must stay green (it is the contract Chip relies on).
+
+> **Scheduled revisit (user direction, 2026-06-09).** When Microchip lands, the whole
+> gate/tests system is to be re-examined — this is the first point a second project
+> exists, so the "whole-repo fast lane ≈ one project's tests" identity no longer holds.
+> See ADR 0003 → *Scheduled revisit* for what to reconsider (per-project scoping, the
+> `slow` set, the rot mitigation actually in place, and the overstated "used modules"
+> framing).
 
 ---
 
