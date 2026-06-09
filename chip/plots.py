@@ -40,6 +40,12 @@ THRESHOLD_COLOR = "#c0392b"     # the resist clip level + the printed CD
 COHERENT_LIMIT_COLOR = "#2f6fb0"   # the k₁=0.5 coherent resolution limit (λ/NA)
 TWO_BEAM_LIMIT_COLOR = "#d4711f"   # the k₁=0.25 two-beam resolution floor (λ/2NA)
 
+# Device (Phase 4) colours — the V_t waterfall (where the threshold voltage comes from).
+VFB_COLOR = "#8e44ad"           # the flat-band voltage term (gate work function)
+BAND_COLOR = "#2f6fb0"          # the 2φ_F surface-potential term
+DEPL_COLOR = "#d4711f"          # the depletion-charge term Q_dep/C_ox
+VT_COLOR = "#27795b"            # the resulting threshold voltage V_t
+
 
 def _depth_um(x: np.ndarray) -> np.ndarray:
     """Cell-centre depths cm → µm (the reported length unit)."""
@@ -265,4 +271,114 @@ def litho_figure(
     ax_c.grid(True, alpha=0.18)
 
     fig.tight_layout(rect=(0, 0, 1, 0.98))
+    return fig
+
+
+def device_figure(result) -> "plt.Figure":
+    """The banked Phase-4 artifact: the whole process→device flow on one figure — recipe in, V_t out.
+
+    The chip's payoff figure (counterpart of Steel's four-curves anchor): one coherent n-MOSFET chained
+    through every process module, the device parameter read off the end. ``result`` is the demo's plain
+    :class:`~projects.chip.demo_device.FlowResult` bundle (frozen dataclasses + arrays — no live solver
+    object, ADR 0002). Four panels, the forward flow:
+
+      ① **diffusion** — the n⁺ source/drain profile into the p-type channel, junction depth marked;
+      ② **oxidation** — the Deal–Grove growth curve with the thin **gate-oxide** point marked;
+      ③ **litho** — the gate aerial image, the printed CD (= channel length) shaded;
+      ④ **device** — the ``V_t`` *waterfall*: ``V_FB`` + ``2φ_F`` + ``Q_dep/C_ox`` stacking to the
+         threshold voltage, with ``γ``, ``C_ox`` and the long-channel ``I_Dsat`` annotated.
+
+    The coherence is the message: the three process outputs describe the **same** device, so ``V_t`` is
+    the genuine consequence of the recipe (the advisor's flagged requirement — not three unrelated
+    numbers on one canvas).
+    """
+    r = result
+    m = r.mos
+    fig, ((ax_d, ax_o), (ax_l, ax_v)) = plt.subplots(2, 2, figsize=(13.5, 10))
+
+    # --- ① diffusion: n⁺ S/D into the p-channel -------------------------------------
+    xum = _depth_um(r.sd_drivein.x)
+    ax_d.semilogy(xum, np.maximum(r.sd_drivein.N, 1.0), color=DRIVEIN_COLOR, lw=2.4,
+                  label=f"n⁺ {r.sd_junction.dopant} source/drain")
+    ax_d.axhline(m.N_A, color=BACKGROUND_COLOR, ls="--", lw=1.4,
+                 label=f"p-channel $N_A$ = {m.N_A:.0e} cm⁻³")
+    xj = r.sd_junction.x_j_um
+    ax_d.axvline(xj, color=JUNCTION_COLOR, ls=":", lw=1.6)
+    ax_d.plot([xj], [m.N_A], "o", color=JUNCTION_COLOR, ms=7, zorder=5)
+    ax_d.annotate(f"S/D junction\n$x_j$ = {xj:.2f} µm", xy=(xj, m.N_A),
+                  xytext=(xj * 0.5, m.N_A * 60), color=JUNCTION_COLOR, fontsize=9, ha="center",
+                  arrowprops=dict(arrowstyle="->", color=JUNCTION_COLOR, lw=1.1))
+    ax_d.set_xlim(0, min(float(xum[-1]), xj * 3))
+    ax_d.set_ylim(m.N_A * 0.3, float(r.sd_drivein.N[0]) * 3)
+    ax_d.set_xlabel("depth  (µm)")
+    ax_d.set_ylabel("dopant concentration $N$  (cm⁻³)")
+    ax_d.set_title("① diffusion — n⁺ source/drain into the p-channel")
+    ax_d.legend(loc="upper right", fontsize=8.5, framealpha=0.95)
+    ax_d.grid(True, which="both", alpha=0.18)
+
+    # --- ② oxidation: the thin gate oxide on the Deal–Grove curve --------------------
+    t = r.t_hours
+    ax_o.loglog(t, r.oxide_curve, color=DRY_COLOR, lw=2.6, label="dry O₂ growth (Deal–Grove)")
+    tg = r.gate_oxide.t_minutes / 60.0
+    ax_o.plot([tg], [r.gate_oxide.t_ox], "o", color=THRESHOLD_COLOR, ms=8, zorder=6)
+    ax_o.annotate(f"gate oxide\n$t_{{ox}}$ = {r.gate_oxide.t_ox_nm:.0f} nm", xy=(tg, r.gate_oxide.t_ox),
+                  xytext=(tg * 0.22, r.gate_oxide.t_ox * 2.3), color=THRESHOLD_COLOR, fontsize=9, ha="center",
+                  arrowprops=dict(arrowstyle="->", color=THRESHOLD_COLOR, lw=1.1))
+    ax_o.set_xlim(float(t[0]), float(t[-1]))
+    ax_o.set_xlabel("oxidation time  (hr)")
+    ax_o.set_ylabel("oxide thickness  $x_{ox}$  (µm)")
+    ax_o.set_title("② oxidation — a thin dry gate oxide (reaction-limited)")
+    ax_o.legend(loc="lower right", fontsize=8.5, framealpha=0.95)
+    ax_o.grid(True, which="both", alpha=0.18)
+
+    # --- ③ litho: the gate aerial image → CD (channel length) ------------------------
+    x, I = np.asarray(r.litho_x_nm), np.asarray(r.litho_intensity)
+    ax_l.plot(x, I, color=AERIAL_COLOR, lw=2.6, label="gate aerial image")
+    ax_l.axhline(r.litho_threshold, color=THRESHOLD_COLOR, ls="--", lw=1.5,
+                 label=f"resist threshold = {r.litho_threshold:.2f}")
+    cd = r.gate_feature.cd_nm
+    centre = r.gate_feature.pitch_nm / 2.0               # the dark line (clear-space centre at x=0)
+    ax_l.axvspan(centre - cd / 2, centre + cd / 2, color=THRESHOLD_COLOR, alpha=0.12)
+    ax_l.annotate(f"gate length\nCD = {cd:.0f} nm", xy=(centre, r.litho_threshold),
+                  xytext=(centre, r.litho_threshold + 0.30 * I.max()), color=THRESHOLD_COLOR,
+                  fontsize=9, ha="center", arrowprops=dict(arrowstyle="->", color=THRESHOLD_COLOR, lw=1.1))
+    ax_l.set_xlim(float(x[0]), float(x[-1]))
+    ax_l.set_ylim(0, I.max() * 1.35)
+    ax_l.set_xlabel("position  $x$  (nm)")
+    ax_l.set_ylabel("aerial-image intensity  $I(x)$")
+    ax_l.set_title("③ litho — the gate aerial image → CD = channel length")
+    ax_l.legend(loc="upper right", fontsize=8.5, framealpha=0.95)
+    ax_l.grid(True, alpha=0.18)
+
+    # --- ④ device: the V_t waterfall (where the threshold voltage comes from) ---------
+    segments = [
+        ("$V_{FB}$", 0.0, m.V_FB, VFB_COLOR),
+        ("$+\\,2\\phi_F$", m.V_FB, m.V_FB + m.two_phi_F, BAND_COLOR),
+        ("$+\\,Q_{dep}/C_{ox}$", m.V_FB + m.two_phi_F, m.V_t, DEPL_COLOR),
+    ]
+    for i, (_, lo, hi, color) in enumerate(segments):
+        ax_v.bar(i, hi - lo, bottom=lo, width=0.68, color=color, edgecolor="white", zorder=3)
+        ax_v.text(i, hi + (0.03 if hi >= lo else -0.03) * (1 if hi >= 0 else -1),
+                  f"{hi - lo:+.2f}", ha="center", va="bottom" if hi >= lo else "top", fontsize=9)
+        if i > 0:                                         # connector from the previous segment top
+            ax_v.plot([i - 1 + 0.34, i - 0.34], [lo, lo], color="#999999", lw=0.9, ls=":", zorder=2)
+    ax_v.bar(3, m.V_t, bottom=0.0, width=0.68, color=VT_COLOR, edgecolor="white", zorder=3)
+    ax_v.axhline(0.0, color="#444444", lw=0.8)
+    ax_v.annotate(f"$V_t$ = {m.V_t:.3f} V", xy=(3, m.V_t), xytext=(3, m.V_t + 0.16),
+                  ha="center", fontsize=11, fontweight="bold", color=VT_COLOR)
+    ax_v.set_xticks([0, 1, 2, 3])
+    ax_v.set_xticklabels(["$V_{FB}$", "$2\\phi_F$", "$Q_{dep}/C_{ox}$", "$V_t$"], fontsize=9)
+    ax_v.set_ylabel("contribution to $V_t$  (V)")
+    ax_v.set_title("④ device — the threshold voltage and where it comes from")
+    ax_v.text(0.03, 0.04,
+              f"$N_A$ = {m.N_A:.0e} cm⁻³,  $t_{{ox}}$ = {m.t_ox_um * 1e3:.0f} nm,  {m.gate} gate\n"
+              f"$C_{{ox}}$ = {m.C_ox:.2e} F/cm²,  $\\gamma$ = {m.gamma:.2f} V$^{{1/2}}$,  "
+              f"$I_{{Dsat}}$ = {r.i_dsat * 1e3:.1f} mA",
+              transform=ax_v.transAxes, fontsize=8.5, va="bottom",
+              bbox=dict(boxstyle="round", fc="white", ec="#cccccc", alpha=0.9))
+    ax_v.grid(True, axis="y", alpha=0.18)
+
+    fig.suptitle("Microchip: process → device — a coherent n-MOSFET, recipe in → $V_t$ out",
+                 fontsize=13, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
     return fig

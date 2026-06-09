@@ -14,9 +14,11 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
 > (`oxidation.py`) uses **Deal–Grove-native µm-hour** — `B` (µm²/hr), `B/A` (µm/hr) — the units the
 > cited rate constants are tabulated in. *Lithography* (`litho.py`) uses **litho-native nm** —
 > wavelengths (193 nm) and feature sizes are quoted in nm — exposing the printed CD in µm at the
-> boundary. **One unit system *within* each module; native units *per* module** (Steel's "one system
-> throughout" was about not splitting units inside the engine-coupled computation — here each module is
-> self-contained). See each module's docstring.
+> boundary. *The device* (`device.py`) uses **semiconductor CGS** (like dopant diffusion) — ε in F/cm,
+> charge in C/cm², `C_ox` in F/cm² — consuming the upstream `t_ox` in µm (→cm at its boundary) and the
+> channel `N_A` in cm⁻³. **One unit system *within* each module; native units *per* module** (Steel's
+> "one system throughout" was about not splitting units inside the engine-coupled computation — here
+> each module is self-contained). See each module's docstring.
 
 ## Load pointer (per-session working set, ARCHITECTURE.md §11)
 
@@ -48,6 +50,16 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   Parseval power-balance), `image_contrast`/`nils`, `print_cd` + `expose_grating` (constant-threshold
   resist → CD in nm/µm). The module docstring is its contract (cited `k₁`/NILS, the
   scalar/no-defocus/Abbe-not-Hopkins/threshold-resist scope edge). Saves `docs/figures/chip-litho.png`.
+- **To work on the device (Phase 4):** `device.py` + `tests/test_device.py`, the demo
+  `demo_device.py` + `tests/test_demo_device.py`, and `plots.device_figure`. The **process → device**
+  payoff — a chip-local compact closed form (**does not touch the engine**): `threshold_voltage`
+  (`V_t = V_FB + 2φ_F + Q_dep/C_ox`) consuming a channel `N_A` (Phase 1) + a gate `t_ox` (Phase 2) +
+  a litho CD (Phase 3, *geometry only*); `fermi_potential`/`oxide_capacitance`/`flatband_voltage`/
+  `depletion_charge` the building blocks, `depletion_charge_poisson` the **independent Poisson anchor**,
+  `threshold_voltage_body_effect` the √-law, `gate_charge`/`inversion_charge`/`oxide_field` the
+  charge-neutrality/Gauss conservation, `saturation_current` the honest long-channel drive readout. The
+  module docstring is its contract (cited MIT 6.012 benchmark, the long-channel/ideal-oxide scope edge).
+  Saves `docs/figures/chip-device.png`.
 - **To use the diffusion/heat spine:** load `engines/diffusion/CONTRACT.md` only — never Steel's
   or chip's internals. Chip instantiates the same contract Steel's `carburize.py` did (mass mode).
 
@@ -71,7 +83,14 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   diffraction orders** beside the **contrast-vs-pitch** resolution curve (`docs/figures/chip-litho.png`);
   193 nm ArF, NA 0.85, σ 0.5 → contrast/NILS/CD fall toward the cutoff, image goes flat below ~151 nm
   pitch. 25-test triad green (19 litho + 6 demo).
-- **Phase 4 — compact MOS `V_t`:** planned.
+- **Phase 4 — compact MOS `V_t` (process → device): BUILT** (2026-06-09). `device.py` (the compact
+  closed form `V_t = V_FB + 2φ_F + Q_dep/C_ox`, body-effect √-law, charge-neutrality/Gauss, optional
+  long-channel `I_Dsat` — a chip-local model, **not** the engine) + `demo_device.py` +
+  `plots.device_figure`. Banked artifact: the **whole process→device flow on one figure** — a coherent
+  n-MOSFET chained diffusion → oxidation → litho → `V_t` (`docs/figures/chip-device.png`); channel
+  `N_A` = 1e17, dry-O₂ 14 nm gate oxide, 167 nm litho gate → **`V_t` ≈ 0.55 V** (cf. the cited MIT
+  6.012 worked example at exactly 15 nm → 0.58 V). 15-test triad green: the **independent
+  depletion-Poisson anchor** (not the √-law), charge-neutrality/Gauss conservation, the MIT benchmark.
 
 ## Test runner (tiered gate, ADR 0003)
 

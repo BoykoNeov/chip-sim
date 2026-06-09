@@ -415,6 +415,35 @@ from a 100 %-complete Steel to Chip.
 > a 1-D uniform source line (not the chord-weighted 2-D-disk projection). **Next = Phase 4 (compact MOS Vt
 > — the process→device payoff, consuming a Phase-1 profile + a Phase-2 oxide + a Phase-3 CD).**
 
+> **Phase 4 — compact MOS V_t (process → device): BUILT (2026-06-09).** `projects/chip/device.py` — the
+> **payoff** phase that closes the loop: a chip-local **compact closed form** ``V_t = V_FB + 2·φ_F +
+> Q_dep/C_ox`` (like Phase 2, it does **not** touch the frozen engine — it is its own algebra) consuming
+> the three upstream process outputs as **one coherent n-MOSFET**: the channel ``N_A`` (a Phase-1 p-type
+> substrate), the gate ``t_ox`` (a Phase-2 *thin dry* oxide — the gate-oxide regime, **not** the banked
+> field oxide), and the gate CD (a Phase-3 litho feature → channel length ``L``). With `demo_device.py` +
+> `plots.device_figure` (the banked artifact: the **whole forward flow on one figure** — diffusion →
+> oxidation → litho → the ``V_t`` *waterfall* → `docs/figures/chip-device.png`; channel ``N_A``=1e17,
+> dry-O₂ 1000 °C/20 min → 14 nm gate oxide, 193 nm-ArF litho → 167 nm gate → **``V_t`` ≈ 0.55 V**,
+> ``I_Dsat`` ≈ 3.3 mA). **15-test triad** sealed; whole-repo fast gate **331 green** (+15). Triad:
+> *analytic* = an **INDEPENDENT depletion-Poisson integration** — ``solve_ivp`` on ``ψ″=q·N_A/ε_Si`` +
+> ``brentq`` root-find of the depletion width where ``ψ_s=2φ_F``, recovering ``Q_dep=√(2qε_Si N_A·2φ_F)``
+> to ~1e-9 (the **Phase-2 solve_ivp analogue** — *not* the body-effect √-law, which is the same formula
+> rearranged and kept only as a cheap γ-consistency check; the advisor's blocking correction);
+> *conservation* = MOS **charge neutrality / Gauss** — ``Q_g = −(Q_dep+Q_inv)`` closes to machine
+> precision, ``Q_inv=−C_ox(V_GB−V_t)`` above threshold, ``E_ox=Q_g/ε_ox``; *benchmark* = the cited
+> **MIT 6.012 PS3 P2** worked example (n⁺-poly / p-1e17 / 15 nm → ``V_FB``=−0.97 V, ``C_ox``=2.3e-7,
+> ``V_t``≈0.58 V; parts b,c = the conservation cross-check) + the ``V_t``-vs-(``N_A``,``t_ox``) trends.
+> Durable calls: **units = semiconductor CGS-cm** (as Phase 1a — ε in F/cm, charge C/cm²; ``t_ox`` µm→cm
+> and CD µm at the boundary), constants pinned online (`[[mos-threshold-voltage-source]]` — Wikipedia /
+> Chenming Hu Ch.5 / MIT 6.012; **n_i=1.0e10** the MIT-reproducing pin, 1.45e10 named as +~10 mV),
+> **CD = geometry-only** (sets ``L`` and the honest long-channel ``I_Dsat``∝W/L, **does not** enter the
+> long-channel ``V_t`` — short-channel rolloff is the 2-D charge-sharing/DIBL tar pit, the named §5 scope
+> ceiling; the advisor's other blocking call — coupling CD into ``V_t`` would destroy the exact anchor),
+> **one coherent device** (not three unrelated numbers — the banked field oxide / 1e15 n-wafer would
+> blow up ``C_ox`` / mismatch the channel type), ideal-oxide/uniform-channel/degenerate-poly-gate scope
+> edge named. **MICROCHIP COMPLETE (all 4 phases). NEXT = build the committed manifest-backed per-project
+> gate (ADR 0003 successor — the §7 user direction, now that Microchip provides a 2nd manifest entry).**
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **frozen
 `engines/diffusion`** in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**
