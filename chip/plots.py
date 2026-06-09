@@ -33,6 +33,13 @@ JUNCTION_COLOR = "#c0392b"    # the pn junction (where the profile crosses N_B)
 WET_COLOR = "#2f6fb0"
 DRY_COLOR = "#d4711f"
 
+# Lithography (Phase 3) colours.
+AERIAL_COLOR = "#6a3d9a"        # the assembled aerial image (violet — light/intensity)
+MASK_COLOR = "#999999"          # the ideal mask transmission (the square wave we asked for)
+THRESHOLD_COLOR = "#c0392b"     # the resist clip level + the printed CD
+COHERENT_LIMIT_COLOR = "#2f6fb0"   # the k₁=0.5 coherent resolution limit (λ/NA)
+TWO_BEAM_LIMIT_COLOR = "#d4711f"   # the k₁=0.25 two-beam resolution floor (λ/2NA)
+
 
 def _depth_um(x: np.ndarray) -> np.ndarray:
     """Cell-centre depths cm → µm (the reported length unit)."""
@@ -170,6 +177,92 @@ def oxidation_figure(
               bbox=dict(boxstyle="round", fc="white", ec="#cccccc", alpha=0.9))
     ax_r.legend(loc="upper right", fontsize=9, framealpha=0.95)
     ax_r.grid(True, alpha=0.18)
+
+    fig.tight_layout(rect=(0, 0, 1, 0.98))
+    return fig
+
+
+def litho_figure(
+    x_nm: np.ndarray,
+    image: np.ndarray,
+    partials: list[tuple[str, np.ndarray]],
+    mask: np.ndarray,
+    threshold: float,
+    cd_span: tuple[float, float] | None,
+    pitch_nm: float,
+    pitches_nm: np.ndarray,
+    contrasts: np.ndarray,
+    pitch_coherent: float,
+    pitch_two_beam: float,
+    wavelength_nm: float,
+    NA: float,
+    sigma: float,
+) -> "plt.Figure":
+    """The banked lithography artifact: the aerial image assembling from its orders + contrast-vs-pitch.
+
+    Left panel (**the mechanism** — why a pitch resolves, ADR 0002 §5): the aerial image of a line/space
+    grating *assembling from its diffraction orders*. ``partials`` is a list of ``(label, I)`` partial
+    sums — the DC (0th) order alone (a flat field), then + the 1st order (the fundamental cos fringe),
+    then + higher orders (the line squares up) — converging onto the full collected ``image``. The ideal
+    ``mask`` transmission (the square wave we asked for) is drawn faint for reference, the constant resist
+    ``threshold`` as a dashed line, and the printed line (``cd_span`` = the dark region below threshold)
+    shaded with its CD. *Fewer orders collected → a coarser image; the pupil throwing away the high
+    orders is why the printed edge rounds.*
+
+    Right panel (**the benchmark** — where the pattern stops resolving): image ``contrasts`` vs
+    ``pitches_nm`` for this system, falling to ~0 at the pupil cutoff. The two Rayleigh limits are marked
+    — ``pitch_coherent`` = λ/NA (half-pitch k₁=0.5, conventional) and ``pitch_two_beam`` = λ/2NA (k₁=0.25,
+    the two-beam floor) — with the sub-resolution region shaded. The classic resolution curve.
+
+    Consumes plain arrays only (ADR 0002) — no live imaging object.
+    """
+    fig, (ax_i, ax_c) = plt.subplots(1, 2, figsize=(13, 6))
+    x = np.asarray(x_nm)
+
+    # --- left: the aerial image assembling from its diffraction orders ----------------
+    ax_i.plot(x, mask, color=MASK_COLOR, lw=1.2, ls="-", alpha=0.55,
+              label="ideal mask (the square wave)")
+    cmap = plt.get_cmap("viridis")
+    n = len(partials)
+    for k, (label, I_partial) in enumerate(partials):
+        ax_i.plot(x, I_partial, color=cmap(k / max(n, 1) * 0.8), lw=1.6, alpha=0.85, label=label)
+    ax_i.plot(x, image, color=AERIAL_COLOR, lw=3.0, label="aerial image (all collected orders)", zorder=5)
+    ax_i.axhline(threshold, color=THRESHOLD_COLOR, ls="--", lw=1.6,
+                 label=f"resist threshold = {threshold:.2f}")
+    if cd_span is not None:
+        x0, x1 = cd_span
+        ax_i.axvspan(x0, x1, color=THRESHOLD_COLOR, alpha=0.10)
+        ax_i.annotate(f"printed line\nCD = {x1 - x0:.0f} nm",
+                      xy=((x0 + x1) / 2, threshold), xytext=((x0 + x1) / 2, threshold + 0.18 * image.max()),
+                      color=THRESHOLD_COLOR, fontsize=9, ha="center",
+                      arrowprops=dict(arrowstyle="->", color=THRESHOLD_COLOR, lw=1.2))
+    ax_i.set_xlim(float(x[0]), float(x[-1]))
+    ax_i.set_ylim(0, image.max() * 1.35)
+    ax_i.set_xlabel("position  $x$  (nm)")
+    ax_i.set_ylabel("aerial-image intensity  $I(x)$")
+    ax_i.set_title(f"the aerial image assembling from its orders  (pitch {pitch_nm:.0f} nm)")
+    ax_i.legend(loc="upper right", fontsize=8.0, framealpha=0.95)
+    ax_i.grid(True, alpha=0.18)
+
+    # --- right: contrast vs pitch — where the pattern stops resolving ------------------
+    pitches_nm = np.asarray(pitches_nm)
+    contrasts = np.asarray(contrasts)
+    ax_c.plot(pitches_nm, contrasts, color=AERIAL_COLOR, lw=2.6, zorder=4,
+              label=f"contrast (σ = {sigma:.2f})")
+    ax_c.axvline(pitch_coherent, color=COHERENT_LIMIT_COLOR, ls="--", lw=1.6,
+                 label=f"coherent limit λ/NA = {pitch_coherent:.0f} nm  ($k_1$=0.5)")
+    ax_c.axvline(pitch_two_beam, color=TWO_BEAM_LIMIT_COLOR, ls=":", lw=1.8,
+                 label=f"two-beam floor λ/2NA = {pitch_two_beam:.0f} nm  ($k_1$=0.25)")
+    ax_c.axvspan(float(pitches_nm.min()), pitch_two_beam, color=TWO_BEAM_LIMIT_COLOR, alpha=0.08)
+    ax_c.set_xlim(float(pitches_nm.min()), float(pitches_nm.max()))
+    ax_c.set_ylim(0, 1.05)
+    ax_c.set_xlabel("grating pitch  $p$  (nm)")
+    ax_c.set_ylabel("image contrast  $(I_{max}-I_{min})/(I_{max}+I_{min})$")
+    ax_c.set_title(f"resolution: contrast vs pitch  (λ={wavelength_nm:.0f} nm, NA={NA:.2f})")
+    ax_c.text(0.30, 0.30, "← pattern stops resolving\n(contrast → 0 at the cutoff)",
+              transform=ax_c.transAxes, fontsize=9, va="center", ha="center", color="#555555")
+    ax_c.legend(loc="lower right", fontsize=8.5, framealpha=0.95)
+    ax_c.grid(True, alpha=0.18)
 
     fig.tight_layout(rect=(0, 0, 1, 0.98))
     return fig

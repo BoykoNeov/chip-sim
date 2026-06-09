@@ -386,6 +386,35 @@ from a 100 %-complete Steel to Chip.
 > modeled** (v1 is plain Deal–Grove — the honest ceiling). The OED/segregation back-coupling stays
 > the named §3 deferral (forward-only). **Next = Phase 3 (lithography aerial image).**
 
+> **Phase 3 — BUILT (2026-06-09).** `projects/chip/litho.py` — the **lithography aerial image**, the
+> chip project's **one genuinely-new module** (Fourier optics) and its risk phase; **chip-local, not
+> promoted to `engines/`** (rule-of-three), and like Phase 2 it **does not touch the frozen PDE engine**
+> (it is its own diffraction computation). One core primitive `coherent_image` (= `|Σ_m a_m·e^{2πi f_m x}|²`)
+> used twice: the exact **two-beam anchor** `two_beam_image` (two equal orders → `4·cos²(πx/p)` to machine
+> precision) and the **Abbe sum-over-source** workhorse `abbe_image` (partial coherence by incoherent
+> source-point summation — **deliberately not Hopkins TCC**, the named tar pit). With `demo_litho.py` +
+> `plots.litho_figure` (the banked artifact: the aerial image **assembling from its diffraction orders**
+> beside the **contrast-vs-pitch** resolution curve → `docs/figures/chip-litho.png`; 193 nm ArF, NA 0.85,
+> σ 0.5 → contrast/NILS/CD fall toward the cutoff, the image goes flat below the σ-source pitch limit
+> ~151 nm). **25-test triad** sealed; whole-repo fast gate **316 green** (+25). Triad: *analytic* = the
+> exact `4cos²` (pure trig) + **Rayleigh `R=k₁λ/NA` derived from the pupil cutoff** (k₁=0.5 coherent on-axis
+> where ±1 just fit `1/p ≤ NA/λ`; k₁=0.25 two-beam where the off-axis pole spans the full pupil `1/p ≤
+> 2NA/λ` and **exactly {0,+1} pass → cos² emerges from the workhorse itself**); *conservation* = the
+> **Parseval power balance** — the image's DC (spatial mean) = total power passed by the pupil `Σ|c_m|²`,
+> computed two independent ways (a squared sum vs a sum of squares) to machine precision; *benchmark* =
+> contrast/NILS-vs-pitch trend vs the cited curves (loose). Durable calls: **units = litho-native nm**
+> (per-module native-units principle; CD exposed in µm at the boundary), constants pinned online
+> (`[[litho-aerial-image-source]]` — Mack / lithoguru: **k₁=0.25 two-beam floor / 0.5 coherent / ≈0.28
+> best**, **NILS≥1 minimally resolved / ≳2 robust**), the **explicit-source-array API** (a σ-disk can't
+> express extreme off-axis, so k₁=0.25 needs the off-axis point handed in — advisor call), the
+> **exact-cos²-vs-realistic-grating split** kept (a real 50%-duty grating has `c₀=0.5≠c₁=1/π` → visibility
+> 0.906 < the ideal cos²'s 1.0 — *not* asserted against the exact form, the Phase 1a discipline), **NILS at
+> the geometric design edge** (threshold-free), and the **scope edge named not modeled**: scalar (no
+> vector/polarization — honest at low/moderate NA), **ideal in-focus aberration-free pupil** (no defocus/
+> Zernikes), Abbe-not-Hopkins, constant-threshold resist (no acid diffusion/PEB blur), 1-D line/space, and
+> a 1-D uniform source line (not the chord-weighted 2-D-disk projection). **Next = Phase 4 (compact MOS Vt
+> — the process→device payoff, consuming a Phase-1 profile + a Phase-2 oxide + a Phase-3 CD).**
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **frozen
 `engines/diffusion`** in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**
