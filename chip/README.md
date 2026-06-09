@@ -117,8 +117,8 @@ live. The payoff section turns a **process knob** (gate-oxide time, channel `N_A
 move — the chip counterpart of Steel's four-curves anchor.
 
 ```powershell
-pip install -e .[viz,notebook]        # matplotlib (viz) + ipywidgets + the nbclient/ipykernel run stack
-jupyter lab projects/chip/chip.ipynb  # or: jupyter notebook
+pip install -e .[viz,notebook]        # matplotlib (viz) + jupyterlab + ipywidgets + the nbclient/ipykernel run stack
+jupyter lab projects/chip/chip.ipynb  # (classic UI: `pip install notebook`, then `jupyter notebook`)
 ```
 
 It is a **thin skin** (ADR 0002), built to the same rule as Steel's `steel.ipynb`: every *compute*
