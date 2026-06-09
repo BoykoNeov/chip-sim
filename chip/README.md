@@ -60,6 +60,14 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   charge-neutrality/Gauss conservation, `saturation_current` the honest long-channel drive readout. The
   module docstring is its contract (cited MIT 6.012 benchmark, the long-channel/ideal-oxide scope edge).
   Saves `docs/figures/chip-device.png`.
+- **To work on the teaching notebook (§9):** `chip.ipynb` + `tests/test_chip_notebook.py`. A *thin
+  skin* on the four phase modules — each compute cell calls the validated module **directly** (a
+  static figure per section, embedded in the committed `.ipynb`), with `ipywidgets.interact` as sugar
+  on top; the test executes it headless (`nbclient`) and asserts no cell errors (`slow`-marked, gated
+  on the `[notebook]` extra **and** a registered kernelspec — a clean checkout skips). Needs
+  `pip install -e .[viz,notebook]`. **Why the direct cells, not interact callbacks:** `interact`
+  captures exceptions in an `Output` widget, so a break in an interact callback never reaches the test
+  — the validated calls must live in plain cells (the same rule as Steel's `steel.ipynb`).
 - **To use the diffusion/heat spine:** load `engines/diffusion/CONTRACT.md` only — never Steel's
   or chip's internals. Chip instantiates the same contract Steel's `carburize.py` did (mass mode).
 
@@ -92,6 +100,37 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   gate length → coherent cross-section) → **`V_t` ≈ 0.55 V** (cf. the cited MIT 6.012 worked example
   at exactly 15 nm → 0.58 V). 20-test triad green (15 device + 5 demo): the **independent
   depletion-Poisson anchor** (not the √-law), charge-neutrality/Gauss conservation, the MIT benchmark.
+- **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
+  interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
+  **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated
+  module live; ends on the coherent process→device flow. Headless smoke-test
+  `tests/test_chip_notebook.py` (`slow`). See below.
+
+## Interactive surface — the teaching notebook (`chip.ipynb`, §9)
+
+The *education* artifact (target #1): the four phase modules with the knobs exposed. A guided
+"process recipe in, device out" narrative — diffusion → the pn junction, Deal–Grove oxidation,
+the lithography aerial image, and the compact MOS `V_t` — with **ipywidgets sliders** (diffusion
+time/temperature & dopant, oxidation furnace temperature & crystal face, exposure pitch/NA/σ,
+channel doping & gate-oxide time) re-running `diffusion_dopant`/`junction`/`oxidation`/`litho`/`device`
+live. The payoff section turns a **process knob** (gate-oxide time, channel `N_A`) and watches `V_t`
+move — the chip counterpart of Steel's four-curves anchor.
+
+```powershell
+pip install -e .[viz,notebook]        # matplotlib (viz) + ipywidgets + the nbclient/ipykernel run stack
+jupyter lab projects/chip/chip.ipynb  # or: jupyter notebook
+```
+
+It is a **thin skin** (ADR 0002), built to the same rule as Steel's `steel.ipynb`: every *compute*
+cell calls the validated module **directly** (a static figure per section, embedded in the committed
+`.ipynb` so it reads on GitHub without a kernel), and `interact` is sugar layered on top. That split is
+load-bearing — `ipywidgets.interact` runs its callback inside an `Output` that **captures** exceptions,
+so a break inside an interact callback would never reach the smoke-test; the validated calls therefore
+live in plain cells. `tests/test_chip_notebook.py` executes the notebook headless (`nbclient`,
+`allow_errors=False`) and asserts **no cell errors** — *that it runs clean*, not a physics check
+(ADR 0002) — `slow`-marked and gated on the `[notebook]` stack **and** a registered kernelspec, so a
+headless/clean checkout skips rather than errors. Like the notebook itself, this layer adds **reach,
+not correctness**: the per-phase triads already validate the numbers.
 
 ## Test runner (tiered gate, ADR 0003)
 
@@ -103,3 +142,5 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
 
 `pyproject.toml`'s `testpaths` already carries `projects`, so `projects/chip/tests/` is collected
 with no config change; `pythonpath = ["."]` lets chip import the frozen engine as `engines.diffusion…`.
+The notebook smoke-test (`tests/test_chip_notebook.py`) is `slow`-marked, so the fast lane deselects it;
+it runs in the full gate (`python -m tools.gate chip` / `./run_tests.ps1`).

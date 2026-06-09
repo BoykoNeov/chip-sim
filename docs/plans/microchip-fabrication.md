@@ -212,7 +212,7 @@ BigSim/
     process.py                      # the recipe driver: chains oxidation→diffusion→litho→device
     plots.py                        # chip-local figures (→ promote to viz/ by rule-of-three)
     demo_junction.py / demo_oxidation.py / demo_litho.py / demo_process.py   # banked artifacts
-    chip.ipynb                      # OPTIONAL single teaching notebook (see §9) — only if it earns it
+    chip.ipynb                      # single teaching notebook (see §9) — BUILT: per-phase sliders → V_t
     README.md                       # per-module map + per-session load pointer
     tests/                          # the validation triads (the seal)
   pyproject.toml                    # testpaths += projects/chip (§7)
@@ -332,10 +332,14 @@ engine's plain arrays; a figure is never in the correctness path.
   **Chip is *not* the flagship.** Steel, as the flagship, shipped **both** a teaching
   notebook **and** a Streamlit app as the demonstrator; ADR 0002 is explicit that
   *later sims pick the interactive surface their pedagogy needs, not both by reflex.*
-  So Chip defaults to the **static-figure floor plus *at most one* teaching notebook**
-  (`chip.ipynb`: process-recipe sliders → profile/junction/`V_t`), and **builds no
-  Streamlit app** unless a specific payoff later demands it. *(Stated explicitly so a
-  future session does not reflexively rebuild Steel's dual surface here.)*
+  So Chip ships the **static-figure floor plus a *single* teaching notebook**
+  (`chip.ipynb` — **BUILT 2026-06-09**: process-recipe sliders → profile/junction,
+  oxide, aerial image, and `V_t`, one section per phase, ending on the process→device
+  flow), and **builds no Streamlit app** unless a specific payoff later demands it.
+  *(Stated explicitly so a future session does not reflexively rebuild Steel's dual
+  surface here.)* The notebook is a *thin skin* (the steel pattern): each compute cell
+  calls the validated module directly, `interact` is sugar, and a `slow` headless
+  smoke-test (`tests/test_chip_notebook.py`) asserts it executes clean.
 - **Toolkit:** plot primitives start chip-local in `plots.py`; promotion to the shared
   `viz/` is by rule-of-three (ARCHITECTURE.md §6). Steel's `plots.py` is the second
   data point — a third reuse (chip) of a primitive (e.g. the profile-vs-depth line, the
