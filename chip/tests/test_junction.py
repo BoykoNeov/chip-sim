@@ -98,6 +98,21 @@ def test_junction_depth_matches_analytic_gaussian_at_the_deep_tail():
     assert xj_num == pytest.approx(xj_ana, rel=0.03)
 
 
+def test_junction_depth_scales_as_sqrt_Dt():
+    # The plan's benchmark phrasing "x_j(√Dt)": the erfc junction depth ∝ √(Dt) (the self-similar
+    # variable x/2√(Dt) at the fixed level set N_B/N_s). Solve predep at several times (fixed T, N_s,
+    # N_B) and confirm x_j/√t is constant — parity with carburize's case-depth ∝ √(Dt) leg. TIGHT.
+    Ns, NB = 3.0e20, 3.0e15                            # N_B/N_s = 1e-5 → z ≈ 3.1 (the deep-tail crossing)
+    grid = uniform_grid(4.0e-4, 800)
+    ratios = []
+    for t_min in (10.0, 20.0, 40.0):
+        p = dd.predeposit(grid, "B", 1050.0, t_min * 60.0, N_surface=Ns)
+        ratios.append(jn.junction_depth(p.x, p.N, NB) / math.sqrt(t_min))
+    ratios = np.array(ratios)
+    assert np.all(np.isfinite(ratios))
+    assert ratios.std() / ratios.mean() < 0.02         # constant ratio → x_j ∝ √t
+
+
 def test_junction_depth_nan_when_no_crossing():
     x = np.linspace(0, 1e-4, 100)
     N = 1e18 * np.exp(-x / 2e-5)                        # decays from 1e18

@@ -33,7 +33,7 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
 - **Phase 1a — dopant diffusion & the pn junction: BUILT** (2026-06-09). `diffusion_dopant.py`
   (predep `erfc` / drive-in Gaussian, cited Fair `D(T)` for B/P) + `junction.py` (junction depth +
   Masetti/Irvin sheet resistance) + the banked two-step boron pn-junction demo (`x_j` ≈ 1.05 µm,
-  `R_s` ≈ 135 Ω/sq into a 1e15 n-type wafer). 27-test triad green.
+  `R_s` ≈ 134 Ω/sq into a 1e15 n-type wafer). 28-test triad green.
 - **Phase 2 — Deal–Grove oxidation:** next (a chip-local analytic/ODE module, not the PDE engine).
 - **Phase 3 — lithography aerial image; Phase 4 — compact MOS `V_t`:** planned.
 

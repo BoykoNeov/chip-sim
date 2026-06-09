@@ -357,8 +357,8 @@ from a 100 %-complete Steel to Chip.
 > engine is unit-agnostic and the cited data is native cm/cm²·s⁻¹/cm⁻³), `junction.py`
 > (junction depth + **Masetti `μ(N)`** sheet-resistance conductance integral, Irvin
 > cross-check), `plots.py` + `demo_junction.py` (the banked two-step boron pn-junction:
-> `x_j` ≈ 1.05 µm, `R_s` ≈ 135 Ω/sq into a 1e15 n-type wafer → `docs/figures/chip-junction.png`).
-> Triad sealed by 27 tests (whole-repo fast gate **267 green**): the exact `erfc`/`Gaussian`
+> `x_j` ≈ 1.05 µm, `R_s` ≈ 134 Ω/sq into a 1e15 n-type wafer → `docs/figures/chip-junction.png`).
+> Triad sealed by 28 tests (whole-repo fast gate **268 green**): the exact `erfc`/`Gaussian`
 > anchors on their idealizations (constant-D), dose conservation + the predep flux identity, and
 > a **deep-tail (z≈3) numeric-vs-analytic `x_j` certification** that licenses the realistic demo's
 > numeric junction. Masetti coefficients pinned online (IUE-Vienna + allpix²/CERN). **Next = Phase 2

@@ -178,8 +178,11 @@ def sheet_resistance(
     mask = x < x_j
     if mask.sum() < 1:
         return float("nan")
-    xx = np.concatenate([x[mask], [x_j]])
-    NN = np.concatenate([N[mask], [N_background]])        # carrier density → N_B at the junction
+    # Integrate from the true surface x=0 (carrying the surface concentration N[0]) through the
+    # cell centres to the junction x_j. Starting at the first cell centre instead would omit the
+    # [0, Δx/2] half-cell where σ peaks, biasing R_s ~1 % high — small, but R_s is a reported number.
+    xx = np.concatenate([[0.0], x[mask], [x_j]])
+    NN = np.concatenate([[N[0]], N[mask], [N_background]])   # surface → cells → N_B at the junction
     carriers = np.clip(NN - N_background, 0.0, None)      # net majority carrier
     sigma = Q_ELEMENTARY * mobility(NN, dopant) * carriers
     conductance = float(np.trapezoid(sigma, xx))         # ∫σ dx  → S/sq
