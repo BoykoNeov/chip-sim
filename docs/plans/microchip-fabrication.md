@@ -291,12 +291,14 @@ live external solver / kernel / subprocess gets the `slow` marker. Editing the f
 `engines/diffusion` is the cross-cutting case that *triggers the full gate* — its
 `tests/` seal must stay green (it is the contract Chip relies on).
 
-> **Scheduled revisit (user direction, 2026-06-09).** When Microchip lands, the whole
-> gate/tests system is to be re-examined — this is the first point a second project
-> exists, so the "whole-repo fast lane ≈ one project's tests" identity no longer holds.
-> See ADR 0003 → *Scheduled revisit* for what to reconsider (per-project scoping, the
-> `slow` set, the rot mitigation actually in place, and the overstated "used modules"
-> framing).
+> **On completion, build the per-project gate (committed — user direction, 2026-06-09).**
+> Microchip is the trigger: once it lands, the interim whole-repo fast lane is replaced
+> by a **per-project gate** — a commit to a project runs only the tests concerning that
+> project (its own + the tests of the modules it uses), driven by a **single source of
+> truth** (project → used engines/modules → test suites). Microchip is the first point
+> that manifest has a second, distinct entry to validate against. Design it then; see
+> ADR 0003 → *Successor* (also still-open there: the `slow` set for chip's heavy tests,
+> and whether the full-gate rot-catcher is CI).
 
 ---
 
