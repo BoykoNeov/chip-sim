@@ -17,8 +17,13 @@ This carries the whole plan §3 Phase-2 triad (microchip-fabrication.md). Unlike
   and the wet-vs-dry thicknesses vs the published Deal–Grove table (wide band — published points
   carry pressure/orientation/source spread).
 
-The constants ``C, Ea`` are cited Deal–Grove data (deal-grove-oxidation-source memory note), NOT fit
-to any thickness here — what makes the thickness benchmark a cross-check, not a tautology.
+The benchmark leg's strength, stated precisely (the validated-vs-calibrated discipline): it rests on
+**citation fidelity** — the constants pinned to the published Deal–Grove table (deal-grove-oxidation-source
+memory note), which is NOT a tautology (they could be miscited) — plus the independent tight
+algebraic-identity leg. The **thickness comparison is a consistency check, not an independent cross-check**:
+Deal–Grove's B/(B/A) were originally fit to oxide-thickness data, so thickness-from-constants vs published
+thickness is closer to model-vs-itself than carburize's tracer-diffusion D (a separate measurement domain).
+Hence thickness asserted loosely, constants tightly.
 """
 import math
 

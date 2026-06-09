@@ -93,9 +93,15 @@ Validation boundary
 -------------------
 There is no shared engine here to lean on — this module *is* the closed form, so its tests carry the
 whole triad: the algebraic identity + asymptotes + ODE consistency (analytic), the 0.44 silicon
-bookkeeping (conservation), and the cited rate-constant table (benchmark). The constants ``C, Ea``
-are cited Deal–Grove data, **not** fit to any thickness here — what makes the thickness benchmark a
-cross-check, not a tautology.
+bookkeeping (conservation), and the cited rate-constant table (benchmark). **A precise note on the
+benchmark's strength** (the validated-vs-calibrated discipline): what carries this leg is **citation
+fidelity** — the constants pinned to the published Deal–Grove table (*not* a tautology: they could be
+miscited) — plus the independent tight algebraic-identity leg. The thickness comparison is a
+**consistency check, not an independent cross-check**: unlike carburize's ``D`` (from *tracer-diffusion*,
+a different measurement domain than the case depth it predicts), Deal–Grove's ``B``/``B/A`` were
+**originally fit to oxide-thickness-vs-time data** (the 1965 paper), so computing thickness from them
+and comparing to published thickness is closer to model-vs-itself. Hence thickness is asserted
+*loosely* and the constants *tightly* — the honest split.
 """
 from __future__ import annotations
 
