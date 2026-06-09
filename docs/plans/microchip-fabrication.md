@@ -364,6 +364,28 @@ from a 100 %-complete Steel to Chip.
 > numeric junction. Masetti coefficients pinned online (IUE-Vienna + allpix²/CERN). **Next = Phase 2
 > (Deal–Grove oxidation).**
 
+> **Phase 2 — BUILT (2026-06-09).** `projects/chip/oxidation.py` — the Deal–Grove linear-parabolic
+> closed form `x_ox² + A·x_ox = B(t+τ)` for **wet** and **dry** oxidation, the **first chip module
+> that does not touch the frozen engine** (oxide growth is its own closed form; a chip-local
+> analytic/ODE module per §2/§3). With `demo_oxidation.py` + `plots.oxidation_figure` (the banked
+> artifact: oxide-thickness-vs-time wet-vs-dry log-log, riding the **linear `(B/A)·t`** asymptote
+> when thin and bending onto the **parabolic `√(Bt)`** when thick, beside a growth-rate mechanism
+> panel → `docs/figures/chip-oxidation.png`; (100) 1100 °C/1 h → **dry ≈ 0.099 µm / wet ≈ 0.642 µm,
+> wet ~6.5× faster**). **23-test triad** sealed; whole-repo fast gate **291 green** (+23). Triad:
+> *analytic* = the algebraic identity `x²+Ax−B(t+τ)=0` to machine precision + the linear/parabolic
+> asymptotes + an independent **ODE** integration of `dx/dt=B/(A+2x)` recovering the closed form
+> (<1e-6) + the τ machinery recovering an initial oxide exactly; *conservation* = silicon consumed
+> `0.44·x_ox` with the moving-boundary `0.44`-below / `0.56`-above bookkeeping closing exactly;
+> *benchmark* = the cited rate constants pinned exactly + the wet≫dry thickness band. Durable calls:
+> **units = Deal–Grove-native µm-hour** (the per-module native-units principle — Fair `D₀` was native
+> cm²/s→CGS, `B/A` is native µm/hr→µm-hr; µm the cross-module currency; the README's "one system
+> throughout" prose reworded so docs don't self-contradict), constants pinned online to a cited
+> source (`[[deal-grove-oxidation-source]]` — IUE-Vienna → Plummer–Deal–Griffin / Deal & Grove 1965;
+> **wet `Ea_B = 0.78 eV` table value**, not the 0.71 in prose summaries; **1.68 orientation factor on
+> the linear `B/A` only**, default (100); Si `0.44`), and the **thin-dry (Massoud) anomaly named not
+> modeled** (v1 is plain Deal–Grove — the honest ceiling). The OED/segregation back-coupling stays
+> the named §3 deferral (forward-only). **Next = Phase 3 (lithography aerial image).**
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **frozen
 `engines/diffusion`** in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**

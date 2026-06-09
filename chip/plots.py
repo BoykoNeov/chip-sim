@@ -29,6 +29,10 @@ DRIVEIN_COLOR = "#2f6fb0"     # cool — the sealed-surface Gaussian, spread dee
 BACKGROUND_COLOR = "#888888"  # the wafer's opposite-type background doping N_B
 JUNCTION_COLOR = "#c0392b"    # the pn junction (where the profile crosses N_B)
 
+# Oxidation (Phase 2) colours: wet = cool blue (H₂O, fast), dry = warm amber (O₂, slow).
+WET_COLOR = "#2f6fb0"
+DRY_COLOR = "#d4711f"
+
 
 def _depth_um(x: np.ndarray) -> np.ndarray:
     """Cell-centre depths cm → µm (the reported length unit)."""
@@ -102,6 +106,70 @@ def junction_figure(
         ax_m.set_title("the morph: erfc → Gaussian as the dose drives in")
         ax_m.legend(loc="upper right", fontsize=8.5, framealpha=0.95)
         ax_m.grid(True, which="both", alpha=0.18)
+
+    fig.tight_layout(rect=(0, 0, 1, 0.98))
+    return fig
+
+
+def oxidation_figure(
+    t_hours: np.ndarray,
+    curves: list[tuple[str, np.ndarray, float, float, str]],
+    T_celsius: float = 1100.0,
+    orientation: str = "100",
+) -> "plt.Figure":
+    """The banked Deal–Grove artifact: oxide thickness vs time (wet vs dry) + the growth-rate mechanism.
+
+    ``curves`` is a list of ``(label, x_ox, B, A, color)`` — one per ambient, all sharing the time
+    axis ``t_hours`` (oxide thickness ``x_ox`` in µm; rate constants ``B`` µm²/hr, ``A`` µm).
+
+    Left panel (**the banked readout** — log-log): ``x_ox(t)`` for each ambient, with its **linear**
+    ``(B/A)·t`` (slope 1, dotted) and **parabolic** ``√(B·t)`` (slope ½, dashed) asymptotes drawn —
+    the curve riding the linear asymptote when thin and bending onto the parabolic one when thick.
+    The two regimes the plan names, annotated straight on the curve.
+
+    Right panel (**the mechanism** — why it bends): the growth rate ``dx_ox/dt = B/(A+2·x_ox)`` vs
+    thickness — flat at the linear plateau ``B/A`` while thin (reaction-limited), then rolling off as
+    the thickening film throttles oxidant diffusion (the diffusion bottleneck). *Why* growth slows
+    from linear to parabolic.
+
+    Consumes plain arrays only (ADR 0002) — no live model object.
+    """
+    fig, (ax_t, ax_r) = plt.subplots(1, 2, figsize=(13, 6))
+    t = np.asarray(t_hours, dtype=float)
+
+    # --- left: oxide thickness vs time, wet & dry, with the two asymptotes -----------
+    for label, x_ox, B, A, color in curves:
+        ax_t.loglog(t, x_ox, color=color, lw=2.6, label=label, zorder=4)
+        ax_t.loglog(t, (B / A) * t, color=color, lw=1.0, ls=":", alpha=0.7)      # linear (slope 1)
+        ax_t.loglog(t, np.sqrt(B * t), color=color, lw=1.0, ls="--", alpha=0.7)  # parabolic (slope ½)
+    ax_t.set_xlim(t[0], t[-1])
+    ymax = max(x_ox.max() for _, x_ox, _, _, _ in curves)
+    ax_t.set_ylim(min(x_ox.min() for _, x_ox, _, _, _ in curves), ymax * 1.4)
+    ax_t.set_xlabel("oxidation time  (hr)")
+    ax_t.set_ylabel("oxide thickness  $x_{ox}$  (µm)")
+    ax_t.set_title(f"Deal–Grove oxide growth at {T_celsius:.0f} °C, (" + orientation + ") Si")
+    # Annotate the two regimes on the curve (dotted = linear B/A·t, dashed = parabolic √Bt).
+    ax_t.text(0.04, 0.93, "···  linear  $(B/A)\\,t$   (reaction-limited, slope 1)\n"
+              "– –  parabolic  $\\sqrt{B\\,t}$   (diffusion-limited, slope ½)",
+              transform=ax_t.transAxes, fontsize=8.5, va="top",
+              bbox=dict(boxstyle="round", fc="white", ec="#cccccc", alpha=0.9))
+    ax_t.legend(loc="lower right", fontsize=9, framealpha=0.95)
+    ax_t.grid(True, which="both", alpha=0.18)
+
+    # --- right: the growth-rate mechanism dx/dt = B/(A+2x) --------------------------
+    for label, x_ox, B, A, color in curves:
+        xx = np.linspace(1e-3, float(x_ox.max()), 300)
+        rate = B / (A + 2.0 * xx)                     # oxidation.growth_rate
+        ax_r.plot(xx, rate, color=color, lw=2.4, label=label)
+        ax_r.axhline(B / A, color=color, ls=":", lw=1.0, alpha=0.7)     # the linear plateau B/A
+    ax_r.set_xlabel("oxide thickness  $x_{ox}$  (µm)")
+    ax_r.set_ylabel("growth rate  $dx_{ox}/dt$  (µm/hr)")
+    ax_r.set_title("the mechanism: rate $= B/(A+2x_{ox})$ — diffusion throttles growth")
+    ax_r.text(0.5, 0.92, "plateau at $B/A$ (thin, reaction-limited)\n→ rolls off as $B/2x_{ox}$ (thick, diffusion-limited)",
+              transform=ax_r.transAxes, fontsize=8.5, va="top", ha="center",
+              bbox=dict(boxstyle="round", fc="white", ec="#cccccc", alpha=0.9))
+    ax_r.legend(loc="upper right", fontsize=9, framealpha=0.95)
+    ax_r.grid(True, alpha=0.18)
 
     fig.tight_layout(rect=(0, 0, 1, 0.98))
     return fig
