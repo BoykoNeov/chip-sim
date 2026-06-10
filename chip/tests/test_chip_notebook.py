@@ -40,13 +40,13 @@ NOTEBOOK = Path(__file__).resolve().parents[1] / "chip.ipynb"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # chip.ipynb executes clean locally (~8 s), but on the GitHub Actions (Ubuntu) runner the
-# Jupyter kernel wedges at the zmq/asyncio comms layer *mid-execution* — a sub-second cell
-# never returns its reply, the kernel goes idle, and the run blows past the 240 s subprocess
-# wall-clock below (SIGKILL). An infra hang, NOT a notebook-content failure (the steel/planet
-# notebook smoke tests pass on the same runner). It is the kernel-idle "comms-race" family
-# documented in steel-sim's docs/handoffs/notebook-kernel-wedge.md — but a DIFFERENT instance
-# from both that doc's Windows-Proactor bug and the in-process Windows deadlock the docstring
-# above explains: this one is Linux-runner, mid-EXECUTION (not startup).
+# Jupyter kernel wedges at the zmq/asyncio comms layer: the kernel goes idle but nbclient never
+# returns from execute(), so the run blows past the 240 s subprocess wall-clock below (SIGKILL).
+# An infra hang, NOT a notebook-content failure (the steel/planet notebook smoke tests pass on the
+# same runner) and NOT a startup wedge — the cells do execute. It is the kernel-idle "comms-race"
+# family documented in steel-sim's docs/handoffs/notebook-kernel-wedge.md — but a DIFFERENT
+# instance from both that doc's Windows-Proactor bug and the in-process Windows deadlock the
+# docstring above explains: this one is Linux-runner, and survives the fixes those target.
 #
 # Two fixes were tried/suspected and ruled out — recorded so they aren't re-attempted:
 #   * "kernel-startup hang → force a SelectorEventLoop" — wrong on both counts: the hang is
