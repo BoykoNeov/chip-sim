@@ -1,5 +1,7 @@
 # chip-sim — a microchip-fabrication simulator
 
+[![full-gate](https://github.com/BoykoNeov/chip-sim/actions/workflows/full-gate.yml/badge.svg)](https://github.com/BoykoNeov/chip-sim/actions/workflows/full-gate.yml)
+
 *Process recipe in, device out.* An educational simulator that walks a wafer through the
 front-end process flow — dopant diffusion, junction formation, thermal oxidation,
 lithography, and the resulting MOS device — each step validated against cited
