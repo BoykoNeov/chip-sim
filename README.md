@@ -35,14 +35,14 @@ jupyter lab chip/chip.ipynb             # the teaching notebook (needs .[viz,not
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow"     # routine fast lane — 163 tests
-./run_tests.ps1                   # full suite — 164 tests (adds the slow notebook smoke-test)
+./run_tests.ps1 -m "not slow"     # routine fast lane — 179 tests
+./run_tests.ps1                   # full suite — 180 tests (adds the slow notebook smoke-test)
 ```
 
-The suite is **164 tests**, all green. The one `slow` test executes `chip.ipynb` end-to-end in
-a fresh kernel; it self-skips under CI (a known kernel-startup wedge on the GitHub runner — an
-infra hang, not a content failure) and runs in the local full gate. Optional stacks are
-importorskip-gated, so a headless checkout skips rather than errors.
+The suite is **180 tests**, all green. The one `slow` test executes `chip.ipynb` end-to-end in
+a fresh kernel; it self-skips under CI (a known infra hang on the GitHub runner — the kernel goes
+idle but `nbclient` never returns, a zmq/asyncio comms race, not a content failure) and runs in the
+local full gate. Optional stacks are importorskip-gated, so a headless checkout skips rather than errors.
 
 ## Provenance
 
