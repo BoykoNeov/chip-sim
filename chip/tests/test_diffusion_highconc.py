@@ -1,20 +1,22 @@
 """Chip v1.3 validation: concentration-dependent diffusivity D(N) — the high-concentration box.
 
-The named scope edge of :mod:`diffusion_dopant` (constant-``D`` ``erfc``), **promoted**. The decisive
-claim under test is architectural: ``D(N)`` — the case ``CONTRACT.md`` and the plan both flagged as a
-v1.1 **engine amendment** — is built **entirely within the ** :mod:`engines.diffusion` contract,
-via a stateful-closure **lagged-coefficient** hook in the consumer's step-loop (no engine edit). The
-triad (plan §3), with the validated-vs-calibrated split made explicit:
+The named scope edge of :mod:`diffusion_dopant` (constant-``D`` ``erfc``), **promoted**. These tests
+validate the **dopant physics** of the box; the *numerical* machinery (the nonlinear ``D(u)`` Picard
+solve) now lives in the engine — ``D(N)`` was promoted to the engine's native
+:class:`~engines.diffusion.StateDependent` path (the first exercise of the unfreeze, ADR 0004), so the
+engine-level invariants (the degenerate seam, Picard convergence, the model-independent Boltzmann
+anchor) live in ``engines/diffusion/tests/test_nonlinear_d.py``. What stays here is the chip triad
+(plan §3), the validated-vs-calibrated split made explicit:
 
-* **Analytical limit (tight).** (a) the **degenerate seam** — a constant ``D`` through the same
-  closure equals the plain scalar-``D`` engine run **bit-for-bit** (the hook *is* the engine),
-  and the model's ``D_eff → D⁰+D⁻+D⁼`` as ``N → 0``; (b) **Boltzmann similarity** — a constant-source
-  ``D(N)`` profile collapses under ``x/√t`` for **any** ``D(N)`` (model-independent; validates the
-  nonlinear machinery, not Fair's coefficients).
+* **Analytical limit (tight).** (a) the model's ``D_eff → D⁰+D⁻+D⁼`` as ``N → 0`` (so the dilute box
+  is the constant-``D`` ``erfc``), and the constant-``D`` baseline reproduces the analytic ``erfc``;
+  (b) **Boltzmann similarity** — the real, stiff ``(n/n_i)²`` phosphorus ``D(N)`` profile collapses
+  under ``x/√t`` (model-independent: validates the nonlinear solve converges to the right self-similar
+  field, not Fair's coefficients).
 * **Conservation (a machinery check, not a physics validation).** A sealed-surface drive-in conserves
   ``∫N dx`` to machine precision *with* ``D(N)`` active — the finite-volume telescoping is
-  ``D``-independent. It confirms the closure didn't break structural conservation; it says nothing
-  about the ``D(N)`` magnitude.
+  ``D``-independent (per Picard iterate). It confirms the nonlinear path didn't break structural
+  conservation; it says nothing about the ``D(N)`` magnitude.
 * **Benchmark (loose / calibrated).** ``D∝(n/n_i)²`` (phosphorus) gives the **boxier front + deeper
   junction** than constant ``D`` (Plummer slides 15/25/27) — coefficients cited, not fit to the box.
 
@@ -26,7 +28,7 @@ import numpy as np
 import pytest
 from scipy.special import erfc
 
-from engines.diffusion import Diffusion1D, uniform_grid, Dirichlet, Neumann
+from engines.diffusion import uniform_grid
 from chip.diffusion_dopant import DOPANTS, CM_PER_UM, analytic_predep_erfc, diffusivity
 from chip import diffusion_highconc as hc
 
@@ -83,27 +85,21 @@ def test_effective_diffusivity_rises_with_concentration_n_squared_for_P():
 
 
 # --------------------------------------------------------------------------- #
-# Analytical limit (a): the degenerate seam — the closure IS the engine
+# Analytical limit (a): the constant-D baseline reproduces the analytic erfc
 # --------------------------------------------------------------------------- #
-def test_degenerate_seam_constant_D_closure_equals_scalar_engine_bitforbit():
-    # The headline architecture check: feed a CONSTANT D through the lagged closure and it equals a
-    # plain scalar-D engine predep to the bit. The hook adds nothing when D doesn't vary —
-    # i.e. concentration-dependent D is the *same* solver, driven with a stateful coefficient.
+def test_constant_D_predeposit_matches_analytic_erfc():
+    # The constant-D box baseline (a constant fed through the native StateDependent path) reproduces
+    # the analytic erfc on its idealization — the honest reference the box front is compared against.
+    # (The bit-for-bit "constant StateDependent == scalar engine" seam is now an ENGINE invariant:
+    # engines/diffusion/tests/test_nonlinear_d.py::test_constant_state_dependent_equals_scalar_bitforbit.)
     grid = uniform_grid(1.5 * CM_PER_UM, 800)
     Ns = DOPANTS["P"].N_solid_solubility
     D_const = hc.intrinsic_diffusivity_lowconc("P", 1000.0)
-    t_pre, n_steps = 30 * 60.0, 800
+    t_pre = 30 * 60.0
 
-    N_closure = hc.constant_D_predeposit(grid, "P", 1000.0, t_pre, D_const, n_steps=n_steps)
-    solver = Diffusion1D(grid, D_const, Dirichlet(Ns), Neumann(0.0))
-    N_scalar = np.zeros(grid.n)
-    dt = t_pre / n_steps
-    for _ in range(n_steps):
-        N_scalar = solver.step(N_scalar, dt)
-    assert np.max(np.abs(N_closure - N_scalar)) == 0.0          # bit-for-bit
-    # and that constant-D run is the analytic erfc on its idealization
+    N_const = hc.constant_D_predeposit(grid, "P", 1000.0, t_pre, D_const, n_steps=800)
     erfc_an = analytic_predep_erfc(grid.centers, t_pre, D_const, Ns)
-    assert np.max(np.abs(N_closure - erfc_an)) / Ns < 1e-3
+    assert np.max(np.abs(N_const - erfc_an)) / Ns < 1e-3
 
 
 # --------------------------------------------------------------------------- #
@@ -117,8 +113,8 @@ def test_boltzmann_similarity_collapse_under_x_over_sqrt_t():
     g1 = uniform_grid(1.5 * CM_PER_UM, 800)
     g2 = uniform_grid(3.0 * CM_PER_UM, 1600)
     t = 30 * 60.0
-    p1 = hc.predeposit_highconc(g1, "P", 1000.0, t, n_steps=1600, picard_iters=4)
-    p2 = hc.predeposit_highconc(g2, "P", 1000.0, 4 * t, n_steps=3200, picard_iters=4)
+    p1 = hc.predeposit_highconc(g1, "P", 1000.0, t, n_steps=1600)
+    p2 = hc.predeposit_highconc(g2, "P", 1000.0, 4 * t, n_steps=3200)
     N2_at_2x = np.interp(2.0 * g1.centers, g2.centers, p2.N)
     Ns = DOPANTS["P"].N_solid_solubility
     assert np.max(np.abs(p1.N - N2_at_2x)) / Ns < 5e-3          # collapse (numeric + interp error)
@@ -132,9 +128,9 @@ def test_sealed_drivein_conserves_dose_with_D_of_N_active():
     # for ANY non-negative D field. Re-confirmed here with a time-AND-state-varying D(N): the closure
     # did not break the engine's structural conservation. (It does NOT validate the D(N) magnitude.)
     grid = uniform_grid(1.5 * CM_PER_UM, 800)
-    seed = hc.predeposit_highconc(grid, "P", 1000.0, 30 * 60.0, n_steps=800, picard_iters=2)
+    seed = hc.predeposit_highconc(grid, "P", 1000.0, 30 * 60.0, n_steps=800)
     dose_in = float(np.sum(seed.N * grid.widths))
-    out = hc.drive_in_highconc(grid, seed.N, "P", 1000.0, 20 * 60.0, n_steps=800, picard_iters=2)
+    out = hc.drive_in_highconc(grid, seed.N, "P", 1000.0, 20 * 60.0, n_steps=800)
     assert abs(out.dose - dose_in) / dose_in < 1e-10
 
 
@@ -156,7 +152,7 @@ def test_concentration_dependent_D_gives_boxier_front_and_deeper_junction():
     Ns = DOPANTS["P"].N_solid_solubility
     D_int = hc.intrinsic_diffusivity_lowconc("P", 1000.0)
 
-    enh = hc.predeposit_highconc(grid, "P", 1000.0, 30 * 60.0, n_steps=800, picard_iters=2)
+    enh = hc.predeposit_highconc(grid, "P", 1000.0, 30 * 60.0, n_steps=800)
     const = hc.constant_D_predeposit(grid, "P", 1000.0, 30 * 60.0, D_int, n_steps=800)
 
     # (1) boxier front
@@ -173,7 +169,7 @@ def test_n_squared_dopant_boxier_than_n_linear_than_constant():
     # The charge-state ordering: P (D⁼, n²) is boxier than As (D⁻, n¹) is boxier than constant D.
     grid = uniform_grid(1.5 * CM_PER_UM, 800)
     Ns = 1.0e21                                      # common high surface conc for a fair comparison
-    kw = dict(N_surface=Ns, n_steps=800, picard_iters=2)
+    kw = dict(N_surface=Ns, n_steps=800)
     P = hc.predeposit_highconc(grid, "P", 1000.0, 30 * 60.0, **kw)
     As = hc.predeposit_highconc(grid, "As", 1000.0, 30 * 60.0, **kw)
     const = hc.constant_D_predeposit(grid, "P", 1000.0, 30 * 60.0,
@@ -183,31 +179,6 @@ def test_n_squared_dopant_boxier_than_n_linear_than_constant():
     s_As = _front_sharpness(As.x, As.N, Ns)
     s_c = _front_sharpness(grid.centers, const, Ns)
     assert s_P > s_As > s_c
-
-
-# --------------------------------------------------------------------------- #
-# Numerics honesty — Picard converges; lagged-only converges to it as dt -> 0
-# --------------------------------------------------------------------------- #
-def test_picard_converges_and_lagged_approaches_it_with_smaller_dt():
-    grid = uniform_grid(1.5 * CM_PER_UM, 800)
-    Ns = DOPANTS["P"].N_solid_solubility
-    t = 30 * 60.0
-
-    def xj(p):
-        return hc.junction_depth_simple(p.x, p.N, 1e15)
-
-    # 2 Picard iterations already converge the within-step nonlinearity (2 vs 6 agree to ~0.1% on the
-    # interpolated x_j — the residual is sub-cell front placement, not an unconverged coupling).
-    p2 = hc.predeposit_highconc(grid, "P", 1000.0, t, n_steps=800, picard_iters=2)
-    p6 = hc.predeposit_highconc(grid, "P", 1000.0, t, n_steps=800, picard_iters=6)
-    assert abs(xj(p2) - xj(p6)) / xj(p2) < 3e-3
-
-    # Pure-lagged (the minimal hook) carries a first-order lag error that shrinks with dt, approaching
-    # the Picard-converged value — the scheme is consistent (it does not converge to the wrong field).
-    lag_coarse = hc.predeposit_highconc(grid, "P", 1000.0, t, n_steps=800, picard_iters=0)
-    lag_fine = hc.predeposit_highconc(grid, "P", 1000.0, t, n_steps=3200, picard_iters=0)
-    assert abs(xj(lag_fine) - xj(p2)) < abs(xj(lag_coarse) - xj(p2))
-    assert abs(xj(lag_fine) - xj(p2)) / xj(p2) < 0.01
 
 
 # --------------------------------------------------------------------------- #
@@ -221,7 +192,7 @@ def test_scope_edge_deep_tail_has_no_anomalous_enhancement():
     grid = uniform_grid(2.0 * CM_PER_UM, 1000)
     Ns = DOPANTS["P"].N_solid_solubility
     n_i = hc.intrinsic_carrier_concentration(1000.0)
-    enh = hc.predeposit_highconc(grid, "P", 1000.0, 30 * 60.0, n_steps=1000, picard_iters=2)
+    enh = hc.predeposit_highconc(grid, "P", 1000.0, 30 * 60.0, n_steps=1000)
     const = hc.constant_D_predeposit(grid, "P", 1000.0, 30 * 60.0,
                                      hc.intrinsic_diffusivity_lowconc("P", 1000.0), n_steps=1000)
     # in the dilute tail (N < 0.01·n_i) the enhanced profile is NOT deeper than constant-D by more

@@ -629,6 +629,43 @@ from a 100 %-complete Steel to Chip.
 > section (consistent with v1.1/v1.2/v1.3). SHARED-FILE ASKS: a `litho-defocus-v14` memory note + the DOF/Bossung/
 > frequency-doubling/`k₂` pin appended to `[[litho-aerial-image-source]]`.
 
+> **v1.5 — `D(N)` promoted to the engine's NATIVE nonlinear path (the first exercise of the unfreeze): BUILT
+> (2026-06-10).** Not a new chip-physics regime — a **promotion of v1.3's numerics into the engine**. v1.3 built
+> concentration-dependent `D(N)` as a **consumer-side lagged-coefficient hook** precisely *because the engine was
+> frozen* (the decisive v1.3 finding: the frozen surface was expressive enough to reach a lagged `D(N)` via a
+> `D(t)` closure over the evolving field). With **ADR 0004 unfreezing the engine** (open + test-gated), that
+> workaround's honest home is the engine itself — and the unfreeze ADR names *"a native nonlinear `D(u)` path"* as
+> its archetype of an ordinary, suite-gated edit. So `engines/diffusion` gains a native nonlinear diffusivity,
+> `StateDependent(func)` (a `D = func(u)` wrapper), solved per step by **Picard**: assemble the operator with `D`
+> frozen at the current iterate → one tridiagonal solve → re-evaluate `D` at the result → repeat to the fixed
+> point (= the fully-implicit nonlinear backward-Euler solve). `chip/diffusion_highconc.py`'s `_diffuse_dn`
+> collapses to a thin step-loop over a `StateDependent` solver (no field holder, no consumer-side correctors; the
+> `picard_iters` knob is **gone** — the engine converges the step). **Durable advisor calls: (1) Picard, NOT
+> Newton** — the load-bearing reason is not convergence speed but that every Picard *iterate* is a standard linear
+> backward-Euler solve with `D≥0`, so the nonlinear path **inherits the engine's per-iterate invariants** (the
+> discrete-maximum-principle #3 and the structural finite-volume conservation #2); Newton would need `dD/du`, lose
+> the monotone-per-iterate property, and buy quadratic convergence the smooth charge-state `D(N)` (~2 iters) does
+> not need. **(2) The amendment is ADDITIVE, structurally** — the Picard loop is entered *only* for a
+> `StateDependent` `D`; every linear `D` form (scalar / array / `D(t)`) hits the unchanged single-solve `step()`,
+> which is why the **18 prior engine invariants pass UNMODIFIED** (the proof the amendment did not silently break a
+> consumer — ADR 0004's rule; "if you find yourself editing an existing engine test, the change isn't additive").
+> **(3) Convergence norm scaled by the field max** (the dopant profile spans ~1e21→1e15; a per-cell-relative
+> criterion would be dominated by the dilute tail) — `max|Δu| ≤ picard_tol·max|u|`, capped at `picard_max_iter`,
+> no raise on the cap. **(4) Pure Picard, no damping/Anderson** — so a constant `D` converges in the first iterate
+> and reproduces the scalar-`D` run **bit-for-bit** (the degenerate seam, now an engine invariant). New engine seal
+> `engines/diffusion/tests/test_nonlinear_d.py` (**9 tests**): the degenerate seam (`StateDependent(const)==scalar`,
+> bit-for-bit), the Picard fixed-point residual (converged, not a lag), no-flux conservation with `D(u)` active
+> (telescoping is `D`-independent per iterate), the model-independent **Boltzmann-similarity** collapse
+> (`N(x,t)≡N(2x,4t)` for *any* `D(u)`), lagged→converged consistency as `dt→0`, and an in-bounds (`[0, surface]`)
+> front. Two of these migrated up from `test_diffusion_highconc.py` (they were always *engine* properties, asserted
+> against a consumer closure in v1.3). `CONTRACT.md` amended: the **"nonlinear `D(u)` is v1.1, not built" line is
+> now built** (invariant 6 added; the `StateDependent` API bullet, the discretization note, the status-banner
+> "first amendment" line); **2-D / explicit stay the deferred regimes**. Engine suite **18→27**; chip fast lane
+> **160**; whole-repo fast lane **187**. **No new ADR** (ADR 0004 pre-authorizes this as an ordinary edit; this
+> entry is the record). The **box physics and the v1.3 demo numbers are unchanged** (v1.3's `picard_iters=2` was
+> already ~converged, ~0.1%): `x_j` 0.34→0.76 µm, ×42/×486 surface enhancement — the banked figure stands.
+> SHARED-FILE ASKS: update the `chip-highconc-v13` + `engine-unfrozen` memory notes (the promotion landed).
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **`engines/diffusion`**
 engine in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**

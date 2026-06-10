@@ -11,11 +11,12 @@ phosphorus predeposition two ways on one depth axis and overlaying them:
   * **``D(N)`` (Fair charge-state)** — phosphorus's doubly-negative-vacancy ``(n/n_i)²`` term makes
     ``D`` enormous near the surface and intrinsic in the dilute tail → the **box**, deeper junction.
 
-The decisive build note (the headline): ``D(N)`` is the case ``CONTRACT.md`` and the plan both flagged
-as needing a **engine amendment** — and it needed **none**. It is built entirely within the
-:mod:`engines.diffusion` contract, via a stateful-closure **lagged-coefficient** hook in the
-consumer's step-loop (:mod:`diffusion_highconc`). *Even the edge we thought needed an amendment fits
-within the engine* — the v1.x thesis, intact.
+The decisive build note (the headline): ``D(N)`` is a genuine **nonlinear** diffusivity, and it now
+runs on the engine's **native nonlinear path** — wrapped in :class:`~engines.diffusion.StateDependent`
+and solved per step by **Picard** (the fully-implicit nonlinear backward-Euler solve). This is the
+**first exercise of the engine unfreeze** (ADR 0004): the v1.3 consumer-side lagged-coefficient hook
+(a workaround for the then-frozen engine) is **promoted** into the engine itself (:mod:`diffusion_highconc`
+is now a thin step-loop over the solver).
 
 The banked artifact (`docs/figures/chip-highconc.png`): two panels — left, the box profile (constant
 ``D`` erfc vs the ``D(N)`` box, junctions marked); right, the mechanism (``D_eff/D_intrinsic`` vs
@@ -52,7 +53,6 @@ N_ACTIVE_MAX = hc.N_ACTIVE_MAX_P   # active-carrier plateau cap (Velichko ~3.4e2
 LENGTH_UM = 1.5
 N_CELLS = 800
 N_STEPS = 800
-PICARD_ITERS = 2               # converges the stiff (n/n_i)² coupling (2 == 6; see the triad)
 
 # NB: repo root is parents[1] for a file in chip/ (post the standalone-chip-sim flatten).
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -68,7 +68,7 @@ def compute() -> dict:
     """
     grid = uniform_grid(LENGTH_UM * dd.CM_PER_UM, N_CELLS)
     D_int = hc.intrinsic_diffusivity_lowconc(DOPANT, T_PREDEP)
-    common = dict(N_surface=N_SURFACE, n_steps=N_STEPS, picard_iters=PICARD_ITERS)
+    common = dict(N_surface=N_SURFACE, n_steps=N_STEPS)
 
     # The headline box is the **active-carrier-capped** (physical) one; the uncapped full-activation
     # model is shown as the upper bound (its (n/n_i)² magnitude is ~10× larger — the activation caveat).
@@ -119,9 +119,9 @@ def print_summary(case: dict) -> None:
           f"(×{case['xj_box']/case['xj_const']:.1f} deeper)")
     print(f"      D(N) box (uncapped, upper bound):x_j = {case['xj_box_uncapped']:.3f} µm\n")
     print("  → the high-concentration front diffuses fast (enhanced D) and steepens into a BOX; the\n"
-          "    dilute tail stays intrinsic. This needed NO engine amendment — a stateful-closure\n"
-          "    lagged-coefficient hook (Picard-converging to the fully-implicit nonlinear solve)\n"
-          "    expresses D(N) within the contract.\n"
+          "    dilute tail stays intrinsic. D(N) runs on the engine's NATIVE nonlinear path\n"
+          "    (StateDependent + Picard = the fully-implicit nonlinear backward-Euler solve) — the\n"
+          "    first exercise of the engine unfreeze (the v1.3 consumer-side lag, promoted).\n"
           "  (the ×486 uncapped magnitude is the raw equilibrium model; the active-carrier plateau cap\n"
           "   gives the physical ×42. scope edge: equilibrium D(n) captures the box front + deeper\n"
           "   junction, NOT the anomalous phosphorus tail — that is non-equilibrium I-injection/clustering.)\n")

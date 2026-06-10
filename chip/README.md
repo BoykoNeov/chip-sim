@@ -87,9 +87,10 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   `tests/test_coupling.py`, the demo `demo_coupling.py` + `tests/test_demo_coupling.py`, and
   `plots.coupling_figure`. The **Phase-1↔2 back-reaction** (oxidation reaching back on the dopant
   profile), built **entirely on the engine** — OED is its already-supported variable-`D(t)`
-  callable, segregation a `Neumann(flux(t))` BC — **no engine amendment** (the decisive finding;
-  `D(N)` was the case we thought *would* need one — v1.3 showed it does **not** either, via the
-  consumer-side lagged-closure hook). `oxidize_couple` runs an oxidizing
+  callable, segregation a `Neumann(flux(t))` BC — **no engine amendment** (OED is a *linear* `D(t)`
+  of oxidation rate, genuinely engine-native; contrast the genuinely-**nonlinear** `D(N)` of v1.3,
+  which *was* promoted to the engine's native `StateDependent` Picard path at the unfreeze — v1.5).
+  `oxidize_couple` runs an oxidizing
   anneal: **OED** enhances `D` (cited `f_I`; `oed_enhancement_factor`/`interstitial_supersaturation`),
   **segregation** partitions dopant at the moving interface (cited `m`; `segregation_flux` → boron
   depletes, phosphorus piles up). The module docstring is its contract (the unified `dx_ox/dt=0`
@@ -99,14 +100,16 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
 - **To work on concentration-dependent diffusivity (v1.3 — the high-concentration box):**
   `diffusion_highconc.py` + `tests/test_diffusion_highconc.py`, the demo `demo_diffusion_highconc.py`
   + `tests/test_demo_diffusion_highconc.py`, and `plots.highconc_figure`. The Phase-1 **`D(N)`** scope
-  edge, promoted — and the case both `CONTRACT.md` and the plan flagged as a v1.1 **engine amendment**,
-  built with **none**: a `D(t)` closure over the evolving field in the consumer's step-loop is a
-  **lagged-coefficient `D(N)`** within the contract (Picard-converging to the fully-implicit
-  solve). `effective_diffusivity` is the cited **Fair charge-state** `D_eff = D⁰+D⁻(n/n_i)+D⁼(n/n_i)²`
+  edge, promoted. **`D(N)` now runs on the engine's native nonlinear path** (`StateDependent` + Picard
+  = the fully-implicit nonlinear backward-Euler solve): the v1.3 consumer-side lagged-coefficient hook
+  (a workaround for the then-frozen engine) was **promoted into the engine** at the unfreeze — so
+  `_diffuse_dn` is now a thin step-loop over a `StateDependent` solver, and the degenerate-seam /
+  convergence invariants live in `engines/diffusion/tests/test_nonlinear_d.py`.
+  `effective_diffusivity` is the cited **Fair charge-state** `D_eff = D⁰+D⁻(n/n_i)+D⁼(n/n_i)²`
   (`CHARGE_STATE_TERMS`, Plummer Ch. 7 / Fair–Tsai 1977); `intrinsic_carrier_concentration` the `n_i(T)`;
   `predeposit_highconc`/`drive_in_highconc` the fab steps (the box), `constant_D_predeposit` the
-  baseline + degenerate-seam check, `n_active_max` the activation/plateau cap. The module docstring is
-  its contract (the closure hook, the degenerate seam / Boltzmann-similarity / conservation-as-machinery
+  baseline, `n_active_max` the activation/plateau cap. The module docstring is its contract (the native
+  path, the model's `D_eff → D⁰+D⁻+D⁼` low-conc limit / Boltzmann-similarity / conservation-as-machinery
   triad, and the **scope edge** — the box front captured, the anomalous **tail/kink** named-not-modelled).
   Saves `docs/figures/chip-highconc.png`.
 - **To work on the teaching notebook (§9):** `chip.ipynb` + `tests/test_chip_notebook.py`. A *thin
@@ -201,6 +204,8 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   the anomalous **tail/kink** (non-equilibrium I-injection/clustering — Velichko 2019, Fair–Tsai
   emitter-dip); full activation (`n=N`) is the flagged approximation, made adjustable by the
   `n_active_max` plateau cap. **No ADR / no engine re-seal** (the finding obviated them); seal intact.
+  *(Superseded 2026-06-10 by the v1.5 promotion below: with the engine unfrozen, this nonlinear solve
+  moved into the engine's native `StateDependent` Picard path — the lagged-closure hook is gone.)*
 - **v1.4 — lithographic defocus, the depth of focus & the Bossung curve: BUILT** (2026-06-10).
   `litho.py` §7 — Phase 3's **"ideal in-focus pupil"** scope edge, promoted. Defocus is a pure **phase**
   aberration, so it fits **inside** the litho module (no new path, engine untouched): `defocus_phase`
@@ -220,6 +225,23 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   at every z, machine precision); *benchmark* = the Bossung CD/NILS degradation + `k₂=0.5` **derived** from
   the φ=π/2 null at the resolution limit (paraxial; the exact full-cosθ null converges onto it as NA→0).
   Zernike aberrations (coma/astigmatism/spherical) and immersion NA≥1 (vector) stay the named scope edges.
+- **v1.5 — `D(N)` promoted to the engine's native nonlinear path (the first exercise of the unfreeze): BUILT**
+  (2026-06-10). With the engine **unfrozen** (ADR 0004 — open + test-gated), v1.3's consumer-side
+  lagged-coefficient hook (a workaround for the then-frozen engine) was promoted **into the engine itself**:
+  `engines/diffusion` gained a native nonlinear diffusivity `StateDependent(func)`, solved per step by
+  **Picard** (the fully-implicit nonlinear backward-Euler solve). `diffusion_highconc.py`'s `_diffuse_dn` is
+  now a thin step-loop over a `StateDependent` solver — no field holder, no `picard_iters` corrector knob (the
+  engine converges the step). **Picard, not Newton** (deliberate): each iterate is an ordinary linear
+  backward-Euler solve with `D≥0`, so the nonlinear path inherits the engine's monotonicity + structural
+  conservation **per iterate**. **Additive:** only `StateDependent` enters the loop, so the **18 prior engine
+  invariants pass unmodified** — the proof the amendment did not break a consumer. New engine seal
+  `engines/diffusion/tests/test_nonlinear_d.py` (**9 tests:** the degenerate seam `StateDependent(const)==scalar`
+  **bit-for-bit**, the Picard fixed-point residual, no-flux conservation with `D(u)` active, the
+  model-independent **Boltzmann-similarity** collapse, lagged→converged consistency, an in-bounds front). Engine
+  suite **18→27**; whole-repo fast lane **187**. `CONTRACT.md`'s "nonlinear `D(u)` is v1.1, not built" line is
+  now **built** (invariant 6); 2-D / explicit stay the deferred regimes. The box physics + demo numbers are
+  unchanged (v1.3's `picard_iters=2` was already ~converged), so the v1.3 banked figure stands. **No new ADR**
+  — ADR 0004 names native nonlinear `D(u)` as *the* example of an ordinary test-gated edit.
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated

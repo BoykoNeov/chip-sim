@@ -29,6 +29,20 @@ Discretization
     - ``crank_nicolson`` (θ=½) — 2nd-order in time, unconditionally stable but
       *not monotone* (can produce decaying oscillations at large dt).
 
+Nonlinear (state-dependent) diffusivity
+----------------------------------------
+``D`` may also be a :class:`StateDependent` wrapper around a callable ``func(u)`` — a diffusivity
+that depends on the *unknown field itself* (e.g. the concentration-dependent dopant diffusivity
+``D(N)``). The engine then solves each implicit step **nonlinearly** by **Picard** iteration:
+assemble the operator with ``D`` frozen at the current iterate, do the one tridiagonal solve,
+re-evaluate ``D`` at the new field, repeat to a fixed point — which *is* the fully-implicit
+nonlinear backward-Euler solve. Every inner solve is an ordinary linear backward-Euler step with
+``D ≥ 0``, so the nonlinear scheme **inherits the per-iterate invariants** (the discrete maximum
+principle and structural finite-volume conservation) — Picard, deliberately, not Newton. A constant
+``func`` converges in the first iterate and reproduces the scalar-``D`` run bit-for-bit. The linear
+``D`` forms (scalar / array / ``D(t)``) are untouched: only a :class:`StateDependent` ``D`` enters
+the Picard loop.
+
 The data boundary (ADR 0001)
 ----------------------------
 The ``state`` is a plain 1-D ``ndarray`` of cell-centered ``u`` values. That
@@ -160,6 +174,30 @@ def _eval(param: BCParam, t: float) -> float:
 
 
 # --------------------------------------------------------------------------- #
+# Nonlinear diffusivity (state-dependent D = func(u))
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class StateDependent:
+    """A nonlinear, **state-dependent** diffusivity ``D = func(u)`` — the engine's native
+    nonlinear path.
+
+    Wrapping a callable in ``StateDependent`` (rather than passing a bare callable, which the
+    engine reads as the time-dependent ``D(t)``) declares that ``D`` depends on the *unknown
+    field* ``u`` itself, so each implicit step is solved **nonlinearly** by Picard iteration
+    (see :meth:`Diffusion1D._step_nonlinear` and the module docstring). ``func`` takes the
+    length-``N`` cell-centered state ``u`` and returns ``D`` as a scalar or a length-``N``
+    cell-centered array.
+
+    A *constant* ``func`` converges in the first iterate and reproduces the scalar-``D`` run
+    **bit-for-bit** — the hook *is* the engine. Spatial / temporal dependence, when needed, is
+    carried by the consumer closing the callable over its grid / schedule; the wrapper itself is
+    deliberately ``func(u)`` only (Picard, not Newton — no Jacobian, no ``D(u, t)`` generality).
+    """
+
+    func: Callable[[np.ndarray], ArrayLike]
+
+
+# --------------------------------------------------------------------------- #
 # Solver
 # --------------------------------------------------------------------------- #
 class Diffusion1D:
@@ -169,10 +207,12 @@ class Diffusion1D:
     ----------
     grid : Grid
         The finite-volume grid (use :func:`uniform_grid` / :func:`grid_from_edges`).
-    D : float | ndarray | callable
-        Diffusivity. Scalar, length-N cell-centered array ``D(x)``, or a callable
-        ``D(t)`` returning either. Interior face diffusivity is the harmonic mean
-        of the two adjacent cell values (correct flux continuity for layered media).
+    D : float | ndarray | callable | StateDependent
+        Diffusivity. Scalar, length-N cell-centered array ``D(x)``, a callable
+        ``D(t)`` returning either, or a :class:`StateDependent` wrapper ``D = func(u)``
+        for the **nonlinear** (concentration-dependent) path (Picard-solved per step).
+        Interior face diffusivity is the harmonic mean of the two adjacent cell values
+        (correct flux continuity for layered media).
     bc_left, bc_right : Dirichlet | Neumann | Robin
         Boundary condition at each end, independently.
     source : float | ndarray | callable, optional
@@ -181,16 +221,26 @@ class Diffusion1D:
     method : {"backward_euler", "crank_nicolson"}
         Time-integration scheme; backward Euler (default) is the unconditionally
         stable *and monotone* one the stability invariant guarantees.
+    picard_tol : float, optional
+        Convergence tolerance for the nonlinear (``StateDependent`` ``D``) Picard
+        iteration: a step is converged when the max change between iterates is
+        ``≤ picard_tol · max|u|`` (scaled by the field magnitude, so it is robust for
+        many-decade profiles). Ignored for linear ``D``.
+    picard_max_iter : int, optional
+        Safety cap on Picard iterations per step (smooth ``D`` converges in ~2–5).
+        On reaching it the best estimate is returned without raising. Ignored for linear ``D``.
     """
 
     def __init__(
         self,
         grid: Grid,
-        D: DSpec,
+        D: Union[DSpec, "StateDependent"],
         bc_left: Union[Dirichlet, Neumann, Robin],
         bc_right: Union[Dirichlet, Neumann, Robin],
         source: Union[DSpec, None] = None,
         method: str = "backward_euler",
+        picard_tol: float = 1e-10,
+        picard_max_iter: int = 100,
     ) -> None:
         if method not in _METHODS:
             raise ValueError(f"method must be one of {sorted(_METHODS)}, got {method!r}")
@@ -204,14 +254,27 @@ class Diffusion1D:
         self._source = source
         self.method = method
         self.theta = _METHODS[method]
+        self.picard_tol = float(picard_tol)
+        self.picard_max_iter = int(picard_max_iter)
         # distance between adjacent cell centers (length N-1) — the face widths
         # over which the interior gradient is taken.
         self._dx_face = np.diff(grid.centers)
 
     # -- coefficient assembly ------------------------------------------------ #
-    def _D_cells(self, t: float) -> np.ndarray:
-        """Cell-centered diffusivity at time ``t`` as a length-N array."""
-        D = self._D(t) if callable(self._D) else self._D
+    def _D_cells(self, t: float, u: Union[np.ndarray, None] = None) -> np.ndarray:
+        """Cell-centered diffusivity as a length-N array.
+
+        Evaluated at time ``t`` for the linear forms (scalar / array / callable ``D(t)``); for a
+        :class:`StateDependent` ``D`` it is evaluated at the supplied field ``u`` (``func(u)``).
+        """
+        if isinstance(self._D, StateDependent):
+            if u is None:
+                raise ValueError("a StateDependent D requires the current field u to evaluate")
+            D = self._D.func(np.asarray(u, dtype=float))
+        elif callable(self._D):
+            D = self._D(t)
+        else:
+            D = self._D
         D = np.asarray(D, dtype=float)
         if D.ndim == 0:
             D = np.full(self.grid.n, float(D))
@@ -230,19 +293,20 @@ class Diffusion1D:
             raise ValueError(f"source must be scalar or length {self.grid.n}, got shape {S.shape}")
         return S
 
-    def _operator(self, t: float):
+    def _operator(self, t: float, u: Union[np.ndarray, None] = None):
         """Assemble the semidiscrete system  du/dt = A·u + b  at time ``t``.
 
         Returns the three diagonals of the tridiagonal matrix ``A`` (``sub[i] =
         A[i, i-1]``, ``diag[i] = A[i, i]``, ``sup[i] = A[i, i+1]``) and the
         boundary/source vector ``b``. ``A`` carries the diffusion operator plus
         the diagonal contributions of Dirichlet/Robin boundaries; ``b`` carries
-        their inhomogeneous parts, the Neumann flux, and the source.
+        their inhomogeneous parts, the Neumann flux, and the source. For a
+        :class:`StateDependent` ``D`` the diffusivity is frozen at the iterate ``u``.
         """
         g = self.grid
         n = g.n
         dx = g.widths
-        Dc = self._D_cells(t)
+        Dc = self._D_cells(t, u)
 
         # Interior face transmissibilities  T_{i+1/2} = D_face / dist(centers).
         # Harmonic-mean face diffusivity gives exact flux continuity across a
@@ -309,6 +373,8 @@ class Diffusion1D:
         u0 = np.asarray(state, dtype=float)
         if u0.shape != (self.grid.n,):
             raise ValueError(f"state must have length {self.grid.n}, got shape {u0.shape}")
+        if isinstance(self._D, StateDependent):
+            return self._step_nonlinear(u0, dt, t0)
         theta = self.theta
         t1 = t0 + dt
 
@@ -332,6 +398,49 @@ class Diffusion1D:
         ab[1, :] = 1.0 - dt * theta * diag1
         ab[2, :-1] = -dt * theta * sub1[1:]
         return solve_banded((1, 1), ab, rhs)
+
+    def _step_nonlinear(self, u0: np.ndarray, dt: float, t0: float) -> np.ndarray:
+        """One implicit step with a :class:`StateDependent` ``D``, by Picard iteration.
+
+        Each iterate freezes ``D`` at the current field estimate and does **one** ordinary linear
+        tridiagonal solve (so it inherits the engine's monotone, conservative single-step machinery);
+        re-evaluating ``D`` at the result and repeating drives the within-step coefficient to its
+        fixed point — the fully-implicit nonlinear backward-Euler (or θ-method) solve. The lagged
+        predictor is ``u0``; convergence is the max iterate-change scaled by ``max|u|`` (robust for
+        many-decade profiles). A constant ``D`` converges in the first iterate and returns the
+        scalar-``D`` result bit-for-bit. Pure Picard — no relaxation/damping — preserves that seam.
+        """
+        theta = self.theta
+        n = self.grid.n
+        t1 = t0 + dt
+
+        # Crank–Nicolson explicit half uses D at the OLD (known) state u0 — assembled once,
+        # outside the Picard loop. Backward Euler (theta=1) has no explicit half.
+        if theta != 1.0:
+            sub0, diag0, sup0, b0 = self._operator(t0, u0)
+            rhs_expl = u0.copy()
+            rhs_expl[:-1] += (1.0 - theta) * dt * sup0[:-1] * u0[1:]
+            rhs_expl[1:] += (1.0 - theta) * dt * sub0[1:] * u0[:-1]
+            rhs_expl += (1.0 - theta) * dt * diag0 * u0
+
+        u_iter = u0
+        u_new = u0
+        for _ in range(self.picard_max_iter):
+            sub1, diag1, sup1, b1 = self._operator(t1, u_iter)  # D frozen at the current iterate
+            if theta == 1.0:  # backward Euler
+                rhs = u0 + dt * b1
+            else:  # Crank–Nicolson: explicit half (D at u0) + implicit half (D at the iterate)
+                rhs = rhs_expl + dt * (theta * b1 + (1.0 - theta) * b0)
+            ab = np.zeros((3, n))
+            ab[0, 1:] = -dt * theta * sup1[:-1]
+            ab[1, :] = 1.0 - dt * theta * diag1
+            ab[2, :-1] = -dt * theta * sub1[1:]
+            u_new = solve_banded((1, 1), ab, rhs)
+            scale = max(float(np.max(np.abs(u_new))), 1.0)
+            if np.max(np.abs(u_new - u_iter)) <= self.picard_tol * scale:
+                break
+            u_iter = u_new
+        return u_new
 
     def solve(self, state: np.ndarray, t_end: float, dt: float, t0: float = 0.0) -> np.ndarray:
         """Advance from ``t0`` to ``t0 + t_end`` in steps of ``dt`` (last step trimmed)."""
@@ -361,7 +470,7 @@ class Diffusion1D:
         conservation the operator enforces.
         """
         u = np.asarray(state, dtype=float)
-        Dc = self._D_cells(t)
+        Dc = self._D_cells(t, u)
         if end == "left":
             bc, dxi, Db, u_cell = self.bc_left, self.grid.widths[0], Dc[0], u[0]
         elif end == "right":

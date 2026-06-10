@@ -8,27 +8,29 @@ diffusion is **concentration-enhanced**: at ``N ≫ n_i`` the diffusivity rises 
 concentration, the high-concentration front steepens into a near-vertical **"box"**, and the junction
 pushes deeper than the constant-``D`` ``erfc`` predicts. This module builds that physics.
 
-The decisive architecture finding (why this needed **no** engine amendment)
------------------------------------------------------------------------------------
-Both ``CONTRACT.md`` ("nonlinear ``D(u)`` is v1.1, **not built**") and the plan flagged ``D(N)`` as
-the one case that would force a **deliberate v1.1 contract amendment** — a re-opening of the ``engines.diffusion`` seal. **It does not.** The contract already promises a callable
-``D(t)`` (the case Steel uses for carbon-during-cooling, ``test_variable_d``), and the consumer
-already drives the solver **one ``step()`` at a time** in a Python loop (:func:`diffusion_dopant._diffuse`).
-A ``D(t)`` callable that *closes over a mutable holder of the evolving field*, updated **after** each
-step, is therefore a **lagged-coefficient ``D(N)``** entirely within the public API: when ``step()``
-assembles its implicit operator at ``t₁`` the holder still holds ``Nⁿ`` (the *old* level), so ``D`` is
-frozen at the old state — the textbook **semi-implicit / frozen-coefficient** scheme, one tridiagonal
-solve per step, **zero engine edits** (:func:`_diffuse_dn`). The contract blesses "``D(t)`` when the
-consumer closes over a schedule"; closing over the evolving *state* is the **same mechanism**, named
-not hidden — a deliberate frozen-coefficient hook, not a ``D`` that secretly reads state behind the
-engine's back. And it is not merely a *lag*: an optional **Picard** iteration (re-evaluate ``D`` at the
-new estimate, re-solve from ``Nⁿ``, repeat) converges the within-step coefficient to a fixed point —
-which *is* the **fully-implicit nonlinear backward-Euler solve** — in ~2 iterations (the triad pins
-``2 == 6``, dt-stable). So the precise claim: **``D(N)`` — the edge both docs flagged for a v1.1
-amendment — is recovered as a lagged-coefficient scheme that Picard-converges to the fully-implicit
-nonlinear solve, entirely within the engine, no amendment.** (Contrast v1.2's OED, a ``D(t)`` of
-*oxidation rate*; here ``D`` is a genuine function of the unknown ``N`` — still expressible, via the
-step-loop lag.)
+The native engine path (promoted from the v1.3 consumer-side lag)
+----------------------------------------------------------------
+``D(N)`` is a genuine **nonlinear** diffusivity — ``D`` is a function of the *unknown* field ``N`` —
+the one regime ``CONTRACT.md`` long listed as deferred ("nonlinear ``D(u)`` is v1.1, **not built**").
+It is now built **into the engine**: ``D(N)`` is wrapped in
+:class:`~engines.diffusion.StateDependent` and handed to the solver, which solves each implicit step
+**nonlinearly by Picard** — assemble the operator with ``D`` frozen at the current iterate, do the one
+tridiagonal solve, re-evaluate ``D`` at the result, repeat to a fixed point (= the fully-implicit
+nonlinear backward-Euler solve). This is the **first exercise of the engine unfreeze** (ADR 0004):
+the surface is now open + test-gated, so the deferred nonlinear regime grows *into* the engine by an
+ordinary, suite-gated edit rather than being routed around it.
+
+*Historical note (the v1.3 build, now superseded).* v1.3 originally built ``D(N)`` **without** an
+engine edit, because the engine was frozen at the time: the consumer drove the solver one ``step()``
+at a time and a ``D(t)`` callable closing over a mutable holder of the evolving field — updated *after*
+each step — gave a **lagged-coefficient** ``D(N)`` entirely within the public API, with an optional
+in-consumer Picard corrector converging it to the fully-implicit solve. That was a real result (the
+frozen engine was more expressive than it looked), but with the unfreeze the honest home for the
+nonlinear solve is the engine itself: :func:`_diffuse_dn` is now a thin step-loop over a
+``StateDependent`` solver — no holder, no consumer-side correctors, the engine converges the step.
+(Contrast v1.2's OED, a ``D(t)`` of *oxidation rate* — a position/time-dependent diffusivity that
+still fits the **linear** ``D(t)`` path; ``D(N)`` is the genuinely nonlinear case, and it is the one
+that motivated the native path.)
 
 The model — Fair's charge-state diffusivity (cited, the box driver)
 -------------------------------------------------------------------
@@ -51,22 +53,26 @@ near-surface ``N ≳ n_i`` region is enhanced and the deep tail stays intrinsic.
 Validation triad (plan §3) — what is asserted tight vs loose
 ------------------------------------------------------------
 * **Analytical limit (tight, two legs).**
-  (a) *Degenerate seam.* A constant ``D`` fed through the **same closure machinery**
-  (:func:`_diffuse_dn` with a constant ``D_of_N``) equals the plain scalar-``D`` engine run
-  **bit-for-bit** (``0`` difference) — the closure adds nothing when ``D`` does not vary, i.e. the
-  hook *is* the engine. As ``N → 0`` the model's own ``D_eff → D⁰+D⁻+D⁼`` (a constant), so the
-  low-concentration profile is the constant-``D`` ``erfc``.
+  (a) *Degenerate seam.* A constant ``D`` fed through the **native nonlinear path**
+  (:func:`constant_D_predeposit` → a constant ``StateDependent``) equals the plain scalar-``D`` engine
+  run **bit-for-bit** (``0`` difference) — Picard converges in the first iterate when ``D`` does not
+  vary, i.e. the nonlinear hook *is* the engine. This is now an **engine** invariant
+  (``engines/diffusion/tests/test_nonlinear_d.py``); the chip leg keeps the physics corollary that as
+  ``N → 0`` the model's own ``D_eff → D⁰+D⁻+D⁼`` (a constant), so the low-concentration profile is the
+  constant-``D`` ``erfc``.
   (b) *Boltzmann similarity (model-independent).* A constant-source diffusion into a semi-infinite
   medium with **any** ``D(N)`` has a profile depending on ``x, t`` only through ``η = x/√t`` — a free,
   exact, *form-independent* anchor for the nonlinear path. Run at ``t`` and ``4t``; ``N(x, t)`` and
   ``N(2x, 4t)`` collapse (:func:`predeposit_highconc`, the similarity test). It validates the
-  **machinery** (the lagged ``D(N)`` solve converges to the right self-similar field), independent of
-  whether Fair's *coefficients* are right.
+  **machinery** (the nonlinear ``D(N)`` solve converges to the right self-similar field), independent
+  of whether Fair's *coefficients* are right. (The engine carries the model-independent version of
+  this anchor too — ``test_nonlinear_d.py`` — for a generic ``D(u)``.)
 * **Conservation — a machinery check, not a physics validation.** Under a **sealed (no-flux)
   surface** drive-in, ``∫N dx`` is conserved to machine precision *even with* ``D(N)`` active — the
-  finite-volume telescoping is **``D``-independent** (it holds for any non-negative ``D`` field), so
-  this confirms the closure did not break the engine's structural conservation. It says **nothing**
-  about whether the ``D(N)`` magnitude is right (stated plainly, the v1.2 honesty).
+  finite-volume telescoping is **``D``-independent** (it holds for any non-negative ``D`` field, per
+  Picard iterate), so this confirms the nonlinear path did not break the engine's structural
+  conservation. It says **nothing** about whether the ``D(N)`` magnitude is right (stated plainly, the
+  v1.2 honesty).
 * **Benchmark (loose / calibrated split).**
   - *Cited (the form + the box trend):* the charge-state model and its coefficients
     (Plummer–Deal–Griffin Ch. 7 / Fair & Tsai 1977), and the qualitative result that ``D∝(n/n_i)²``
@@ -93,15 +99,16 @@ discipline as Phase 1a's constant-``D`` and v1.1's thin-dry anomaly. The plateau
 saturate below the chemical ``N`` once clustering sets in) is why the full-activation ``n = N`` above
 is the flagged approximation.
 
-The lagged-coefficient scheme — honest numerics
------------------------------------------------
-Each implicit sub-step is linear and monotone (an M-matrix for any ``D ≥ 0``), but the **lagged
-nonlinear** scheme is *not* guaranteed monotone at a steep front — it can in principle overshoot the
-Dirichlet surface value. Empirically it does **not** at the resolutions used here (the box front
-stays ``≤ N_surface``, no negatives), and the lag error is **first-order in ``dt``** and controlled by
-refinement; an optional **Picard** corrector (``picard_iters > 0``: re-evaluate ``D`` at the new
-estimate and re-solve, within the same step) tightens the front at fixed ``dt``. The tight legs above
-hold for either; the validated content is the *form*, not a specific step count.
+The nonlinear solve — honest numerics
+-------------------------------------
+Each Picard **iterate** is a linear, monotone backward-Euler solve (an M-matrix for any ``D ≥ 0``),
+so it inherits the engine's discrete maximum principle bounded by the data ``[0, N_surface]`` — and
+the converged fixed point therefore stays in those bounds too. This is asserted **empirically**, not
+claimed as a theorem about the nonlinear scheme (the box front stays ``≤ N_surface``, no negatives;
+the v1.3 "don't over-claim monotonicity" discipline). The engine converges the within-step
+coefficient to its fixed point automatically (default ``picard_tol``/``picard_max_iter``); the
+consumer no longer carries a lag or a corrector count. The validated content is the *form* of the
+box, not a step count.
 
 Units — semiconductor-conventional CGS, identical to :mod:`diffusion_dopant`
 ----------------------------------------------------------------------------
@@ -132,7 +139,7 @@ from typing import Callable
 
 import numpy as np
 
-from engines.diffusion import Diffusion1D, uniform_grid, Grid, Dirichlet, Neumann
+from engines.diffusion import Diffusion1D, uniform_grid, Grid, Dirichlet, Neumann, StateDependent
 from chip.diffusion_dopant import (
     DOPANTS,
     Dopant,
@@ -259,7 +266,7 @@ def effective_diffusivity(
 
 
 # --------------------------------------------------------------------------- #
-# 3. The stateful-closure lagged-coefficient driver (the engine hook)
+# 3. The native-engine nonlinear-D(N) driver
 # --------------------------------------------------------------------------- #
 def _diffuse_dn(
     grid: Grid,
@@ -269,33 +276,27 @@ def _diffuse_dn(
     bc_right,
     t_seconds: float,
     n_steps: int,
-    picard_iters: int = 0,
 ) -> tuple[np.ndarray, float, float]:
-    """March ``N0`` for ``t_seconds`` with a concentration-dependent ``D(N)`` — via the engine.
+    """March ``N0`` for ``t_seconds`` with a concentration-dependent ``D(N)`` — the engine's native
+    nonlinear path.
 
-    The hook (module docstring): a ``D(t)`` callable closes over ``holder["N"]``, updated **after**
-    each :meth:`Diffusion1D.step`, so the operator assembled inside ``step`` reads the **old** level
-    ``Nⁿ`` — a lagged-coefficient (frozen-coefficient) ``D(N)`` solve, one tridiagonal solve per step,
-    **no engine edits**. ``picard_iters`` > 0 adds corrector solves within each step (re-evaluate
-    ``D`` at the new estimate, re-solve from ``Nⁿ``) to tighten the nonlinear front at fixed ``dt``.
+    ``D_of_N`` is wrapped in :class:`~engines.diffusion.StateDependent` and handed straight to the
+    solver, which solves each implicit step **nonlinearly by Picard** — the fully-implicit nonlinear
+    backward-Euler solve the v1.3 consumer-side lag was an approximation to (module docstring). No
+    coefficient holder, no manual correctors: the engine evaluates ``D(N)`` against each Picard
+    iterate and converges within the step. The step-loop is retained only to accumulate the per-step
+    surface-flux dose (the conservation diagnostic), exactly as :func:`diffusion_dopant._diffuse`.
 
     Returns ``(N, dose, surface_flux_dose)`` — the final profile, its ``∫N dx``, and the accumulated
-    ``Σ dt·flux(left)`` (the conservation diagnostic), exactly as :func:`diffusion_dopant._diffuse`.
+    ``Σ dt·flux(left)``.
     """
-    holder = {"N": np.array(N0, dtype=float)}
-    solver = Diffusion1D(grid, lambda t: D_of_N(holder["N"]), bc_left, bc_right)
+    solver = Diffusion1D(grid, StateDependent(D_of_N), bc_left, bc_right)
     N = np.array(N0, dtype=float)
     dt = t_seconds / n_steps
     surf_flux = 0.0
     t = 0.0
     for _ in range(n_steps):
-        N_old = N
-        N_new = solver.step(N_old, dt, t0=t)        # D from holder == N_old (lagged predictor)
-        for _ in range(picard_iters):                # optional Picard correctors at the new estimate
-            holder["N"] = N_new
-            N_new = solver.step(N_old, dt, t0=t)
-        N = N_new
-        holder["N"] = N                              # commit the new level for the next step's lag
+        N = solver.step(N, dt, t0=t)
         t += dt
         surf_flux += dt * solver.flux(N, "left", t=t)
     return N, solver.total(N), surf_flux
@@ -312,7 +313,7 @@ class HighConcProfile:
     **cm⁻³**). ``dopant``/``T_celsius``/``t``/``stage`` record the step; ``dose`` is ``∫N dx`` (cm⁻²),
     ``surface_flux_dose`` the accumulated ``Σ dt·flux(left)``; ``D_intrinsic`` is the model's
     low-concentration constant (:func:`intrinsic_diffusivity_lowconc`) — the constant-``D`` baseline a
-    box profile is compared against. ``picard_iters`` records the scheme used.
+    box profile is compared against.
     """
 
     x: np.ndarray
@@ -326,7 +327,6 @@ class HighConcProfile:
     surface_flux_dose: float
     D_intrinsic: float
     length: float
-    picard_iters: int
 
 
 def predeposit_highconc(
@@ -336,16 +336,16 @@ def predeposit_highconc(
     t_seconds: float,
     N_surface: float | None = None,
     n_steps: int = 800,
-    picard_iters: int = 0,
     n_active_max: float | None = None,
 ) -> HighConcProfile:
     """Constant-source predeposition with concentration-dependent ``D(N)`` (engine, Dirichlet surface).
 
     Holds the surface at ``N_surface`` (default the dopant's solid-solubility limit) and diffuses into
-    an un-doped wafer with ``D = D_eff(N)`` (the box driver). Far end no-flux (semi-infinite). The
-    near-surface ``N ≫ n_i`` region diffuses fast and steepens into the box; the dilute tail stays at
-    the intrinsic ``D``. Compare against a constant-``D`` :func:`diffusion_dopant.predeposit` (or the
-    ``erfc`` at ``D_intrinsic``) to read the enhancement.
+    an un-doped wafer with ``D = D_eff(N)`` (the box driver), solved by the engine's native nonlinear
+    ``StateDependent`` path (Picard per step). Far end no-flux (semi-infinite). The near-surface
+    ``N ≫ n_i`` region diffuses fast and steepens into the box; the dilute tail stays at the intrinsic
+    ``D``. Compare against a constant-``D`` :func:`diffusion_dopant.predeposit` (or the ``erfc`` at
+    ``D_intrinsic``) to read the enhancement.
 
     ``N_surface`` defaults to the dopant's solid-solubility limit when it is in :data:`DOPANTS`
     (B/P/Sb); for a charge-state-only dopant (e.g. As) it must be passed explicitly. ``n_active_max``
@@ -357,13 +357,12 @@ def predeposit_highconc(
     N0 = np.zeros(grid.centers.size)
     N, dose, surf_flux = _diffuse_dn(
         grid, lambda N: effective_diffusivity(name, N, T_celsius, n_active_max), N0,
-        Dirichlet(Ns), Neumann(0.0), t_seconds, n_steps, picard_iters,
+        Dirichlet(Ns), Neumann(0.0), t_seconds, n_steps,
     )
     return HighConcProfile(
         x=grid.centers, N=N, dopant=name, T_celsius=T_celsius, t=t_seconds, stage="predeposition",
         N_surface=Ns, dose=dose, surface_flux_dose=surf_flux,
         D_intrinsic=intrinsic_diffusivity_lowconc(name, T_celsius), length=grid.length,
-        picard_iters=picard_iters,
     )
 
 
@@ -374,27 +373,26 @@ def drive_in_highconc(
     T_celsius: float,
     t_seconds: float,
     n_steps: int = 800,
-    picard_iters: int = 0,
     n_active_max: float | None = None,
 ) -> HighConcProfile:
     """Sealed-surface drive-in with concentration-dependent ``D(N)`` (engine, Neumann(0) both ends).
 
-    Redistributes a fixed dose with ``D = D_eff(N)`` and the surface **sealed** — so ``∫N dx`` is
-    conserved to machine precision *even with* ``D(N)`` (the finite-volume telescoping is
-    ``D``-independent: the conservation machinery-check). The high-concentration core relaxes faster
-    than its tail, so a box flattens differently than a constant-``D`` Gaussian would. ``n_active_max``
-    caps the active carrier driving ``D`` (see :func:`effective_diffusivity`).
+    Redistributes a fixed dose with ``D = D_eff(N)`` (the engine's native nonlinear ``StateDependent``
+    path) and the surface **sealed** — so ``∫N dx`` is conserved to machine precision *even with*
+    ``D(N)`` (the finite-volume telescoping is ``D``-independent, a conservation machinery-check that
+    holds per Picard iterate). The high-concentration core relaxes faster than its tail, so a box
+    flattens differently than a constant-``D`` Gaussian would. ``n_active_max`` caps the active
+    carrier driving ``D`` (see :func:`effective_diffusivity`).
     """
     name = _dopant_name(dopant)
     N, dose, surf_flux = _diffuse_dn(
         grid, lambda N: effective_diffusivity(name, N, T_celsius, n_active_max), np.asarray(N_initial, float),
-        Neumann(0.0), Neumann(0.0), t_seconds, n_steps, picard_iters,
+        Neumann(0.0), Neumann(0.0), t_seconds, n_steps,
     )
     return HighConcProfile(
         x=grid.centers, N=N, dopant=name, T_celsius=T_celsius, t=t_seconds, stage="drive-in",
         N_surface=float(N[0]), dose=dose, surface_flux_dose=surf_flux,
         D_intrinsic=intrinsic_diffusivity_lowconc(name, T_celsius), length=grid.length,
-        picard_iters=picard_iters,
     )
 
 
@@ -407,12 +405,13 @@ def constant_D_predeposit(
     N_surface: float | None = None,
     n_steps: int = 800,
 ) -> np.ndarray:
-    """The same predep recipe at a **constant** ``D_const`` through the same closure machinery → ``N(x)``.
+    """The same predep recipe at a **constant** ``D_const`` through the same native path → ``N(x)``.
 
-    The constant-``D`` companion for the box-front comparison and the **degenerate-seam** test: with a
-    constant ``D_of_N`` the lagged closure adds nothing, so this equals a plain scalar-``D`` engine
-    predep bit-for-bit. Pass ``D_const = intrinsic_diffusivity_lowconc(...)`` for the honest
-    constant baseline.
+    The constant-``D`` companion for the box-front comparison: a constant ``D_of_N`` fed through the
+    native ``StateDependent`` path converges in the first Picard iterate and so equals a plain
+    scalar-``D`` engine predep **bit-for-bit** (the degenerate seam, now an engine invariant —
+    ``engines/diffusion/tests/test_nonlinear_d.py``). Pass ``D_const = intrinsic_diffusivity_lowconc(...)``
+    for the honest constant baseline.
     """
     name = _dopant_name(dopant)
     Ns = _default_surface_concentration(name, N_surface)

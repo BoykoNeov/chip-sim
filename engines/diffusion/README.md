@@ -19,8 +19,8 @@ and Planet (EBM heat transport); **unfrozen 2026-06-10** — now open + test-gat
 | File | What |
 |---|---|
 | `CONTRACT.md` | **The API contract.** Start here. PDE, modes, API, sign conventions, the guaranteed invariants, the validation boundary. |
-| `diffusion1d.py` | The solver: `Diffusion1D`, `Grid`/`uniform_grid`/`grid_from_edges`, `Dirichlet`/`Neumann`/`Robin`. Cell-centered finite volume + θ-method implicit stepping. |
-| `tests/` | The seal (18 tests): `test_erfc` (analytical limit + 2nd-order spatial convergence), `test_conservation` (exact no-flux mass balance), `test_stability` (unconditional stability, per method), `test_source` (source-augmented conservation), `test_variable_d` (callable `D(t)` + array `D(x)`/harmonic mean), `test_time_order` (BE 1st- / CN 2nd-order in time), `test_robin_heat` (heat-mode Robin + flux bookkeeping). |
+| `diffusion1d.py` | The solver: `Diffusion1D`, `Grid`/`uniform_grid`/`grid_from_edges`, `Dirichlet`/`Neumann`/`Robin`, `StateDependent` (nonlinear `D(u)`). Cell-centered finite volume + θ-method implicit stepping; Picard for the nonlinear path. |
+| `tests/` | The seal (27 tests): `test_erfc` (analytical limit + 2nd-order spatial convergence), `test_conservation` (exact no-flux mass balance), `test_stability` (unconditional stability, per method), `test_source` (source-augmented conservation), `test_variable_d` (callable `D(t)` + array `D(x)`/harmonic mean), `test_time_order` (BE 1st- / CN 2nd-order in time), `test_robin_heat` (heat-mode Robin + flux bookkeeping), `test_nonlinear_d` (the `StateDependent` `D(u)` Picard path — degenerate seam, fixed point, conservation, Boltzmann similarity). |
 
 ## Run the seal
 
@@ -41,6 +41,14 @@ and Planet (EBM heat transport); **unfrozen 2026-06-10** — now open + test-gat
 - **The engine carries no material constants.** Arrhenius `D₀,Q`, `α`, `h` are
   the consumer's; the engine consumes a generic `D` and BCs. This keeps the
   API surface minimal and the validation boundary honest.
+- **Nonlinear `D(u)` is Picard, not Newton, and additive** (the first exercise of
+  the unfreeze, 2026-06-10). A `StateDependent(func)` diffusivity is solved per step
+  by Picard — each iterate is an ordinary linear backward-Euler solve, so it inherits
+  the engine's monotonicity and structural conservation per iterate (Newton would
+  need `dD/du` and lose that). Only `StateDependent` enters the Picard loop; the
+  linear `D` forms are byte-for-byte unchanged, which is why the 18 prior tests pass
+  unmodified. Microchip v1.3's `D(N)` box (`chip/diffusion_highconc.py`) was built on
+  a consumer-side lag while the engine was frozen; the unfreeze promoted it here.
 - **The `state` array is the whole data contract** (ADR 0001): the seam for a
   future compiled core or a deferred heavy regime, and what the viz layer
   (ADR 0002) consumes.

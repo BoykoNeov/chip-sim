@@ -10,7 +10,9 @@
 > (ADR 0004) — but an amendment must not silently break an existing consumer.
 > Opened so the engine
 > can grow past the v1 surface (the deferred nonlinear `D(u)` / 2-D / explicit
-> regimes noted below) by direct, test-gated amendment.
+> regimes noted below) by direct, test-gated amendment. **First amendment landed
+> 2026-06-10: native nonlinear `D(u)` (`StateDependent`, invariant 6)** — additive,
+> the 18 prior invariants pass unmodified; 2-D / explicit remain the deferred regimes.
 
 ## What it solves
 
@@ -43,18 +45,25 @@ one engine serves both, and why Planet's EBM heat transport is the same code.
   `crank_nicolson` (θ=½, optional).
 - Interior **face diffusivity = harmonic mean** of the two cell values (exact
   flux continuity across a D-discontinuity; reduces to D for constant D).
+- **Nonlinear `D(u)`** (a `StateDependent` diffusivity) is solved per step by
+  **Picard** (successive substitution): each iterate is one ordinary linear
+  tridiagonal solve with `D` frozen at the current field, repeated to a fixed point
+  (= the fully-implicit nonlinear solve). Every iterate is the monotone, conservative
+  single-step operator, so the nonlinear path inherits those guarantees — Picard,
+  not Newton. Linear `D` forms skip the loop entirely.
 
 ## API
 
 ```python
 from engines.diffusion import (
     Diffusion1D, Grid, uniform_grid, grid_from_edges,
-    Dirichlet, Neumann, Robin,
+    Dirichlet, Neumann, Robin, StateDependent,
 )
 
 grid   = uniform_grid(length, n)          # or grid_from_edges([...])  (non-uniform)
 solver = Diffusion1D(grid, D, bc_left, bc_right, source=None,
-                     method="backward_euler")   # or "crank_nicolson"
+                     method="backward_euler",    # or "crank_nicolson"
+                     picard_tol=1e-10, picard_max_iter=100)   # nonlinear-D controls only
 
 state = solver.step(state, dt, t0=0.0)            # one step; returns new array
 state = solver.solve(state, t_end, dt, t0=0.0)    # march to t0+t_end
@@ -62,10 +71,16 @@ q     = solver.total(state)                       # ∫u dx = Σ uᵢΔxᵢ
 J     = solver.flux(state, end, t=0.0)            # end ∈ {"left","right"}
 ```
 
-- **`D`**: scalar, length-`n` cell-centered array `D(x)`, or callable `D(t)`
-  returning either. (`D(T)` is expressed as a callable closing over a temperature
-  schedule: `lambda t: D0*np.exp(-Q/(R*T(t)))`.) Full nonlinear `D(u)` is **v1.1,
-  not built** (keeps v1 small).
+- **`D`**: scalar, length-`n` cell-centered array `D(x)`, a callable `D(t)`
+  returning either, or a `StateDependent(func)` wrapper for the **nonlinear**
+  diffusivity `D = func(u)` (e.g. concentration-dependent `D(N)`). (`D(T)` is
+  expressed as a callable closing over a temperature schedule:
+  `lambda t: D0*np.exp(-Q/(R*T(t)))`.) A bare callable is always `D(t)`; **only**
+  the `StateDependent` wrapper triggers the nonlinear per-step Picard solve
+  (invariant 6) — the linear forms keep their single-solve `step()`.
+- **`picard_tol`, `picard_max_iter`**: control the `StateDependent` Picard solve
+  (convergence `max|Δu| ≤ picard_tol·max|u|`, capped at `picard_max_iter`,
+  no raise on cap). Ignored for the linear `D` forms.
 - **`source`**: scalar, length-`n` array, or callable `S(t)`; units of `u`/time.
 - **Boundary conditions** (each end, independently):
   - `Dirichlet(value)` — `u = value` at the face (`value` scalar or `value(t)`).
@@ -118,6 +133,16 @@ layer (ADR 0002) consumes the same `state` — never a live solver object.
    case steel uses next), and an array `D(x)` two-layer medium reproduces the
    exact series-resistance steady state — the one check that exercises the
    harmonic-mean face diffusivity.
+6. **Nonlinear `D(u)`** (`test_nonlinear_d.py`, added 2026-06-10): a
+   `StateDependent(func)` diffusivity is solved per step by **Picard** iteration to
+   the fully-implicit nonlinear backward-Euler fixed point. Asserted: a *constant*
+   `func` reproduces the scalar-`D` run **bit-for-bit** (the degenerate seam — the
+   nonlinear hook *is* the engine); the Picard output satisfies its own nonlinear
+   residual (converged, not a lag); `Σ uᵢΔxᵢ` stays conserved under no-flux with
+   `D(u)` active (the telescoping is `D`-independent **per iterate**); and a
+   constant-source profile collapses under `η = x/√t` for **any** `D(u)` (the
+   model-independent self-similar anchor). **Additive:** only `StateDependent` enters
+   the Picard loop, so invariants 1–5 pass **unmodified** (their tests are unchanged).
 
 ## Validation boundary (what 1a does *not* claim)
 
@@ -131,6 +156,8 @@ TTT/Jominy data (Steel plan §3, Phases 1–2). The validation suite here promis
 ## Units & scope
 
 - **SI throughout.** Mass vs heat mode differ only by relabelling.
-- **Not in v1:** nonlinear `D(u)`; 2-D/3-D; explicit time stepping. The
-  array-`state` boundary is the seam where a deferred heavy regime (or a compiled
-  core) is later slotted without touching consumers (ARCHITECTURE.md §8, ADR 0001).
+- **Nonlinear `D(u)` is built** (2026-06-10, the first exercise of the unfreeze):
+  pass `StateDependent(func)`; each step is Picard-solved (invariant 6).
+- **Not built:** 2-D/3-D; explicit time stepping. The array-`state` boundary is the
+  seam where a deferred heavy regime (or a compiled core) is later slotted without
+  touching consumers (ARCHITECTURE.md §8, ADR 0001).
