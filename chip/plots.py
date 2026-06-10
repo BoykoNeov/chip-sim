@@ -42,6 +42,13 @@ THRESHOLD_COLOR = "#c0392b"     # the resist clip level + the printed CD
 COHERENT_LIMIT_COLOR = "#2f6fb0"   # the k₁=0.5 coherent resolution limit (λ/NA)
 TWO_BEAM_LIMIT_COLOR = "#d4711f"   # the k₁=0.25 two-beam resolution floor (λ/2NA)
 
+# Coupling (v1.2) colours — the Phase 1↔2 back-coupling (oxidation reaching back on the profile).
+INERT_COLOR = "#888888"         # the baseline: a sealed inert drive-in (no oxidation, no coupling)
+OED_COLOR = "#d4711f"           # OED only — the enhanced, deeper profile (amber, like oxidation)
+COUPLED_COLOR = "#2f6fb0"       # OED + segregation — the full back-coupling (boron depletion case)
+PILEUP_COLOR = "#27795b"        # the phosphorus pile-up case (green — the opposite-sign signature)
+SEED_COLOR = "#bbbbbb"          # the starting profile (the predep seed before the oxidizing anneal)
+
 # Device (Phase 4) colours — the V_t waterfall (where the threshold voltage comes from).
 VFB_COLOR = "#8e44ad"           # the flat-band voltage term (gate work function)
 BAND_COLOR = "#2f6fb0"          # the 2φ_F surface-potential term
@@ -470,4 +477,75 @@ def device_figure(result) -> "plt.Figure":
     fig.suptitle("Microchip: process → device — a coherent n-MOSFET, recipe in → $V_t$ out",
                  fontsize=13, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
+    return fig
+
+
+def coupling_figure(cases: list[dict]) -> "plt.Figure":
+    """The banked v1.2 artifact: oxidation reaching back on the dopant profile (OED + segregation).
+
+    One panel per dopant ``case`` (a dict from :func:`demo_coupling.compute`), each over-plotting the
+    same depth axis (log concentration):
+
+      * the **seed** (the predep before the oxidizing anneal, faint);
+      * the **inert** drive-in (grey baseline — what v1 assumed: no back-coupling);
+      * **OED only** (amber — the profile pushed *deeper*, the diffusivity enhanced by injected
+        interstitials);
+      * **OED + segregation** (the full coupling — the surface reshaped: **boron depletes**,
+        **phosphorus piles up**), with the surface concentration shift annotated.
+
+    The teaching point drawn straight on the figure: *oxidation is not a bystander — it enhances the
+    diffusion and partitions the dopant at the moving interface.* Consumes plain arrays / the
+    :class:`coupling.CoupledResult` dataclasses (no live solver object, ADR 0002).
+    """
+    n = len(cases)
+    fig, axes = plt.subplots(1, n, figsize=(6.6 * n, 6), squeeze=False)
+    for ax, case in zip(axes[0], cases):
+        inert, oed, coupled = case["inert"], case["oed"], case["coupled"]
+        sig_color = COUPLED_COLOR if case["sign"] == "depletion" else PILEUP_COLOR
+        x_um = _depth_um(inert.x)
+
+        ax.semilogy(x_um, np.maximum(case["seed"], 1.0), color=SEED_COLOR, lw=1.4, ls=":",
+                    label=f"seed (predep), surface {case['seed'][0]:.1e}")
+        ax.semilogy(x_um, np.maximum(inert.N, 1.0), color=INERT_COLOR, lw=2.0,
+                    label=f"inert drive-in, surface {inert.surface_concentration:.1e}")
+        ax.semilogy(x_um, np.maximum(oed.N, 1.0), color=OED_COLOR, lw=2.2,
+                    label=f"+ OED (×{oed.effective_Dt / (oed.D_inert * oed.t_seconds):.2f} eff. $\\int\\!D\\,dt$)")
+        ax.semilogy(x_um, np.maximum(coupled.N, 1.0), color=sig_color, lw=2.6,
+                    label=f"+ segregation, surface {coupled.surface_concentration:.1e}")
+
+        # Annotate the surface shift (the segregation signature): depletion (down) or pile-up (up).
+        # Read against OED-only — the amber→coloured step — so it ISOLATES segregation from OED's
+        # spreading (OED deepens the profile, dropping the surface peak for both dopants; segregation
+        # then reshapes it: boron further down, phosphorus back up). Coupled-vs-inert would conflate
+        # the two and hide phosphorus pile-up behind the OED drop.
+        ratio = coupled.surface_concentration / oed.surface_concentration
+        verb = "depletes" if case["sign"] == "depletion" else "piles up"
+        ax.annotate(
+            f"surface {verb} vs OED\n×{ratio:.2f}  (m = {case['m']})",
+            xy=(x_um[0], coupled.surface_concentration),
+            # text low-centre, well clear of the upper-right legend (arrow runs to the surface cell).
+            xytext=(x_um[-1] * 0.34, coupled.surface_concentration * 0.10),
+            color=sig_color, fontsize=9.5, ha="center",
+            arrowprops=dict(arrowstyle="->", color=sig_color, lw=1.2),
+        )
+        floor = min(inert.surface_concentration, coupled.surface_concentration) * 1e-3
+        ceil = max(case["seed"][0], coupled.surface_concentration) * 4
+        ax.set_ylim(max(floor, 1e13), ceil)
+        ax.set_xlim(0, x_um[-1] * 0.6)
+        ax.set_xlabel("depth  (µm)")
+        ax.set_ylabel("dopant concentration $N$  (cm⁻³)")
+        ax.set_title(f"{case['name']} — {case['sign']} ($f_I$ = {case['f_I']})")
+        ax.legend(loc="upper right", fontsize=8.3, framealpha=0.95)
+        ax.grid(True, which="both", alpha=0.18)
+        # Own the scope edge on the artifact itself: pile-up magnitude carries the fixed-grid
+        # swept-sliver double-count (direction real, ~2× high); depletion (boron) is robust.
+        note = ("robust (oxide-uptake-dominated)" if case["sign"] == "depletion"
+                else "direction real; magnitude ~2× high\n(fixed-grid swept-sliver edge)")
+        ax.text(0.03, 0.03, note, transform=ax.transAxes, fontsize=7.6, va="bottom", ha="left",
+                color="#555555", style="italic",
+                bbox=dict(boxstyle="round", fc="white", ec="#dddddd", alpha=0.85))
+
+    fig.suptitle("Microchip v1.2: the Phase 1↔2 back-coupling — oxidation reshapes the dopant profile",
+                 fontsize=13, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
     return fig

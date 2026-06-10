@@ -485,6 +485,47 @@ from a 100 %-complete Steel to Chip.
 > native-units rule), µm at the boundary. SHARED-FILE ASKS: the `massoud-thin-oxide-source` memory note
 > (this addendum carries the full pin meanwhile).
 
+> **v1.2 — the Phase 1↔2 back-coupling (OED + dopant segregation): BUILT (2026-06-10).** The named §3
+> deferral of *both* Phase 1 (the `D(N)`-adjacent back-reaction) and Phase 2 (the OED/segregation
+> coupling), **promoted** (the steel-ferrite-bay / Massoud move). `projects/chip/coupling.py`, chip-local,
+> consuming a `diffusion_dopant` profile + an `oxidation` rate. **The decisive architecture finding: both
+> effects are expressible *within the frozen engine* — no contract amendment.** *OED* (oxidation-enhanced
+> diffusion) is a **position/time-dependent `D(x,t)`** (it tracks the oxidation rate + depth, **not** the
+> concentration `N`), so it is the engine's *already-frozen variable-`D(t)` callable* case
+> (`test_variable_d`) — pointedly **not** the unbuilt nonlinear `D(N)` case (that one *would* need a v1.1
+> amendment; it stays the named `diffusion_dopant` scope edge). *Segregation* is a time-dependent
+> `Neumann(flux(t))` surface BC. Model: `D_eff/D_inert = 1 + f_I·Δ`, supersaturation `Δ = Δ_ref·(dx_ox/dt /
+> R_ref)^0.5` (the cited half-power law), cited `f_I` (B 0.30 / P 0.38 / Sb 0.015 — the dual I/V
+> quantification paper) reproducing **enhanced (B, P) vs un-enhanced (Sb)**; segregation flux `J =
+> N_surf·(0.44 − 1/m)·(dx_ox/dt)`, cited `m = solubility_Si/solubility_SiO₂` (B 0.3 / P 10 — **Hollauer §4.1
+> Table 4.1, the SAME dissertation as the Massoud pin**) giving **boron depletion / phosphorus pile-up**.
+> With `demo_coupling.py` + `plots.coupling_figure` (the banked artifact: boron depletion beside phosphorus
+> pile-up, each decomposing inert → +OED [deeper, ×~2 effective `∫D dt`] → +segregation → `docs/figures/
+> chip-oed-segregation.png`). **19-test triad** sealed; chip gate **152 green** (+19). Triad:
+> *analytic* = the **unified degenerate seam** (`dx_ox/dt=0` collapses both effects → plain `drive_in`
+> bit-for-bit) + the **OED ≡ effective-`∫D dt`** leg (the frozen variable-`D` τ-substitution: a warm-started
+> Gaussian under OED matches the analytic Gaussian at age `a₀+∫D_eff dt`); *conservation* = OED-alone-sealed
+> dose machine-exact (a real check) + the coupled `Si+oxide` identity (an **accounting** identity, not a
+> magnitude check); *benchmark* = cited `f_I` (enhanced ordering P>B; Sb un-enhanced) + cited `m`
+> (depletion/pile-up directions). Durable advisor calls: **(1)** the degenerate anchor is `dx_ox/dt→0`, **not**
+> `m→∞` (the advisor's first correction — `m→∞` = oxide accepts nothing = *maximum pile-up*, not sealed; the
+> wrong anchor was dropped). **(2) The named scope edge — the swept-sliver double-count** (the advisor's
+> blocking call): the segregation flux is a **moving-*interface* mass balance run on a *non-moving* grid**, so
+> the `0.44·R` recession term ("dopant freed by consumed silicon") is **counted twice** (the swept region is
+> kept in the domain *and* its dopant re-injected at the surface). Pinned by the **`m→∞` inert-oxide
+> diagnostic** (an inert oxide must conserve silicon dopant; the model spuriously *gains* ~10% of the dose).
+> Consequence owned in code+tests+figure: **boron depletion is robust** (oxide-uptake-dominated, `1/m=3.3`
+> vs the `0.44` double-count ≈13% — the device-relevant case), **phosphorus pile-up direction is real but
+> magnitude ~2× inflated**; the coupled "conservation" reframed as an accounting identity (tautological —
+> closes for any flux). The real fix (advance the interface / remap the ~1-cell swept region) is a
+> Stefan-problem treatment the pure-diffusion engine can't express — named, not silently carried. **(3)**
+> Sb stays a *qualitative* ORD scope edge (`f_I`=0.015 → factor ≈1.05 = a small *wrong-sign* residual, **not**
+> a retardation number — true ORD needs the unmodeled vacancy-undersaturation term). The OED amplitude is
+> **calibrated (flagged)**; the tight legs (degenerate, effective-`∫D dt`, OED conservation) hold for any
+> amplitude. Units: semiconductor CGS-cm (the diffusion side), the oxidation rate consumed at the boundary
+> (unit-free ratio for `Δ`, cm/s for the flux). SHARED-FILE ASKS: the `oed-source`, `dopant-segregation-source`,
+> and (finally) `massoud-thin-oxide-source` memory notes.
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **frozen
 `engines/diffusion`** in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**
