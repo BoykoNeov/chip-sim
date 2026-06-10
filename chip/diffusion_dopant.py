@@ -1,9 +1,9 @@
-"""Dopant diffusion: the frozen spine in mass mode → the predep/drive-in chain (Chip Phase 1a).
+"""Dopant diffusion: the spine in mass mode → the predep/drive-in chain (Chip Phase 1a).
 
 The *same* sealed :mod:`engines.diffusion` solver that cooled Steel's Jominy bar (heat
 mode) and carburized its gear tooth (carbon mass mode) now diffuses **dopant atoms** into
 silicon — the chip face of the program spine. Two classic fab steps, both straight
-instantiations of the frozen contract:
+instantiations of the contract:
 
   * **Predeposition** — a constant-source step. The wafer surface is held at the dopant's
     **solid-solubility limit** ``N_s`` (a fixed atmosphere/glass source), so the surface is
@@ -48,7 +48,7 @@ The exact forms assume **constant, intrinsic D**. The honest ceiling, named not 
     edge (carburize's Tibbetts analogue) bites the *predep leg* hardest. The exact erfc/Gaussian legs
     are validated on their idealizations; the realistic predep→drive-in demo's job is the junction,
     not the exact form. **BUILT in v1.3** (:mod:`diffusion_highconc`): the Fair charge-state ``D(N)``
-    and its **box** profile — and the decisive finding is that it needed **no** frozen-engine
+    and its **box** profile — and the decisive finding is that it needed **no** engine
     amendment (``CONTRACT.md`` flags nonlinear ``D(u)`` as unbuilt, and it *stays* unbuilt **in the
     engine**): a lagged-coefficient ``D(N)`` is reachable from the *consumer's* step-loop via a
     stateful ``D(t)`` closure, Picard-converging to the fully-implicit solve. The box **front** +
@@ -70,7 +70,7 @@ concentration ``N``    **cm⁻³**        Trumbore ``N_s`` is *native* cm⁻³ �
 dose ``Q = ∫N dx``     **cm⁻²**        (atoms per cm² of wafer)
 temperature            **°C**          → kelvin internally for the Arrhenius
 =====================  ==============  =====================================================
-The frozen engine is unit-agnostic (no physical constant is baked in — verified; it solves
+The engine is unit-agnostic (no physical constant is baked in — verified; it solves
 the PDE in whatever consistent length/time the consumer feeds it), so we run it in **cm and
 seconds**. This keeps every cited constant in the exact units its source states (best for
 verifiability) and lets :mod:`junction` integrate ``R_s`` in Ω/sq directly. **One unit system
@@ -78,7 +78,7 @@ throughout the module — never split m-for-diffusion / cm-for-R_s.**
 
 Validation boundary
 -------------------
-The solver machinery is the frozen engine's, validated in ``engines/diffusion/tests``. This
+The solver machinery is the engine's, validated in ``engines/diffusion/tests``. This
 module's tests validate the **dopant instantiation**: the erfc/Gaussian forms (constant-D),
 the dose conservation + predep flux-bookkeeping identity, and (with :mod:`junction`) the
 junction-depth / sheet-resistance benchmark vs Irvin. The diffusivity *values* (``D₀, Ea``)
@@ -196,7 +196,7 @@ def predep_dose(N_surface: float, D: float, t: float) -> float:
 
 
 # --------------------------------------------------------------------------- #
-# 3. The frozen-engine wrapper + the two fab steps → DopantProfile
+# 3. The engine wrapper + the two fab steps → DopantProfile
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class DopantProfile:
@@ -236,7 +236,7 @@ def _diffuse(
     grid: Grid, D: float, N0: np.ndarray, bc_left, bc_right,
     t_seconds: float, n_steps: int, method: str,
 ) -> tuple[np.ndarray, float, float]:
-    """Thin frozen-engine wrapper: march ``N0`` for ``t_seconds`` → ``(N, dose, surf_flux)``.
+    """Thin engine wrapper: march ``N0`` for ``t_seconds`` → ``(N, dose, surf_flux)``.
 
     The single place the engine is called. ``dose`` is the final ``∫N dx``; ``surf_flux`` is the
     accumulated ``Σ dt·flux(left)`` — the surface flux integrated over the march, the
@@ -263,7 +263,7 @@ def predeposit(
     n_steps: int = 600,
     method: str = "backward_euler",
 ) -> DopantProfile:
-    """Constant-source predeposition → the ``erfc`` profile (frozen engine, **Dirichlet** surface).
+    """Constant-source predeposition → the ``erfc`` profile (engine, **Dirichlet** surface).
 
     Holds the surface at ``N_surface`` (default = the dopant's solid-solubility limit) and
     diffuses into an initially un-doped wafer; the far end is no-flux (semi-infinite, provided
@@ -302,7 +302,7 @@ def drive_in(
     n_steps: int = 600,
     method: str = "backward_euler",
 ) -> DopantProfile:
-    """Sealed-surface drive-in → redistribute a fixed dose (frozen engine, **Neumann(0)** both ends).
+    """Sealed-surface drive-in → redistribute a fixed dose (engine, **Neumann(0)** both ends).
 
     Takes an existing profile ``N_initial`` (e.g. a predep ``erfc``, or a warm-started analytic
     Gaussian) and redistributes it deeper at ``T_celsius`` for ``t_seconds`` with the surface

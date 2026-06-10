@@ -1,7 +1,7 @@
 """Chip v1.2 validation: the Phase 1↔2 back-coupling — OED + dopant segregation.
 
-This carries the plan's v1.2 triad (:mod:`coupling`). The coupling is built *entirely on* the frozen
-:mod:`engines.diffusion` (OED is its already-frozen variable-``D(t)`` callable; segregation a
+This carries the plan's v1.2 triad (:mod:`coupling`). The coupling is built *entirely on* the
+:mod:`engines.diffusion` (OED is its already-supported variable-``D(t)`` callable; segregation a
 ``Neumann(flux(t))`` BC) — so unlike Phase 2/3/4 there *is* a spine underneath, and these tests
 validate the **coupling instantiation**, not the solver machinery (sealed in
 ``engines/diffusion/tests``):
@@ -68,7 +68,7 @@ def test_enhancement_and_flux_vanish_at_zero_oxidation_rate():
 
 def test_oed_is_the_engine_effective_integral_D_dt():
     # OED's REAL analytic leg (not mere degenerate recovery): a sealed-surface OED solve depends on
-    # the history only through ∫D_eff dt (the frozen variable-D τ-substitution, test_variable_d). So
+    # the history only through ∫D_eff dt (the variable-D τ-substitution, test_variable_d). So
     # a warm-started analytic Gaussian propagated under OED equals the analytic Gaussian at the
     # effective age a0 + ∫D_eff dt. This exercises the enhancement *through the engine*, end to end.
     D_inert = dd.diffusivity("B", 1000.0)

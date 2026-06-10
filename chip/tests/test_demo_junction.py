@@ -1,7 +1,7 @@
 """Integration test for the pn-junction demo (Chip Phase 1a — the demo IS the integration test).
 
 The junction demo wires the whole dopant mass-mode chain together — ``diffusion_dopant.two_step``
-(predep ``erfc`` → drive-in via the frozen engine) → ``junction.analyze_junction`` (junction depth
+(predep ``erfc`` → drive-in via the engine) → ``junction.analyze_junction`` (junction depth
 + Masetti sheet resistance) → ``plots``. So its compute pipeline is the end-to-end check that they
 compose, asserted on the *robust* thesis (a junction ~1 µm deep with a sane sheet resistance, the
 dose conserved through the drive-in, the surface redistributed deeper), not brittle exact numbers

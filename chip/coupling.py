@@ -17,17 +17,17 @@ deferral becomes today's phase) — builds them:
     → the silicon surface **depletes**; **phosphorus (m > 1)** is rejected by the oxide → it
     **piles up** at the silicon surface ("snowplow").
 
-Both are expressible **entirely within the frozen** :mod:`engines.diffusion` **contract** — the
+Both are expressible **entirely within the ** :mod:`engines.diffusion` **contract** — the
 decisive architecture finding, and *why* this was reachable without an engine amendment:
 
   * OED is a **position/time-dependent diffusivity** ``D(x, t)`` (it depends on the oxidation rate
-    and depth, **not** on the concentration ``N``), so it is the engine's already-frozen
+    and depth, **not** on the concentration ``N``), so it is the engine's already-supported
     *variable-D callable* ``D(t)`` case (CONTRACT.md / ``test_variable_d``) — **not** the unbuilt
     nonlinear ``D(N)`` case (that one *would* need a v1.1 contract amendment, and is the separate
     named scope edge of :mod:`diffusion_dopant`). Here OED is a clean ``D(t)`` the engine already
     promises.
   * Segregation is a **time-dependent surface flux** at the interface, i.e. a ``Neumann(flux(t))``
-    boundary — also frozen (BC parameters accept callables).
+    boundary — also supported (BC parameters accept callables).
 
 The unified degenerate anchor (the seam the whole module recovers v1 through)
 -----------------------------------------------------------------------------
@@ -47,7 +47,7 @@ Validation triad (plan §3) — what is asserted tight vs loose
   (a) *Degenerate recovery.* ``dx_ox/dt = 0`` → :func:`oxidize_couple` equals
   :func:`diffusion_dopant.drive_in` to machine precision (both effects vanish — the unified seam).
   (b) *OED ≡ the engine's time-substitution.* A sealed-surface OED solve depends on the diffusion
-  history **only through** ``∫ D_eff(t) dt`` (the frozen variable-D ``τ = ∫D dt`` guarantee,
+  history **only through** ``∫ D_eff(t) dt`` (the variable-D ``τ = ∫D dt`` guarantee,
   ``test_variable_d``): warm-started from an analytic Gaussian it reproduces
   :func:`diffusion_dopant.analytic_drivein_gaussian` at the *effective* age
   ``a₀ + ∫ D_eff dt`` (:func:`effective_Dt`) — OED's **real** analytic leg, not merely degenerate
@@ -140,7 +140,7 @@ units) honored.
 
 Validation boundary
 -------------------
-The solver machinery is the frozen engine's (``engines/diffusion/tests``); the constants are cited
+The solver machinery is the engine's (``engines/diffusion/tests``); the constants are cited
 (the OED/segregation source notes). This module's tests validate the **coupling instantiation**: the
 unified degenerate seam, the OED effective-``∫D dt`` leg, the per-scenario conservation, and the
 cited-``f_I``/``m`` direction benchmarks. The OED *amplitude* is calibrated (flagged), so the
@@ -326,7 +326,7 @@ def effective_Dt(
 ) -> float:
     """The effective diffusion length-squared ``∫₀ᵗ D_eff(t') dt'`` (cm²) over an oxidizing anneal.
 
-    The frozen engine's variable-D guarantee is that a sealed-surface profile depends on the
+    The engine's variable-D guarantee is that a sealed-surface profile depends on the
     diffusion history **only through** this integral (the ``τ = ∫D dt`` time substitution,
     ``test_variable_d``). So a warm-started analytic Gaussian propagated under OED reproduces the
     analytic Gaussian at the effective age ``a₀ + effective_Dt`` — OED's real analytic leg. With
@@ -414,7 +414,7 @@ def oxidize_couple(
     The Phase-1↔2 coupled step: a furnace anneal that **grows oxide and redistributes dopant at the
     same time**. Unlike :func:`diffusion_dopant.drive_in` (a sealed inert anneal), here the oxidizing
     interface (i) **enhances** the diffusivity via OED (the time-varying ``D_eff(t)`` callable the
-    frozen engine accepts) and (ii) **segregates** dopant across the moving boundary (a lagged
+    engine accepts) and (ii) **segregates** dopant across the moving boundary (a lagged
     ``Neumann(flux(t))`` surface BC). The far end stays no-flux (semi-infinite).
 
     Parameters
@@ -454,7 +454,7 @@ def oxidize_couple(
             f"no cited segregation coefficient for {d.name!r} "
             f"(have {sorted(SEGREGATION_COEFFICIENT)}) — pass segregation=False or segregation_m=…")
 
-    # OED diffusivity as the engine's frozen D(t) callable (scalar → broadcast; uniform in depth,
+    # OED diffusivity as the engine's D(t) callable (scalar → broadcast; uniform in depth,
     # the named recombination-length-≫-junction reduction). oed=False ⇒ the bare intrinsic D.
     def D_of_t(t_seconds_: float) -> float:
         if not oed:

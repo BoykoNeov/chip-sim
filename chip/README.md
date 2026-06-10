@@ -1,7 +1,7 @@
 # `chip` — the microchip fabrication simulator
 
 *Process recipe in, device out.* Project #2 of the program and the **first consumer of the
-frozen diffusion/heat spine** (`engines/diffusion`): it builds **no** new shared engine — it
+diffusion/heat spine** (`engines/diffusion`): it builds **no** new shared engine — it
 proves the spine reuses. Dopant profiles *are* the carbon-diffusion code Steel froze, in **mass
 mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/microchip-fabrication.md).
 
@@ -10,7 +10,7 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
 > cross-module length currency** (junction depths and oxide thicknesses both reported in µm).
 > *Dopant diffusion* (`diffusion_dopant.py`, `junction.py`) uses **semiconductor CGS** — cm /
 > cm²·s⁻¹ / cm⁻³ / cm²·V⁻¹·s⁻¹ — the native units of Fair `D₀`, Trumbore `N_s`, Masetti `μ` (the
-> frozen engine is unit-agnostic, fed cm + seconds; `R_s` falls out in Ω/sq directly). *Oxidation*
+> engine is unit-agnostic, fed cm + seconds; `R_s` falls out in Ω/sq directly). *Oxidation*
 > (`oxidation.py`) uses **Deal–Grove-native µm-hour** — `B` (µm²/hr), `B/A` (µm/hr) — the units the
 > cited rate constants are tabulated in (its v1.1 **Massoud block** computes in the *Massoud*
 > tables' native **nm-minute** — the same rule applied per cited *dataset* — exporting µm at the
@@ -25,7 +25,7 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
 ## Load pointer (per-session working set, ARCHITECTURE.md §11)
 
 - **To work on dopant diffusion (Phase 1a):** `diffusion_dopant.py` + its `tests/`. It loads the
-  frozen `engines/diffusion/CONTRACT.md` (**mass mode**: Dirichlet predep surface / Neumann(0)
+  `engines/diffusion/CONTRACT.md` (**mass mode**: Dirichlet predep surface / Neumann(0)
   sealed drive-in) — `predeposit` → `erfc`, `drive_in` → near-Gaussian, `two_step` chains them.
   The module docstring is its contract (the cited Fair `D(T)`, the exact-anchor-vs-realistic-demo
   split, the constant-D scope edge).
@@ -38,7 +38,7 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   `two_step` → `analyze_junction` → `plots` and saves `docs/figures/chip-junction.png`.
 - **To work on oxidation (Phase 2):** `oxidation.py` + `tests/test_oxidation.py`, the demo
   `demo_oxidation.py` + `tests/test_demo_oxidation.py`, and `plots.oxidation_figure`. A **chip-local
-  closed form** (Deal–Grove `x²+Ax=B(t+τ)`, wet/dry) — **does not touch the frozen engine**;
+  closed form** (Deal–Grove `x²+Ax=B(t+τ)`, wet/dry) — **does not touch the engine**;
   `grow_oxide` → `OxideGrowth` (`t_ox` in µm, the cross-module currency), `oxide_thickness`/
   `linear_limit`/`parabolic_limit`/`growth_rate` the closed form + limits + ODE. The module docstring
   is its contract (cited `B`/`B/A`, the deferred OED/segregation coupling).
@@ -55,7 +55,7 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   `docs/figures/chip-thin-oxide.png`.
 - **To work on lithography (Phase 3):** `litho.py` + `tests/test_litho.py`, the demo `demo_litho.py`
   + `tests/test_demo_litho.py`, and `plots.litho_figure`. The chip's **one genuinely-new module** —
-  **Fourier optics**, chip-local (not promoted to `engines/`); **does not touch the frozen engine**.
+  **Fourier optics**, chip-local (not promoted to `engines/`); **does not touch the engine**.
   Core: `coherent_image` (the `|Σ orders|²` primitive) → `two_beam_image` (the exact `4cos²(πx/p)`
   anchor) + `abbe_image` (the partially-coherent **Abbe sum-over-source** workhorse, with
   `conventional_source`/`offaxis_source`); `rayleigh_resolution` (`R=k₁λ/NA`), `transmitted_power` (the
@@ -66,7 +66,7 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
 - **To work on defocus & the depth of focus (v1.4 — Phase 3's "in-focus pupil" scope edge, promoted):**
   `litho.py` §7 + `tests/test_defocus.py`, the demo `demo_defocus.py` + `tests/test_demo_defocus.py`, and
   `plots.defocus_figure`. Defocus is a pure **phase** aberration, so it lives **inside** the existing
-  Fourier-optics machinery — **no new path, no frozen-engine touch**: `defocus_phase` (the pupil phase
+  Fourier-optics machinery — **no new path, no engine touch**: `defocus_phase` (the pupil phase
   `exp(i·(2π/λ)·z·(1−cosθ))` on the full pupil coordinate `f_m+f_s`; `z=0` → in-focus **bit-for-bit**)
   multiplies each collected order, threaded through `abbe_image`/`expose_grating` (`defocus_nm=0.0`).
   `Imaging.depth_of_focus`/`rayleigh_depth_of_focus` (`DOF=k₂λ/NA²`, `K2_DOF=0.5`), `fundamental_amplitude`
@@ -86,7 +86,7 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
 - **To work on the back-coupling (v1.2 — OED + dopant segregation):** `coupling.py` +
   `tests/test_coupling.py`, the demo `demo_coupling.py` + `tests/test_demo_coupling.py`, and
   `plots.coupling_figure`. The **Phase-1↔2 back-reaction** (oxidation reaching back on the dopant
-  profile), built **entirely on the frozen engine** — OED is its already-frozen variable-`D(t)`
+  profile), built **entirely on the engine** — OED is its already-supported variable-`D(t)`
   callable, segregation a `Neumann(flux(t))` BC — **no engine amendment** (the decisive finding;
   `D(N)` was the case we thought *would* need one — v1.3 showed it does **not** either, via the
   consumer-side lagged-closure hook). `oxidize_couple` runs an oxidizing
@@ -101,7 +101,7 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   + `tests/test_demo_diffusion_highconc.py`, and `plots.highconc_figure`. The Phase-1 **`D(N)`** scope
   edge, promoted — and the case both `CONTRACT.md` and the plan flagged as a v1.1 **engine amendment**,
   built with **none**: a `D(t)` closure over the evolving field in the consumer's step-loop is a
-  **lagged-coefficient `D(N)`** within the frozen contract (Picard-converging to the fully-implicit
+  **lagged-coefficient `D(N)`** within the contract (Picard-converging to the fully-implicit
   solve). `effective_diffusivity` is the cited **Fair charge-state** `D_eff = D⁰+D⁻(n/n_i)+D⁼(n/n_i)²`
   (`CHARGE_STATE_TERMS`, Plummer Ch. 7 / Fair–Tsai 1977); `intrinsic_carrier_concentration` the `n_i(T)`;
   `predeposit_highconc`/`drive_in_highconc` the fab steps (the box), `constant_D_predeposit` the
@@ -166,8 +166,8 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
 - **v1.2 — the Phase 1↔2 back-coupling (OED + dopant segregation): BUILT** (2026-06-10). `coupling.py`
   — the named §3 deferral of both `oxidation` and the plan, **promoted** (the steel-ferrite-bay /
   Massoud move). Two oxidation back-reactions on the Phase-1 profile, both expressible **within the
-  frozen engine** (the decisive architecture finding — **no contract amendment**): **OED**
-  (oxidation-enhanced diffusion) is the engine's already-frozen variable-`D(t)` callable
+  engine** (the decisive architecture finding — **no contract amendment**): **OED**
+  (oxidation-enhanced diffusion) is the engine's already-supported variable-`D(t)` callable
   (`D_eff/D_inert = 1 + f_I·Δ`, supersaturation `Δ ∝ (dx_ox/dt)^0.5`, cited `f_I` B 0.30 / P 0.38);
   **segregation** is a `Neumann(flux(t))` BC (`J = N_surf·(0.44 − 1/m)·dx_ox/dt`, cited `m` B 0.3 / P
   10 → boron depletes, phosphorus piles up). + `demo_coupling.py` + `plots.coupling_figure`. Banked
@@ -175,7 +175,7 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   ×~2 effective `∫D dt`) → +segregation (surface reshaped) (`docs/figures/chip-oed-segregation.png`).
   19-test triad: the **unified degenerate seam** (`dx_ox/dt=0` → plain `drive_in` bit-for-bit — drop
   the wrong `m→∞` anchor, the advisor's first call), the **OED ≡ effective-`∫D dt`** analytic leg (the
-  frozen variable-`D` τ-substitution), OED-alone dose conservation, the cited `f_I`/`m` direction
+  variable-`D` τ-substitution), OED-alone dose conservation, the cited `f_I`/`m` direction
   benchmarks. **The named scope edge (the advisor's blocking call): the swept-sliver double-count** —
   the segregation flux is a *moving-interface* mass balance run on a *non-moving* grid, so the `0.44·R`
   recession term is counted twice; the **`m→∞` inert-oxide diagnostic** pins the artifact (spurious
@@ -185,8 +185,7 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   check**. Sb kept a *qualitative* ORD scope edge (`f_I`=0.015 → ≈1.05, not a retardation number).
 - **v1.3 — concentration-dependent diffusivity `D(N)` (the high-concentration box): BUILT** (2026-06-10).
   `diffusion_highconc.py` — the Phase-1 `D(N)` scope edge, promoted. **The decisive finding: `D(N)` — the
-  case both `CONTRACT.md` and §3 flagged as a v1.1 frozen-engine amendment — fits *within* the frozen
-  engine, no amendment.** The consumer's step-loop + a `D(t)` closure over the evolving field = a
+  case both `CONTRACT.md` and §3 flagged as a v1.1 engine amendment — fits *within* the engine, no amendment.** The consumer's step-loop + a `D(t)` closure over the evolving field = a
   **lagged-coefficient `D(N)`** (one solve/step, zero engine edits), Picard-converging to the
   fully-implicit nonlinear solve (`2==6`, dt-stable). Cited **Fair charge-state** model
   `D_eff = D⁰+D⁻(n/n_i)+D⁼(n/n_i)²` (Plummer Ch. 7 / Fair–Tsai 1977); `n_i(T)=3.87e16·T^1.5·exp(−0.605/kT)`.
@@ -204,7 +203,7 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   `n_active_max` plateau cap. **No ADR / no engine re-seal** (the finding obviated them); seal intact.
 - **v1.4 — lithographic defocus, the depth of focus & the Bossung curve: BUILT** (2026-06-10).
   `litho.py` §7 — Phase 3's **"ideal in-focus pupil"** scope edge, promoted. Defocus is a pure **phase**
-  aberration, so it fits **inside** the litho module (no new path, frozen engine untouched): `defocus_phase`
+  aberration, so it fits **inside** the litho module (no new path, engine untouched): `defocus_phase`
   multiplies each collected order by `exp(i·(2π/λ)·z·(1−cosθ))` (keyed to the full pupil coordinate
   `f_m+f_s`), threaded through `abbe_image`/`expose_grating` — `z=0` is the in-focus image **bit-for-bit**.
   + `demo_defocus.py` + `plots.defocus_figure`. Banked artifact: the **Bossung curve** (printed CD vs
@@ -262,6 +261,6 @@ not correctness**: the per-phase triads already validate the numbers.
 ```
 
 `pyproject.toml`'s `testpaths` already carries `projects`, so `chip/tests/` is collected
-with no config change; `pythonpath = ["."]` lets chip import the frozen engine as `engines.diffusion…`.
+with no config change; `pythonpath = ["."]` lets chip import the engine as `engines.diffusion…`.
 The notebook smoke-test (`tests/test_chip_notebook.py`) is `slow`-marked, so the fast lane deselects it;
 it runs in the full gate (`python -m tools.gate chip` / `./run_tests.ps1`).

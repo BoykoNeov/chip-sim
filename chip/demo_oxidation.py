@@ -1,7 +1,7 @@
 """The Phase-2 anchor demo: thermal oxide grown by Deal–Grove — recipe in, oxide out.
 
 The chip's **second exact anchor** and its one closed-form step. Where Phase 1a diffused dopant
-through the frozen PDE spine, this grows **SiO₂** by the analytic **Deal–Grove** linear-parabolic
+through the PDE spine, this grows **SiO₂** by the analytic **Deal–Grove** linear-parabolic
 law (:mod:`oxidation`) — no engine, just the closed form ``x_ox² + A·x_ox = B(t+τ)``. The headline is
 the **wet-vs-dry** contrast on one wafer:
 

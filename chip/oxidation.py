@@ -1,9 +1,9 @@
 """Thermal oxidation: the Deal–Grove linear-parabolic model (Chip Phase 2).
 
 The second exact anchor of the chip project, and its **one genuinely-closed-form** step.
-Where Phase 1a diffused dopant atoms *into* silicon (the frozen PDE spine in mass mode), oxidation
+Where Phase 1a diffused dopant atoms *into* silicon (the PDE spine in mass mode), oxidation
 *consumes* silicon and grows **SiO₂** on top of it — and unlike diffusion, oxide growth has its own
-**closed-form** kinetics, so this is a small **chip-local analytic/ODE module, not the frozen PDE
+**closed-form** kinetics, so this is a small **chip-local analytic/ODE module, not the PDE
 engine** (plan §2/§3: Deal–Grove is its own closed form, project-local until rule-of-three).
 
 The model (Deal & Grove 1965)

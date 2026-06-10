@@ -2,12 +2,12 @@
 
 The named scope edge of :mod:`diffusion_dopant` (constant-``D`` ``erfc``), **promoted**. The decisive
 claim under test is architectural: ``D(N)`` — the case ``CONTRACT.md`` and the plan both flagged as a
-v1.1 **engine amendment** — is built **entirely within the frozen** :mod:`engines.diffusion` contract,
+v1.1 **engine amendment** — is built **entirely within the ** :mod:`engines.diffusion` contract,
 via a stateful-closure **lagged-coefficient** hook in the consumer's step-loop (no engine edit). The
 triad (plan §3), with the validated-vs-calibrated split made explicit:
 
 * **Analytical limit (tight).** (a) the **degenerate seam** — a constant ``D`` through the same
-  closure equals the plain scalar-``D`` frozen-engine run **bit-for-bit** (the hook *is* the engine),
+  closure equals the plain scalar-``D`` engine run **bit-for-bit** (the hook *is* the engine),
   and the model's ``D_eff → D⁰+D⁻+D⁼`` as ``N → 0``; (b) **Boltzmann similarity** — a constant-source
   ``D(N)`` profile collapses under ``x/√t`` for **any** ``D(N)`` (model-independent; validates the
   nonlinear machinery, not Fair's coefficients).
@@ -83,12 +83,12 @@ def test_effective_diffusivity_rises_with_concentration_n_squared_for_P():
 
 
 # --------------------------------------------------------------------------- #
-# Analytical limit (a): the degenerate seam — the closure IS the frozen engine
+# Analytical limit (a): the degenerate seam — the closure IS the engine
 # --------------------------------------------------------------------------- #
 def test_degenerate_seam_constant_D_closure_equals_scalar_engine_bitforbit():
     # The headline architecture check: feed a CONSTANT D through the lagged closure and it equals a
-    # plain scalar-D frozen-engine predep to the bit. The hook adds nothing when D doesn't vary —
-    # i.e. concentration-dependent D is the *same* frozen solver, driven with a stateful coefficient.
+    # plain scalar-D engine predep to the bit. The hook adds nothing when D doesn't vary —
+    # i.e. concentration-dependent D is the *same* solver, driven with a stateful coefficient.
     grid = uniform_grid(1.5 * CM_PER_UM, 800)
     Ns = DOPANTS["P"].N_solid_solubility
     D_const = hc.intrinsic_diffusivity_lowconc("P", 1000.0)

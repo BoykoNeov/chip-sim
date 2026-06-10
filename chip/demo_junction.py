@@ -1,6 +1,6 @@
 """The Phase-1a anchor demo: a pn junction from a two-step diffusion — recipe in, junction out.
 
-*One solver, the chip face of the spine.* The frozen :mod:`engines.diffusion` that cooled
+*One solver, the chip face of the spine.* The :mod:`engines.diffusion` that cooled
 Steel's Jominy bar (heat mode) and carburized its gear tooth (carbon mass mode) now diffuses
 **boron into silicon** (dopant mass mode) — proving the program spine reuses verbatim. The
 classic two-step process:

@@ -4,7 +4,7 @@ The Phase-3 §-named scope edge ("ideal in-focus pupil"), **promoted** (the stee
 oxidation-Massoud / coupling / D(N) move). Defocus is a pure **phase** aberration on the pupil, so it
 lives inside the existing Fourier-optics machinery (``litho.defocus_phase`` multiplies each collected
 order, ``abbe_image``/``expose_grating`` thread ``defocus_nm``) — no new code path. Like the rest of
-litho there is no frozen engine underneath, so these tests carry the whole mini-triad:
+litho there is no engine underneath, so these tests carry the whole mini-triad:
 
 * **Analytic (tight).** (a) The degenerate seam — ``z = 0`` is the in-focus image **bit-for-bit**.
   (b) A **symmetric two-beam (dipole)** image is defocus-invariant to machine precision (the "infinite

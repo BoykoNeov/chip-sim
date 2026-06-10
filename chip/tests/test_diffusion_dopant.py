@@ -1,8 +1,8 @@
-"""Chip Phase-1a validation: dopant diffusion — the frozen spine in mass mode.
+"""Chip Phase-1a validation: dopant diffusion — the spine in mass mode.
 
 This carries the analytical-limit and conservation legs of the plan's Phase-1 triad
-(microchip-fabrication.md §3). Like carburize, the two headline legs are the **frozen
-engine's own guarantees** re-instantiated in dopant mass mode — no new calibration:
+(microchip-fabrication.md §3). Like carburize, the two headline legs are the **engine's
+own guarantees** re-instantiated in dopant mass mode — no new calibration:
 
 * **Analytical limit (constant D).** The numeric **predeposition** (constant Dirichlet
   surface) matches ``N_s·erfc(x/2√(Dt))``; the **drive-in** of an exact delta-IC
@@ -75,7 +75,7 @@ def _deep_predep():
 
 
 def test_predep_matches_erfc_in_the_interior():
-    # The frozen engine (mass mode, constant D + Dirichlet surface) reproduces the error-function
+    # The engine (mass mode, constant D + Dirichlet surface) reproduces the error-function
     # solution. Compare the interior (drop the Dirichlet surface cell, which carries the half-cell
     # first-order error); the active region is where erfc rises meaningfully above zero.
     p = _deep_predep()

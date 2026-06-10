@@ -12,10 +12,10 @@ phosphorus predeposition two ways on one depth axis and overlaying them:
     ``D`` enormous near the surface and intrinsic in the dilute tail → the **box**, deeper junction.
 
 The decisive build note (the headline): ``D(N)`` is the case ``CONTRACT.md`` and the plan both flagged
-as needing a **frozen-engine amendment** — and it needed **none**. It is built entirely within the
-frozen :mod:`engines.diffusion` contract, via a stateful-closure **lagged-coefficient** hook in the
+as needing a **engine amendment** — and it needed **none**. It is built entirely within the
+:mod:`engines.diffusion` contract, via a stateful-closure **lagged-coefficient** hook in the
 consumer's step-loop (:mod:`diffusion_highconc`). *Even the edge we thought needed an amendment fits
-within the frozen engine* — the v1.x thesis, intact.
+within the engine* — the v1.x thesis, intact.
 
 The banked artifact (`docs/figures/chip-highconc.png`): two panels — left, the box profile (constant
 ``D`` erfc vs the ``D(N)`` box, junctions marked); right, the mechanism (``D_eff/D_intrinsic`` vs
@@ -119,9 +119,9 @@ def print_summary(case: dict) -> None:
           f"(×{case['xj_box']/case['xj_const']:.1f} deeper)")
     print(f"      D(N) box (uncapped, upper bound):x_j = {case['xj_box_uncapped']:.3f} µm\n")
     print("  → the high-concentration front diffuses fast (enhanced D) and steepens into a BOX; the\n"
-          "    dilute tail stays intrinsic. This needed NO frozen-engine amendment — a stateful-closure\n"
+          "    dilute tail stays intrinsic. This needed NO engine amendment — a stateful-closure\n"
           "    lagged-coefficient hook (Picard-converging to the fully-implicit nonlinear solve)\n"
-          "    expresses D(N) within the frozen contract.\n"
+          "    expresses D(N) within the contract.\n"
           "  (the ×486 uncapped magnitude is the raw equilibrium model; the active-carrier plateau cap\n"
           "   gives the physical ×42. scope edge: equilibrium D(n) captures the box front + deeper\n"
           "   junction, NOT the anomalous phosphorus tail — that is non-equilibrium I-injection/clustering.)\n")

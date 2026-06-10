@@ -625,7 +625,7 @@ def highconc_figure(case: dict) -> "plt.Figure":
     axm.grid(True, which="both", alpha=0.18)
 
     fig.suptitle("Microchip v1.3: concentration-dependent diffusivity $D(N)$ — the high-concentration box "
-                 "(within the frozen engine)", fontsize=12.5, y=0.995)
+                 "(within the engine)", fontsize=12.5, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     return fig
 

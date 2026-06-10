@@ -3,7 +3,7 @@
 > Per-project plan **#2** of the educational-simulator program. Built to the
 > **Section 10 template** of `ARCHITECTURE.md`; inherits Sections 2–9 as fixed
 > invariants (compliance check in §8 below). This is the **second** project in
-> build order (Steel → Microchip → Planet) and the **first consumer of the frozen
+> build order (Steel → Microchip → Planet) and the **first consumer of the
 > diffusion/heat spine** — it builds *no* new shared engine, it proves the spine
 > reuses (ARCHITECTURE.md §4).
 
@@ -23,7 +23,7 @@ at the solid-solubility limit; a sealed-surface **drive-in** then redistributes
 that fixed dose deeper, the profile morphing toward a **Gaussian**; the **junction
 depth** `x_j` emerges where the diffused profile crosses the background doping, and
 the **sheet resistance** falls out of the integrated profile. The whole thing is
-computed by the **frozen `engines/diffusion` solver with zero new engine code** —
+computed by the **`engines/diffusion` solver with zero new engine code** —
 predep is a Dirichlet surface, drive-in is a no-flux surface, both in mass mode.
 *Recipe in (times, temperatures), junction out* — the cheapest, most direct proof
 that the spine Steel built and froze reuses verbatim (dopant profiles **are** the
@@ -36,7 +36,7 @@ test for the Phase-1 module.
 
 | Engine | Status here | Contract pointer |
 |---|---|---|
-| **Diffusion/heat (Fick / erfc)** — the program spine | **`[reuse frozen ✓ — Steel Phase 1a]`** | `engines/diffusion/CONTRACT.md`. Loaded as the **one-page contract**, never Steel's internals (ARCHITECTURE.md §6/§11). Chip instantiates **mass mode** (`u = N`, dopant concentration; `D = D₀·exp(−Q_a/kT)` Arrhenius for B/P/As in Si): predeposition = **Dirichlet** surface (solid-solubility `N_s`), drive-in = **Neumann(0)** surface (sealed) + far-field Neumann(0). Exactly the mass-mode face `projects/steel/carburize.py` already exercised. |
+| **Diffusion/heat (Fick / erfc)** — the program spine | **`[reuse ✓ — Steel Phase 1a]`** | `engines/diffusion/CONTRACT.md`. Loaded as the **one-page contract**, never Steel's internals (ARCHITECTURE.md §6/§11). Chip instantiates **mass mode** (`u = N`, dopant concentration; `D = D₀·exp(−Q_a/kT)` Arrhenius for B/P/As in Si): predeposition = **Dirichlet** surface (solid-solubility `N_s`), drive-in = **Neumann(0)** surface (sealed) + far-field Neumann(0). Exactly the mass-mode face `projects/steel/carburize.py` already exercised. |
 
 **No new shared engine is built here.** The one genuinely-new module Chip adds is
 the **aerial-image Fourier optics** (Phase 3) — but it is *chip-local*
@@ -48,7 +48,7 @@ has ≥3 uses (the same call `projects/steel/pathint.py` makes). Thermal oxidati
 > **Freeze-before-reuse (invariant 5).** The diffusion solver was sealed behind its
 > validation suite at the end of **Steel Phase 1a**; Chip is the first downstream
 > consumer and touches only its `CONTRACT.md`. If Chip ever needs a behaviour the
-> frozen contract does not promise (e.g. concentration-dependent `D(u)` — see the
+> contract does not promise (e.g. concentration-dependent `D(u)` — see the
 > §3 Phase-1 scope edge), that is a **v1.1 contract amendment**, deliberate and
 > tested, never an ad-hoc reach into the engine internals.
 
@@ -73,20 +73,20 @@ independent fact) vs what is *calibrated* (a cited constant, flagged) — and it
 
 The constant-source **predeposition** (`erfc`) and limited-source **drive-in**
 (`Gaussian`), then the **junction** and **sheet resistance** they produce. The
-frozen engine in mass mode supplies the profile; chip adds only the dopant
+engine in mass mode supplies the profile; chip adds only the dopant
 Arrhenius `D(T)`, the junction reading, and the Irvin sheet-resistance map.
 
 **Validation triad — Phase 1**
 - *Analytical limit (constant D).* Predep matches `N(x,t) = N_s·erfc(x/2√(Dt))`;
   drive-in from a **delta-function surface dose** matches the exact **Gaussian**
   `N(x,t) = (Q/√(πDt))·exp(−x²/4Dt)`. These exact anchors hold the engine to its
-  frozen erfc/Gaussian guarantee. **Scope edge, named (mirrors carburize's
+  erfc/Gaussian guarantee. **Scope edge, named (mirrors carburize's
   constant-D-vs-Tibbetts):** the analytic forms are exact only for **constant D**;
   real high-concentration diffusion is **concentration-enhanced** `D(N)` (the
   phosphorus box/kink-and-tail). So the exact leg is validated in the **constant-D
   / moderate-dose** regime, and `D(N)` is the scope ceiling — *not* silently papered
   over. **`D(N)` BUILT in v1.3** (`diffusion_highconc.py`; see §10): the Fair
-  charge-state box, recovered *within* the frozen engine via a stateful-closure
+  charge-state box, recovered *within* the engine via a stateful-closure
   lagged-coefficient hook — **no** amendment (the engine's nonlinear `D(u)` stays
   unbuilt; the lag lives in the consumer). The box **front** + deeper junction are
   captured; the anomalous **tail/kink** (non-equilibrium) is the named ceiling there.
@@ -118,7 +118,7 @@ on one depth axis, the junction depth marked where it crosses `N_B`, with `x_j` 
 The **Deal–Grove** linear-parabolic model of oxide growth — `x_ox² + A·x_ox =
 B(t+τ)` — with its **linear** (reaction-limited, thin-oxide, rate `B/A`) and
 **parabolic** (diffusion-limited, thick-oxide, rate `B`) regimes. A small chip-local
-module (an analytic/ODE solve, **not** the frozen PDE engine — Deal–Grove is its
+module (an analytic/ODE solve, **not** the PDE engine — Deal–Grove is its
 own closed form). Grows oxide for **wet** and **dry** O₂.
 
 **Validation triad — Phase 2**
@@ -204,9 +204,9 @@ internals (ARCHITECTURE.md §6). Mirrors the `projects/steel/` layout.
 
 ```
 BigSim/
-  engines/diffusion/CONTRACT.md     # the FROZEN spine Chip consumes (load this, not steel/)
+  engines/diffusion/CONTRACT.md     # the spine Chip consumes (load this, not steel/)
   chip/
-    diffusion_dopant.py             # frozen-engine instantiation: predep(erfc)/drive-in(Gaussian);
+    diffusion_dopant.py             # engine instantiation: predep(erfc)/drive-in(Gaussian);
                                      #   dopant Arrhenius D(T) for B/P/As                          (Phase 1)
     junction.py                     # profile → junction depth x_j + sheet resistance (Irvin)      (Phase 1)
     oxidation.py                    # Deal–Grove linear-parabolic oxide growth (wet/dry)           (Phase 2)
@@ -288,9 +288,9 @@ the full gate is exceptional.
 ```
 
 `pyproject.toml`'s `testpaths` gains `chip` (it already carries `engines`
-and `projects`); the existing `pythonpath = ["."]` lets chip tests import the frozen
+and `projects`); the existing `pythonpath = ["."]` lets chip tests import the
 engine as `engines.diffusion…` with no install step. Any new chip test that drives a
-live external solver / kernel / subprocess gets the `slow` marker. Editing the frozen
+live external solver / kernel / subprocess gets the `slow` marker. Editing
 `engines/diffusion` is the cross-cutting case that *triggers the full gate* — its
 `tests/` seal must stay green (it is the contract Chip relies on).
 
@@ -309,11 +309,11 @@ live external solver / kernel / subprocess gets the `slow` marker. Editing the f
 
 | Program invariant | How this plan honors it |
 |---|---|
-| 1 — build toolkit once, solver-heavy first | Builds **no** new shared engine; reuses the frozen diffusion spine. The one new module (Fourier optics) stays chip-local until rule-of-three. |
+| 1 — build toolkit once, solver-heavy first | Builds **no** new shared engine; reuses the diffusion spine. The one new module (Fourier optics) stays chip-local until rule-of-three. |
 | 2 — phase so each stage banks a working artifact | Four phases, each an explicit banked artifact (junction, oxide curve, aerial image, the process→device flow). |
 | 3 — validation triad from day one | Instantiated *concretely per phase* in §3 (analytic + conservation + benchmark), each with its non-circularity split + scope edge. |
 | 4 — target consequence where mechanism is a wall | §5: 1-D profiles + aerial-image litho + compact device, instead of 2-D/3-D TCAD + rigorous EMF litho. |
-| 5 — reuse only frozen modules | Consumes `engines/diffusion/CONTRACT.md` (sealed in Steel 1a); any new engine behaviour is a deliberate v1.1 contract amendment, not an internal reach. |
+| 5 — reuse only validated modules | Consumes `engines/diffusion/CONTRACT.md` (sealed in Steel 1a); any new engine behaviour is a deliberate v1.1 contract amendment, not an internal reach. |
 | 6 — updating docs is part of every change | This plan + per-module README + `docs/decisions/` are maintained per change; ARCHITECTURE.md §11 pointer updated as Chip progresses. |
 | Terms of use (§9) | §6: the **export-control carve-out** is explicitly invoked (the one difference from Steel) — generic physics, no recipes/targeting; reference constants cited, not redistributed. |
 
@@ -373,7 +373,7 @@ from a 100 %-complete Steel to Chip.
 
 > **Phase 2 — BUILT (2026-06-09).** `chip/oxidation.py` — the Deal–Grove linear-parabolic
 > closed form `x_ox² + A·x_ox = B(t+τ)` for **wet** and **dry** oxidation, the **first chip module
-> that does not touch the frozen engine** (oxide growth is its own closed form; a chip-local
+> that does not touch the engine** (oxide growth is its own closed form; a chip-local
 > analytic/ODE module per §2/§3). With `demo_oxidation.py` + `plots.oxidation_figure` (the banked
 > artifact: oxide-thickness-vs-time wet-vs-dry log-log, riding the **linear `(B/A)·t`** asymptote
 > when thin and bending onto the **parabolic `√(Bt)`** when thick, beside a growth-rate mechanism
@@ -395,7 +395,7 @@ from a 100 %-complete Steel to Chip.
 
 > **Phase 3 — BUILT (2026-06-09).** `chip/litho.py` — the **lithography aerial image**, the
 > chip project's **one genuinely-new module** (Fourier optics) and its risk phase; **chip-local, not
-> promoted to `engines/`** (rule-of-three), and like Phase 2 it **does not touch the frozen PDE engine**
+> promoted to `engines/`** (rule-of-three), and like Phase 2 it **does not touch the PDE engine**
 > (it is its own diffraction computation). One core primitive `coherent_image` (= `|Σ_m a_m·e^{2πi f_m x}|²`)
 > used twice: the exact **two-beam anchor** `two_beam_image` (two equal orders → `4·cos²(πx/p)` to machine
 > precision) and the **Abbe sum-over-source** workhorse `abbe_image` (partial coherence by incoherent
@@ -424,7 +424,7 @@ from a 100 %-complete Steel to Chip.
 
 > **Phase 4 — compact MOS V_t (process → device): BUILT (2026-06-09).** `chip/device.py` — the
 > **payoff** phase that closes the loop: a chip-local **compact closed form** ``V_t = V_FB + 2·φ_F +
-> Q_dep/C_ox`` (like Phase 2, it does **not** touch the frozen engine — it is its own algebra) consuming
+> Q_dep/C_ox`` (like Phase 2, it does **not** touch the engine — it is its own algebra) consuming
 > the three upstream process outputs as **one coherent n-MOSFET**: the channel ``N_A`` (a Phase-1 p-type
 > substrate), the gate ``t_ox`` (a Phase-2 *thin dry* oxide — the gate-oxide regime, **not** the banked
 > field oxide), and the gate CD (a Phase-3 litho feature → channel length ``L``). With `demo_device.py` +
@@ -455,7 +455,7 @@ from a 100 %-complete Steel to Chip.
 
 > **v1.1 — the Massoud thin-dry correction: BUILT (2026-06-10).** Phase 2's **named scope edge,
 > promoted** (the steel-ferrite-bay move: yesterday's honest ceiling becomes today's phase) —
-> `oxidation.py` §5, chip-local, the frozen engine untouched, the **plain path bit-for-bit unchanged**
+> `oxidation.py` §5, chip-local, the engine untouched, the **plain path bit-for-bit unchanged**
 > (`grow_oxide` never applies the enhancement; `K=0` degenerate recovery pinned). The cited model is
 > Massoud's **time-decay formulation** ``dx/dt = (B + K₁e^(−t/τ₁) + K₂e^(−t/τ₂))/(A+2x)`` — chosen
 > over the sibling thickness-decay form (`+Cᵢe^(−x/Lᵢ)`, L₁≈1 nm/L₂≈7 nm) because it **integrates in
@@ -492,9 +492,9 @@ from a 100 %-complete Steel to Chip.
 > deferral of *both* Phase 1 (the `D(N)`-adjacent back-reaction) and Phase 2 (the OED/segregation
 > coupling), **promoted** (the steel-ferrite-bay / Massoud move). `chip/coupling.py`, chip-local,
 > consuming a `diffusion_dopant` profile + an `oxidation` rate. **The decisive architecture finding: both
-> effects are expressible *within the frozen engine* — no contract amendment.** *OED* (oxidation-enhanced
+> effects are expressible *within the engine* — no contract amendment.** *OED* (oxidation-enhanced
 > diffusion) is a **position/time-dependent `D(x,t)`** (it tracks the oxidation rate + depth, **not** the
-> concentration `N`), so it is the engine's *already-frozen variable-`D(t)` callable* case
+> concentration `N`), so it is the engine's *already-supported variable-`D(t)` callable* case
 > (`test_variable_d`) — pointedly **not** the unbuilt nonlinear `D(N)` case (that one *would* need a v1.1
 > amendment; it stays the named `diffusion_dopant` scope edge). *Segregation* is a time-dependent
 > `Neumann(flux(t))` surface BC. Model: `D_eff/D_inert = 1 + f_I·Δ`, supersaturation `Δ = Δ_ref·(dx_ox/dt /
@@ -506,7 +506,7 @@ from a 100 %-complete Steel to Chip.
 > pile-up, each decomposing inert → +OED [deeper, ×~2 effective `∫D dt`] → +segregation → `docs/figures/
 > chip-oed-segregation.png`). **19-test triad** sealed; chip gate **152 green** (+19). Triad:
 > *analytic* = the **unified degenerate seam** (`dx_ox/dt=0` collapses both effects → plain `drive_in`
-> bit-for-bit) + the **OED ≡ effective-`∫D dt`** leg (the frozen variable-`D` τ-substitution: a warm-started
+> bit-for-bit) + the **OED ≡ effective-`∫D dt`** leg (the variable-`D` τ-substitution: a warm-started
 > Gaussian under OED matches the analytic Gaussian at age `a₀+∫D_eff dt`); *conservation* = OED-alone-sealed
 > dose machine-exact (a real check) + the coupled `Si+oxide` identity (an **accounting** identity, not a
 > magnitude check); *benchmark* = cited `f_I` (enhanced ordering P>B; Sb un-enhanced) + cited `m`
@@ -531,9 +531,9 @@ from a 100 %-complete Steel to Chip.
 
 > **v1.3 — concentration-dependent diffusivity `D(N)` (the high-concentration box): BUILT (2026-06-10).** The
 > Phase-1 named scope edge — `D(N)`, the case **both `CONTRACT.md` and §3 flagged as needing a deliberate v1.1
-> frozen-engine amendment** — **promoted** (the steel-ferrite-bay / Massoud / v1.2 move). `chip/diffusion_highconc.py`,
+> engine amendment** — **promoted** (the steel-ferrite-bay / Massoud / v1.2 move). `chip/diffusion_highconc.py`,
 > chip-local, consuming the `diffusion_dopant` registry. **The decisive finding (and the advisor's gating
-> correction): it needed NO amendment — `D(N)` fits *within* the frozen engine, the v1.x thesis intact.** My
+> correction): it needed NO amendment — `D(N)` fits *within* the engine, the v1.x thesis intact.** My
 > premise "`D(N)` requires touching the engine" was *asserted, not shown*, and false: the consumer's `_diffuse`
 > already drives the solver **one `step()` at a time**, so a `D(t)` callable **closing over a mutable holder of the
 > evolving field, updated *after* each step**, is a **lagged-coefficient `D(N)`** entirely within the public API —
@@ -543,7 +543,7 @@ from a 100 %-complete Steel to Chip.
 > optional **Picard** iteration converges the within-step coefficient to a fixed point — the **fully-implicit
 > nonlinear backward-Euler solve** — in **~2 iterations** (pinned `2 == 6`, dt-stable). So the precise claim:
 > `D(N)` is recovered as a *lagged-coefficient scheme that Picard-converges to the fully-implicit nonlinear solve,
-> entirely within the frozen engine* (contrast v1.2's OED, a `D(t)` of *oxidation rate*; here `D` is a genuine
+> entirely within the engine* (contrast v1.2's OED, a `D(t)` of *oxidation rate*; here `D` is a genuine
 > function of the **unknown** `N`). **No ADR, no engine re-seal** (the finding obviated both); `CONTRACT.md` was
 > deliberately **left untouched** — its "nonlinear `D(u)` is v1.1, not built" line stays *accurate* (the engine has
 > no native nonlinear path; the *consumer* got the lag). Engine seal re-confirmed intact (18/18). **The model**
@@ -560,7 +560,7 @@ from a 100 %-complete Steel to Chip.
 > goes **`x_j` 0.34 µm (constant `D`) → 0.76 µm capped (×2.2 deeper)**, surface `D_eff/D_intrinsic` **×42 capped**
 > (the uncapped equilibrium model is ×486 / `x_j` 1.25 µm — the upper bound, shown but **not** the headline).
 > **14-test triad.** *Analytic (tight):* (a) the **degenerate seam** — a constant `D` through the same closure equals
-> the plain scalar-`D` frozen-engine run **bit-for-bit** (the hook *is* the engine); the model's `D_eff → D⁰+D⁻+D⁼`
+> the plain scalar-`D` engine run **bit-for-bit** (the hook *is* the engine); the model's `D_eff → D⁰+D⁻+D⁼`
 > as `N→0`; (b) **Boltzmann similarity** — the constant-source profile collapses under `x/√t` (`5e-4`) for the real
 > **stiff `(n/n_i)²`** model, a *model-independent* anchor (validates the nonlinear machinery, not Fair's coefficients).
 > *Conservation (machinery, NOT magnitude — the honest framing):* sealed drive-in conserves `∫N dx` to machine
@@ -587,7 +587,7 @@ from a 100 %-complete Steel to Chip.
 
 > **v1.4 — lithographic defocus, the depth of focus & the Bossung curve: BUILT (2026-06-10).** Phase 3's
 > §3-named scope edge — the **"ideal in-focus aberration-free pupil"** — **promoted** (the steel-ferrite-bay /
-> Massoud / v1.2 / v1.3 move). `chip/litho.py` §7, chip-local, the frozen engine untouched, and — like v1.2/v1.3 —
+> Massoud / v1.2 / v1.3 move). `chip/litho.py` §7, chip-local, the engine untouched, and — like v1.2/v1.3 —
 > **no new code path**: defocus is a pure **phase** aberration, and `coherent_image` already sums *complex*
 > amplitudes, so `defocus_phase` just multiplies each collected order by `exp(i·(2π/λ)·z·(1−cosθ))` (keyed to the
 > order's **full pupil coordinate** `f_m+f_s` = its true propagation angle), threaded through `abbe_image`/
@@ -623,14 +623,14 @@ from a 100 %-complete Steel to Chip.
 > NA=0.85→0.15: ratio 0.76→0.99) — the honest high-NA caveat, owned in code+test. **Scope edges named-not-modelled:**
 > Zernike aberrations (coma/astigmatism/spherical) — only **defocus** is added; immersion NA≥1 (the scalar model's
 > evanescent edge / the named vector tar pit); the constant-threshold resist (no acid-diffusion/PEB blur — the
-> *next* litho promotion candidate, the "blur = a diffusion solve → frozen-engine reuse" angle). The docstring's
+> *next* litho promotion candidate, the "blur = a diffusion solve → engine reuse" angle). The docstring's
 > old "no defocus phase, no Zernikes" scope line was amended to "aberration-free apart from defocus." Units: the §7
 > additions stay litho-native **nm** (defocus z, DOF in nm); CD exposed in nm/µm as before. The notebook gains **no**
 > section (consistent with v1.1/v1.2/v1.3). SHARED-FILE ASKS: a `litho-defocus-v14` memory note + the DOF/Bossung/
 > frequency-doubling/`k₂` pin appended to `[[litho-aerial-image-source]]`.
 
-**Phase 1a — dopant diffusion & the pn junction.** Instantiate the **frozen
-`engines/diffusion`** in mass mode (`diffusion_dopant.py`): a constant-source
+**Phase 1a — dopant diffusion & the pn junction.** Instantiate the **`engines/diffusion`**
+engine in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**
 (Neumann(0)) → Gaussian, with a **cited** B/P/As Arrhenius `D(T)` (pinned to a
 source at build). Then `junction.py` (junction depth + Irvin sheet resistance) and
@@ -667,7 +667,7 @@ program discipline (cited reference facts, not carried from memory — the
   the R_s cross-check stays non-circular.
 
 **The named scope edge, sharpened by these sources.** Predep runs *at* the
-solid-solubility limit = high concentration = exactly where the frozen engine's
+solid-solubility limit = high concentration = exactly where the engine's
 **constant-D** erfc is weakest (real `D(N)` is concentration-enhanced — the P
 kink-and-tail; the engine's flagged-unbuilt v1.1 case). So the constant-D-vs-`D(N)`
 edge (carburize's Tibbetts analogue) **bites the predep leg specifically harder** than

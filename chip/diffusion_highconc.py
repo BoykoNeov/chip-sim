@@ -8,11 +8,10 @@ diffusion is **concentration-enhanced**: at ``N ≫ n_i`` the diffusivity rises 
 concentration, the high-concentration front steepens into a near-vertical **"box"**, and the junction
 pushes deeper than the constant-``D`` ``erfc`` predicts. This module builds that physics.
 
-The decisive architecture finding (why this needed **no** frozen-engine amendment)
+The decisive architecture finding (why this needed **no** engine amendment)
 -----------------------------------------------------------------------------------
 Both ``CONTRACT.md`` ("nonlinear ``D(u)`` is v1.1, **not built**") and the plan flagged ``D(N)`` as
-the one case that would force a **deliberate v1.1 contract amendment** — a re-opening of the frozen
-``engines.diffusion`` seal. **It does not.** The frozen contract already promises a callable
+the one case that would force a **deliberate v1.1 contract amendment** — a re-opening of the ``engines.diffusion`` seal. **It does not.** The contract already promises a callable
 ``D(t)`` (the case Steel uses for carbon-during-cooling, ``test_variable_d``), and the consumer
 already drives the solver **one ``step()`` at a time** in a Python loop (:func:`diffusion_dopant._diffuse`).
 A ``D(t)`` callable that *closes over a mutable holder of the evolving field*, updated **after** each
@@ -27,7 +26,7 @@ new estimate, re-solve from ``Nⁿ``, repeat) converges the within-step coeffici
 which *is* the **fully-implicit nonlinear backward-Euler solve** — in ~2 iterations (the triad pins
 ``2 == 6``, dt-stable). So the precise claim: **``D(N)`` — the edge both docs flagged for a v1.1
 amendment — is recovered as a lagged-coefficient scheme that Picard-converges to the fully-implicit
-nonlinear solve, entirely within the frozen engine, no amendment.** (Contrast v1.2's OED, a ``D(t)`` of
+nonlinear solve, entirely within the engine, no amendment.** (Contrast v1.2's OED, a ``D(t)`` of
 *oxidation rate*; here ``D`` is a genuine function of the unknown ``N`` — still expressible, via the
 step-loop lag.)
 
@@ -53,9 +52,9 @@ Validation triad (plan §3) — what is asserted tight vs loose
 ------------------------------------------------------------
 * **Analytical limit (tight, two legs).**
   (a) *Degenerate seam.* A constant ``D`` fed through the **same closure machinery**
-  (:func:`_diffuse_dn` with a constant ``D_of_N``) equals the plain scalar-``D`` frozen-engine run
+  (:func:`_diffuse_dn` with a constant ``D_of_N``) equals the plain scalar-``D`` engine run
   **bit-for-bit** (``0`` difference) — the closure adds nothing when ``D`` does not vary, i.e. the
-  hook *is* the frozen engine. As ``N → 0`` the model's own ``D_eff → D⁰+D⁻+D⁼`` (a constant), so the
+  hook *is* the engine. As ``N → 0`` the model's own ``D_eff → D⁰+D⁻+D⁼`` (a constant), so the
   low-concentration profile is the constant-``D`` ``erfc``.
   (b) *Boltzmann similarity (model-independent).* A constant-source diffusion into a semi-infinite
   medium with **any** ``D(N)`` has a profile depending on ``x, t`` only through ``η = x/√t`` — a free,
@@ -107,7 +106,7 @@ hold for either; the validated content is the *form*, not a specific step count.
 Units — semiconductor-conventional CGS, identical to :mod:`diffusion_dopant`
 ----------------------------------------------------------------------------
 **cm / cm²·s⁻¹ / cm⁻³**; ``n_i`` in cm⁻³ (so ``n/n_i`` is dimensionless), depths reported in **µm** at
-the boundary. The frozen engine is fed cm and seconds, as in Phase 1a. The ``(x, N)`` arrays are the
+the boundary. The engine is fed cm and seconds, as in Phase 1a. The ``(x, N)`` arrays are the
 plain loose-coupling currency :mod:`junction` consumes — a box profile reads its (deeper) ``x_j`` and
 (lower) ``R_s`` with no change to the junction reader.
 
@@ -260,7 +259,7 @@ def effective_diffusivity(
 
 
 # --------------------------------------------------------------------------- #
-# 3. The stateful-closure lagged-coefficient driver (the frozen-engine hook)
+# 3. The stateful-closure lagged-coefficient driver (the engine hook)
 # --------------------------------------------------------------------------- #
 def _diffuse_dn(
     grid: Grid,
@@ -272,7 +271,7 @@ def _diffuse_dn(
     n_steps: int,
     picard_iters: int = 0,
 ) -> tuple[np.ndarray, float, float]:
-    """March ``N0`` for ``t_seconds`` with a concentration-dependent ``D(N)`` — via the frozen engine.
+    """March ``N0`` for ``t_seconds`` with a concentration-dependent ``D(N)`` — via the engine.
 
     The hook (module docstring): a ``D(t)`` callable closes over ``holder["N"]``, updated **after**
     each :meth:`Diffusion1D.step`, so the operator assembled inside ``step`` reads the **old** level
@@ -340,7 +339,7 @@ def predeposit_highconc(
     picard_iters: int = 0,
     n_active_max: float | None = None,
 ) -> HighConcProfile:
-    """Constant-source predeposition with concentration-dependent ``D(N)`` (frozen engine, Dirichlet surface).
+    """Constant-source predeposition with concentration-dependent ``D(N)`` (engine, Dirichlet surface).
 
     Holds the surface at ``N_surface`` (default the dopant's solid-solubility limit) and diffuses into
     an un-doped wafer with ``D = D_eff(N)`` (the box driver). Far end no-flux (semi-infinite). The
@@ -378,7 +377,7 @@ def drive_in_highconc(
     picard_iters: int = 0,
     n_active_max: float | None = None,
 ) -> HighConcProfile:
-    """Sealed-surface drive-in with concentration-dependent ``D(N)`` (frozen engine, Neumann(0) both ends).
+    """Sealed-surface drive-in with concentration-dependent ``D(N)`` (engine, Neumann(0) both ends).
 
     Redistributes a fixed dose with ``D = D_eff(N)`` and the surface **sealed** — so ``∫N dx`` is
     conserved to machine precision *even with* ``D(N)`` (the finite-volume telescoping is
@@ -411,8 +410,8 @@ def constant_D_predeposit(
     """The same predep recipe at a **constant** ``D_const`` through the same closure machinery → ``N(x)``.
 
     The constant-``D`` companion for the box-front comparison and the **degenerate-seam** test: with a
-    constant ``D_of_N`` the lagged closure adds nothing, so this equals a plain scalar-``D`` frozen-
-    engine predep bit-for-bit. Pass ``D_const = intrinsic_diffusivity_lowconc(...)`` for the honest
+    constant ``D_of_N`` the lagged closure adds nothing, so this equals a plain scalar-``D`` engine
+    predep bit-for-bit. Pass ``D_const = intrinsic_diffusivity_lowconc(...)`` for the honest
     constant baseline.
     """
     name = _dopant_name(dopant)

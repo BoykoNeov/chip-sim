@@ -1,7 +1,7 @@
 """Chip Phase-2 validation: thermal oxidation — the Deal–Grove triad.
 
 This carries the whole plan §3 Phase-2 triad (microchip-fabrication.md). Unlike Phase 1a there is
-**no frozen engine underneath** — this module *is* the closed form — so its tests carry every leg:
+**no engine underneath** — this module *is* the closed form — so its tests carry every leg:
 
 * **Analytical limit (tight, on its idealization).** The exact ``x_ox(t)`` satisfies the algebraic
   identity ``x_ox² + A·x_ox − B(t+τ) = 0`` to machine precision; reproduces the linear ``(B/A)·t``

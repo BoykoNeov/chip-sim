@@ -3,7 +3,7 @@
 The chip's payoff demo and the counterpart of Steel's four-curves anchor. It chains **one coherent
 n-MOSFET** through all three process modules and reads the device parameter off the end:
 
-  1. **Diffusion** (Phase 1a, frozen engine) — an n⁺ phosphorus source/drain diffused into a
+  1. **Diffusion** (Phase 1a, engine) — an n⁺ phosphorus source/drain diffused into a
      **p-type, N_A = 1e17 channel**; the junction depth ``x_j`` is the S/D depth.
   2. **Oxidation** (Phase 2, Deal–Grove) — a thin **dry-O₂ gate oxide** (~14 nm, the reaction-limited
      thin regime — *not* the banked field oxide); its ``t_ox`` sets ``C_ox``.

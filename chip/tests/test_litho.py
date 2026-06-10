@@ -1,7 +1,7 @@
 """Chip Phase-3 validation: the lithography aerial image — the Fourier-optics triad.
 
 This carries the whole plan §3 Phase-3 triad (microchip-fabrication.md). Like Phase 2 (and unlike
-Phase 1a) there is **no frozen engine underneath** — this module *is* its own Fourier-optics
+Phase 1a) there is **no engine underneath** — this module *is* its own Fourier-optics
 computation — so its tests carry every leg:
 
 * **Analytical limit (tight, on its idealization).** The exact two-beam image is ``4·cos²(πx/p)`` to

@@ -1,7 +1,7 @@
 """The Phase-3 anchor demo: the lithography aerial image — recipe in, printed feature out.
 
 The chip's **one genuinely-new module** and its risk phase: pattern transfer by **Fourier optics**.
-Where Phase 1a diffused dopant (the frozen PDE spine) and Phase 2 grew oxide (a closed-form ODE), this
+Where Phase 1a diffused dopant (the PDE spine) and Phase 2 grew oxide (a closed-form ODE), this
 forms the **aerial image** — the light intensity a projection lens casts onto the resist — and clips it
 to a printed **critical dimension** (CD). Two stories on one figure:
 

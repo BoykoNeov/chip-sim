@@ -1,6 +1,6 @@
 """Chip Phase-4 validation: the compact MOS threshold voltage — the process→device triad.
 
-Carries the whole plan §4 triad (microchip-fabrication.md). Like Phase 2 there is **no frozen engine
+Carries the whole plan §4 triad (microchip-fabrication.md). Like Phase 2 there is **no engine
 underneath** — this module *is* the compact closed form — so its tests carry every leg:
 
 * **Analytical limit (tight) — the INDEPENDENT depletion-Poisson solve.** The closed-form depletion
