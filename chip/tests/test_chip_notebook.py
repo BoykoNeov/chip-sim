@@ -39,15 +39,30 @@ import pytest
 NOTEBOOK = Path(__file__).resolve().parents[1] / "chip.ipynb"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# chip.ipynb executes clean locally (~8 s), but on the GitHub Actions runner the Jupyter
-# kernel wedges at the zmq/asyncio comms layer and the run blows past the 240 s subprocess
-# wall-clock below — an infra hang, NOT a notebook-content failure (reproduced as 3 straight
-# full-gate reds; the steel/planet notebook smoke tests pass on the same runner). The fast
-# lane never runs this `slow` test, and the *local* full gate still does (where it is
-# reliable), so we skip it ONLY in CI to keep the badge meaningful instead of permanently red.
-# REMOVE this gate once the kernel-startup hang is root-caused (candidate: force a
-# SelectorEventLoop in the child executor + bound kernel start-up). See the chip-notebook flake.
-_SKIP_IN_CI = os.environ.get("CI", "").lower() in {"true", "1"}
+# chip.ipynb executes clean locally (~8 s), but on the GitHub Actions (Ubuntu) runner the
+# Jupyter kernel wedges at the zmq/asyncio comms layer *mid-execution* — a sub-second cell
+# never returns its reply, the kernel goes idle, and the run blows past the 240 s subprocess
+# wall-clock below (SIGKILL). An infra hang, NOT a notebook-content failure (the steel/planet
+# notebook smoke tests pass on the same runner). It is the kernel-idle "comms-race" family
+# documented in steel-sim's docs/handoffs/notebook-kernel-wedge.md — but a DIFFERENT instance
+# from both that doc's Windows-Proactor bug and the in-process Windows deadlock the docstring
+# above explains: this one is Linux-runner, mid-EXECUTION (not startup).
+#
+# Two fixes were tried/suspected and ruled out — recorded so they aren't re-attempted:
+#   * "kernel-startup hang → force a SelectorEventLoop" — wrong on both counts: the hang is
+#     mid-execution, and Linux CI is ALREADY on a selector loop, so forcing one is a no-op here
+#     (on Windows it is steel-sim §4's proven *trap* — a deterministic timeout-length stall).
+#   * "ipykernel-7.x regression → pin ipykernel<7" — re-confirmed dead end in CI run 27299430919
+#     (2026-06-10): with ipykernel 6.31.0 pinned the notebook STILL hung the 240 s wall on attempt
+#     1/10. (Per the flake note, 6.31.0 blocks at interpreter teardown vs 7.x's mid-execution race —
+#     different stage, same hang; pinning does not rescue the gate either way.)
+#
+# So we skip it ONLY in CI (the fast lane never runs this `slow` test; the *local* full gate
+# still does, where it is reliable) to keep the badge meaningful instead of permanently red.
+# To re-test a candidate fix on the runner without un-skipping, set CHIP_NOTEBOOK_FORCE_CI=1 in
+# a CI step (the escape hatch below). See the chip-notebook flake.
+_FORCE_IN_CI = os.environ.get("CHIP_NOTEBOOK_FORCE_CI", "").lower() in {"true", "1"}
+_SKIP_IN_CI = os.environ.get("CI", "").lower() in {"true", "1"} and not _FORCE_IN_CI
 
 
 @pytest.mark.slow
