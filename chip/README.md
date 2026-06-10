@@ -72,6 +72,18 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   charge-neutrality/Gauss conservation, `saturation_current` the honest long-channel drive readout. The
   module docstring is its contract (cited MIT 6.012 benchmark, the long-channel/ideal-oxide scope edge).
   Saves `docs/figures/chip-device.png`.
+- **To work on the back-coupling (v1.2 — OED + dopant segregation):** `coupling.py` +
+  `tests/test_coupling.py`, the demo `demo_coupling.py` + `tests/test_demo_coupling.py`, and
+  `plots.coupling_figure`. The **Phase-1↔2 back-reaction** (oxidation reaching back on the dopant
+  profile), built **entirely on the frozen engine** — OED is its already-frozen variable-`D(t)`
+  callable, segregation a `Neumann(flux(t))` BC — **no engine amendment** (the decisive finding;
+  contrast the unbuilt `D(N)` case, which *would* need one). `oxidize_couple` runs an oxidizing
+  anneal: **OED** enhances `D` (cited `f_I`; `oed_enhancement_factor`/`interstitial_supersaturation`),
+  **segregation** partitions dopant at the moving interface (cited `m`; `segregation_flux` → boron
+  depletes, phosphorus piles up). The module docstring is its contract (the unified `dx_ox/dt=0`
+  degenerate seam, the OED effective-`∫D dt` analytic leg, the validated-vs-calibrated split, and the
+  **swept-sliver scope edge** — boron depletion robust, phosphorus pile-up direction-real-but-~2×-high
+  on the fixed grid). Saves `docs/figures/chip-oed-segregation.png`.
 - **To work on the teaching notebook (§9):** `chip.ipynb` + `tests/test_chip_notebook.py`. A *thin
   skin* on the four phase modules — each compute cell calls the validated module **directly** (a
   static figure per section, embedded in the committed `.ipynb`), with `ipywidgets.interact` as sugar
@@ -126,6 +138,26 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   `M₁+M₂` dose, the cited-table pins + Hollauer's own Fig.-2.19 point, the τ **sign-typo finding**
   (the dissertation prints `exp(−E_τ/kT)`; only `exp(+E_τ/kT)` reproduces its own figure — the
   positive sign is pinned in code and tests).
+- **v1.2 — the Phase 1↔2 back-coupling (OED + dopant segregation): BUILT** (2026-06-10). `coupling.py`
+  — the named §3 deferral of both `oxidation` and the plan, **promoted** (the steel-ferrite-bay /
+  Massoud move). Two oxidation back-reactions on the Phase-1 profile, both expressible **within the
+  frozen engine** (the decisive architecture finding — **no contract amendment**): **OED**
+  (oxidation-enhanced diffusion) is the engine's already-frozen variable-`D(t)` callable
+  (`D_eff/D_inert = 1 + f_I·Δ`, supersaturation `Δ ∝ (dx_ox/dt)^0.5`, cited `f_I` B 0.30 / P 0.38);
+  **segregation** is a `Neumann(flux(t))` BC (`J = N_surf·(0.44 − 1/m)·dx_ox/dt`, cited `m` B 0.3 / P
+  10 → boron depletes, phosphorus piles up). + `demo_coupling.py` + `plots.coupling_figure`. Banked
+  artifact: **boron depletion beside phosphorus pile-up**, each decomposing inert → +OED (deeper,
+  ×~2 effective `∫D dt`) → +segregation (surface reshaped) (`docs/figures/chip-oed-segregation.png`).
+  19-test triad: the **unified degenerate seam** (`dx_ox/dt=0` → plain `drive_in` bit-for-bit — drop
+  the wrong `m→∞` anchor, the advisor's first call), the **OED ≡ effective-`∫D dt`** analytic leg (the
+  frozen variable-`D` τ-substitution), OED-alone dose conservation, the cited `f_I`/`m` direction
+  benchmarks. **The named scope edge (the advisor's blocking call): the swept-sliver double-count** —
+  the segregation flux is a *moving-interface* mass balance run on a *non-moving* grid, so the `0.44·R`
+  recession term is counted twice; the **`m→∞` inert-oxide diagnostic** pins the artifact (spurious
+  ~10% silicon-dose gain). Consequence owned in code/tests/figure: **boron depletion robust**
+  (oxide-uptake-dominated, the device-relevant case), **phosphorus pile-up direction real but
+  magnitude ~2× high**; the coupled "conservation" is an **accounting identity, not a magnitude
+  check**. Sb kept a *qualitative* ORD scope edge (`f_I`=0.015 → ≈1.05, not a retardation number).
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated

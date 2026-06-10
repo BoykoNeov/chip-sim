@@ -101,14 +101,17 @@ plain Deal–Grove path there). Wet oxidation has no thin-regime anomaly (no wet
   spread): wet oxidizes ~6× faster than dry; both Arrhenius in ``T``; the (100) values land in the
   textbook band (≈ 0.10 µm dry, 0.64 µm wet at 1100 °C / 1 h).
 
-Deferred coupling, named (out of v1)
-------------------------------------
+The back-coupling — was deferred, BUILT in v1.2 (:mod:`coupling`)
+----------------------------------------------------------------
 Oxidation back-reacts on the Phase-1 dopant profile two ways — **segregation** (dopant
 redistributes across the moving Si/SiO₂ interface by its segregation coefficient) and
 **oxidation-enhanced diffusion (OED)** (the interface injects silicon self-interstitials that speed
-the underlying dopant diffusion). v1 takes only the **forward** direction (Phase 4 consumes a
-Phase-1 profile *and* a Phase-2 oxide independently); the OED/segregation back-coupling is a named
-deferral — the plain-scalar seam (an oxide thickness out) keeps it slottable later.
+the underlying dopant diffusion). v1 took only the **forward** direction (Phase 4 consumes a
+Phase-1 profile *and* a Phase-2 oxide independently); the OED/segregation back-coupling was a named
+deferral, the plain-scalar seam (an oxide rate out) kept slottable. **v1.2 builds it** in
+:mod:`coupling` — and the slot held: it consumes this module's ``oxide_thickness``/``growth_rate``
+(and the v1.1 Massoud rate) as the ``dx_ox/dt`` driving both effects, and the cited ``SI_SIO2_RATIO``
+(0.44) enters the segregation mass balance. This module is untouched (the forward path stays as built).
 
 Units — Deal–Grove-native µm + hours (the per-module cited-data convention)
 --------------------------------------------------------------------------
