@@ -77,13 +77,27 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   `plots.coupling_figure`. The **Phase-1↔2 back-reaction** (oxidation reaching back on the dopant
   profile), built **entirely on the frozen engine** — OED is its already-frozen variable-`D(t)`
   callable, segregation a `Neumann(flux(t))` BC — **no engine amendment** (the decisive finding;
-  contrast the unbuilt `D(N)` case, which *would* need one). `oxidize_couple` runs an oxidizing
+  `D(N)` was the case we thought *would* need one — v1.3 showed it does **not** either, via the
+  consumer-side lagged-closure hook). `oxidize_couple` runs an oxidizing
   anneal: **OED** enhances `D` (cited `f_I`; `oed_enhancement_factor`/`interstitial_supersaturation`),
   **segregation** partitions dopant at the moving interface (cited `m`; `segregation_flux` → boron
   depletes, phosphorus piles up). The module docstring is its contract (the unified `dx_ox/dt=0`
   degenerate seam, the OED effective-`∫D dt` analytic leg, the validated-vs-calibrated split, and the
   **swept-sliver scope edge** — boron depletion robust, phosphorus pile-up direction-real-but-~2×-high
   on the fixed grid). Saves `docs/figures/chip-oed-segregation.png`.
+- **To work on concentration-dependent diffusivity (v1.3 — the high-concentration box):**
+  `diffusion_highconc.py` + `tests/test_diffusion_highconc.py`, the demo `demo_diffusion_highconc.py`
+  + `tests/test_demo_diffusion_highconc.py`, and `plots.highconc_figure`. The Phase-1 **`D(N)`** scope
+  edge, promoted — and the case both `CONTRACT.md` and the plan flagged as a v1.1 **engine amendment**,
+  built with **none**: a `D(t)` closure over the evolving field in the consumer's step-loop is a
+  **lagged-coefficient `D(N)`** within the frozen contract (Picard-converging to the fully-implicit
+  solve). `effective_diffusivity` is the cited **Fair charge-state** `D_eff = D⁰+D⁻(n/n_i)+D⁼(n/n_i)²`
+  (`CHARGE_STATE_TERMS`, Plummer Ch. 7 / Fair–Tsai 1977); `intrinsic_carrier_concentration` the `n_i(T)`;
+  `predeposit_highconc`/`drive_in_highconc` the fab steps (the box), `constant_D_predeposit` the
+  baseline + degenerate-seam check, `n_active_max` the activation/plateau cap. The module docstring is
+  its contract (the closure hook, the degenerate seam / Boltzmann-similarity / conservation-as-machinery
+  triad, and the **scope edge** — the box front captured, the anomalous **tail/kink** named-not-modelled).
+  Saves `docs/figures/chip-highconc.png`.
 - **To work on the teaching notebook (§9):** `chip.ipynb` + `tests/test_chip_notebook.py`. A *thin
   skin* on the four phase modules — each compute cell calls the validated module **directly** (a
   static figure per section, embedded in the committed `.ipynb`), with `ipywidgets.interact` as sugar
@@ -158,6 +172,25 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   (oxide-uptake-dominated, the device-relevant case), **phosphorus pile-up direction real but
   magnitude ~2× high**; the coupled "conservation" is an **accounting identity, not a magnitude
   check**. Sb kept a *qualitative* ORD scope edge (`f_I`=0.015 → ≈1.05, not a retardation number).
+- **v1.3 — concentration-dependent diffusivity `D(N)` (the high-concentration box): BUILT** (2026-06-10).
+  `diffusion_highconc.py` — the Phase-1 `D(N)` scope edge, promoted. **The decisive finding: `D(N)` — the
+  case both `CONTRACT.md` and §3 flagged as a v1.1 frozen-engine amendment — fits *within* the frozen
+  engine, no amendment.** The consumer's step-loop + a `D(t)` closure over the evolving field = a
+  **lagged-coefficient `D(N)`** (one solve/step, zero engine edits), Picard-converging to the
+  fully-implicit nonlinear solve (`2==6`, dt-stable). Cited **Fair charge-state** model
+  `D_eff = D⁰+D⁻(n/n_i)+D⁼(n/n_i)²` (Plummer Ch. 7 / Fair–Tsai 1977); `n_i(T)=3.87e16·T^1.5·exp(−0.605/kT)`.
+  Phosphorus's `D⁼` `(n/n_i)²` term drives the **box**. + `demo_diffusion_highconc.py` +
+  `plots.highconc_figure`. Banked artifact: constant-`D` `erfc` vs the `D(N)` box (capped-physical +
+  uncapped upper bound) + the `D_eff/D_intrinsic` mechanism (`docs/figures/chip-highconc.png`); P predep
+  1000 °C/30 min → `x_j` **0.34 → 0.76 µm** (×2.2 deeper, capped; ×42 surface `D`). **14-test triad:** the
+  **degenerate seam** (constant `D` through the closure == scalar engine **bit-for-bit** — the hook *is*
+  the engine), **Boltzmann similarity** (`x/√t` collapse, model-independent, holds for the stiff `n²`),
+  **dose conservation** with `D(N)` active (a **machinery** check — telescoping is `D`-independent — *not*
+  a magnitude validation), the box-front/deeper-junction benchmark (cited not fit), Picard convergence.
+  Scope edge named-not-modelled: equilibrium `D(n)` captures the box **front** + deeper junction, **not**
+  the anomalous **tail/kink** (non-equilibrium I-injection/clustering — Velichko 2019, Fair–Tsai
+  emitter-dip); full activation (`n=N`) is the flagged approximation, made adjustable by the
+  `n_active_max` plateau cap. **No ADR / no engine re-seal** (the finding obviated them); seal intact.
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated

@@ -42,13 +42,18 @@ The named scope edge (bites the predep leg specifically — sharper than carburi
 -----------------------------------------------------------------------------------
 The exact forms assume **constant, intrinsic D**. The honest ceiling, named not hidden:
 
-  * Real high-concentration diffusion is **concentration-enhanced** ``D(N)`` (the phosphorus
-    kink-and-tail, As–vacancy clustering) — the frozen engine's flagged-unbuilt v1.1 ``D(u)``
-    case (CONTRACT.md). The wrinkle carburize did *not* have: a **predep runs *at* the
-    solid-solubility limit** = maximum concentration = **precisely where constant-D erfc is
-    weakest**. So the constant-D-vs-``D(N)`` edge (carburize's Tibbetts analogue) bites the
-    *predep leg* hardest. The exact erfc/Gaussian legs are validated on their idealizations;
-    the realistic predep→drive-in demo's job is the junction, not the exact form.
+  * Real high-concentration diffusion is **concentration-enhanced** ``D(N)`` — the wrinkle
+    carburize did *not* have: a **predep runs *at* the solid-solubility limit** = maximum
+    concentration = **precisely where constant-D erfc is weakest**. So the constant-D-vs-``D(N)``
+    edge (carburize's Tibbetts analogue) bites the *predep leg* hardest. The exact erfc/Gaussian legs
+    are validated on their idealizations; the realistic predep→drive-in demo's job is the junction,
+    not the exact form. **BUILT in v1.3** (:mod:`diffusion_highconc`): the Fair charge-state ``D(N)``
+    and its **box** profile — and the decisive finding is that it needed **no** frozen-engine
+    amendment (``CONTRACT.md`` flags nonlinear ``D(u)`` as unbuilt, and it *stays* unbuilt **in the
+    engine**): a lagged-coefficient ``D(N)`` is reachable from the *consumer's* step-loop via a
+    stateful ``D(t)`` closure, Picard-converging to the fully-implicit solve. The box **front** +
+    deeper junction are captured; the anomalous phosphorus **tail/kink** (non-equilibrium) remains the
+    named scope edge there.
   * The dopants diffuse by **different mechanisms** (B, P interstitial-assisted; Sb vacancy),
     so a single intrinsic Arrhenius is a reduction — the literature spread in ``D₀/Ea`` *is*
     this content, not an error to resolve.

@@ -17,7 +17,8 @@ engine carries its own contract (`engines/diffusion/CONTRACT.md`) and its own te
 ```
 engines/diffusion/   # the frozen 1-D diffusion/heat solver (+ its own tests)
 chip/                # the simulator: diffusion_dopant, junction, oxidation, litho, device,
-                     #   coupling (Phase 1↔2 OED + segregation), plots, demos, chip.ipynb
+                     #   coupling (Phase 1↔2 OED + segregation), diffusion_highconc (v1.3 D(N) box),
+                     #   plots, demos, chip.ipynb
 docs/decisions/      # ADRs 0001–0003 (language/perf, visualization/UX, test policy)
 docs/plans/          # microchip-fabrication.md — the full build plan
 docs/figures/        # banked figures (chip-*.png)
@@ -34,11 +35,11 @@ jupyter lab chip/chip.ipynb             # the teaching notebook (needs .[viz,not
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow"     # routine fast lane — 149 tests
-./run_tests.ps1                   # full suite — 150 tests (adds the slow notebook smoke-test)
+./run_tests.ps1 -m "not slow"     # routine fast lane — 163 tests
+./run_tests.ps1                   # full suite — 164 tests (adds the slow notebook smoke-test)
 ```
 
-The suite is **150 tests**, all green. The one `slow` test executes `chip.ipynb` end-to-end in
+The suite is **164 tests**, all green. The one `slow` test executes `chip.ipynb` end-to-end in
 a fresh kernel; it self-skips under CI (a known kernel-startup wedge on the GitHub runner — an
 infra hang, not a content failure) and runs in the local full gate. Optional stacks are
 importorskip-gated, so a headless checkout skips rather than errors.

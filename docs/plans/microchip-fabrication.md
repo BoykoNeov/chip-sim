@@ -83,10 +83,13 @@ Arrhenius `D(T)`, the junction reading, and the Irvin sheet-resistance map.
   frozen erfc/Gaussian guarantee. **Scope edge, named (mirrors carburize's
   constant-D-vs-Tibbetts):** the analytic forms are exact only for **constant D**;
   real high-concentration diffusion is **concentration-enhanced** `D(N)` (the
-  phosphorus kink-and-tail), which the frozen engine does **not** model (full
-  `D(u)` is the contract's v1.1-flagged-unbuilt case). So the exact leg is
-  validated in the **constant-D / moderate-dose** regime, and `D(N)` is the scope
-  ceiling — *not* silently papered over.
+  phosphorus box/kink-and-tail). So the exact leg is validated in the **constant-D
+  / moderate-dose** regime, and `D(N)` is the scope ceiling — *not* silently papered
+  over. **`D(N)` BUILT in v1.3** (`diffusion_highconc.py`; see §10): the Fair
+  charge-state box, recovered *within* the frozen engine via a stateful-closure
+  lagged-coefficient hook — **no** amendment (the engine's nonlinear `D(u)` stays
+  unbuilt; the lag lives in the consumer). The box **front** + deeper junction are
+  captured; the anomalous **tail/kink** (non-equilibrium) is the named ceiling there.
 - *Conservation.* The drive-in **dose `∫N dx` is conserved to machine precision**
   (sealed surface = no-flux both ends → the engine's own exact finite-volume
   guarantee, re-confirmed for this BC pair). The predep dose *grows* as the exact
@@ -525,6 +528,62 @@ from a 100 %-complete Steel to Chip.
 > amplitude. Units: semiconductor CGS-cm (the diffusion side), the oxidation rate consumed at the boundary
 > (unit-free ratio for `Δ`, cm/s for the flux). SHARED-FILE ASKS: the `oed-source`, `dopant-segregation-source`,
 > and (finally) `massoud-thin-oxide-source` memory notes.
+
+> **v1.3 — concentration-dependent diffusivity `D(N)` (the high-concentration box): BUILT (2026-06-10).** The
+> Phase-1 named scope edge — `D(N)`, the case **both `CONTRACT.md` and §3 flagged as needing a deliberate v1.1
+> frozen-engine amendment** — **promoted** (the steel-ferrite-bay / Massoud / v1.2 move). `chip/diffusion_highconc.py`,
+> chip-local, consuming the `diffusion_dopant` registry. **The decisive finding (and the advisor's gating
+> correction): it needed NO amendment — `D(N)` fits *within* the frozen engine, the v1.x thesis intact.** My
+> premise "`D(N)` requires touching the engine" was *asserted, not shown*, and false: the consumer's `_diffuse`
+> already drives the solver **one `step()` at a time**, so a `D(t)` callable **closing over a mutable holder of the
+> evolving field, updated *after* each step**, is a **lagged-coefficient `D(N)`** entirely within the public API —
+> when `step()` assembles its operator at `t₁` the holder still holds `Nⁿ` (the old level), so `D` is frozen at the
+> old state (one tridiagonal solve/step, zero engine edits). A 20-line spike proved it before any build: degenerate
+> seam `0.0` bit-for-bit, dose conserved `2e-15`, Boltzmann collapse `2e-3`. And it is **not merely a lag**: an
+> optional **Picard** iteration converges the within-step coefficient to a fixed point — the **fully-implicit
+> nonlinear backward-Euler solve** — in **~2 iterations** (pinned `2 == 6`, dt-stable). So the precise claim:
+> `D(N)` is recovered as a *lagged-coefficient scheme that Picard-converges to the fully-implicit nonlinear solve,
+> entirely within the frozen engine* (contrast v1.2's OED, a `D(t)` of *oxidation rate*; here `D` is a genuine
+> function of the **unknown** `N`). **No ADR, no engine re-seal** (the finding obviated both); `CONTRACT.md` was
+> deliberately **left untouched** — its "nonlinear `D(u)` is v1.1, not built" line stays *accurate* (the engine has
+> no native nonlinear path; the *consumer* got the lag). Engine seal re-confirmed intact (18/18). **The model**
+> (cited): Fair charge-state `D_eff = D⁰ + D⁻(n/n_i) + D⁼(n/n_i)²` (Plummer–Deal–Griffin Ch. 7 eqn 7.18 / **Fair &
+> Tsai, JECS 124:1107 1977**, the slide-15 coefficient table — `D⁰` for P/Sb match the Phase-1a intrinsic values
+> exactly, one lineage; **B is the exception**, charge-state `D⁰+D⁺≈1.0/3.5` vs Phase-1a `0.76/3.46`, a different
+> Fair fit), with `n_i(T)=3.87e16·T^1.5·exp(−0.605/kT)` (cross-checked `1.4e10` @300K / `3.7e18` @890°C vs Velichko's
+> read `4.6e18` — the high-T `n_i ≈ 7e18` @1000°C is why only `N ≳ n_i` is enhanced). **Phosphorus is the showcase:**
+> its doubly-negative-vacancy `D⁼` `(n/n_i)²` term drives the boxiest front. Banked artifact (`demo_diffusion_highconc.py`
+> + `plots.highconc_figure` → `docs/figures/chip-highconc.png`): the constant-intrinsic-`D` `erfc` beside the `D(N)`
+> **box** (the active-carrier-capped *physical* curve + the full-activation *upper bound*, faint), plus the
+> mechanism panel (`D_eff/D_intrinsic` vs depth — large at the surface, the activation **plateau**, ×1 in the tail —
+> *that* carves the box). Demo numbers (P predep 1000°C/30min at solubility 1.2e21): box junction into `N_B`=1e15
+> goes **`x_j` 0.34 µm (constant `D`) → 0.76 µm capped (×2.2 deeper)**, surface `D_eff/D_intrinsic` **×42 capped**
+> (the uncapped equilibrium model is ×486 / `x_j` 1.25 µm — the upper bound, shown but **not** the headline).
+> **14-test triad.** *Analytic (tight):* (a) the **degenerate seam** — a constant `D` through the same closure equals
+> the plain scalar-`D` frozen-engine run **bit-for-bit** (the hook *is* the engine); the model's `D_eff → D⁰+D⁻+D⁼`
+> as `N→0`; (b) **Boltzmann similarity** — the constant-source profile collapses under `x/√t` (`5e-4`) for the real
+> **stiff `(n/n_i)²`** model, a *model-independent* anchor (validates the nonlinear machinery, not Fair's coefficients).
+> *Conservation (machinery, NOT magnitude — the honest framing):* sealed drive-in conserves `∫N dx` to machine
+> precision *with* `D(N)` active, because the finite-volume telescoping is **`D`-independent** — it confirms the
+> closure didn't break structural conservation, says nothing about the `D(N)` magnitude. *Benchmark (loose/calibrated):*
+> `D∝(n/n_i)²` gives the **boxier front + deeper junction** than constant `D` (Plummer slides 15/25/27: "no coupling
+> produces a 'boxier' profile because of concentration dependent diffusion"), coefficients cited not fit; `n²>n¹>const`
+> ordering; Picard convergence + lagged-consistency-as-dt→0. Durable advisor calls: **(1)** the **gating** correction —
+> spike the closure *before* writing the amendment; the cheap path worked, so there is no amendment (a more interesting
+> finding than "amended as planned"). **(2)** Boltzmann-on-the-predep + "conservation is a machinery check, not physics."
+> **(3)** **don't over-claim monotonicity** — each *linear* sub-step is monotone (M-matrix, `D≥0`), but the *lagged
+> nonlinear* scheme is not guaranteed monotone at a steep front (empirically no overshoot, `max N ≤ N_surface`; lag
+> error first-order in dt, Picard tightens). **(4)** **benchmark honesty** — deliver box-front + deeper `x_j`, and the
+> **anomalous tail/kink is the named scope edge** (non-equilibrium P–V dissociation / I-injection / clustering —
+> **Velichko arXiv:1905.10667**, Fair–Tsai emitter-dip, Plummer slide 22), *not* an equilibrium-`D(n)` claim; and the
+> **full-activation `n=N` is the flagged approximation** made adjustable via `n_active_max` (the active-carrier plateau
+> cap ≈3.4e20 → the physical ×42 *and* the flat-top plateau — a scope-edge turned feature), so ×486 doesn't ship as a
+> prediction. Units: semiconductor CGS-cm (as Phase 1a); the notebook gains **no** section (consistent with v1.1/v1.2).
+> Chip fast lane **156 green** (+14); whole-repo fast lane **163**. SHARED-FILE ASKS: a `dopant-conc-dependent-diffusion`
+> memory note. **Also surfaced (a pre-existing regression, flagged not fixed):** the standalone-flatten left the six
+> sibling `chip/demo_*.py` carrying a stale `parents[2]` repo-root → they now **mis-save their banked figures one level
+> *above* the repo** (the committed figures predate the flatten, so it went unnoticed; the README references them). This
+> demo uses the correct `parents[1]`; fixing the other six is a separate one-line-each change left for the user.
 
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **frozen
 `engines/diffusion`** in mass mode (`diffusion_dopant.py`): a constant-source

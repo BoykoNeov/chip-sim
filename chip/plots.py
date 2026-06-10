@@ -49,6 +49,13 @@ COUPLED_COLOR = "#2f6fb0"       # OED + segregation — the full back-coupling (
 PILEUP_COLOR = "#27795b"        # the phosphorus pile-up case (green — the opposite-sign signature)
 SEED_COLOR = "#bbbbbb"          # the starting profile (the predep seed before the oxidizing anneal)
 
+# High-concentration D(N) (v1.3) colours — the concentration-dependent-diffusivity box.
+CONST_D_COLOR = "#888888"       # the constant intrinsic-D erfc baseline (grey — what Phase 1a assumed)
+BOX_COLOR = "#2f6fb0"           # the enhanced D(N) box profile (the deeper, steeper phosphorus front)
+NLINEAR_COLOR = "#d4711f"       # the n¹ companion (arsenic — boxier than constant, less than n²)
+ENH_COLOR = "#a93226"           # the D_eff/D_intrinsic enhancement curve (crimson — the mechanism)
+NI_COLOR = "#27795b"            # the intrinsic carrier concentration n_i (where the enhancement bites)
+
 # Device (Phase 4) colours — the V_t waterfall (where the threshold voltage comes from).
 VFB_COLOR = "#8e44ad"           # the flat-band voltage term (gate work function)
 BAND_COLOR = "#2f6fb0"          # the 2φ_F surface-potential term
@@ -547,5 +554,69 @@ def coupling_figure(cases: list[dict]) -> "plt.Figure":
 
     fig.suptitle("Microchip v1.2: the Phase 1↔2 back-coupling — oxidation reshapes the dopant profile",
                  fontsize=13, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    return fig
+
+
+def highconc_figure(case: dict) -> "plt.Figure":
+    """The banked v1.3 artifact: concentration-dependent ``D(N)`` → the high-concentration box.
+
+    Two panels from a :func:`demo_diffusion_highconc.compute` ``case`` dict:
+
+      * **left — the box profile.** Log concentration vs depth: the constant-intrinsic-``D`` ``erfc``
+        (grey, what Phase 1a assumed), the **active-carrier-capped** ``D(N)`` box (solid blue, the
+        physical headline), and the **full-activation** box (faint blue — the ``n=N`` upper bound,
+        ~10× larger magnitude: the activation caveat, drawn). The intrinsic ``n_i`` line marks where
+        the enhancement bites; the junction depths into the background ``N_B`` are marked.
+      * **right — the mechanism.** ``D_eff(N)/D_intrinsic`` along the (capped) box profile: the
+        diffusivity is large near the surface (``N ≫ n_i``), plateaus at the activation cap, and
+        collapses to ``1`` in the dilute tail — *that* depth-varying enhancement is what carves the box.
+
+    Drawn straight on the figure: the box front + deeper junction are captured; the anomalous
+    phosphorus **tail** is the named scope edge (non-equilibrium, not in an equilibrium ``D(n)``).
+    Consumes plain arrays (no live solver object, ADR 0002).
+    """
+    fig, (ax, axm) = plt.subplots(1, 2, figsize=(13.2, 6))
+    x_um = _depth_um(case["x"])
+    n_i, N_B = case["n_i"], case["N_background"]
+
+    # -- left: the profiles ------------------------------------------------- #
+    ax.semilogy(x_um, np.maximum(case["const"], 1.0), color=CONST_D_COLOR, lw=2.0, ls="--",
+                label=f"constant intrinsic $D$ (erfc), $x_j$ = {case['xj_const']:.2f} µm")
+    if "box_uncapped" in case:
+        ax.semilogy(x_um, np.maximum(case["box_uncapped"], 1.0), color=BOX_COLOR, lw=1.5, ls=":",
+                    alpha=0.55,
+                    label=f"box, full activation $n=N$ (upper bound), $x_j$ = {case['xj_box_uncapped']:.2f} µm")
+    ax.semilogy(x_um, np.maximum(case["box"], 1.0), color=BOX_COLOR, lw=2.6,
+                label=f"$D(N)$ box ({case['name']}, $n^2$, capped), $x_j$ = {case['xj_box']:.2f} µm")
+    ax.axhline(n_i, color=NI_COLOR, lw=1.2, ls=":", label=f"$n_i$ = {n_i:.1e} cm⁻³")
+    ax.axhline(N_B, color=BACKGROUND_COLOR, lw=1.2, ls="-.", label=f"background $N_B$ = {N_B:.0e} cm⁻³")
+    for xj, col in ((case["xj_const"], CONST_D_COLOR), (case["xj_box"], BOX_COLOR)):
+        if np.isfinite(xj):
+            ax.axvline(xj, color=col, lw=1.0, ls=":", alpha=0.7)
+    ax.set_xlim(0, x_um[-1] * 0.85)
+    ax.set_ylim(max(N_B * 1e-2, 1e13), case["N_surface"] * 4)
+    ax.set_xlabel("depth  (µm)")
+    ax.set_ylabel("dopant concentration $N$  (cm⁻³)")
+    ax.set_title(f"the box: concentration-dependent $D$ pushes {case['name']} deeper, steeper")
+    ax.legend(loc="upper right", fontsize=8.3, framealpha=0.95)
+    ax.grid(True, which="both", alpha=0.18)
+    ax.text(0.03, 0.03,
+            "front captured; anomalous tail NOT modelled\n(non-equilibrium — the named scope edge)",
+            transform=ax.transAxes, fontsize=7.6, va="bottom", ha="left", color="#555555",
+            style="italic", bbox=dict(boxstyle="round", fc="white", ec="#dddddd", alpha=0.85))
+
+    # -- right: the mechanism (D enhancement vs depth) ---------------------- #
+    axm.semilogy(x_um, np.maximum(case["enhancement"], 1e-3), color=ENH_COLOR, lw=2.4)
+    axm.axhline(1.0, color=CONST_D_COLOR, lw=1.4, ls="--", label="intrinsic $D$ (×1)")
+    axm.set_xlim(0, x_um[-1] * 0.85)
+    axm.set_xlabel("depth  (µm)")
+    axm.set_ylabel("$D_\\mathrm{eff}(N)\\,/\\,D_\\mathrm{intrinsic}$")
+    axm.set_title(f"why: $D$ is ×{case['surface_enhancement']:.0f} at the surface (capped), ×1 in the tail")
+    axm.legend(loc="upper right", fontsize=9)
+    axm.grid(True, which="both", alpha=0.18)
+
+    fig.suptitle("Microchip v1.3: concentration-dependent diffusivity $D(N)$ — the high-concentration box "
+                 "(within the frozen engine)", fontsize=12.5, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     return fig
