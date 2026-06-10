@@ -6,8 +6,9 @@
 > projects load — Microchip and Planet depend on *this*, never on
 > `projects/steel/`. **Governance: open + test-gated.** The surface below is open
 > to amendment — gated by re-running the suite (and a deliberate update to any
-> invariant the amendment changes), no longer sealed behind an ADR + re-seal — but
-> an amendment must not silently break an existing consumer. Opened so the engine
+> invariant the amendment changes), no longer sealed behind an ADR + re-seal
+> (ADR 0004) — but an amendment must not silently break an existing consumer.
+> Opened so the engine
 > can grow past the v1 surface (the deferred nonlinear `D(u)` / 2-D / explicit
 > regimes noted below) by direct, test-gated amendment.
 

@@ -7,7 +7,7 @@ front-end process flow — dopant diffusion, junction formation, thermal oxidati
 lithography, and the resulting MOS device — each step validated against cited
 semiconductor-process references.
 
-It is built on a **frozen, separately-validated diffusion/heat solver engine**
+It is built on a **separately-validated diffusion/heat solver engine**
 (`engines/diffusion`): the dopant-profile physics *is* a 1-D diffusion solve in **mass
 mode**, so the simulator adds no new numerical core — it proves the engine reuses. The
 engine carries its own contract (`engines/diffusion/CONTRACT.md`) and its own test suite.
@@ -15,11 +15,11 @@ engine carries its own contract (`engines/diffusion/CONTRACT.md`) and its own te
 ## Layout
 
 ```
-engines/diffusion/   # the frozen 1-D diffusion/heat solver (+ its own tests)
+engines/diffusion/   # the 1-D diffusion/heat solver (+ its own tests)
 chip/                # the simulator: diffusion_dopant, junction, oxidation, litho, device,
                      #   coupling (Phase 1↔2 OED + segregation), diffusion_highconc (v1.3 D(N) box),
                      #   plots, demos, chip.ipynb
-docs/decisions/      # ADRs 0001–0003 (language/perf, visualization/UX, test policy)
+docs/decisions/      # ADRs 0001–0004 (language/perf, visualization/UX, test policy, engine unfreeze)
 docs/plans/          # microchip-fabrication.md — the full build plan
 docs/figures/        # banked figures (chip-*.png)
 ```
@@ -49,6 +49,6 @@ importorskip-gated, so a headless checkout skips rather than errors.
 chip-sim was developed inside the **BigSim** monorepo — an educational program of three
 simulators (steel, microchip, planet) sharing two separately-validated solver engines —
 then extracted into a standalone repo with its history. The diffusion engine and the
-cross-project pedagogy (it was first frozen by the steel simulator's carburizing model)
+cross-project pedagogy (it was first validated by the steel simulator's carburizing model)
 are documented in the plan and ADRs; the sibling simulators live in their own repos. The
 archive: [github.com/BoykoNeov/BigSim](https://github.com/BoykoNeov/BigSim).
