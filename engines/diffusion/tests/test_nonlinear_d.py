@@ -80,6 +80,25 @@ def test_constant_state_dependent_no_flux_conserves_exactly():
     assert abs(s.total(u) - t0) <= 1e-12 * abs(t0)
 
 
+def test_constant_state_dependent_equals_scalar_crank_nicolson():
+    # The Picard path also covers Crank–Nicolson (θ=½), which carries a separate explicit-half assembly
+    # (`rhs_expl`, the `b0` term) that the backward-Euler consumers never exercise. Lock it the same way:
+    # a constant StateDependent under method="crank_nicolson" must reproduce the scalar-D CN run
+    # **bit-for-bit** (constant D converges in the first iterate; the explicit half and the implicit
+    # matrices are identical). A non-trivial IC makes the explicit operator terms non-zero, so a sign or
+    # scoping error in the CN branch would break this.
+    g = uniform_grid(1.0, 128)
+    c = 0.25
+    ic = np.cos(np.pi * g.centers) + 1.5
+    nl = Diffusion1D(g, StateDependent(lambda u: c), Neumann(0.0), Neumann(0.0), method="crank_nicolson")
+    lin = Diffusion1D(g, c, Neumann(0.0), Neumann(0.0), method="crank_nicolson")
+    u_nl, u_lin = ic.copy(), ic.copy()
+    for _ in range(40):
+        u_nl = nl.step(u_nl, 0.01)
+        u_lin = lin.step(u_lin, 0.01)
+    assert np.max(np.abs(u_nl - u_lin)) == 0.0          # bit-for-bit, including the CN explicit half
+
+
 # --------------------------------------------------------------------------- #
 # Fixed point — Picard converged to the fully-implicit nonlinear solve
 # --------------------------------------------------------------------------- #

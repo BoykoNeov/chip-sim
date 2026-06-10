@@ -20,7 +20,7 @@ and Planet (EBM heat transport); **unfrozen 2026-06-10** — now open + test-gat
 |---|---|
 | `CONTRACT.md` | **The API contract.** Start here. PDE, modes, API, sign conventions, the guaranteed invariants, the validation boundary. |
 | `diffusion1d.py` | The solver: `Diffusion1D`, `Grid`/`uniform_grid`/`grid_from_edges`, `Dirichlet`/`Neumann`/`Robin`, `StateDependent` (nonlinear `D(u)`). Cell-centered finite volume + θ-method implicit stepping; Picard for the nonlinear path. |
-| `tests/` | The seal (27 tests): `test_erfc` (analytical limit + 2nd-order spatial convergence), `test_conservation` (exact no-flux mass balance), `test_stability` (unconditional stability, per method), `test_source` (source-augmented conservation), `test_variable_d` (callable `D(t)` + array `D(x)`/harmonic mean), `test_time_order` (BE 1st- / CN 2nd-order in time), `test_robin_heat` (heat-mode Robin + flux bookkeeping), `test_nonlinear_d` (the `StateDependent` `D(u)` Picard path — degenerate seam, fixed point, conservation, Boltzmann similarity). |
+| `tests/` | The seal (28 tests): `test_erfc` (analytical limit + 2nd-order spatial convergence), `test_conservation` (exact no-flux mass balance), `test_stability` (unconditional stability, per method), `test_source` (source-augmented conservation), `test_variable_d` (callable `D(t)` + array `D(x)`/harmonic mean), `test_time_order` (BE 1st- / CN 2nd-order in time), `test_robin_heat` (heat-mode Robin + flux bookkeeping), `test_nonlinear_d` (the `StateDependent` `D(u)` Picard path — degenerate seam, fixed point, conservation, Boltzmann similarity). |
 
 ## Run the seal
 

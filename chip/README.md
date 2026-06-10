@@ -235,10 +235,10 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   backward-Euler solve with `D≥0`, so the nonlinear path inherits the engine's monotonicity + structural
   conservation **per iterate**. **Additive:** only `StateDependent` enters the loop, so the **18 prior engine
   invariants pass unmodified** — the proof the amendment did not break a consumer. New engine seal
-  `engines/diffusion/tests/test_nonlinear_d.py` (**9 tests:** the degenerate seam `StateDependent(const)==scalar`
-  **bit-for-bit**, the Picard fixed-point residual, no-flux conservation with `D(u)` active, the
-  model-independent **Boltzmann-similarity** collapse, lagged→converged consistency, an in-bounds front). Engine
-  suite **18→27**; whole-repo fast lane **187**. `CONTRACT.md`'s "nonlinear `D(u)` is v1.1, not built" line is
+  `engines/diffusion/tests/test_nonlinear_d.py` (**10 tests:** the degenerate seam `StateDependent(const)==scalar`
+  **bit-for-bit** (backward-Euler *and* Crank–Nicolson), the Picard fixed-point residual, no-flux conservation
+  with `D(u)` active, the model-independent **Boltzmann-similarity** collapse, lagged→converged consistency, an
+  in-bounds front). Engine suite **18→28**; whole-repo fast lane **188**. `CONTRACT.md`'s "nonlinear `D(u)` is v1.1, not built" line is
   now **built** (invariant 6); 2-D / explicit stay the deferred regimes. The box physics + demo numbers are
   unchanged (v1.3's `picard_iters=2` was already ~converged), so the v1.3 banked figure stands. **No new ADR**
   — ADR 0004 names native nonlinear `D(u)` as *the* example of an ordinary test-gated edit.

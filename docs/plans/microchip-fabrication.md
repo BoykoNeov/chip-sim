@@ -653,15 +653,17 @@ from a 100 %-complete Steel to Chip.
 > criterion would be dominated by the dilute tail) — `max|Δu| ≤ picard_tol·max|u|`, capped at `picard_max_iter`,
 > no raise on the cap. **(4) Pure Picard, no damping/Anderson** — so a constant `D` converges in the first iterate
 > and reproduces the scalar-`D` run **bit-for-bit** (the degenerate seam, now an engine invariant). New engine seal
-> `engines/diffusion/tests/test_nonlinear_d.py` (**9 tests**): the degenerate seam (`StateDependent(const)==scalar`,
-> bit-for-bit), the Picard fixed-point residual (converged, not a lag), no-flux conservation with `D(u)` active
+> `engines/diffusion/tests/test_nonlinear_d.py` (**10 tests**): the degenerate seam (`StateDependent(const)==scalar`,
+> bit-for-bit — backward-Euler *and* Crank–Nicolson), the Picard fixed-point residual (converged, not a lag),
+> no-flux conservation with `D(u)` active
 > (telescoping is `D`-independent per iterate), the model-independent **Boltzmann-similarity** collapse
 > (`N(x,t)≡N(2x,4t)` for *any* `D(u)`), lagged→converged consistency as `dt→0`, and an in-bounds (`[0, surface]`)
 > front. Two of these migrated up from `test_diffusion_highconc.py` (they were always *engine* properties, asserted
 > against a consumer closure in v1.3). `CONTRACT.md` amended: the **"nonlinear `D(u)` is v1.1, not built" line is
 > now built** (invariant 6 added; the `StateDependent` API bullet, the discretization note, the status-banner
-> "first amendment" line); **2-D / explicit stay the deferred regimes**. Engine suite **18→27**; chip fast lane
-> **160**; whole-repo fast lane **187**. **No new ADR** (ADR 0004 pre-authorizes this as an ordinary edit; this
+> "first amendment" line); **2-D / explicit stay the deferred regimes**. (The nonlinear Picard path also covers
+> Crank–Nicolson — locked by a θ=½ degenerate-seam test even though every consumer uses backward Euler.) Engine
+> suite **18→28**; chip fast lane **160**; whole-repo fast lane **188**. **No new ADR** (ADR 0004 pre-authorizes this as an ordinary edit; this
 > entry is the record). The **box physics and the v1.3 demo numbers are unchanged** (v1.3's `picard_iters=2` was
 > already ~converged, ~0.1%): `x_j` 0.34→0.76 µm, ×42/×486 surface enhancement — the banked figure stands.
 > SHARED-FILE ASKS: update the `chip-highconc-v13` + `engine-unfrozen` memory notes (the promotion landed).
