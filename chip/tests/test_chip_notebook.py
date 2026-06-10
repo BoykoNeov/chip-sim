@@ -37,7 +37,7 @@ from pathlib import Path
 import pytest
 
 NOTEBOOK = Path(__file__).resolve().parents[1] / "chip.ipynb"
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # chip.ipynb executes clean locally (~8 s), but on the GitHub Actions runner the Jupyter
 # kernel wedges at the zmq/asyncio comms layer and the run blows past the 240 s subprocess
