@@ -1,0 +1,75 @@
+# Full-gate CI — runs the canonical full pytest suite (every test, incl. the slow
+# notebook-kernel test) on every push and pull request.
+#
+# This is the mitigation the test-execution policy (docs/decisions/0003) names: the
+# routine *local* gate is the fast lane (`pytest -m "not slow"`); the slow notebook
+# smoke-test's correct home is CI running the full gate on push, off the developer's
+# critical path. This workflow is that home.
+#
+# Design notes (the non-obvious choices):
+#
+#   * Silent-skip is the dominant failure mode of a full gate that exists to run the
+#     OPTIONAL stacks. Every optional-stack test is importorskip / skipif, so a
+#     fat-fingered install line or a missing Jupyter kernelspec makes those tests SKIP,
+#     not fail — a green run that quietly tested fewer. Two guards below defend the
+#     count: (1) a post-install import check that fails LOUDLY if any extra is absent;
+#     (2) explicit kernelspec registration (pip install ipykernel does NOT register one).
+#     `pytest -rs` then prints every skip reason into the run log so a new silent skip
+#     is caught by eyeballing one log.
+#
+#   * The chip.ipynb notebook smoke-test self-skips under CI (the kernel wedges at the
+#     zmq/asyncio comms layer on the GitHub runner — an infra hang, not a content
+#     failure; it runs in the local full gate). So one intentional skip is expected here.
+
+name: full-gate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same ref supersedes an in-flight run.
+concurrency:
+  group: full-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install chip-sim with every optional stack
+        # viz (matplotlib figures) + notebook (nbclient/nbformat/ipykernel/ipywidgets — plus
+        # jupyterlab, which rides along but is editor-only: no test imports it, so it is
+        # intentionally absent from the import-presence guard below).
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test,viz,notebook]"
+
+      - name: Fail loudly if any optional stack is missing
+        # Guards against a silently-incomplete install: importorskip would otherwise
+        # turn a missing extra into a green skip, not a red failure.
+        run: >
+          python -c "import importlib.util as u;
+          mods=['numpy','scipy','pytest','matplotlib','nbformat','nbclient','ipykernel','ipywidgets'];
+          miss=[m for m in mods if u.find_spec(m) is None];
+          assert not miss, f'missing optional stacks: {miss}';
+          print('all optional stacks present:', mods)"
+
+      - name: Register a Jupyter kernelspec
+        # `pip install ipykernel` does NOT register a kernelspec; the notebook test
+        # looks for one named 'python3' and SKIPS without it. (The notebook test still
+        # self-skips under CI — this keeps the gate honest if that skip is ever lifted.)
+        run: python -m ipykernel install --user --name python3
+
+      - name: Full gate — the whole suite
+        # Bare pytest = the canonical full gate. -rs prints every skip reason so a
+        # silent-skip regression is visible in this log (the chip.ipynb CI-skip shows here).
+        run: python -m pytest -rs

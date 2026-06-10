@@ -7,11 +7,11 @@ it builds *no* new shared engine, it proves the spine reuses — dopant profiles
 
 Phase 1a public API — dopant diffusion & the pn junction:
 
-    from projects.chip.diffusion_dopant import (
+    from chip.diffusion_dopant import (
         DOPANTS, diffusivity, predeposit, drive_in, two_step,
         analytic_predep_erfc, analytic_drivein_gaussian, predep_dose,
     )
-    from projects.chip.junction import junction_depth, sheet_resistance, mobility
+    from chip.junction import junction_depth, sheet_resistance, mobility
 
 > **UNIT SYSTEM — semiconductor-conventional CGS.** Unlike Steel (SI metres), the
 > chip modules work in **cm / cm²·s⁻¹ / cm⁻³ / cm²·V⁻¹·s⁻¹** — the *native* units of

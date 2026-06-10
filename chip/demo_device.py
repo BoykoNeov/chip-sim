@@ -19,7 +19,7 @@ at exactly 15 nm → 0.58 V; this demo's 14 nm oxide gives the slightly lower va
 
 Run headless (saves the figure, prints the flow):
 
-    python -m projects.chip.demo_device
+    python -m chip.demo_device
 """
 from __future__ import annotations
 

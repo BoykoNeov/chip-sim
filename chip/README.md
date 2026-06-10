@@ -1,4 +1,4 @@
-# `projects/chip` — the microchip fabrication simulator
+# `chip` — the microchip fabrication simulator
 
 *Process recipe in, device out.* Project #2 of the program and the **first consumer of the
 frozen diffusion/heat spine** (`engines/diffusion`): it builds **no** new shared engine — it
@@ -176,7 +176,7 @@ move — the chip counterpart of Steel's four-curves anchor.
 
 ```powershell
 pip install -e .[viz,notebook]        # matplotlib (viz) + jupyterlab + ipywidgets + the nbclient/ipykernel run stack
-jupyter lab projects/chip/chip.ipynb  # (classic UI: `pip install notebook`, then `jupyter notebook`)
+jupyter lab chip/chip.ipynb  # (classic UI: `pip install notebook`, then `jupyter notebook`)
 ```
 
 It is a **thin skin** (ADR 0002), built to the same rule as Steel's `steel.ipynb`: every *compute*
@@ -195,10 +195,10 @@ not correctness**: the per-phase triads already validate the numbers.
 ```powershell
 # from repo root
 ./run_tests.ps1 -m "not slow"   # routine commit gate (whole-repo fast lane, ~9 s — collects chip)
-./run_tests.ps1 projects/chip   # scope to chip while iterating
+./run_tests.ps1 chip   # scope to chip while iterating
 ```
 
-`pyproject.toml`'s `testpaths` already carries `projects`, so `projects/chip/tests/` is collected
+`pyproject.toml`'s `testpaths` already carries `projects`, so `chip/tests/` is collected
 with no config change; `pythonpath = ["."]` lets chip import the frozen engine as `engines.diffusion…`.
 The notebook smoke-test (`tests/test_chip_notebook.py`) is `slow`-marked, so the fast lane deselects it;
 it runs in the full gate (`python -m tools.gate chip` / `./run_tests.ps1`).

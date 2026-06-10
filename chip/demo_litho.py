@@ -27,7 +27,7 @@ cross-check, not a tautology.
 
 Run headless (saves the figure, prints the table):
 
-    python -m projects.chip.demo_litho
+    python -m chip.demo_litho
 """
 from __future__ import annotations
 

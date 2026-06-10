@@ -20,7 +20,7 @@ linear-parabolic again.
 
 Run headless (saves the figure, prints the table):
 
-    python -m projects.chip.demo_thin_oxide
+    python -m chip.demo_thin_oxide
 """
 from __future__ import annotations
 

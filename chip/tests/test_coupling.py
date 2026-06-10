@@ -31,8 +31,8 @@ import pytest
 
 from engines.diffusion import uniform_grid
 
-from projects.chip import coupling as cp
-from projects.chip import diffusion_dopant as dd
+from chip import coupling as cp
+from chip import diffusion_dopant as dd
 
 # A standard depth grid + a starting profile shared across the cases (a boron predep seed).
 GRID = uniform_grid(3.0 * dd.CM_PER_UM, 600)

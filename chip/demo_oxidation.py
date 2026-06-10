@@ -20,7 +20,7 @@ agreement is a cross-check, not a tautology.
 
 Run headless (saves the figure, prints the table):
 
-    python -m projects.chip.demo_oxidation
+    python -m chip.demo_oxidation
 """
 from __future__ import annotations
 

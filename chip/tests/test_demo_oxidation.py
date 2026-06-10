@@ -12,7 +12,7 @@ without error", and skipped where the optional viz extra is absent.
 import numpy as np
 import pytest
 
-from projects.chip.demo_oxidation import (
+from chip.demo_oxidation import (
     compute, T_RANGE_HOURS, PUBLISHED_DRY_UM, PUBLISHED_WET_UM,
 )
 
@@ -64,7 +64,7 @@ def test_oxidation_figure_builds():
     # Viz smoke test only (never a correctness check): skip cleanly without the extra.
     plt = pytest.importorskip("matplotlib")
     plt.use("Agg")
-    from projects.chip.plots import oxidation_figure
+    from chip.plots import oxidation_figure
 
     t_hours, curves, _ = compute()
     fig = oxidation_figure(t_hours, curves)

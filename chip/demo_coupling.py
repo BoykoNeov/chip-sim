@@ -31,7 +31,7 @@ boron as the trustworthy case and phosphorus as the qualitative sign-contrast.
 
 Run headless (saves the figure, prints the table):
 
-    python -m projects.chip.demo_coupling
+    python -m chip.demo_coupling
 """
 from __future__ import annotations
 

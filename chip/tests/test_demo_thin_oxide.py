@@ -13,7 +13,7 @@ The figure is **not** in the correctness path (ADR 0002): rendering is checked o
 import numpy as np
 import pytest
 
-from projects.chip.demo_thin_oxide import compute, GATE_MIN, T_GATE, T_RANGE_MIN
+from chip.demo_thin_oxide import compute, GATE_MIN, T_GATE, T_RANGE_MIN
 
 
 def test_demo_pipeline_massoud_before_after():
@@ -56,7 +56,7 @@ def test_demo_vt_consequence_is_device_sized():
 def test_demo_recipe_is_inside_the_cited_range():
     # Guard the demo recipe itself: the gate-oxide point must stay inside the cited Massoud fit
     # window (800–1000 °C, the refuse-don't-extrapolate edge) and inside the plotted sweep.
-    from projects.chip import oxidation as ox
+    from chip import oxidation as ox
     lo, hi = ox.MASSOUD_T_RANGE_C
     assert lo <= T_GATE <= hi
     assert T_RANGE_MIN[0] <= GATE_MIN <= T_RANGE_MIN[1]
@@ -66,7 +66,7 @@ def test_thin_oxide_figure_builds():
     # Viz smoke test only (never a correctness check): skip cleanly without the extra.
     plt = pytest.importorskip("matplotlib")
     plt.use("Agg")
-    from projects.chip.plots import thin_oxide_figure
+    from chip.plots import thin_oxide_figure
 
     t_min, curves, rates, gate, _ = compute()
     fig = thin_oxide_figure(

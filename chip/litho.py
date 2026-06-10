@@ -4,7 +4,7 @@ The pattern-transfer step, and the project's **risk phase** — so the tractabil
 **inside this module**, not just in the scope ceiling. This is the chip project's **one genuinely-new
 module**: where Phase 1a reused the frozen PDE spine (dopant diffusion) and Phase 2 was a small
 closed-form ODE (Deal–Grove oxidation), lithography is **Fourier optics** — and it stays *chip-local*
-(`projects/chip/litho.py`), **not** promoted to `engines/`: only chip uses it, so per the rule-of-three
+(`chip/litho.py`), **not** promoted to `engines/`: only chip uses it, so per the rule-of-three
 it stays project-local until a stabilized interface has ≥3 uses (plan §2).
 
 The model — diffraction-limited imaging of a line/space mask

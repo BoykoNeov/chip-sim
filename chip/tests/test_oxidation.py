@@ -30,7 +30,7 @@ import math
 import numpy as np
 import pytest
 
-from projects.chip import oxidation as ox
+from chip import oxidation as ox
 
 
 # --------------------------------------------------------------------------- #

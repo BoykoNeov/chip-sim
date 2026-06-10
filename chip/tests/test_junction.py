@@ -24,8 +24,8 @@ import pytest
 from scipy.special import erfc, erfcinv
 
 from engines.diffusion import uniform_grid, Neumann
-from projects.chip import diffusion_dopant as dd
-from projects.chip import junction as jn
+from chip import diffusion_dopant as dd
+from chip import junction as jn
 
 
 # --------------------------------------------------------------------------- #

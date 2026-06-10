@@ -24,7 +24,7 @@ computation — so its tests carry every leg:
 import numpy as np
 import pytest
 
-from projects.chip import litho as L
+from chip import litho as L
 
 
 # --------------------------------------------------------------------------- #

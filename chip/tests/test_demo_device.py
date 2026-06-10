@@ -16,7 +16,7 @@ without error", and skipped where the optional viz extra is absent.
 """
 import pytest
 
-from projects.chip.demo_device import compute, CHANNEL_N_A, GATE
+from chip.demo_device import compute, CHANNEL_N_A, GATE
 
 
 def test_demo_pipeline_chains_to_a_coherent_device():
@@ -61,7 +61,7 @@ def test_device_figure_builds():
     # Viz smoke test only (never a correctness check): skip cleanly without the extra.
     plt = pytest.importorskip("matplotlib")
     plt.use("Agg")
-    from projects.chip.plots import device_figure
+    from chip.plots import device_figure
 
     r = compute()
     fig = device_figure(r)

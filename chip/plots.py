@@ -375,7 +375,7 @@ def device_figure(result) -> "plt.Figure":
 
     The chip's payoff figure (counterpart of Steel's four-curves anchor): one coherent n-MOSFET chained
     through every process module, the device parameter read off the end. ``result`` is the demo's plain
-    :class:`~projects.chip.demo_device.FlowResult` bundle (frozen dataclasses + arrays — no live solver
+    :class:`~chip.demo_device.FlowResult` bundle (frozen dataclasses + arrays — no live solver
     object, ADR 0002). Four panels, the forward flow:
 
       ① **diffusion** — the n⁺ source/drain profile into the p-type channel, junction depth marked;

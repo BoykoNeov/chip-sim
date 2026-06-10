@@ -15,7 +15,7 @@ import math
 import numpy as np
 import pytest
 
-from projects.chip.demo_junction import (
+from chip.demo_junction import (
     compute, N_BACKGROUND, PUBLISHED_XJ_UM, PUBLISHED_RS_OHM_SQ,
 )
 
@@ -55,7 +55,7 @@ def test_junction_figure_builds():
     # Viz smoke test only (never a correctness check): skip cleanly without the extra.
     plt = pytest.importorskip("matplotlib")
     plt.use("Agg")
-    from projects.chip.plots import junction_figure
+    from chip.plots import junction_figure
 
     predep, drivein, junction, morph = compute()
     fig = junction_figure(predep, drivein, junction, morph=morph)

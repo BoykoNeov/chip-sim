@@ -24,7 +24,7 @@ import math
 import numpy as np
 import pytest
 
-from projects.chip import device as dev
+from chip import device as dev
 
 
 # --------------------------------------------------------------------------- #

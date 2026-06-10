@@ -13,8 +13,8 @@ error", and skipped where the optional viz extra is absent.
 import numpy as np
 import pytest
 
-from projects.chip import litho
-from projects.chip.demo_litho import (
+from chip import litho
+from chip.demo_litho import (
     compute, PITCH_SWEEP, TABLE_PITCHES, WAVELENGTH_NM, NA, SIGMA,
 )
 
@@ -86,7 +86,7 @@ def test_litho_figure_builds():
     # Viz smoke test only (never a correctness check): skip cleanly without the extra.
     plt = pytest.importorskip("matplotlib")
     plt.use("Agg")
-    from projects.chip.plots import litho_figure
+    from chip.plots import litho_figure
 
     data = compute()
     fig = litho_figure(

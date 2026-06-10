@@ -40,7 +40,7 @@ test for the Phase-1 module.
 
 **No new shared engine is built here.** The one genuinely-new module Chip adds is
 the **aerial-image Fourier optics** (Phase 3) — but it is *chip-local*
-(`projects/chip/litho.py`), **not** promoted to `engines/`: only chip uses it, so
+(`chip/litho.py`), **not** promoted to `engines/`: only chip uses it, so
 per invariant 5 / rule-of-three it stays project-local until a stabilized interface
 has ≥3 uses (the same call `projects/steel/pathint.py` makes). Thermal oxidation
 (Phase 2) is a small analytic/ODE module, also chip-local.
@@ -202,7 +202,7 @@ internals (ARCHITECTURE.md §6). Mirrors the `projects/steel/` layout.
 ```
 BigSim/
   engines/diffusion/CONTRACT.md     # the FROZEN spine Chip consumes (load this, not steel/)
-  projects/chip/
+  chip/
     diffusion_dopant.py             # frozen-engine instantiation: predep(erfc)/drive-in(Gaussian);
                                      #   dopant Arrhenius D(T) for B/P/As                          (Phase 1)
     junction.py                     # profile → junction depth x_j + sheet resistance (Irvin)      (Phase 1)
@@ -215,7 +215,7 @@ BigSim/
     chip.ipynb                      # single teaching notebook (see §9) — BUILT: per-phase sliders → V_t
     README.md                       # per-module map + per-session load pointer
     tests/                          # the validation triads (the seal)
-  pyproject.toml                    # testpaths += projects/chip (§7)
+  pyproject.toml                    # testpaths += chip (§7)
 ```
 
 **Contracts kept short.** Each module's docstring is its contract (the steel
@@ -284,7 +284,7 @@ the full gate is exceptional.
                                 #   root-config, a release, or CI
 ```
 
-`pyproject.toml`'s `testpaths` gains `projects/chip` (it already carries `engines`
+`pyproject.toml`'s `testpaths` gains `chip` (it already carries `engines`
 and `projects`); the existing `pythonpath = ["."]` lets chip tests import the frozen
 engine as `engines.diffusion…` with no install step. Any new chip test that drives a
 live external solver / kernel / subprocess gets the `slow` marker. Editing the frozen
@@ -355,7 +355,7 @@ needs no special engineering (ADR 0001 scope).
 **Plan banked (this document).** The build order (ARCHITECTURE.md §4) now advances
 from a 100 %-complete Steel to Chip.
 
-> **Phase 1a — BUILT (2026-06-09).** `projects/chip/` created: `diffusion_dopant.py`
+> **Phase 1a — BUILT (2026-06-09).** `chip/` created: `diffusion_dopant.py`
 > (predep `erfc` Dirichlet / drive-in Gaussian Neumann(0), cited Fair `D(T)` for B/P, in
 > **CGS-semiconductor units** — the advisor-confirmed departure from Steel's SI, since the
 > engine is unit-agnostic and the cited data is native cm/cm²·s⁻¹/cm⁻³), `junction.py`
@@ -368,7 +368,7 @@ from a 100 %-complete Steel to Chip.
 > numeric junction. Masetti coefficients pinned online (IUE-Vienna + allpix²/CERN). **Next = Phase 2
 > (Deal–Grove oxidation).**
 
-> **Phase 2 — BUILT (2026-06-09).** `projects/chip/oxidation.py` — the Deal–Grove linear-parabolic
+> **Phase 2 — BUILT (2026-06-09).** `chip/oxidation.py` — the Deal–Grove linear-parabolic
 > closed form `x_ox² + A·x_ox = B(t+τ)` for **wet** and **dry** oxidation, the **first chip module
 > that does not touch the frozen engine** (oxide growth is its own closed form; a chip-local
 > analytic/ODE module per §2/§3). With `demo_oxidation.py` + `plots.oxidation_figure` (the banked
@@ -390,7 +390,7 @@ from a 100 %-complete Steel to Chip.
 > modeled** (v1 is plain Deal–Grove — the honest ceiling). The OED/segregation back-coupling stays
 > the named §3 deferral (forward-only). **Next = Phase 3 (lithography aerial image).**
 
-> **Phase 3 — BUILT (2026-06-09).** `projects/chip/litho.py` — the **lithography aerial image**, the
+> **Phase 3 — BUILT (2026-06-09).** `chip/litho.py` — the **lithography aerial image**, the
 > chip project's **one genuinely-new module** (Fourier optics) and its risk phase; **chip-local, not
 > promoted to `engines/`** (rule-of-three), and like Phase 2 it **does not touch the frozen PDE engine**
 > (it is its own diffraction computation). One core primitive `coherent_image` (= `|Σ_m a_m·e^{2πi f_m x}|²`)
@@ -419,7 +419,7 @@ from a 100 %-complete Steel to Chip.
 > a 1-D uniform source line (not the chord-weighted 2-D-disk projection). **Next = Phase 4 (compact MOS Vt
 > — the process→device payoff, consuming a Phase-1 profile + a Phase-2 oxide + a Phase-3 CD).**
 
-> **Phase 4 — compact MOS V_t (process → device): BUILT (2026-06-09).** `projects/chip/device.py` — the
+> **Phase 4 — compact MOS V_t (process → device): BUILT (2026-06-09).** `chip/device.py` — the
 > **payoff** phase that closes the loop: a chip-local **compact closed form** ``V_t = V_FB + 2·φ_F +
 > Q_dep/C_ox`` (like Phase 2, it does **not** touch the frozen engine — it is its own algebra) consuming
 > the three upstream process outputs as **one coherent n-MOSFET**: the channel ``N_A`` (a Phase-1 p-type
@@ -487,7 +487,7 @@ from a 100 %-complete Steel to Chip.
 
 > **v1.2 — the Phase 1↔2 back-coupling (OED + dopant segregation): BUILT (2026-06-10).** The named §3
 > deferral of *both* Phase 1 (the `D(N)`-adjacent back-reaction) and Phase 2 (the OED/segregation
-> coupling), **promoted** (the steel-ferrite-bay / Massoud move). `projects/chip/coupling.py`, chip-local,
+> coupling), **promoted** (the steel-ferrite-bay / Massoud move). `chip/coupling.py`, chip-local,
 > consuming a `diffusion_dopant` profile + an `oxidation` rate. **The decisive architecture finding: both
 > effects are expressible *within the frozen engine* — no contract amendment.** *OED* (oxidation-enhanced
 > diffusion) is a **position/time-dependent `D(x,t)`** (it tracks the oxidation rate + depth, **not** the

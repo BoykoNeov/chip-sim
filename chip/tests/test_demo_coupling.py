@@ -11,7 +11,7 @@ without error", and skipped where the optional viz extra is absent.
 """
 import pytest
 
-from projects.chip.demo_coupling import compute, DOPANT_CASES
+from chip.demo_coupling import compute, DOPANT_CASES
 
 
 def test_demo_pipeline_runs_both_dopants():
@@ -52,7 +52,7 @@ def test_coupling_figure_builds():
     # Viz smoke test only (never a correctness check): skip cleanly without the extra.
     plt = pytest.importorskip("matplotlib")
     plt.use("Agg")
-    from projects.chip.plots import coupling_figure
+    from chip.plots import coupling_figure
 
     fig = coupling_figure(compute())
     assert len(fig.axes) == 2                          # one panel per dopant (boron, phosphorus)

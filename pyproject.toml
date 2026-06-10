@@ -1,0 +1,52 @@
+# Build config exists for ONE consumer: full-gate CI (`pip install -e .[…]` to pull the
+# optional stacks). Local dev never installs — pytest's `pythonpath = ["."]` (below) puts
+# the repo root on sys.path, so `engines.*` / `chip.*` import without a build step. The
+# flat layout has two top-level packages, which setuptools won't auto-discover, so name them
+# explicitly here (else `pip install -e .` fails with "Multiple top-level packages discovered").
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["engines*", "chip*"]
+
+[project]
+name = "chip-sim"
+version = "0.1.0"
+description = "Educational microchip-fabrication simulator on a frozen, separately-validated diffusion solver engine."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+# Visualization is opt-in (ADR 0002): the compute core and the test suite stay
+# headless/matplotlib-free; only the render layer (chip/plots.py, demos, the notebook)
+# needs this. Install with `pip install -e .[viz]`.
+viz = ["matplotlib>=3.7"]
+# The teaching notebook (chip.ipynb) is opt-in. This extra carries two things: (1) jupyterlab —
+# the interactive frontend a human opens the notebook in (`jupyter lab chip/chip.ipynb`); and
+# (2) the headless run stack — ipywidgets (the live sliders) + nbclient/nbformat/ipykernel — which
+# the execution smoke-test (chip/tests/test_chip_notebook.py) uses to run the notebook without a
+# browser. matplotlib stays in [viz], so the full runnable combo is `pip install -e .[viz,notebook]`.
+# The committed suite stays notebook-free regardless (the smoke-test is slow-marked and
+# importorskip/kernelspec-gated, and self-skips under CI — see the test docstring).
+notebook = ["jupyterlab>=4", "ipywidgets>=8", "nbclient", "nbformat", "ipykernel"]
+
+# Single-command test runner config. `pythonpath = ["."]` puts the repo root on
+# sys.path so tests import the engine as `engines.diffusion...` (and the project as
+# `chip...`) without an install step.
+#
+# Tiered gate (ADR 0003): the routine local gate is the fast lane
+#   `pytest -m "not slow"`   — the always-on suite (~? s)
+#   `pytest`                 — the full suite, incl. the slow notebook smoke-test (CI / release)
+# `slow` marks the handful of tests that drive a live kernel / subprocess (the notebook execution).
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["engines", "chip"]
+addopts = "-q"
+markers = [
+    "slow: drives a live kernel / subprocess; deselect in the inner loop with -m 'not slow' (ADR 0003)",
+]
