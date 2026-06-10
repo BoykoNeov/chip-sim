@@ -53,7 +53,7 @@ GATE = "n+poly"                # n⁺-poly gate (φ_gate = +0.55 V)
 DEVICE_WIDTH_UM = 10.0         # W for the long-channel drive-current readout
 OVERDRIVE_V = 1.0              # V_GS − V_t for I_Dsat
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-device.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-device.png"
 

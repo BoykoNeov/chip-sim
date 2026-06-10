@@ -43,7 +43,7 @@ N_T = 400
 CHANNEL_N_A = 1.0e17           # cm⁻³
 GATE = "n+poly"
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-thin-oxide.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-thin-oxide.png"
 

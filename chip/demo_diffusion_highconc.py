@@ -54,9 +54,7 @@ N_CELLS = 800
 N_STEPS = 800
 PICARD_ITERS = 2               # converges the stiff (n/n_i)² coupling (2 == 6; see the triad)
 
-# NB: repo root is parents[1] for a file in chip/ (post the standalone-chip-sim flatten). The sibling
-# demos still carry the pre-flatten parents[2] and now mis-save one level up — a known stale path,
-# flagged separately; this demo uses the correct depth.
+# NB: repo root is parents[1] for a file in chip/ (post the standalone-chip-sim flatten).
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-highconc.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-highconc.png"

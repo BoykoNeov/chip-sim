@@ -56,7 +56,7 @@ N_CELLS = 600
 # The two contrasting dopants: boron (m < 1 → depletion), phosphorus (m > 1 → pile-up).
 DOPANT_CASES = ("B", "P")
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-oed-segregation.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-oed-segregation.png"
 

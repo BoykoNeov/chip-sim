@@ -50,7 +50,7 @@ LENGTH_UM, N_CELLS = 3.0, 600
 PUBLISHED_XJ_UM = (0.5, 1.5)
 PUBLISHED_RS_OHM_SQ = (50.0, 300.0)
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-junction.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-junction.png"
 

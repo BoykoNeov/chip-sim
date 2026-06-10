@@ -57,7 +57,7 @@ N_PITCH = 140
 # The printed-exposure table: coarse → near-limit → sub-resolution (σ conventional).
 TABLE_PITCHES = (600.0, 350.0, 240.0, 180.0, 150.0)
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-litho.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-litho.png"
 

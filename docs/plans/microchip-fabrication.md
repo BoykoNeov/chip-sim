@@ -580,10 +580,10 @@ from a 100 %-complete Steel to Chip.
 > cap ≈3.4e20 → the physical ×42 *and* the flat-top plateau — a scope-edge turned feature), so ×486 doesn't ship as a
 > prediction. Units: semiconductor CGS-cm (as Phase 1a); the notebook gains **no** section (consistent with v1.1/v1.2).
 > Chip fast lane **156 green** (+14); whole-repo fast lane **163**. SHARED-FILE ASKS: a `dopant-conc-dependent-diffusion`
-> memory note. **Also surfaced (a pre-existing regression, flagged not fixed):** the standalone-flatten left the six
-> sibling `chip/demo_*.py` carrying a stale `parents[2]` repo-root → they now **mis-save their banked figures one level
+> memory note. **Also surfaced (a pre-existing regression):** the standalone-flatten left the six
+> sibling `chip/demo_*.py` carrying a stale `parents[2]` repo-root → they **mis-saved their banked figures one level
 > *above* the repo** (the committed figures predate the flatten, so it went unnoticed; the README references them). This
-> demo uses the correct `parents[1]`; fixing the other six is a separate one-line-each change left for the user.
+> demo used the correct `parents[1]`; **the other six were fixed to `parents[1]` (one line each).**
 
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **frozen
 `engines/diffusion`** in mass mode (`diffusion_dopant.py`): a constant-source

@@ -42,7 +42,7 @@ N_T = 200
 PUBLISHED_DRY_UM = 0.10
 PUBLISHED_WET_UM = 0.64
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-oxidation.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-oxidation.png"
 
