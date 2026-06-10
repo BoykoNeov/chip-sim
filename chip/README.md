@@ -12,7 +12,9 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
 > cm²·s⁻¹ / cm⁻³ / cm²·V⁻¹·s⁻¹ — the native units of Fair `D₀`, Trumbore `N_s`, Masetti `μ` (the
 > frozen engine is unit-agnostic, fed cm + seconds; `R_s` falls out in Ω/sq directly). *Oxidation*
 > (`oxidation.py`) uses **Deal–Grove-native µm-hour** — `B` (µm²/hr), `B/A` (µm/hr) — the units the
-> cited rate constants are tabulated in. *Lithography* (`litho.py`) uses **litho-native nm** —
+> cited rate constants are tabulated in (its v1.1 **Massoud block** computes in the *Massoud*
+> tables' native **nm-minute** — the same rule applied per cited *dataset* — exporting µm at the
+> boundary). *Lithography* (`litho.py`) uses **litho-native nm** —
 > wavelengths (193 nm) and feature sizes are quoted in nm — exposing the printed CD in µm at the
 > boundary. *The device* (`device.py`) uses **semiconductor CGS** (like dopant diffusion) — ε in F/cm,
 > charge in C/cm², `C_ox` in F/cm² — consuming the upstream `t_ox` in µm (→cm at its boundary) and the
@@ -39,8 +41,18 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   closed form** (Deal–Grove `x²+Ax=B(t+τ)`, wet/dry) — **does not touch the frozen engine**;
   `grow_oxide` → `OxideGrowth` (`t_ox` in µm, the cross-module currency), `oxide_thickness`/
   `linear_limit`/`parabolic_limit`/`growth_rate` the closed form + limits + ODE. The module docstring
-  is its contract (cited `B`/`B/A`, the Massoud thin-dry scope edge, the deferred OED/segregation
-  coupling). Saves `docs/figures/chip-oxidation.png`.
+  is its contract (cited `B`/`B/A`, the deferred OED/segregation coupling).
+  Saves `docs/figures/chip-oxidation.png`.
+- **To work on the thin-dry (Massoud) correction (v1.1, Phase 2's promoted scope edge):**
+  `oxidation.py` §5 + the v1.1 block of `tests/test_oxidation.py`, the demo `demo_thin_oxide.py` +
+  `tests/test_demo_thin_oxide.py`, and `plots.thin_oxide_figure`. The cited **Massoud time-decay**
+  model `dx/dt = (B + K₁e^(−t/τ₁) + K₂e^(−t/τ₂))/(A+2x)` — closed form (the quadratic identity
+  gains two saturating doses `Mᵢ = Kᵢτᵢ`), **dry O₂ / 800–1000 °C / (100)(111)(110) only**
+  (refuses outside the cited fit), on **Massoud's own coherent `B`,`B/A` set** (not spliced onto
+  the 1965 constants). `grow_oxide_massoud` → `OxideGrowth(model="massoud")`; the default
+  `grow_oxide` path stays bit-for-bit plain Deal–Grove. The module docstring §5 is its contract
+  (the τ sign-typo finding, the thin-seed-only `x_initial` edge). Saves
+  `docs/figures/chip-thin-oxide.png`.
 - **To work on lithography (Phase 3):** `litho.py` + `tests/test_litho.py`, the demo `demo_litho.py`
   + `tests/test_demo_litho.py`, and `plots.litho_figure`. The chip's **one genuinely-new module** —
   **Fourier optics**, chip-local (not promoted to `engines/`); **does not touch the frozen engine**.
@@ -100,6 +112,20 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   gate length → coherent cross-section) → **`V_t` ≈ 0.55 V** (cf. the cited MIT 6.012 worked example
   at exactly 15 nm → 0.58 V). 20-test triad green (15 device + 5 demo): the **independent
   depletion-Poisson anchor** (not the √-law), charge-neutrality/Gauss conservation, the MIT benchmark.
+- **v1.1 — the Massoud thin-dry correction (Phase 2's scope edge, promoted): BUILT** (2026-06-10).
+  `oxidation.py` §5 — the cited Massoud **time-decay** enhancement (Massoud & Plummer, *J. Appl.
+  Phys.* 62:3416, 1987; refit `B`/`B/A` from *JECS* 132:1746, 1985; constants per Hollauer TU Wien
+  diss. 2007 Tables 2.3/2.4, dry O₂ 800–1000 °C, three orientations) with its **exact closed form**
+  `x²+Ax = Bt + ΣMᵢ(1−e^(−t/τᵢ)) + (xᵢ²+Axᵢ)` + `solve_ivp` cross-check + degenerate-recovery seam
+  (`K=0` → plain Deal–Grove bit-for-bit; the default path untouched). + `demo_thin_oxide.py` +
+  `plots.thin_oxide_figure`. Banked artifact: the **gate-oxide before/after** — the Phase-4 recipe
+  (dry 1000 °C/20 min) grows **14.1 nm under v1 Deal–Grove but 23.3 nm under Massoud (×1.65)**,
+  and feeding both to Phase 4 moves **V_t by +0.44 V** — the thin-dry anomaly was a V_t-sized error
+  in the chain, not a footnote (`docs/figures/chip-thin-oxide.png`). 16-test mini-triad green
+  (11 module + 5 demo): the integrated quadratic identity to machine precision, the saturating
+  `M₁+M₂` dose, the cited-table pins + Hollauer's own Fig.-2.19 point, the τ **sign-typo finding**
+  (the dissertation prints `exp(−E_τ/kT)`; only `exp(+E_τ/kT)` reproduces its own figure — the
+  positive sign is pinned in code and tests).
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated

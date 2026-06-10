@@ -450,6 +450,41 @@ from a 100 %-complete Steel to Chip.
 > edge named. **MICROCHIP COMPLETE (all 4 phases). NEXT = build the committed manifest-backed per-project
 > gate (ADR 0003 successor — the §7 user direction, now that Microchip provides a 2nd manifest entry).**
 
+> **v1.1 — the Massoud thin-dry correction: BUILT (2026-06-10).** Phase 2's **named scope edge,
+> promoted** (the steel-ferrite-bay move: yesterday's honest ceiling becomes today's phase) —
+> `oxidation.py` §5, chip-local, the frozen engine untouched, the **plain path bit-for-bit unchanged**
+> (`grow_oxide` never applies the enhancement; `K=0` degenerate recovery pinned). The cited model is
+> Massoud's **time-decay formulation** ``dx/dt = (B + K₁e^(−t/τ₁) + K₂e^(−t/τ₂))/(A+2x)`` — chosen
+> over the sibling thickness-decay form (`+Cᵢe^(−x/Lᵢ)`, L₁≈1 nm/L₂≈7 nm) because it **integrates in
+> closed form**: ``x²+Ax = Bt + ΣKᵢτᵢ(1−e^(−t/τᵢ)) + (xᵢ²+Axᵢ)`` — so v1.1 keeps the module's
+> exact-anchor discipline (machine-precision identity + independent `solve_ivp` cross-check) instead of
+> going numeric-only. Constants pinned at build (the massoud-thin-oxide source pin): Massoud & Plummer,
+> *J. Appl. Phys.* **62**(8):3416–3423 (1987) + Massoud/Plummer/Irene, *JECS* **132**(7):1746 & (11):2685
+> (1985), as compiled in **Hollauer, TU Wien diss. (2007) §2.7 Tables 2.3/2.4** — dry O₂ only,
+> **800–1000 °C, (100)/(111)/(110)**, and the module **refuses** outside the cited fit
+> (refuse-don't-extrapolate; the Massoud `B`,`B/A` Arrhenius is a two-piece fit split at 1000 °C).
+> Durable source calls: **the coherent-set rule** (the `Kᵢ`/`τᵢ` ride Massoud's *own refit* `B`,`B/A` —
+> Table 2.3's, ≠ the 1965 table — never spliced onto the v1 constants; thick-regime disagreement between
+> the two fits is honest, not a bug) and **the τ sign-typo finding** (Hollauer's eqs (2.39)–(2.40) print
+> `τᵢ = τᵢ⁰·exp(−E/kT)`, which with `τ⁰~1e-7 min` gives femtosecond decays; the **positive** exponent
+> gives τ₁≈1.2/τ₂≈7.5 min at 1000 °C and reproduces the dissertation's **own Fig. 2.19** ≈25 nm @
+> 1000 °C/20 min — the consistency check that disambiguated the typo; also Table 2.4's 8th row label
+> "τ₁⁰" is a second typo for τ₂⁰). Banked artifact (`demo_thin_oxide.py` →
+> `docs/figures/chip-thin-oxide.png`): the **gate-oxide before/after** — the Phase-4 recipe (dry
+> 1000 °C/20 min, (100)) grows **14.1 nm (v1 plain Deal–Grove) vs 23.3 nm (Massoud, ×1.65)**, and the
+> Phase-4 readout moves **V_t 0.547 → 0.991 V (ΔV_t = +0.44 V)** — *the thin-dry anomaly was a V_t-sized
+> error in the process→device chain, not an oxidation footnote* (the demo's payoff line). **16-test
+> mini-triad** sealed (11 module + 5 demo): *analytic* = the integrated quadratic identity to 1e-12 +
+> ODE recovery <1e-6 + `K=0`→Deal–Grove + the saturation theorem (the burst is worth exactly `M₁+M₂` of
+> `x²+Ax`, then pure linear-parabolic — the ~25 nm ceiling in time form); *conservation* = the 0.44
+> moving-boundary bookkeeping is growth-law-independent and closes exactly; *benchmark* = all three
+> orientations' table pins + hand-checked evaluated magnitudes + Hollauer's own growth curve. Scope
+> edges named: time-decay ties the burst to *onset* (thin/native seeds only for `x_initial`), wet has
+> no anomaly, T>1000 °C Massoud constants exist but are out (no enhancement there). Units: the §5 block
+> computes in the tables' native **nm-min** (the per-cited-*dataset* sharpening of the per-module
+> native-units rule), µm at the boundary. SHARED-FILE ASKS: the `massoud-thin-oxide-source` memory note
+> (this addendum carries the full pin meanwhile).
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **frozen
 `engines/diffusion`** in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**

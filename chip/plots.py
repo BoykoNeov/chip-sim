@@ -32,6 +32,8 @@ JUNCTION_COLOR = "#c0392b"    # the pn junction (where the profile crosses N_B)
 # Oxidation (Phase 2) colours: wet = cool blue (H₂O, fast), dry = warm amber (O₂, slow).
 WET_COLOR = "#2f6fb0"
 DRY_COLOR = "#d4711f"
+MASSOUD_COLOR = "#a93226"       # the v1.1 thin-dry burst (crimson — the corrected curve)
+BASELINE_COLOR = "#888888"      # the same linear-parabolic law with the burst switched off
 
 # Lithography (Phase 3) colours.
 AERIAL_COLOR = "#6a3d9a"        # the assembled aerial image (violet — light/intensity)
@@ -183,6 +185,93 @@ def oxidation_figure(
               bbox=dict(boxstyle="round", fc="white", ec="#cccccc", alpha=0.9))
     ax_r.legend(loc="upper right", fontsize=9, framealpha=0.95)
     ax_r.grid(True, alpha=0.18)
+
+    fig.tight_layout(rect=(0, 0, 1, 0.98))
+    return fig
+
+
+def thin_oxide_figure(
+    t_min: np.ndarray,
+    curves: dict,
+    rates,
+    gate_t_min: float,
+    gate_massoud_nm: float,
+    gate_v1_nm: float,
+    T_celsius: float = 1000.0,
+    orientation: str = "100",
+) -> "plt.Figure":
+    """The v1.1 thin-oxide artifact: the Massoud burst before/after, beside its decaying rate.
+
+    ``curves`` carries the µm thickness sweeps (``massoud``, ``plain_same_ba``, ``v1_dg1965``)
+    and the nm/min rate sweeps (``rate_massoud``, ``rate_plain``) over ``t_min`` (minutes);
+    ``rates`` is the evaluated Massoud set (for the τ annotations); the ``gate_*`` scalars mark
+    the Phase-4 gate-oxide recipe point on both models.
+
+    Left panel (**the banked readout** — linear axes, the thin regime): oxide thickness vs time —
+    the Massoud curve outrunning both the same-B,A baseline (the burst isolated) and the v1
+    plain-1965 prediction, with the gate-recipe before/after gap marked. The ~25 nm anomaly
+    ceiling is drawn as the named scope line.
+
+    Right panel (**the mechanism** — why): the growth rate vs time, log-y — the Massoud rate
+    starting several × the linear plateau and decaying on τ₁/τ₂ onto the plain linear-parabolic
+    rate (the burst is a *finite* transient, not a new regime).
+
+    Consumes plain arrays/scalars only (ADR 0002).
+    """
+    fig, (ax_x, ax_r) = plt.subplots(1, 2, figsize=(13, 6))
+    t = np.asarray(t_min, dtype=float)
+    nm = 1.0e3
+
+    # --- left: thickness vs time — the before/after ---------------------------------
+    ax_x.plot(t, curves["massoud"] * nm, color=MASSOUD_COLOR, lw=2.6, zorder=5,
+              label="Massoud time-decay model (cited)")
+    ax_x.plot(t, curves["plain_same_ba"] * nm, color=BASELINE_COLOR, lw=1.8, ls="--",
+              label="same B, A — burst switched off")
+    ax_x.plot(t, curves["v1_dg1965"] * nm, color=DRY_COLOR, lw=2.2,
+              label="v1 chain: plain Deal–Grove (1965 constants)")
+    ax_x.axhline(25.0, color="#555555", ls=":", lw=1.2)
+    ax_x.text(0.985, 25.6, "≈ end of the thin-regime anomaly (~25 nm)", fontsize=8,
+              color="#555555", ha="right", transform=ax_x.get_yaxis_transform())
+    # The gate-recipe before/after gap.
+    ax_x.plot([gate_t_min, gate_t_min], [gate_v1_nm, gate_massoud_nm],
+              color=JUNCTION_COLOR, lw=1.4, ls="-", marker="o", ms=6, zorder=6)
+    ax_x.annotate(
+        f"the gate-oxide recipe ({gate_t_min:.0f} min):\n"
+        f"{gate_v1_nm:.1f} nm → {gate_massoud_nm:.1f} nm "
+        f"(+{gate_massoud_nm - gate_v1_nm:.0f} nm the v1 chain missed)",
+        xy=(gate_t_min, 0.5 * (gate_v1_nm + gate_massoud_nm)),
+        xytext=(gate_t_min * 1.22, gate_v1_nm * 0.55),
+        fontsize=9, color=JUNCTION_COLOR,
+        arrowprops=dict(arrowstyle="->", color=JUNCTION_COLOR, lw=1.2),
+    )
+    ax_x.set_xlim(t[0], t[-1])
+    ax_x.set_ylim(0, max(float((curves["massoud"] * nm).max()) * 1.12, 28.0))
+    ax_x.set_xlabel("oxidation time  (min)")
+    ax_x.set_ylabel("oxide thickness  $x_{ox}$  (nm)")
+    ax_x.set_title(f"the thin-dry burst at {T_celsius:.0f} °C, (" + orientation + ") Si, dry O₂")
+    ax_x.legend(loc="lower right", fontsize=9, framealpha=0.95)
+    ax_x.grid(True, alpha=0.18)
+
+    # --- right: the decaying growth rate (the mechanism) ----------------------------
+    interior = t > 0
+    ax_r.semilogy(t[interior], curves["rate_massoud"][interior], color=MASSOUD_COLOR, lw=2.4,
+                  label="Massoud rate  $(B+K_1e^{-t/\\tau_1}+K_2e^{-t/\\tau_2})/(A+2x)$")
+    ax_r.semilogy(t[interior], curves["rate_plain"][interior], color=BASELINE_COLOR, lw=1.8,
+                  ls="--", label="plain rate  $B/(A+2x)$ — same B, A")
+    for tau, name in ((rates.tau1, "$\\tau_1$"), (rates.tau2, "$\\tau_2$")):
+        ax_r.axvline(tau, color="#555555", ls=":", lw=1.1)
+        ax_r.text(tau, 0.965, f" {name} = {tau:.1f} min", fontsize=8.5, color="#555555",
+                  va="top", transform=ax_r.get_xaxis_transform())
+    ax_r.set_xlim(t[0], t[-1])
+    ax_r.set_xlabel("oxidation time  (min)")
+    ax_r.set_ylabel("growth rate  $dx_{ox}/dt$  (nm/min)")
+    ax_r.set_title("the mechanism: a finite burst decaying onto linear-parabolic")
+    ax_r.text(0.5, 0.84, "the enhancement is worth exactly $M_1{+}M_2 = K_1\\tau_1{+}K_2\\tau_2$\n"
+              "of extra $x^2{+}Ax$ — then Deal–Grove again",
+              transform=ax_r.transAxes, fontsize=8.5, va="top", ha="center",
+              bbox=dict(boxstyle="round", fc="white", ec="#cccccc", alpha=0.9))
+    ax_r.legend(loc="upper right", fontsize=8.5, framealpha=0.95)
+    ax_r.grid(True, which="both", alpha=0.18)
 
     fig.tight_layout(rect=(0, 0, 1, 0.98))
     return fig
