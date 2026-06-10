@@ -56,6 +56,14 @@ NLINEAR_COLOR = "#d4711f"       # the n¹ companion (arsenic — boxier than con
 ENH_COLOR = "#a93226"           # the D_eff/D_intrinsic enhancement curve (crimson — the mechanism)
 NI_COLOR = "#27795b"            # the intrinsic carrier concentration n_i (where the enhancement bites)
 
+# Defocus (v1.4) colours — the Bossung curve & the through-focus fundamental.
+BOSSUNG_COLOR = "#6a3d9a"       # the nominal-dose Bossung CD-vs-defocus curve (violet — same family as litho)
+WINDOW_COLOR = "#27795b"        # the process window (the usable focus band)
+ENVELOPE_COLOR = "#a93226"      # the exact 4c₀c₁cos φ analytic envelope (crimson — the tight anchor)
+ONAXIS_COLOR = "#2f6fb0"        # the on-axis coherent fundamental (data points on the envelope)
+PARTIAL_COLOR = "#d4711f"       # the σ-source fundamental — the null softened by partial coherence
+DOF_COLOR = "#c0392b"           # the depth-of-focus event (the φ=π/2 null) marker
+
 # Device (Phase 4) colours — the V_t waterfall (where the threshold voltage comes from).
 VFB_COLOR = "#8e44ad"           # the flat-band voltage term (gate work function)
 BAND_COLOR = "#2f6fb0"          # the 2φ_F surface-potential term
@@ -618,5 +626,86 @@ def highconc_figure(case: dict) -> "plt.Figure":
 
     fig.suptitle("Microchip v1.3: concentration-dependent diffusivity $D(N)$ — the high-concentration box "
                  "(within the frozen engine)", fontsize=12.5, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    return fig
+
+
+def defocus_figure(
+    data: dict,
+    wavelength_nm: float,
+    NA: float,
+    sigma: float,
+    pitch_nm: float,
+    dose_fractions: tuple,
+    cd_spec: float,
+) -> "plt.Figure":
+    """The banked v1.4 artifact: the Bossung curve & the through-focus fundamental (depth of focus).
+
+    ``data`` is the :func:`demo_defocus.compute` bundle (plain arrays/scalars — no live imaging object,
+    ADR 0002). Two panels:
+
+    Left panel (**the banked readout** — the Bossung curve): printed **CD vs defocus** at each fixed dose
+    (the Bossung "smile" family), the **process window** (CD within ±``cd_spec`` of target at the nominal
+    dose) shaded, and the Rayleigh ``DOF = k₂·λ/NA²`` marked. *Where the printed feature stays on-size as
+    focus drifts — the usable focus budget.*
+
+    Right panel (**the mechanism** — why focus runs out): the on-axis three-beam **fundamental** vs
+    defocus (markers) lying on the exact ``4·c₀·c₁·cos φ`` **envelope** (line) — the tight anchor —
+    **nulling at φ = π/2** = the depth-of-focus event, beyond which the fundamental reverses and the image
+    frequency-doubles (contrast reversal). The σ-source curve shows partial coherence softening the null.
+    """
+    fig, (ax_b, ax_f) = plt.subplots(1, 2, figsize=(13, 6))
+    z = np.asarray(data["zabs"])
+    dof, z_null = data["dof"], data["z_null"]
+
+    # --- left: the Bossung family + the process window -------------------------------
+    nominal = 0.50 if 0.50 in dose_fractions else dose_fractions[len(dose_fractions) // 2]
+    for f in dose_fractions:
+        cd = np.asarray(data["bossung"][f], dtype=float).copy()
+        cd[cd <= 0.0] = np.nan                          # don't dive to the axis where the feature stops printing
+        is_nom = abs(f - nominal) < 1e-9
+        ax_b.plot(z, cd, color=BOSSUNG_COLOR, lw=2.6 if is_nom else 1.6,
+                  alpha=1.0 if is_nom else 0.55, zorder=4 if is_nom else 3,
+                  label=f"dose {f*100:.0f} %" + ("  (nominal)" if is_nom else ""))
+    if data["window"] is not None:
+        lo, hi = data["window"]
+        ax_b.axvspan(lo, hi, color=WINDOW_COLOR, alpha=0.13, zorder=1,
+                     label=f"process window (±{cd_spec*100:.0f} % CD): {hi - lo:.0f} nm")
+    for s in (-1.0, 1.0):
+        ax_b.axvline(s * dof, color=DOF_COLOR, ls="--", lw=1.4, alpha=0.8,
+                     label=(f"±DOF = ±{dof:.0f} nm  ($k_2$=0.5)" if s > 0 else None))
+    ax_b.set_xlim(float(z[0]), float(z[-1]))
+    ax_b.set_xlabel("defocus  $z$  (nm)")
+    ax_b.set_ylabel("printed CD  (nm)")
+    ax_b.set_title(f"the Bossung curve: CD vs defocus  (pitch {pitch_nm:.0f} nm, σ={sigma:.2f})")
+    ax_b.legend(loc="lower center", fontsize=8.3, framealpha=0.95)
+    ax_b.grid(True, alpha=0.18)
+
+    # --- right: the fundamental through focus — the exact envelope + the null --------
+    ax_f.plot(z, data["envelope"], color=ENVELOPE_COLOR, lw=2.4, zorder=3,
+              label="exact envelope  $4c_0c_1\\cos\\varphi$")
+    ax_f.plot(z[::6], np.asarray(data["on_axis"])[::6], "o", color=ONAXIS_COLOR, ms=4.5, zorder=5,
+              label="on-axis fundamental (coherent)")
+    ax_f.plot(z, data["partial"], color=PARTIAL_COLOR, lw=2.0, ls="-", alpha=0.9,
+              label=f"σ={sigma:.2f} fundamental (null softened)")
+    ax_f.axhline(0.0, color="#444444", lw=0.8)
+    for s in (-1.0, 1.0):
+        ax_f.axvline(s * z_null, color=DOF_COLOR, ls=":", lw=1.6,
+                     label=(f"φ=π/2 null at ±{z_null:.0f} nm (DOF event)" if s > 0 else None))
+    # Shade and label the frequency-doubling (contrast-reversal) zone beyond the null.
+    ax_f.axvspan(z_null, float(z[-1]), color=DOF_COLOR, alpha=0.06)
+    ax_f.axvspan(float(z[0]), -z_null, color=DOF_COLOR, alpha=0.06)
+    ax_f.text(0.985, 0.04, "beyond the null:\nfrequency doubling\n(contrast reversal)", fontsize=8,
+              color=DOF_COLOR, ha="right", va="bottom", transform=ax_f.transAxes,
+              bbox=dict(boxstyle="round", fc="white", ec="#e3c0bc", alpha=0.9))
+    ax_f.set_xlim(float(z[0]), float(z[-1]))
+    ax_f.set_xlabel("defocus  $z$  (nm)")
+    ax_f.set_ylabel("image fundamental  $\\langle I,\\cos(2\\pi x/p)\\rangle$")
+    ax_f.set_title("why: the fundamental fades to a null, then reverses (the DOF)")
+    ax_f.legend(loc="upper right", fontsize=8.0, framealpha=0.95)
+    ax_f.grid(True, alpha=0.18)
+
+    fig.suptitle("Microchip v1.4: lithographic defocus — the Bossung curve & the depth of focus "
+                 "(within the litho module)", fontsize=12.5, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     return fig

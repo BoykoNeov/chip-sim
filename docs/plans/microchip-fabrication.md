@@ -585,6 +585,50 @@ from a 100 %-complete Steel to Chip.
 > *above* the repo** (the committed figures predate the flatten, so it went unnoticed; the README references them). This
 > demo used the correct `parents[1]`; **the other six were fixed to `parents[1]` (one line each).**
 
+> **v1.4 — lithographic defocus, the depth of focus & the Bossung curve: BUILT (2026-06-10).** Phase 3's
+> §3-named scope edge — the **"ideal in-focus aberration-free pupil"** — **promoted** (the steel-ferrite-bay /
+> Massoud / v1.2 / v1.3 move). `chip/litho.py` §7, chip-local, the frozen engine untouched, and — like v1.2/v1.3 —
+> **no new code path**: defocus is a pure **phase** aberration, and `coherent_image` already sums *complex*
+> amplitudes, so `defocus_phase` just multiplies each collected order by `exp(i·(2π/λ)·z·(1−cosθ))` (keyed to the
+> order's **full pupil coordinate** `f_m+f_s` = its true propagation angle), threaded through `abbe_image`/
+> `expose_grating` as `defocus_nm=0.0` — and `z=0` short-circuits to the float `1.0` so the in-focus path is the v1
+> image **bit-for-bit**. With `demo_defocus.py` + `plots.defocus_figure` (the banked artifact: the **Bossung curve**
+> — printed CD vs defocus across a dose family, the **process window** + `DOF=k₂λ/NA²` marked — beside the
+> **through-focus fundamental**, the on-axis three-beam coefficient riding the exact `4c₀c₁cosφ` envelope, nulling
+> at φ=π/2 then **reversing** into a double-frequency fringe, with a σ-source curve softening the null →
+> `docs/figures/chip-defocus.png`; 193 nm ArF, NA 0.85, σ 0.5, **240 nm pitch** (the resolution limit, where DOF is
+> defined) → DOF ≈ 134 nm, the exact φ=π/2 null at ±119 nm). **16-test mini-triad** (11 module + 5 demo); chip fast
+> lane **161 green** (+16; 145→161). Triad:
+> *analytic (tight)* = (a) the **z=0 degenerate seam** (in-focus bit-for-bit); (b) the **symmetric-dipole
+> infinite-DOF** — two equal beams at ±f_cut share an identical pupil radius → identical defocus phase that factors
+> out of `|Σ|²` → the image is unchanged at **every** z to machine precision (the literal "infinite DOF of the
+> dipole"), while an *asymmetric* two-beam (0 & +1) keeps its visibility but **rotates** the fundamental as `2cosφ`
+> (a fringe shift, not a contrast loss); (c) the on-axis **three-beam fundamental = `4·c₀·c₁·cosφ` to machine
+> precision** — extracted by `fundamental_amplitude` (the `⟨I,cos(2πx/p)⟩` projection), NOT the `image_contrast`
+> metric. *conservation (tight)* = **defocus is unitary** — phase-only ⇒ `|c_m|²` untouched ⇒
+> `mean(image)=Σ|c_m|²=transmitted_power` at every defocus, to machine precision (a real check that the build added
+> *phase*, not amplitude). *benchmark (loose)* = the Bossung CD/NILS degradation with `|z|` + `DOF=k₂λ/NA²` with
+> **`k₂=0.5` DERIVED** from the φ=π/2 null at the resolution limit (`sinθ→NA`), not cited cold. **Durable advisor
+> calls: (1)** the **gating** call — defocus was the right promotion (clean exact anchors, the conservation leg
+> extends for free), build it. **(2) The load-bearing correction — assert the fundamental, NOT the contrast.**
+> "Three-beam contrast ∝ |cosφ|" is *false* under `(I_max−I_min)/(I_max+I_min)`: the image is
+> `I = c₀² + 4c₁²cos²ψ + 4c₀c₁cosφ·cosψ`, whose `4c₁²cos²ψ` is a **defocus-independent second harmonic** — so the
+> *fundamental* (the `cos(2πx/p)` coefficient) is the machine-precision `4c₀c₁cosφ`, but the contrast does **not**
+> vanish at the φ=π/2 null (the image **frequency-doubles** / contrast-reverses there, Mack). Pinned as a *positive*
+> test (`test_dof_null_is_frequency_doubling_not_a_blank_image`). **(3)** the symmetric dipole is **bit-for-bit**
+> identical (not merely contrast-invariant), the asymmetric two-beam is the lateral-shift case — two distinct exact
+> tests. **(4)** keep the analytic-leg φ identical to the code's (**full** `cosθ`, not paraxial `−½πzλ/p²`); then
+> the φ=π/2 null gives `z=λ/2NA²` → `k₂=0.5` falls out — but that is **paraxial**, so at NA 0.85 the exact full-cosθ
+> null (±119 nm) sits ~24% inside the paraxial DOF (±134 nm) and **converges** onto it as NA→0 (pinned across
+> NA=0.85→0.15: ratio 0.76→0.99) — the honest high-NA caveat, owned in code+test. **Scope edges named-not-modelled:**
+> Zernike aberrations (coma/astigmatism/spherical) — only **defocus** is added; immersion NA≥1 (the scalar model's
+> evanescent edge / the named vector tar pit); the constant-threshold resist (no acid-diffusion/PEB blur — the
+> *next* litho promotion candidate, the "blur = a diffusion solve → frozen-engine reuse" angle). The docstring's
+> old "no defocus phase, no Zernikes" scope line was amended to "aberration-free apart from defocus." Units: the §7
+> additions stay litho-native **nm** (defocus z, DOF in nm); CD exposed in nm/µm as before. The notebook gains **no**
+> section (consistent with v1.1/v1.2/v1.3). SHARED-FILE ASKS: a `litho-defocus-v14` memory note + the DOF/Bossung/
+> frequency-doubling/`k₂` pin appended to `[[litho-aerial-image-source]]`.
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **frozen
 `engines/diffusion`** in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**

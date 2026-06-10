@@ -40,7 +40,8 @@ Validation triad (plan §3) — what is asserted tight vs loose
   selects **exactly {0, +1}**, so the two-beam cos² *falls out of the Abbe workhorse itself*. **Scope
   edge, named (the §5 risk-phase gradient, *inside* the module):** v1 is **scalar** diffraction (no
   vector/polarization — honest only at low/moderate NA; immersion NA>1 needs the vector + index
-  treatment), an **ideal in-focus aberration-free pupil** (no defocus phase, no Zernikes), **Abbe not
+  treatment), an **aberration-free pupil apart from defocus** (the **defocus** phase is modelled in
+  **v1.4** — see below — but no other Zernikes: coma/astigmatism/spherical are out), **Abbe not
   Hopkins** (a *method* choice — same answer, different cost — named because Hopkins is the tar pit), a
   **constant-threshold resist** (no acid diffusion / PEB blur / development kinetics), a **1-D
   line/space** mask (no 2-D contacts / line-ends / OPC), and a **1-D uniform source line** (not the
@@ -88,6 +89,32 @@ the cited ``k₁``/NILS rules (benchmark, loose). The benchmark's strength rests
 the independent tight legs (the cos² identity and the power balance, both to machine precision). The
 ``k₁`` values are themselves *validated as a consequence* of the pupil arithmetic, not calibrated — the
 honest split.
+
+v1.4 — defocus, the depth of focus, and the Bossung curve (the promoted scope edge)
+-----------------------------------------------------------------------------------
+The §-named "ideal in-focus pupil" edge, **promoted** (the steel-ferrite-bay / oxidation-Massoud move):
+defocus is a pure **phase** aberration on the pupil, so it fits the existing machinery with no new path —
+:func:`coherent_image` already sums complex amplitudes, and :func:`defocus_phase` multiplies each collected
+order by ``exp(i·(2π/λ)·z·(1 − cosθ))`` keyed to its **full pupil coordinate** ``f_m + f_s``. ``z = 0``
+returns the v1 image bit-for-bit (the degenerate seam). The mini-triad:
+
+* **Analytic (tight).** (a) The degenerate seam (``z = 0`` → in-focus, bit-for-bit). (b) **A symmetric
+  two-beam (dipole) image is defocus-invariant to machine precision** — both beams ride the pupil at the
+  same ``|f|`` → an *identical* defocus phase that factors out of ``|Σ|²`` → the image is literally
+  unchanged at every ``z`` (the "infinite DOF of the dipole"); an *asymmetric* two-beam (0 & +1) instead
+  keeps its contrast but **shifts the fringe laterally** (a relative phase, a pattern-placement error, not
+  a contrast loss). (c) **The on-axis three-beam fundamental is exactly ``4·c₀·c₁·cos φ``** — the
+  :func:`fundamental_amplitude` projection onto ``cos(2πx/p)`` (NOT the contrast metric, which keeps the
+  defocus-independent second harmonic ``4c₁²cos²ψ``), nulling at ``φ = π/2``. *That* null is the
+  depth-of-focus event; past it the image is a pure double-frequency fringe (defocus-induced **frequency
+  doubling / contrast reversal**, Mack).
+* **Conservation (tight) — defocus is unitary.** Phase-only ⇒ ``|amplitude|²`` unchanged ⇒ the
+  power balance ``mean(image) = Σ|c_m|² =`` :func:`transmitted_power` holds at **every** defocus to
+  machine precision. A real check that the implementation added *phase*, not amplitude.
+* **Benchmark (loose) + the k₂ tie.** The Bossung curve (CD vs defocus at fixed dose) broadens/collapses
+  with ``|z|``; the usable defocus is the Rayleigh ``DOF = k₂·λ/NA²`` (:meth:`Imaging.depth_of_focus`),
+  ``k₂ = 0.5`` **derived** from the ``φ = π/2`` fundamental null at the resolution-limited pitch
+  (``sinθ → NA`` ⇒ ``z = λ/2NA²``), not cited cold — the same validated-as-a-consequence split as ``k₁``.
 """
 from __future__ import annotations
 
@@ -107,6 +134,12 @@ K1_TWO_BEAM = 0.25       # two-beam (extreme off-axis / dipole) physical half-pi
 
 # NILS printability rule of thumb (litho-aerial-image-source): ≥1 minimally resolved, ≳2 robust process.
 NILS_PRINTABLE = 2.0
+
+# Rayleigh second-equation depth-of-focus factor (DOF = k₂·λ/NA²), litho-aerial-image-source (Mack).
+# 0.5 is **derived** here, not echoed: the on-axis three-beam image's fundamental nulls at defocus phase
+# φ = π/2 (see §7), which at the resolution-limited pitch (the ±1 orders riding the pupil rim, sinθ→NA)
+# lands at z = λ/(2·NA²) → k₂ = 0.5 — the same validated-as-a-consequence honest split as k₁.
+K2_DOF = 0.5
 
 # Pupil-edge inclusion tolerance: an order landing *exactly* on the rim |f|=f_cut is physically
 # collected, so include it despite floating-point round-off (load-bearing for the k₁ limit cases,
@@ -150,6 +183,15 @@ class Imaging:
         """Smallest pitch resolved with off-axis two-beam illumination, ``λ/(2·NA)`` (nm) → ``k₁=0.25``."""
         return self.wavelength_nm / (2.0 * self.NA)
 
+    def depth_of_focus(self, k2: float = K2_DOF) -> float:
+        """Rayleigh depth of focus ``DOF = k₂·λ/NA²`` (nm) — the focus latitude (companion to :meth:`resolution`).
+
+        The second Rayleigh equation: as resolution scales like ``λ/NA``, the usable defocus scales like
+        ``λ/NA²`` — so pushing NA for resolution costs DOF quadratically (the litho squeeze). ``k2`` default
+        0.5 (:data:`K2_DOF`), the value the on-axis three-beam fundamental null derives (see :func:`defocus_phase`).
+        """
+        return k2 * self.wavelength_nm / (self.NA ** 2)
+
 
 def rayleigh_resolution(wavelength_nm: float, NA: float, k1: float = K1_TWO_BEAM) -> float:
     """Rayleigh resolvable half-pitch ``R = k₁·λ/NA`` (nm) — the standalone form of :meth:`Imaging.resolution`.
@@ -158,6 +200,15 @@ def rayleigh_resolution(wavelength_nm: float, NA: float, k1: float = K1_TWO_BEAM
     ``[[litho-aerial-image-source]]`` values). ``R`` is the half-pitch (= CD of a dense 1:1 line/space).
     """
     return k1 * wavelength_nm / NA
+
+
+def rayleigh_depth_of_focus(wavelength_nm: float, NA: float, k2: float = K2_DOF) -> float:
+    """Rayleigh depth of focus ``DOF = k₂·λ/NA²`` (nm) — the standalone form of :meth:`Imaging.depth_of_focus`.
+
+    The focus-budget companion to :func:`rayleigh_resolution`: resolution scales ``λ/NA``, DOF scales
+    ``λ/NA²``, so the two trade against NA. ``k2`` default 0.5 (:data:`K2_DOF`).
+    """
+    return k2 * wavelength_nm / (NA ** 2)
 
 
 # --------------------------------------------------------------------------- #
@@ -253,7 +304,33 @@ def offaxis_source(imaging: Imaging):
     return np.array([-imaging.f_cut])
 
 
-def abbe_image(x_nm, orders, imaging: Imaging, source_fs=None, n_source: int = 21):
+def defocus_phase(f_total, imaging: Imaging, defocus_nm: float):
+    """Pupil **defocus phase** ``exp(i·(2π/λ)·z·(1 − cosθ))`` of an order at pupil frequency ``f_total`` (v1.4).
+
+    Defocus is a pure *phase* aberration: an order leaving the pupil at angle θ (``sinθ = f_total·λ``, the
+    **full** pupil coordinate ``f_m + f_s``) is delayed, relative to the on-axis ray, by the optical-path
+    error ``z·(1 − cosθ)`` over a defocus ``z`` — a phase ``(2π/λ)·z·(1 − cosθ)``. (Referenced to the
+    on-axis ray so ``f_total = 0`` carries no phase; the absolute reference is immaterial — a phase common
+    to *all* orders factors out of ``|Σ|²``.) Because it is phase-only, ``|amplitude|²`` is unchanged, so
+    defocus **conserves power** (the §-conservation leg) and is *unitary* — it redistributes the image, it
+    does not dim it.
+
+    Returns the literal float ``1.0`` when ``defocus_nm == 0`` so the in-focus path is **bit-for-bit** the
+    v1 image (the degenerate seam). ``f_total`` may be a scalar or array (1/nm). Scope edge: ``cosθ`` uses
+    the **full** ``√(1 − (f_total·λ)²)`` (not the paraxial ``1 − ½(f_total·λ)²``), exact for the scalar
+    model; an evanescent order (``|f_total|·λ ≥ 1``, only reachable at immersion ``NA ≥ 1`` — the named
+    vector scope edge) is outside v1, and a collected order under a dry ``NA < 1`` pupil never reaches it.
+    """
+    if defocus_nm == 0.0:
+        return 1.0
+    ft_lambda = np.asarray(f_total, dtype=float) * imaging.wavelength_nm
+    cos_theta = np.sqrt(np.maximum(1.0 - ft_lambda ** 2, 0.0))
+    phase = (2.0 * np.pi / imaging.wavelength_nm) * defocus_nm * (1.0 - cos_theta)
+    return np.exp(1j * phase)
+
+
+def abbe_image(x_nm, orders, imaging: Imaging, source_fs=None, n_source: int = 21,
+               defocus_nm: float = 0.0):
     """Partially-coherent aerial image by the **Abbe sum over source points** (not Hopkins TCC).
 
     For each source point ``f_s`` (an illumination direction), the mask spectrum shifts so order ``m``
@@ -262,7 +339,12 @@ def abbe_image(x_nm, orders, imaging: Imaging, source_fs=None, n_source: int = 2
     frequencies ``f_m`` (the common illumination carrier ``exp(2πi·f_s·x)`` has unit modulus and drops
     out of the intensity). The partially-coherent image is the **incoherent average** over the source::
 
-        I(x) = (1/N_s)·Σ_{f_s} | Σ_m c_m·P(f_m + f_s)·exp(2πi·f_m·x) |²
+        I(x) = (1/N_s)·Σ_{f_s} | Σ_m c_m·P(f_m + f_s)·D(f_m + f_s; z)·exp(2πi·f_m·x) |²
+
+    where ``D`` is the :func:`defocus_phase` of each collected order (``z = defocus_nm``; ``D ≡ 1`` and the
+    image is **bit-for-bit** the in-focus one when ``z = 0`` — the v1.4 degenerate seam). The defocus phase
+    keys on the **full pupil coordinate** ``f_m + f_s`` (the order's true propagation angle), so an off-axis
+    source point shifts an order's defocus sensitivity along with its pupil position.
 
     ``source_fs`` is an explicit array of source spatial frequencies (build it with
     :func:`conventional_source`, :func:`on_axis_source`, or :func:`offaxis_source`); if omitted, a
@@ -277,7 +359,8 @@ def abbe_image(x_nm, orders, imaging: Imaging, source_fs=None, n_source: int = 2
     x = np.asarray(x_nm, dtype=float)
     total = np.zeros(x.shape, dtype=float)
     for fs in source_fs:
-        passed = [(f, c) for (f, c) in orders if abs(f + fs) <= cutoff]
+        passed = [(f, c * defocus_phase(f + fs, imaging, defocus_nm))
+                  for (f, c) in orders if abs(f + fs) <= cutoff]
         total = total + coherent_image(x, passed)
     return total / len(source_fs)
 
@@ -333,6 +416,23 @@ def nils(x_nm, intensity, edge_nm: float, linewidth_nm: float) -> float:
     slope = np.gradient(log_i, x)
     slope_at_edge = float(np.interp(edge_nm, x, slope))
     return linewidth_nm * abs(slope_at_edge)
+
+
+def fundamental_amplitude(x_nm, intensity, pitch_nm: float) -> float:
+    """The image's **fundamental** Fourier coefficient at ``1/pitch`` — the projection ``⟨I, cos(2πx/p)⟩`` (v1.4).
+
+    The signed amplitude of the ``cos(2πx/p)`` component of the aerial image, by the quadrature projection
+    ``(2/L)·∫₀ᴸ I(x)·cos(2πx/p) dx`` over one period ``L = pitch`` (a uniform grid sampling one full period,
+    ``endpoint=False``, makes the discrete sum exact for the band-limited image). This is the **defocus-clean
+    observable**: for the on-axis three-beam image ``I = c₀² + 4c₁²cos²ψ + 4c₀c₁cosφ·cosψ`` the higher term
+    ``4c₁²cos²ψ`` is a *defocus-independent* second harmonic (at ``2/p``) that is orthogonal to ``cos(2πx/p)``
+    — so this projection returns exactly ``4·c₀·c₁·cos φ`` and **nulls at the defocus phase φ = π/2**. The
+    plain :func:`image_contrast` does *not* (it sees the surviving second harmonic — defocus-induced frequency
+    doubling), which is why the tight defocus anchor asserts on *this*, not on contrast.
+    """
+    x = np.asarray(x_nm, dtype=float)
+    intensity = np.asarray(intensity, dtype=float)
+    return float(2.0 * np.mean(intensity * np.cos(2.0 * np.pi * x / pitch_nm)))
 
 
 # --------------------------------------------------------------------------- #
@@ -414,6 +514,7 @@ def expose_grating(
     duty: float = 0.5,
     threshold: float | None = None,
     n_x: int = 512,
+    defocus_nm: float = 0.0,
 ) -> PrintedFeature:
     """Image a line/space grating and read the printed feature — the Phase-3 'recipe in, CD out' entry.
 
@@ -422,11 +523,14 @@ def expose_grating(
     contrast, NILS (at the nominal edge ``x = duty·p/2``, with ``w = (1−duty)·p`` the line width), and
     the constant-threshold CD of the dark line. ``threshold`` defaults to the **image mean** (a balanced
     clip → nominal duty on a well-resolved image); pass a fixed value to sweep pitch at constant dose.
-    The high-level entry mirroring :func:`oxidation.grow_oxide`. Returns a :class:`PrintedFeature`.
+    ``defocus_nm`` (v1.4) images out of focus (``z = 0`` is the in-focus default, bit-for-bit v1) — sweep
+    it at a fixed ``threshold`` to trace a **Bossung** CD-vs-defocus curve. The high-level entry mirroring
+    :func:`oxidation.grow_oxide`. Returns a :class:`PrintedFeature`.
     """
     orders = grating_orders(pitch_nm, n_orders=n_orders, duty=duty)
     x = np.linspace(0.0, pitch_nm, n_x, endpoint=False)
-    intensity = abbe_image(x, orders, imaging, source_fs=source_fs, n_source=n_source)
+    intensity = abbe_image(x, orders, imaging, source_fs=source_fs, n_source=n_source,
+                           defocus_nm=defocus_nm)
     contrast = image_contrast(intensity)
     edge_nm = duty * pitch_nm / 2.0
     linewidth_nm = (1.0 - duty) * pitch_nm

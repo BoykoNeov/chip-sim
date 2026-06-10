@@ -61,7 +61,18 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   `conventional_source`/`offaxis_source`); `rayleigh_resolution` (`R=k₁λ/NA`), `transmitted_power` (the
   Parseval power-balance), `image_contrast`/`nils`, `print_cd` + `expose_grating` (constant-threshold
   resist → CD in nm/µm). The module docstring is its contract (cited `k₁`/NILS, the
-  scalar/no-defocus/Abbe-not-Hopkins/threshold-resist scope edge). Saves `docs/figures/chip-litho.png`.
+  scalar/Abbe-not-Hopkins/threshold-resist scope edge — **defocus is now modelled, v1.4 below**). Saves
+  `docs/figures/chip-litho.png`.
+- **To work on defocus & the depth of focus (v1.4 — Phase 3's "in-focus pupil" scope edge, promoted):**
+  `litho.py` §7 + `tests/test_defocus.py`, the demo `demo_defocus.py` + `tests/test_demo_defocus.py`, and
+  `plots.defocus_figure`. Defocus is a pure **phase** aberration, so it lives **inside** the existing
+  Fourier-optics machinery — **no new path, no frozen-engine touch**: `defocus_phase` (the pupil phase
+  `exp(i·(2π/λ)·z·(1−cosθ))` on the full pupil coordinate `f_m+f_s`; `z=0` → in-focus **bit-for-bit**)
+  multiplies each collected order, threaded through `abbe_image`/`expose_grating` (`defocus_nm=0.0`).
+  `Imaging.depth_of_focus`/`rayleigh_depth_of_focus` (`DOF=k₂λ/NA²`, `K2_DOF=0.5`), `fundamental_amplitude`
+  (the `⟨I,cos(2πx/p)⟩` projector — the defocus-clean observable). The module docstring §7 is its contract
+  (the symmetric-dipole infinite-DOF anchor, the three-beam fundamental `4c₀c₁cosφ` nulling at φ=π/2, the
+  unitary power-conservation leg, the derived-not-cited `k₂=0.5`). Saves `docs/figures/chip-defocus.png`.
 - **To work on the device (Phase 4):** `device.py` + `tests/test_device.py`, the demo
   `demo_device.py` + `tests/test_demo_device.py`, and `plots.device_figure`. The **process → device**
   payoff — a chip-local compact closed form (**does not touch the engine**): `threshold_voltage`
@@ -191,6 +202,25 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   the anomalous **tail/kink** (non-equilibrium I-injection/clustering — Velichko 2019, Fair–Tsai
   emitter-dip); full activation (`n=N`) is the flagged approximation, made adjustable by the
   `n_active_max` plateau cap. **No ADR / no engine re-seal** (the finding obviated them); seal intact.
+- **v1.4 — lithographic defocus, the depth of focus & the Bossung curve: BUILT** (2026-06-10).
+  `litho.py` §7 — Phase 3's **"ideal in-focus pupil"** scope edge, promoted. Defocus is a pure **phase**
+  aberration, so it fits **inside** the litho module (no new path, frozen engine untouched): `defocus_phase`
+  multiplies each collected order by `exp(i·(2π/λ)·z·(1−cosθ))` (keyed to the full pupil coordinate
+  `f_m+f_s`), threaded through `abbe_image`/`expose_grating` — `z=0` is the in-focus image **bit-for-bit**.
+  + `demo_defocus.py` + `plots.defocus_figure`. Banked artifact: the **Bossung curve** (printed CD vs
+  defocus, a dose family, the process window + `DOF=k₂λ/NA²` marked) beside the **through-focus
+  fundamental** (the on-axis three-beam coefficient riding the exact `4c₀c₁cosφ` envelope, nulling at
+  φ=π/2, then reversing — defocus-induced frequency doubling; the σ-source curve softens the null)
+  (`docs/figures/chip-defocus.png`); 193 nm ArF, NA 0.85, σ 0.5, 240 nm pitch → DOF ≈ 134 nm, the φ=π/2
+  null at ±119 nm. **16-test mini-triad** (11 module + 5 demo): *analytic* = the **z=0 bit-for-bit seam**,
+  the **symmetric-dipole infinite-DOF** (equal pupil radii → identical phase factors out → image
+  unchanged at every z, to machine precision), the asymmetric two-beam **fundamental = 2cosφ** (modulation
+  rotates, contrast preserved), the on-axis three-beam **fundamental = 4c₀c₁cosφ** to machine precision
+  (NOT the contrast metric — which keeps the defocus-independent 2nd harmonic → frequency doubling at the
+  null, pinned); *conservation* = **defocus is unitary** (phase-only → `mean(image)=Σ|c_m|²=transmitted_power`
+  at every z, machine precision); *benchmark* = the Bossung CD/NILS degradation + `k₂=0.5` **derived** from
+  the φ=π/2 null at the resolution limit (paraxial; the exact full-cosθ null converges onto it as NA→0).
+  Zernike aberrations (coma/astigmatism/spherical) and immersion NA≥1 (vector) stay the named scope edges.
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated
