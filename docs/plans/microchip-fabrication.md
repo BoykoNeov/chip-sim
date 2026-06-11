@@ -705,6 +705,50 @@ from a 100 %-complete Steel to Chip.
 > both limits** (inert net→0; boron net `−C_ox·R`). SHARED-FILE ASK: update the `chip-coupling-v12` memory note
 > (the swept-sliver edge is retired; the fixed-grid path is the "before").
 
+> **v1.6 — explicit `forward_euler` (θ=0) stepping, the SECOND exercise of the unfreeze: BUILT
+> (2026-06-11).** Not a chip-physics regime — the second of `CONTRACT.md`'s deferred engine regimes
+> (`Not in v1`: nonlinear `D(u)` ✓v1.5 / 2-D / **explicit**) **promoted natively** (the chosen
+> direction once "native engine amendment" was picked over a third chip phase or a 2-D build). The
+> decisive **gating finding (advisor-verified by tracing `step()`): explicit needed almost no new
+> stepping code** — forward Euler already *falls out* of the existing θ-method at θ=0 (the CN `else`
+> branch assembles `rhs = u0 + dt·(A₀·u0 + b0)`, then the implicit operator `(I − θ·dt·A)` degenerates
+> to the identity so `solve_banded` returns `rhs` unchanged). The only blocker was `_METHODS` not
+> listing it. So the amendment's real content is **not** the stepping but the **new conditional-CFL
+> stability invariant** the suite literally could not express before (it had no conditionally-stable
+> method to define a CFL boundary against — invariant 3 asserted *unconditional* stability for the two
+> implicit methods with nothing to contrast). A small θ=0 early-return branch was added anyway (operator
+> at `t0` only, no wasted `t1` assembly / no solve) so the explicit path reads as first-class rather than
+> an accidental fallout — **additive**: the θ=1 and CN branches are byte-for-byte unchanged, the **28
+> prior engine invariants pass UNMODIFIED**. New seal `engines/diffusion/tests/test_explicit.py` (**6
+> tests**) — the mini-triad: *analytic* = forward Euler decays the no-flux eigenmode at the exact
+> `exp(−Dπ²t/L²)` rate in the stable regime + **1st-order-in-time** (extends invariant 4 additively, on
+> a coarse grid whose CFL limit admits the sampled dts); *conservation* = no-flux `ΣuᵢΔxᵢ` exact under
+> θ=0 too (the FV telescoping is **θ-independent** — a real check, holds on a non-uniform grid and in
+> fact at any dt); *benchmark/headline* = the **CFL boundary**, in two forms — the clean closed-form
+> identity `1/max|diag| == Δx²/2D` to machine precision (uniform/constant-D/no-flux), and the robust
+> operator-diagonal bound on a **non-uniform Dirichlet** grid (stable+monotone+decaying at `0.5·dt_crit`,
+> Nyquist-mode blow-up at `2·dt_crit`), plus the **unconditional-vs-conditional contrast** (backward
+> Euler stays bounded & monotone at 20× the CFL limit where forward Euler explodes). **Durable advisor
+> calls: (1)** the **gating** call — build explicit, NOT 2-D: explicit rhythm-matches v1.5 (tight,
+> additive, default unchanged), *completes a story* (the missing conditional counterpoint), and is
+> low-risk; whereas a speculative 2-D subsystem (new class, sparse/ADI solver, 4-edge BCs, 2-D `state`)
+> has **no consumer** and cuts against the repo's rule-of-three / "name the extension, don't build it"
+> culture (ADR 0003 §4) — 2-D waits for a real consumer (the named demo: lateral diffusion under a mask
+> edge, the cited lateral/vertical ≈ 0.8 rule). **(2) The CFL trap** — do NOT hardcode `dt ≤ Δx²/2D`
+> blindly; that is the uniform/constant-D/interior special case. The sharp von Neumann bound is read off
+> the assembled operator: monotonicity needs `1 + dt·diagᵢ ≥ 0` → `dt_crit = 1/max|diagᵢ|`, and the
+> **Dirichlet ghost transmissibility** (`T_ghost = D/(0.5·Δx)`) + nonuniform small cells make boundary
+> cells' `|diag|` larger → the bound is *tighter* there (the test pins `dt_crit` off `_operator`'s diag,
+> not the textbook number). The clean `Δx²/2D` is anchored separately on the no-flux uniform case where
+> interior cells bind. Units: SI (engine-native); no chip module / notebook touched (a pure engine
+> amendment, no chip consumer — exactly the "no consumer, so the API is θ=0, impossible to guess wrong"
+> point). `CONTRACT.md` amended (status banner second-amendment line, the θ-method discretization bullet,
+> the `method=` enum, invariant 3 conditional-CFL case, invariant 4 forward-Euler 1st-order, the
+> `forward_euler`-built / `Not built: 2-D/3-D` lines); README test-count 28→34 + design note. Engine suite
+> **28 → 34**; whole-repo fast lane **195 → 201**. **No new ADR** (ADR 0004 pre-authorizes this as an
+> ordinary edit; this entry is the record). SHARED-FILE ASKS: a `engine-explicit-stepping-v16` memory note
+> + update `engine-unfrozen` (the second amendment landed; 2-D is the last deferred regime).
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **`engines/diffusion`**
 engine in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**

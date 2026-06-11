@@ -43,6 +43,17 @@ use backward Euler); engine suite **18→28**, whole-repo fast lane **188**. **N
 nonlinear `D(u)` as *the* example of an ordinary test-gated edit. Box physics + v1.3 demo
 numbers unchanged (v1.3 `picard_iters=2` was already ~converged).
 
+**SECOND AMENDMENT LANDED (2026-06-11, v1.6): explicit `forward_euler` (θ=0) is BUILT** — see
+[[engine-explicit-stepping-v16]] for the full record. The gating finding: explicit needed ~no new
+stepping code (it falls out of the θ-method at θ=0; only `_METHODS` was missing the entry) — the real
+content is the **new conditional-CFL stability invariant** the suite couldn't express before (no
+conditionally-stable method to contrast against unconditional stability). Additive: only the θ=0
+branch is new, the **28 prior invariants pass UNMODIFIED**. `test_explicit.py` (6 tests); engine suite
+**28→34**, fast lane **195→201**; no new ADR. Advisor: **build explicit NOT 2-D** (anti-over-build —
+2-D has no consumer, would guess an unvalidated API; **2-D is now the LAST deferred regime**, waits
+for a real consumer = lateral diffusion under a mask edge). The `Not in v1` line is now just **2-D /
+3-D** (nonlinear `D(u)` ✓v1.5, explicit ✓v1.6).
+
 **What did NOT change (keep the gate, drop the seal):**
 - The **test suite still gates.** Every amendment re-runs `engines/diffusion/tests/` and
   keeps it green; an amendment that *changes* an invariant updates its test deliberately,

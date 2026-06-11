@@ -22,12 +22,21 @@ Discretization
   fluxes telescope under summation and ``Σ uᵢ Δxᵢ`` changes *only* through the
   boundary fluxes. Conservation is therefore structural and exact (to machine
   precision) under no-flux boundaries — on uniform *and* non-uniform grids.
-* **θ-method implicit time stepping**, one tridiagonal solve per step
+* **θ-method time stepping**, one tridiagonal solve per implicit step
   (``scipy.linalg.solve_banded``):
     - ``backward_euler`` (θ=1, default) — unconditionally stable *and monotone*
       (discrete maximum principle: no new extrema, no oscillation, for any dt>0).
     - ``crank_nicolson`` (θ=½) — 2nd-order in time, unconditionally stable but
       *not monotone* (can produce decaying oscillations at large dt).
+    - ``forward_euler`` (θ=0) — explicit (no linear solve; ``u^{n+1} = u^n +
+      dt·(A·u^n + b)``), 1st-order in time, but only **conditionally** well-behaved:
+      **monotone** (discrete maximum principle) iff ``dt ≤ 1/max|diag|`` — the CFL
+      limit read off the operator diagonal (= ``Δx²/2D`` on a uniform, constant-D,
+      no-flux grid; *tighter* at Dirichlet faces and small cells) — and merely
+      **bounded** a little past that (a stable-but-non-monotone window up to
+      ``≈2/|λ_min| ≤ 2/max|diag|``, the two limits coinciding on a uniform grid)
+      before it runs away. The explicit counterpoint the implicit methods'
+      unconditional stability is defined against — not the default for production runs.
 
 Nonlinear (state-dependent) diffusivity
 ----------------------------------------
@@ -77,7 +86,7 @@ ArrayLike = Union[float, np.ndarray]
 DSpec = Union[float, np.ndarray, Callable[[float], ArrayLike]]
 BCParam = Union[float, Callable[[float], float]]
 
-_METHODS = {"backward_euler": 1.0, "crank_nicolson": 0.5}
+_METHODS = {"forward_euler": 0.0, "backward_euler": 1.0, "crank_nicolson": 0.5}
 
 
 # --------------------------------------------------------------------------- #
@@ -218,9 +227,11 @@ class Diffusion1D:
     source : float | ndarray | callable, optional
         Source term ``S(x, t)`` (units of ``u`` per unit time). Scalar, length-N
         array, or callable ``S(t)``. ``None`` means no source.
-    method : {"backward_euler", "crank_nicolson"}
+    method : {"backward_euler", "crank_nicolson", "forward_euler"}
         Time-integration scheme; backward Euler (default) is the unconditionally
-        stable *and monotone* one the stability invariant guarantees.
+        stable *and monotone* one the stability invariant guarantees. ``forward_euler``
+        is the explicit (θ=0) scheme — conditionally stable only under the CFL limit
+        ``dt ≤ 1/max|diag|`` — kept as the explicit counterpoint, not for production.
     picard_tol : float, optional
         Convergence tolerance for the nonlinear (``StateDependent`` ``D``) Picard
         iteration: a step is converged when the max change between iterates is
@@ -377,6 +388,17 @@ class Diffusion1D:
             return self._step_nonlinear(u0, dt, t0)
         theta = self.theta
         t1 = t0 + dt
+
+        if theta == 0.0:  # forward Euler (explicit): operator at t0, no linear solve
+            # u^{n+1} = u^n + dt·(A·u^n + b), with A, b assembled at the OLD time t0.
+            # Monotone (discrete max principle) iff dt ≤ 1/max|diag| (= Δx²/2D on a
+            # uniform constant-D no-flux grid); stable a little past that, then blows
+            # up — the conditional counterpoint to the implicit methods. See test_explicit.
+            sub0, diag0, sup0, b0 = self._operator(t0)
+            rate = diag0 * u0 + b0
+            rate[:-1] += sup0[:-1] * u0[1:]
+            rate[1:] += sub0[1:] * u0[:-1]
+            return u0 + dt * rate
 
         sub1, diag1, sup1, b1 = self._operator(t1)
 

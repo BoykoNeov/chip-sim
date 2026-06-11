@@ -12,7 +12,10 @@
 > can grow past the v1 surface (the deferred nonlinear `D(u)` / 2-D / explicit
 > regimes noted below) by direct, test-gated amendment. **First amendment landed
 > 2026-06-10: native nonlinear `D(u)` (`StateDependent`, invariant 6)** — additive,
-> the 18 prior invariants pass unmodified; 2-D / explicit remain the deferred regimes.
+> the 18 prior invariants pass unmodified. **Second amendment landed 2026-06-11:
+> explicit `forward_euler` (θ=0) stepping (invariant 3)** — additive (only the
+> θ=0 branch is new; the implicit paths are byte-for-byte unchanged, the 28 prior
+> invariants pass unmodified); **2-D / 3-D remain the deferred regimes.**
 
 ## What it solves
 
@@ -40,9 +43,11 @@ one engine serves both, and why Planet's EBM heat transport is the same code.
   the flux entering its neighbour across that face, so interior fluxes telescope
   and `Σ uᵢΔxᵢ` changes *only* through boundary fluxes → conservation is
   structural and exact. Holds on **non-uniform** grids too.
-- **θ-method implicit time stepping**, one tridiagonal solve per step
-  (`scipy.linalg.solve_banded`): `backward_euler` (θ=1, default),
-  `crank_nicolson` (θ=½, optional).
+- **θ-method time stepping**: `backward_euler` (θ=1, default) and
+  `crank_nicolson` (θ=½) are implicit, one tridiagonal solve per step
+  (`scipy.linalg.solve_banded`); `forward_euler` (θ=0) is explicit (no solve —
+  `u^{n+1} = u^n + dt·(A·u^n + b)`), conditionally stable under the CFL limit
+  (invariant 3).
 - Interior **face diffusivity = harmonic mean** of the two cell values (exact
   flux continuity across a D-discontinuity; reduces to D for constant D).
 - **Nonlinear `D(u)`** (a `StateDependent` diffusivity) is solved per step by
@@ -62,7 +67,7 @@ from engines.diffusion import (
 
 grid   = uniform_grid(length, n)          # or grid_from_edges([...])  (non-uniform)
 solver = Diffusion1D(grid, D, bc_left, bc_right, source=None,
-                     method="backward_euler",    # or "crank_nicolson"
+                     method="backward_euler",    # or "crank_nicolson" / "forward_euler"
                      picard_tol=1e-10, picard_max_iter=100)   # nonlinear-D controls only
 
 state = solver.step(state, dt, t0=0.0)            # one step; returns new array
@@ -118,16 +123,33 @@ layer (ADR 0002) consumes the same `state` — never a live solver object.
    floating point the only residual is accumulated linear-solver backward-error
    (~1e-11 over a long huge-dt run). Includes the source-augmented exact case
    (`test_source.py`).
-3. **Unconditional stability, per method** (`test_stability.py`):
-   - `backward_euler` — unconditionally stable **and monotone** (discrete maximum
-     principle: no new extrema, no oscillation, any dt>0). *This is the
+3. **Stability, per method** (`test_stability.py`, `test_explicit.py`):
+   - `backward_euler` — **unconditionally** stable **and monotone** (discrete
+     maximum principle: no new extrema, no oscillation, any dt>0). *This is the
      "no oscillatory blow-up" guarantee the stability invariant names.*
-   - `crank_nicolson` — unconditionally stable but **not monotone** (can produce
+   - `crank_nicolson` — **unconditionally** stable but **not monotone** (can produce
      decaying oscillations at large dt). Use it where temporal accuracy matters
      and dt is moderate, not for the headline stability claim.
-4. **Temporal order, per method** (`test_time_order.py`): backward Euler is
-   1st-order, Crank–Nicolson 2nd-order in time (measured against a tiny-dt
-   reference so the slopes are purely temporal).
+   - `forward_euler` — **conditionally** well-behaved, with the same monotone-vs-
+     merely-bounded split this invariant draws for BE vs CN, but now *dt-gated*: it is
+     **monotone** (discrete maximum principle, no new extrema) iff `dt ≤ 1/max|diag|`
+     — the sharp bound read off the assembled operator diagonal (`= Δx²/2D` on a
+     uniform / constant-D / no-flux grid, *tighter* at Dirichlet faces and small
+     cells). It stays merely **bounded (stable)** a little past that on non-uniform
+     grids — a stable-but-non-monotone window of decaying oscillations up to
+     `dt ≈ 2/|λ_min| ∈ [1/max|diag|, 2/max|diag|]` (the two limits coincide on a
+     uniform grid, where the Nyquist eigenvalue is exactly `2·diag`) — and runs away
+     without bound beyond it. `test_explicit.py` brackets this (max-principle at
+     `0.5·dt_crit`, full blow-up by `2·dt_crit`) plus the headline contrast — backward
+     Euler stays bounded *and* monotone at a dt where forward Euler explodes. The
+     explicit method's value is exactly this conditional counterpoint that the two
+     implicit methods' *unconditional* stability is defined against; it is **not** the
+     default for production runs.
+4. **Temporal order, per method** (`test_time_order.py`, `test_explicit.py`):
+   backward Euler and forward Euler are 1st-order, Crank–Nicolson 2nd-order in
+   time (measured against a tiny-dt reference so the slopes are purely temporal;
+   the forward-Euler slope is measured on a coarse grid whose CFL limit admits the
+   sampled dts).
 5. **Variable diffusivity** (`test_variable_d.py`): the callable `D(t)` path
    matches the τ=∫D time-substitution analytic field (the carbon-during-cooling
    case steel uses next), and an array `D(x)` two-layer medium reproduces the
@@ -158,6 +180,8 @@ TTT/Jominy data (Steel plan §3, Phases 1–2). The validation suite here promis
 - **SI throughout.** Mass vs heat mode differ only by relabelling.
 - **Nonlinear `D(u)` is built** (2026-06-10, the first exercise of the unfreeze):
   pass `StateDependent(func)`; each step is Picard-solved (invariant 6).
-- **Not built:** 2-D/3-D; explicit time stepping. The array-`state` boundary is the
-  seam where a deferred heavy regime (or a compiled core) is later slotted without
-  touching consumers (ARCHITECTURE.md §8, ADR 0001).
+- **Explicit `forward_euler` stepping is built** (2026-06-11, the second amendment):
+  `method="forward_euler"` (θ=0), conditionally stable under the CFL limit (invariant 3).
+- **Not built:** 2-D/3-D. The array-`state` boundary is the seam where that deferred
+  heavy regime (or a compiled core) is later slotted without touching consumers
+  (ARCHITECTURE.md §8, ADR 0001).

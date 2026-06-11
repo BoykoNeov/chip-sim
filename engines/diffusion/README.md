@@ -19,8 +19,8 @@ and Planet (EBM heat transport); **unfrozen 2026-06-10** — now open + test-gat
 | File | What |
 |---|---|
 | `CONTRACT.md` | **The API contract.** Start here. PDE, modes, API, sign conventions, the guaranteed invariants, the validation boundary. |
-| `diffusion1d.py` | The solver: `Diffusion1D`, `Grid`/`uniform_grid`/`grid_from_edges`, `Dirichlet`/`Neumann`/`Robin`, `StateDependent` (nonlinear `D(u)`). Cell-centered finite volume + θ-method implicit stepping; Picard for the nonlinear path. |
-| `tests/` | The seal (28 tests): `test_erfc` (analytical limit + 2nd-order spatial convergence), `test_conservation` (exact no-flux mass balance), `test_stability` (unconditional stability, per method), `test_source` (source-augmented conservation), `test_variable_d` (callable `D(t)` + array `D(x)`/harmonic mean), `test_time_order` (BE 1st- / CN 2nd-order in time), `test_robin_heat` (heat-mode Robin + flux bookkeeping), `test_nonlinear_d` (the `StateDependent` `D(u)` Picard path — degenerate seam, fixed point, conservation, Boltzmann similarity). |
+| `diffusion1d.py` | The solver: `Diffusion1D`, `Grid`/`uniform_grid`/`grid_from_edges`, `Dirichlet`/`Neumann`/`Robin`, `StateDependent` (nonlinear `D(u)`). Cell-centered finite volume + θ-method stepping (`backward_euler` / `crank_nicolson` implicit, `forward_euler` explicit); Picard for the nonlinear path. |
+| `tests/` | The seal (34 tests): `test_erfc` (analytical limit + 2nd-order spatial convergence), `test_conservation` (exact no-flux mass balance), `test_stability` (unconditional stability, the implicit methods), `test_explicit` (`forward_euler` θ=0 — the CFL stability boundary + the unconditional-vs-conditional contrast), `test_source` (source-augmented conservation), `test_variable_d` (callable `D(t)` + array `D(x)`/harmonic mean), `test_time_order` (BE 1st- / CN 2nd-order in time), `test_robin_heat` (heat-mode Robin + flux bookkeeping), `test_nonlinear_d` (the `StateDependent` `D(u)` Picard path — degenerate seam, fixed point, conservation, Boltzmann similarity). |
 
 ## Run the seal
 
@@ -37,7 +37,12 @@ and Planet (EBM heat transport); **unfrozen 2026-06-10** — now open + test-gat
 - **Backward Euler is the default for a reason.** It is unconditionally stable
   *and monotone* (discrete maximum principle), so a learner picks any dt without
   blow-up or spurious oscillation. Crank–Nicolson (θ=½) is offered for temporal
-  accuracy but can oscillate at large dt — see `CONTRACT.md`.
+  accuracy but can oscillate at large dt — see `CONTRACT.md`. The explicit
+  `forward_euler` (θ=0) is the *conditional* counterpoint: monotone only under the
+  CFL limit `dt ≤ 1/max|diag|` and bounded only a little past it (`test_explicit`
+  brackets the max-principle at half the limit and full blow-up at 2×, and contrasts
+  it against backward Euler at the same dt) — the amendment that lets the suite
+  *demonstrate* why the default is implicit rather than just assert it.
 - **The engine carries no material constants.** Arrhenius `D₀,Q`, `α`, `h` are
   the consumer's; the engine consumes a generic `D` and BCs. This keeps the
   API surface minimal and the validation boundary honest.
