@@ -338,9 +338,12 @@ slow tests will have a benefit; ensure all tests pass locally and on CI"):
   `pytest_xdist_auto_num_workers` hook → `max(1, os.cpu_count() // 2)`, so `-n auto` resolves to 8
   on this 16-logical-core box (1–2 on a typical CI runner). Justified by the same measurement that
   set the floor: the suite plateaus by ~8 workers (one ~3.9 s module is the Amdahl limit), so the
-  back half of the cores buys ~nothing — and leaving it idle is deliberate headroom. The hook is
-  defined only when xdist imports (else pytest raises `PluginValidationError` for an unknown hook in
-  a bare-`pytest` env). `-n <N>` still overrides.
+  back half of the cores buys ~nothing. **That Amdahl floor is the sole reason** — the cap governs
+  fast-lane throughput only. (An earlier framing called the idle half "headroom for the notebook
+  kernel"; the n/4 result below disproves it — the hook fires only on the fast lane, where the
+  notebook is deselected, so the cap value never touches the notebook.) The hook is defined only
+  when xdist imports (else pytest raises `PluginValidationError` for an unknown hook in a
+  bare-`pytest` env). `-n <N>` still overrides.
 
 - **Grouping.** Slow/kernel tests carry `@pytest.mark.xdist_group("slow")`; under `--dist loadgroup`
   they share one worker, so at most one live Jupyter kernel runs at a time (concurrent kernels would
@@ -348,12 +351,14 @@ slow tests will have a benefit; ensure all tests pass locally and on CI"):
   is exactly one (the notebook), so it has **no live effect in any blessed command**.
 
 - **The hoped-for payoff (a parallel full gate the cap+grouping makes safe) does NOT hold — measured.**
-  Running the whole suite co-scheduled at the capped 8 workers + loadgroup, the notebook still flaked
-  **1-in-4 (3 pass / 1 timeout)**; the half-core cap *reduces but does not remove* the load-sensitive
-  kernel race. So the conclusion is unchanged: the notebook stays **off the concurrent path**, the
-  full gate stays bare serial `pytest`. The cap benefits only the fast lane; the grouping marker is
-  dormant until a second (CPU-bound) slow test arrives. "Ensure all tests pass" is the binding
-  constraint, and it forbids parallelising the one pathological test — not a deadlock, a decision.
+  Running the whole suite co-scheduled, the notebook still flaked at **8 workers + loadgroup (1-in-4,
+  3 pass / 1 timeout)** and again at **4 workers / n/4 (2-in-6, with 12 idle cores)** — fewer workers
+  does not help, and idle cores do not protect the load-sensitive kernel race. So the worker count is
+  irrelevant to the notebook; the conclusion is unchanged: the notebook stays **off the concurrent
+  path**, the full gate stays bare serial `pytest`. The cap benefits only the fast lane (an Amdahl
+  throughput knob); the grouping marker is dormant until a second (CPU-bound) slow test arrives.
+  "Ensure all tests pass" is the binding constraint, and it forbids parallelising the one pathological
+  test — not a deadlock, a decision.
 
 **Scope of this amendment.** *Only* the parallelism axis is promoted. The §4 deferrals of
 per-project markers, a git-diff classifier, and `pytest-testmon` still stand, and the `slow`

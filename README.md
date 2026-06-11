@@ -40,8 +40,8 @@ jupyter lab chip/chip.ipynb             # the teaching notebook (needs .[viz,not
 ```
 
 `-n auto` (pytest-xdist) fans the 188 CPU-bound tests across cores — **capped at half the logical
-cores** (`conftest.py`: the suite floors on one module, so the back half buys ~nothing and the idle
-half is headroom), and **only on the fast lane.**
+cores** (`conftest.py`: the suite floors on one module, so the back half buys ~nothing; the cap is
+an Amdahl throughput knob, not notebook headroom), and **only on the fast lane.**
 The one `slow` test executes `chip.ipynb` in a fresh kernel over a zmq/asyncio comms layer that
 races under load, so parallelism is applied *only* where it is already deselected (the fast lane,
 and CI — where it self-skips). The full gate stays **serial**, so the notebook never runs under

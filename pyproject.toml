@@ -53,21 +53,23 @@ notebook = ["jupyterlab>=4", "ipywidgets>=8", "nbclient", "nbformat", "ipykernel
 # the command line; `-n0` disables it.
 #
 # WORKER CAP: `conftest.py` caps `-n auto` at HALF the logical cores (its
-# `pytest_xdist_auto_num_workers` hook). The suite floors on one ~3.9 s module, so the back half
-# of the cores buys ~nothing, and the idle half is headroom (see the pin below). Adaptive, so CI
-# runners and dev boxes both do the right thing; `-n <N>` overrides.
+# `pytest_xdist_auto_num_workers` hook). The suite floors on one ~3.9 s module, so the back half of
+# the cores buys ~nothing — that Amdahl floor is the SOLE reason for the cap. It is not a knob for
+# the notebook (the hook fires only on the fast lane, where the notebook is deselected — see THE
+# PIN). Adaptive, so CI runners and dev boxes both do the right thing; `-n <N>` overrides.
 #
 # GROUPING: slow/kernel tests carry `@pytest.mark.xdist_group("slow")`, so under `--dist loadgroup`
 # they share ONE worker — at most one live Jupyter kernel at a time. Infrastructure for *several*
 # slow tests; today there is exactly one (the notebook), so it changes nothing in a blessed command.
 #
 # THE PIN — why `-n auto` rides ONLY the fast lane: the slow notebook smoke-test drives a live
-# Jupyter kernel over a zmq/asyncio comms layer that races under load (it hangs ~80 % in CI). The
-# half-core cap was measured to *reduce but not remove* this — co-scheduling the notebook with the
-# 188 still flaked ~1-in-4 even at 8 workers + loadgroup (chip-notebook flake; an upstream bug, not
-# ours). So parallelism is applied ONLY where `slow` is already deselected: the fast lane and CI
-# (where the notebook self-skips). The local full gate stays bare serial `pytest` — the notebook
-# NEVER runs under xdist in any blessed command, so the pin is structural, not fat-fingerable.
+# Jupyter kernel over a zmq/asyncio comms layer that races under load (it hangs ~80 % in CI). A
+# parallel full gate (notebook co-scheduled under xdist) was tried and REJECTED on measurement:
+# even capped + grouped it flaked the notebook ~1-in-4 at 8 workers, and 2-in-6 at 4 workers (12
+# idle cores) — fewer workers does not help and idle cores do not protect it (chip-notebook flake;
+# an upstream bug, not ours). So parallelism is applied ONLY where `slow` is already deselected: the
+# fast lane and CI (where the notebook self-skips). The local full gate stays bare serial `pytest`
+# — the notebook NEVER runs under xdist in any blessed command, so the pin is structural.
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["engines", "chip"]
