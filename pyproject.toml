@@ -43,7 +43,7 @@ notebook = ["jupyterlab>=4", "ipywidgets>=8", "nbclient", "nbformat", "ipykernel
 # `chip...`) without an install step.
 #
 # Tiered gate (ADR 0003): the routine local gate is the fast lane
-#   `pytest -m "not slow" -n auto`   — the always-on suite (188 tests, ~11 s parallel / ~26 s serial)
+#   `pytest -m "not slow" -n auto`   — the always-on suite (188 tests, ~11–13 s parallel / ~26 s serial)
 #   `pytest`                         — the full gate, SERIAL (adds the slow notebook smoke-test)
 # `slow` marks the handful of tests that drive a live kernel / subprocess (the notebook execution).
 #
@@ -52,14 +52,22 @@ notebook = ["jupyterlab>=4", "ipywidgets>=8", "nbclient", "nbformat", "ipykernel
 # debugging (breaks `-s`/pdb, spawns workers for one test) and onto the full gate. Add it on
 # the command line; `-n0` disables it.
 #
+# WORKER CAP: `conftest.py` caps `-n auto` at HALF the logical cores (its
+# `pytest_xdist_auto_num_workers` hook). The suite floors on one ~3.9 s module, so the back half
+# of the cores buys ~nothing, and the idle half is headroom (see the pin below). Adaptive, so CI
+# runners and dev boxes both do the right thing; `-n <N>` overrides.
+#
+# GROUPING: slow/kernel tests carry `@pytest.mark.xdist_group("slow")`, so under `--dist loadgroup`
+# they share ONE worker — at most one live Jupyter kernel at a time. Infrastructure for *several*
+# slow tests; today there is exactly one (the notebook), so it changes nothing in a blessed command.
+#
 # THE PIN — why `-n auto` rides ONLY the fast lane: the slow notebook smoke-test drives a live
-# Jupyter kernel over a zmq/asyncio comms layer that races under load (it hangs ~80 % in CI, and
-# was observed to time out locally when launched right after a parallel bulk — see the
-# chip-notebook flake). So parallelism is applied ONLY where `slow` is already deselected: the
-# fast lane (`-m "not slow" -n auto`) and CI (where the notebook self-skips). The local full gate
-# stays bare serial `pytest` — the notebook NEVER runs under xdist in any blessed command, so the
-# pin is structural, not a convention you can fat-finger. (~20 s saved on the rare full gate is not
-# worth front-loading 16-core contention onto the one load-sensitive test.)
+# Jupyter kernel over a zmq/asyncio comms layer that races under load (it hangs ~80 % in CI). The
+# half-core cap was measured to *reduce but not remove* this — co-scheduling the notebook with the
+# 188 still flaked ~1-in-4 even at 8 workers + loadgroup (chip-notebook flake; an upstream bug, not
+# ours). So parallelism is applied ONLY where `slow` is already deselected: the fast lane and CI
+# (where the notebook self-skips). The local full gate stays bare serial `pytest` — the notebook
+# NEVER runs under xdist in any blessed command, so the pin is structural, not fat-fingerable.
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["engines", "chip"]

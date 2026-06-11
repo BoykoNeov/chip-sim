@@ -66,6 +66,9 @@ _SKIP_IN_CI = os.environ.get("CI", "").lower() in {"true", "1"} and not _FORCE_I
 
 
 @pytest.mark.slow
+@pytest.mark.xdist_group("slow")  # under `--dist loadgroup`, all slow/kernel tests share ONE
+# worker — so at most one live Jupyter kernel runs at a time (concurrent kernels would fight the
+# zmq/asyncio comms layer) and the half-core cap (root conftest.py) leaves the rest idle for it.
 @pytest.mark.skipif(
     _SKIP_IN_CI,
     reason="chip.ipynb kernel wedges on the CI runner (infra hang, not a content failure); "

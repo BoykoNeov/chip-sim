@@ -278,7 +278,7 @@ not correctness**: the per-phase triads already validate the numbers.
 
 ```powershell
 # from repo root
-./run_tests.ps1 -m "not slow" -n auto   # routine commit gate (fast lane, PARALLEL — ~11 s vs ~26 s serial)
+./run_tests.ps1 -m "not slow" -n auto   # routine commit gate (fast lane, PARALLEL — ~11–13 s vs ~26 s serial; -n auto capped at half the logical cores)
 ./run_tests.ps1 chip   # scope to chip while iterating
 ```
 

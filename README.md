@@ -35,11 +35,13 @@ jupyter lab chip/chip.ipynb             # the teaching notebook (needs .[viz,not
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow" -n auto     # routine fast lane — 188 tests, PARALLEL (~11 s vs ~26 s serial)
+./run_tests.ps1 -m "not slow" -n auto     # routine fast lane — 188 tests, PARALLEL (~11–13 s vs ~26 s serial)
 ./run_tests.ps1                           # full gate — 189 tests, SERIAL (adds the slow notebook smoke-test)
 ```
 
-`-n auto` (pytest-xdist) fans the 188 CPU-bound tests across cores — **but only the fast lane.**
+`-n auto` (pytest-xdist) fans the 188 CPU-bound tests across cores — **capped at half the logical
+cores** (`conftest.py`: the suite floors on one module, so the back half buys ~nothing and the idle
+half is headroom), and **only on the fast lane.**
 The one `slow` test executes `chip.ipynb` in a fresh kernel over a zmq/asyncio comms layer that
 races under load, so parallelism is applied *only* where it is already deselected (the fast lane,
 and CI — where it self-skips). The full gate stays **serial**, so the notebook never runs under
