@@ -70,6 +70,11 @@ jobs:
         run: python -m ipykernel install --user --name python3
 
       - name: Full gate — the whole suite
-        # Bare pytest = the canonical full gate. -rs prints every skip reason so a
-        # silent-skip regression is visible in this log (the chip.ipynb CI-skip shows here).
-        run: python -m pytest -rs
+        # The canonical full gate. -rs prints every skip reason so a silent-skip regression is
+        # visible in this log (the chip.ipynb CI-skip shows here). -n auto (pytest-xdist) runs
+        # the 188 CPU-bound tests in parallel — safe here because the slow notebook test
+        # self-skips under CI, so it is never co-scheduled with them (THE PIN, ADR 0003
+        # amendment). If you ever set CHIP_NOTEBOOK_FORCE_CI=1 to actually exercise the notebook
+        # on the runner, run that test SERIALLY (`-m slow -n0`) in a separate step — parallel
+        # load confounds (and can trip) its zmq/asyncio comms race. See the chip-notebook flake.
+        run: python -m pytest -rs -n auto

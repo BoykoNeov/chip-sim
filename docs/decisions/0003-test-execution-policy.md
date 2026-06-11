@@ -1,7 +1,8 @@
 # 0003 — Test execution policy (the tiered gate)
 
 Status: Accepted — 2026-06-09 (amended same day — see Amendment; the per-project Successor
-was built 2026-06-09 once Microchip landed — see *Successor*)
+was built 2026-06-09 once Microchip landed — see *Successor*; **parallelism promoted from
+deferred → built 2026-06-11 — see Amendment (2026-06-11): pytest-xdist**)
 Scope: Program-level invariant; inherited by every per-project plan.
 
 > **Extraction note (standalone repo).** This ADR was written for the BigSim monorepo. In this
@@ -281,3 +282,53 @@ Decisions settled at build (the ones the ADR left open / flagged):
   has nothing to check (§8: name the extension, don't build it). Forward note: when built it
   must run *inside* the per-project gate, not only the whole-repo lane, or it won't fire on
   a per-project commit.
+
+## Amendment (2026-06-11) — `pytest-xdist` promoted from deferred → built
+
+Decision §4 and *Alternatives* both **deferred** parallelism: "Don't build… parallelism
+(`pytest-xdist`) now," and "`pytest-xdist`… rejected for now… **Reconsider at the ~30 s
+fast-lane trigger**." Two things named there have now arrived, so the deferral is lifted **at the
+user's direction (2026-06-11)**:
+
+- **The trigger fired.** That deferral was written when the fast core was ~8 s and the cost lived
+  in 8 Steel live-CALPHAD tests (which parallelise poorly — serialized behind a shared solver). In
+  *this* standalone repo there is no Steel/CALPHAD; the chip fast lane has instead grown by
+  accretion (P1–P4 + v1.1–v1.5) to **188 tests at ~26 s serial** — at the ~30 s trigger the ADR
+  named, and now the cost is broad CPU-bound numerics (PDE solves), which *do* parallelise.
+- **Measured (16-core box):** fast lane **~26 s → ~11 s** (`-n auto`, 2.3×); full suite ~33 s → ~12 s.
+  Gain plateaus at `-n 8` (≈ `-n auto`) — the floor is one ~3.9 s module (`diffusion_highconc`),
+  an Amdahl limit, **not** BLAS oversubscription (pinning `OMP/MKL/OPENBLAS=1` moved nothing).
+
+**Built:** `pytest-xdist>=3` added to the `[test]` extra; the CI full-gate step runs `-rs -n auto`.
+
+**Design — `-n auto` is the blessed *command*, NOT in `addopts`.** Baking it into `addopts` would
+force xdist onto single-test debugging (`-s`/pdb break under xdist; workers spawn for one test) and
+onto the slow run. So `addopts` stays `-q`; the fast lane is `pytest -m "not slow" -n auto`, and
+`-n0` disables it. The blessed commands live in `pyproject`, both `run_tests.*` headers, and the
+READMEs (kept in lockstep).
+
+**THE PIN (load-bearing) — `-n auto` rides ONLY the fast lane.** The lone `slow` test executes
+`chip.ipynb` in a live Jupyter kernel over a zmq/asyncio comms layer that **races under load** — it
+hangs ~80 % in CI (the chip-notebook flake; *not* a content failure). The pin is **structural, by
+construction**: parallelism is applied only where the notebook is already deselected, so it never
+runs under xdist in any blessed command.
+
+- *Fast lane* `pytest -m "not slow" -n auto` — notebook deselected → safe. **This is the only
+  blessed parallel local command.**
+- *Full gate (local)* — bare serial `pytest` (~33 s). Runs the notebook with **no xdist anywhere
+  near it**; this is the pre-existing serial baseline, so the change introduces no new notebook
+  flakiness.
+- *CI* — the notebook self-skips under CI, so `pytest -rs -n auto` never co-schedules it → parallel
+  *and* safe. The one trap: `CHIP_NOTEBOOK_FORCE_CI=1` (the flake's runner re-test hatch) — if used,
+  run the notebook serially (`-m slow -n0`) in a separate step, or parallel load confounds the test.
+
+**Why not a parallel full gate (the two-command `… -n auto && pytest -m slow`)?** It was tried and
+**rejected on evidence.** Run back-to-back, the slow leg launches the kernel *immediately after* the
+bulk's ~12 s of 16-core saturation — and was observed to flake locally (1 timeout / 1 pass across two
+runs) where the notebook in isolation is reliable (4/4). The ~20 s saved on the **rare** full gate
+(ADR 0003: full gate is exceptional) is not worth front-loading contention onto the one load-sensitive
+test. Keeping the full gate serial is simpler *and* makes the pin un-fat-fingerable.
+
+**Scope of this amendment.** *Only* the parallelism axis is promoted. The §4 deferrals of
+per-project markers, a git-diff classifier, and `pytest-testmon` still stand, and the `slow`
+marker's by-kind semantics (Decision §1) are unchanged — xdist is orthogonal to both.

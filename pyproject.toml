@@ -21,7 +21,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7.0"]
+# pytest-xdist parallelises the fast lane (`-n auto`): ~26 s serial → ~11 s on this box.
+# See the gate-runner comment below for the one constraint — the slow notebook test must
+# NOT be co-scheduled under xdist (it stays serial; the pin).
+test = ["pytest>=7.0", "pytest-xdist>=3"]
 # Visualization is opt-in (ADR 0002): the compute core and the test suite stay
 # headless/matplotlib-free; only the render layer (chip/plots.py, demos, the notebook)
 # needs this. Install with `pip install -e .[viz]`.
@@ -40,9 +43,23 @@ notebook = ["jupyterlab>=4", "ipywidgets>=8", "nbclient", "nbformat", "ipykernel
 # `chip...`) without an install step.
 #
 # Tiered gate (ADR 0003): the routine local gate is the fast lane
-#   `pytest -m "not slow"`   — the always-on suite (~? s)
-#   `pytest`                 — the full suite, incl. the slow notebook smoke-test (CI / release)
+#   `pytest -m "not slow" -n auto`   — the always-on suite (188 tests, ~11 s parallel / ~26 s serial)
+#   `pytest`                         — the full gate, SERIAL (adds the slow notebook smoke-test)
 # `slow` marks the handful of tests that drive a live kernel / subprocess (the notebook execution).
+#
+# Parallelism (pytest-xdist, ADR 0003 amendment 2026-06-11): `-n auto` is the *blessed
+# command*, deliberately NOT baked into `addopts` — that would force xdist onto single-test
+# debugging (breaks `-s`/pdb, spawns workers for one test) and onto the full gate. Add it on
+# the command line; `-n0` disables it.
+#
+# THE PIN — why `-n auto` rides ONLY the fast lane: the slow notebook smoke-test drives a live
+# Jupyter kernel over a zmq/asyncio comms layer that races under load (it hangs ~80 % in CI, and
+# was observed to time out locally when launched right after a parallel bulk — see the
+# chip-notebook flake). So parallelism is applied ONLY where `slow` is already deselected: the
+# fast lane (`-m "not slow" -n auto`) and CI (where the notebook self-skips). The local full gate
+# stays bare serial `pytest` — the notebook NEVER runs under xdist in any blessed command, so the
+# pin is structural, not a convention you can fat-finger. (~20 s saved on the rare full gate is not
+# worth front-loading 16-core contention onto the one load-sensitive test.)
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["engines", "chip"]

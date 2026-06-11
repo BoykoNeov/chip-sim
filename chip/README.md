@@ -278,11 +278,12 @@ not correctness**: the per-phase triads already validate the numbers.
 
 ```powershell
 # from repo root
-./run_tests.ps1 -m "not slow"   # routine commit gate (whole-repo fast lane, ~9 s — collects chip)
+./run_tests.ps1 -m "not slow" -n auto   # routine commit gate (fast lane, PARALLEL — ~11 s vs ~26 s serial)
 ./run_tests.ps1 chip   # scope to chip while iterating
 ```
 
-`pyproject.toml`'s `testpaths` already carries `projects`, so `chip/tests/` is collected
+`pyproject.toml`'s `testpaths` already carries `chip`, so `chip/tests/` is collected
 with no config change; `pythonpath = ["."]` lets chip import the engine as `engines.diffusion…`.
-The notebook smoke-test (`tests/test_chip_notebook.py`) is `slow`-marked, so the fast lane deselects it;
-it runs in the full gate (`python -m tools.gate chip` / `./run_tests.ps1`).
+The notebook smoke-test (`tests/test_chip_notebook.py`) is `slow`-marked, so the fast lane deselects it
+(and `-n auto` therefore rides only the fast lane, never co-scheduling the notebook with the 188 —
+**the pin**, ADR 0003 amendment); it runs in the serial full gate (bare `./run_tests.ps1`).

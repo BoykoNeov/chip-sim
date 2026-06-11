@@ -35,14 +35,19 @@ jupyter lab chip/chip.ipynb             # the teaching notebook (needs .[viz,not
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow"     # routine fast lane — 179 tests
-./run_tests.ps1                   # full suite — 180 tests (adds the slow notebook smoke-test)
+./run_tests.ps1 -m "not slow" -n auto     # routine fast lane — 188 tests, PARALLEL (~11 s vs ~26 s serial)
+./run_tests.ps1                           # full gate — 189 tests, SERIAL (adds the slow notebook smoke-test)
 ```
 
-The suite is **180 tests**, all green. The one `slow` test executes `chip.ipynb` end-to-end in
-a fresh kernel; it self-skips under CI (a known infra hang on the GitHub runner — the kernel goes
-idle but `nbclient` never returns, a zmq/asyncio comms race, not a content failure) and runs in the
-local full gate. Optional stacks are importorskip-gated, so a headless checkout skips rather than errors.
+`-n auto` (pytest-xdist) fans the 188 CPU-bound tests across cores — **but only the fast lane.**
+The one `slow` test executes `chip.ipynb` in a fresh kernel over a zmq/asyncio comms layer that
+races under load, so parallelism is applied *only* where it is already deselected (the fast lane,
+and CI — where it self-skips). The full gate stays **serial**, so the notebook never runs under
+xdist (the pin is structural, not a convention). It also self-skips under CI (a known infra hang
+on the GitHub runner — the kernel goes idle but `nbclient` never returns, not a content failure).
+`-n auto` is the blessed *command*, not baked into config, so single-test `-s`/pdb stays serial.
+The suite is **189 tests** (188 fast + 1 slow), all green; optional stacks are importorskip-gated,
+so a headless checkout skips rather than errors.
 
 ## Provenance
 
