@@ -17,11 +17,14 @@ sealed faces, the cited BC). Two stories on one figure:
     Mack eq. (12); blurred by the *same* ``peb_blur`` along ``z``) and keep the **lateral image
     fundamental** (period ``p``). Engine-computed points ride the two analytic heat-kernel envelopes;
     the cited **half-period rule** (σ ≥ λ/4n, Mack's glossary) marks the smoothing floor, and the
-    **window** [erase the ripple, keep ≥½ the fundamental] is shaded. The window **closes near
-    ~151 nm pitch** (numerically beside this system's optical cutoff — a coincidence of parameters,
-    not a law); at NA 0.93 the lens out-resolves the bake (145 nm images, but cannot survive a
-    ridge-erasing bake) — why modern stacks attack reflectivity with a BARC (the cited mitigation
-    list: ARC / dye / PEB) instead of leaning harder on the bake.
+    **window** [erase the ripple, keep ≥½ the fundamental] is shaded. The window closes at
+    ``p_close = λ/(4nc)`` ≈ 151 nm, which is **NA-independent** (resist index + keep-floor only);
+    this system's partial-coherence optical cutoff ``λ/(NA(1+σ))`` ≈ 151 nm slides with the lens, so
+    the ratio ``NA(1+σ)/(4nc)`` is **λ-independent** (≈ 1.0 here — closure ≈ cutoff ≈ 151 nm is a
+    coincidence of two independent parameter groups, not a law). Pushing to NA 0.93 slides the cutoff
+    to ~138 nm while ``p_close`` stays pinned: the lens images 145 nm but the ridge-erasing bake
+    cannot hold it (the lens out-resolves the bake) — why modern stacks attack reflectivity with a
+    BARC (the cited mitigation list: ARC / dye / PEB) instead of leaning harder on the bake.
 
 System: **193 nm ArF**, **NA 0.85** (dry), **σ 0.5** conventional — the same DUV stepper as
 `demo_litho`/`demo_defocus` — imaging a **240 nm** line/space; resist index **n = 1.70**
@@ -137,6 +140,15 @@ def compute():
     sigma_keep = PITCH_NM * np.sqrt(np.log(1.0 / KEEP_FLOOR) / (2.0 * np.pi ** 2))
     p_close = sigma_rule / np.sqrt(np.log(1.0 / KEEP_FLOOR) / (2.0 * np.pi ** 2))
 
+    # Why the closure lands where it does (the reframe): p_close = λ/(4nc) is NA-independent (resist
+    # index + keep-floor only), while the partial-coherence optical cutoff λ/(NA(1+σ)) — the lowest
+    # pitch whose ±1 order the extreme source point still passes — slides with the lens. Their ratio
+    # NA(1+σ)/(4nc) is λ-independent; ≈1 here (closure ≈ cutoff ≈ 151 nm) is a coincidence of two
+    # independent parameter groups (lens+source vs resist+floor), not a law — and the NA bump breaks it.
+    p_cutoff = WAVELENGTH_NM / (NA * (1.0 + SIGMA_SRC))
+    p_cutoff_hi = WAVELENGTH_NM / (NA_HI * (1.0 + SIGMA_SRC))
+    closure_ratio = p_close / p_cutoff                       # = NA(1+σ)/(4nc), λ-independent
+
     # The closure punchline: the NA-0.93 lens images 145 nm, but the rule-abiding bake erases it.
     img_hi = litho.Imaging(WAVELENGTH_NM, NA_HI, sigma=SIGMA_SRC)
     x_d, aerial_d = _aerial(img_hi, PITCH_DENSE_NM)
@@ -149,6 +161,7 @@ def compute():
         features=features, sigmas=sigmas, keep_engine=keep_engine, keep_analytic=keep_analytic,
         ripple_engine=ripple_engine, ripple_analytic=ripple_analytic,
         t_sw=t_sw, sigma_rule=sigma_rule, sigma_keep=sigma_keep, p_close=p_close,
+        p_cutoff=p_cutoff, p_cutoff_hi=p_cutoff_hi, closure_ratio=closure_ratio,
         keep_dense=keep_dense, dense_alive=b0_d, film_nm=film_nm,
     )
 
@@ -176,8 +189,14 @@ def print_summary(data) -> None:
     print(f"  At NA {NA_HI:.2f} / {PITCH_DENSE_NM:.0f} nm the lens still images (the optics are alive)")
     print(f"  but the same bake keeps only {keep:.2f} of the fundamental — the lens out-resolves")
     print(f"  the bake; the resist blur sets the floor → use a BARC (the cited ARC/dye/PEB list).")
-    print(f"  (The {data['p_close']:.0f} nm closure sitting beside this system's optical cutoff "
-          f"~151 nm is a numeric coincidence of these parameters, not a law.)\n")
+    print(f"  Mechanism: p_close = λ/(4nc) = {data['p_close']:.0f} nm is NA-independent (resist + "
+          f"keep-floor only), while the")
+    print(f"  partial-coherence cutoff λ/(NA(1+σ)) slides {data['p_cutoff']:.0f}→{data['p_cutoff_hi']:.0f} nm "
+          f"as NA {NA:.2f}→{NA_HI:.2f}. Their ratio")
+    print(f"  NA(1+σ)/(4nc) = {data['closure_ratio']:.3f} is λ-independent; ≈1 here (both ≈151 nm) is "
+          f"a coincidence of two")
+    print(f"  independent groups, not a law — and the NA bump is what opens the "
+          f"lens-images-but-bake-can't band.\n")
 
 
 def save_figure(data) -> Path:

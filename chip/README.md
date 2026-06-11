@@ -270,9 +270,12 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   Banked artifact: the **latent image dissolving** over the cited 20/40/60 nm series beside the **PEB
   window** (engine retention points riding the two analytic heat kernels — erase the `λ/2n`
   standing-wave ripple, keep the pitch-`p` fundamental) (`docs/figures/chip-peb.png`); 193 nm ArF,
-  NA 0.85, 240 nm pitch, n_resist 1.70 → window σ ∈ [28, 45] nm, closing at ≈151 nm pitch — and at
-  NA 0.93 a 145 nm pitch **images fine but cannot survive a ridge-erasing bake** (the lens
-  out-resolves the bake → why modern stacks use a BARC; the cited ARC/dye/PEB mitigation list).
+  NA 0.85, 240 nm pitch, n_resist 1.70 → window σ ∈ [28, 45] nm, closing at `p_close = λ/4nc` ≈ 151 nm
+  (**NA-independent** — resist index + keep-floor only); this lands on the partial-coherence cutoff
+  `λ/NA(1+σ)` ≈ 151 nm — a **λ-independent coincidence** (ratio `NA(1+σ)/4nc` ≈ 1.0, two independent
+  parameter groups matched to 0.06%), not a law. At NA 0.93 the cutoff slides to ≈138 nm while
+  `p_close` stays pinned, so a 145 nm pitch **images fine but cannot survive a ridge-erasing bake**
+  (the lens out-resolves the bake → why modern stacks use a BARC; the cited ARC/dye/PEB mitigation list).
   **17-test mini-triad** (12 module + 5 demo): *analytic* = the **σ=0 bit-for-bit seam** + σ→0
   continuity, a bare **Neumann eigenmode decaying by its exact eigenvalue exponential**, a realistic
   Abbe image attenuated **per harmonic** by the periodic heat kernel `exp(−2π²k²σ²/p²)` (engine vs

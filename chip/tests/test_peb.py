@@ -224,13 +224,15 @@ def test_peb_window_smooths_standing_waves_but_keeps_the_image():
 
 
 def test_peb_window_closes_at_dense_pitch_the_lens_outresolves_the_bake():
-    # …and CLOSED where the lens can still see: on this NA-0.85 system the keep-half-the-fundamental
-    # closure pitch (~151 nm) happens to coincide with the optical cutoff — so push the dry lens to
-    # NA 0.93 (still scalar-honest, NA<1): a 145 nm pitch now images fine, yet obeying the SAME cited
-    # smoothing rule keeps < half its fundamental. The lens out-resolves the bake — the resist blur,
-    # not the optics, sets the dense-pitch floor; you cannot both erase the standing waves and keep
-    # the latent image, which is exactly why modern stacks attack reflectivity with a BARC instead
-    # (the cited mitigation list: ARC / dye / PEB).
+    # …and CLOSED where the lens can still see. The closure pitch p_close = λ/(4nc) is NA-INDEPENDENT
+    # (resist index + keep-floor only); on this NA-0.85 system it lands on the partial-coherence
+    # optical cutoff λ/(NA(1+σ)) ≈ 151 nm — a λ-independent coincidence of two independent groups
+    # (NA(1+σ)=1.275 vs 4nc=1.274, equal to 0.06%), not a law. Push the dry lens to NA 0.93 (still
+    # scalar-honest, NA<1) and the cutoff slides below the pinned p_close: a 145 nm pitch now images
+    # fine, yet obeying the SAME cited smoothing rule keeps < half its fundamental. The lens
+    # out-resolves the bake — the resist blur, not the optics, sets the dense-pitch floor; you cannot
+    # both erase the standing waves and keep the latent image, which is exactly why modern stacks
+    # attack reflectivity with a BARC instead (the cited mitigation list: ARC / dye / PEB).
     T_sw = L.standing_wave_period(LAMBDA, N_RESIST)
     sigma_rule = 0.5 * T_sw
     img_hi = L.Imaging(LAMBDA, 0.93, sigma=0.5)

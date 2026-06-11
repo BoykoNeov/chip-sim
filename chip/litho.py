@@ -148,9 +148,16 @@ approximation of it. One knob survives: the **diffusion length** ``σ = √(2·D
   **standing waves** (depth ripple of period ``λ/2n`` — :func:`standing_wave_period`, Mack's
   eq. (12), blurred by the *same* :func:`peb_blur` along ``z``) needs ``σ ≳ λ/4n`` (the cited
   half-period rule), while keeping the lateral image needs ``σ ≪ p`` — the **PEB window**, which
-  closes at dense pitch (at 193 nm / n 1.7 / a keep-half-the-fundamental floor: ~151 nm —
-  numerically near this system's v1 resolution cutoff, a coincidence of these parameters, not a
-  law). Scope edges, named: **linear exposure** (latent acid ∝ I — no Dill bleaching/saturation),
+  closes at the pitch ``p_close = λ/(4nc)`` where that floor meets a keep-half-the-fundamental
+  ceiling (~151 nm at 193 nm / n 1.7). ``p_close`` is **NA-independent** (resist index + keep floor
+  only), while this system's partial-coherence optical cutoff ``λ/(NA(1+σ))`` slides with the lens;
+  their ratio ``NA(1+σ)/(4nc)`` is therefore **λ-independent**, and at NA 0.85 / σ 0.5 it is ≈ 1.0006
+  — closure and cutoff land on the *same* ~151 nm not by law but because two independent parameter
+  groups (lens+source ``NA(1+σ)=1.275`` vs resist+floor ``4nc=1.274``) happen to match to 0.06%: a
+  **λ-independent coincidence**, with an NA-mechanism. Push the lens to NA 0.93 and the cutoff slides
+  to ~138 nm while ``p_close`` stays pinned at 151 — a band where the lens images but the bake cannot
+  hold it (the lens out-resolves the bake; why the BARC). Scope edges, named: **linear exposure**
+  (latent acid ∝ I — no Dill bleaching/saturation),
   **constant D** (the CAR reaction–diffusion system — concentration-dependent ``D(h)``, acid loss,
   deprotection kinetics — is the cited next rung), development still a constant threshold, and the
   lateral blur is 1-D in ``x`` while the standing-wave smoothing is 1-D in ``z`` (no coupled 2-D
@@ -675,10 +682,17 @@ def peb_blur(latent, length_nm: float, diffusion_length_nm: float,
     Physically only ``D·t`` enters (``σ² = 2·D·t``), so the blur takes the **diffusion length** σ
     directly and marches a unit bake at ``D = σ²/2``. ``diffusion_length_nm = 0`` returns the input
     **unchanged** (bit-for-bit, never touching the engine — the degenerate seam).
-    ``method="crank_nicolson"`` by default — the contract's stated CN use case (temporal accuracy on
-    a smooth, band-limited profile at moderate dt; the harmonics that survive the bake sit far below
-    CN's oscillation scale), which is what makes the per-harmonic analytic anchor tight; conservation
-    is structural (telescoping fluxes) under either method.
+    ``method="crank_nicolson"`` by default. CN has **no** unconditional discrete max-principle, so on
+    a sharp input it could ring — and acid must stay ≥ 0; what makes it safe here is **band-limiting
+    by the optics**: the latent image carries only a handful of harmonics, all far below CN's
+    oscillation scale, so there is no high-frequency content for CN to overshoot on (the bounds test
+    confirms no ringing). With negativity ruled out by the band limit, the only thing left to choose
+    on is fidelity to the calibrated ``σ = √(2·D·t)`` blur — and CN, 2nd-order in time, matches the
+    exact per-harmonic heat kernel to the discretization floor (the FV eigenvalue gap ``(kΔx)²/12``),
+    which is what makes the analytic anchor tight. ``method="backward_euler"`` is available for a
+    guaranteed max-principle on a non-band-limited input, at a **less accurate** match to the kernel
+    (~6× the CN error at equal ``n_steps``). Conservation is structural (telescoping fluxes) under
+    either method.
     """
     a = np.asarray(latent, dtype=float)
     if diffusion_length_nm < 0.0:

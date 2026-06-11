@@ -784,8 +784,10 @@ def peb_figure(
                  label=f"the PEB window  [{rule:.0f}, {keep_edge:.0f}] nm "
                        f"(≥{keep_floor:.0%} fundamental kept)")
     ax_w.axhline(keep_floor, color="#888888", lw=0.8, ls=":")
-    ax_w.text(0.985, 0.62, f"window closes at\npitch ≈ {data['p_close']:.0f} nm\n"
-                           f"(at NA 0.93, 145 nm images\nbut cannot survive the bake\n→ use a BARC)",
+    ax_w.text(0.985, 0.60, f"closes at p_close ≈ {data['p_close']:.0f} nm\n"
+                           f"(= λ/4nc — NA-independent); optical\n"
+                           f"cutoff λ/NA(1+σ): {data['p_cutoff']:.0f}→{data['p_cutoff_hi']:.0f} nm at\n"
+                           f"NA 0.85→0.93 → lens out-resolves\nthe bake → use a BARC",
               fontsize=8, color="#444444", ha="right", va="center", transform=ax_w.transAxes,
               bbox=dict(boxstyle="round", fc="white", ec="#cccccc", alpha=0.9))
     ax_w.set_xlim(float(sig[0]), float(sig[-1]))

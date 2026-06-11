@@ -22,8 +22,17 @@ existing machinery; v1.7's is that litho — the chip's one module whose foundin
 not touch the engine" — has a resist back-end that **IS the engine's PDE**: the bake is Fick's law
 on the latent acid (cited: σ=√(2Dt), Gaussian-kernel solution, sealed-film homogeneous-Neumann BC —
 [[peb-acid-diffusion-source]]). So `peb_blur` runs `engines.diffusion` in **acid mode** (`u` =
-latent acid, constant `D = σ²/2`, unit bake, `Neumann(0)` both faces, **Crank–Nicolson** — the
-contract's stated temporal-accuracy use case; ENGINE UNTOUCHED, pure consumer, no ADR).
+latent acid, constant `D = σ²/2`, unit bake, `Neumann(0)` both faces, **Crank–Nicolson** default;
+ENGINE UNTOUCHED, pure consumer, no ADR). **CN-default rationale sharpened (2026-06-11 review):**
+CN has NO unconditional discrete max-principle, so the load-bearing reason it's safe here is
+**band-limiting by the optics** (the latent image is a handful of harmonics far below CN's
+oscillation scale → nothing to ring on; the bounds test confirms), NOT "temporal accuracy" per se.
+With negativity ruled out, the only axis left is fidelity to the calibrated σ — CN (2nd-order)
+matches the exact per-harmonic kernel to the FV floor, so it WINS; `backward_euler` is offered for
+a guaranteed max-principle on a non-band-limited input but is a **~6× less accurate** kernel match
+at equal n_steps (measured: CN err 1.3e-5 vs BE 7.9e-5 on the fundamental) → kept CN default, did
+NOT flip to BE (advisor concurred: BE "extra dissipation benign for a blur" is true for the killed
+high modes but BE biases the *retained* σ, and the blur is calibrated to a physical σ).
 
 **The load-bearing construction — the half-period symmetry cell.** A symmetric grating under a
 symmetric source gives an *even* periodic image; its mirror planes x=0, p/2 become the **no-flux
@@ -53,13 +62,26 @@ harmonics as k²; the residual gap tracks the k=2 kernel — 1.2 nm at σ=40, 0.
 (period λ/2n — same `peb_blur` along z, where no-flux is the literal sealed-film BC) yet keep the
 lateral fundamental (period p). Cited floor σ ≥ λ/4n (≈28.4 nm at 193/n1.7; erases 99.3% of the
 ripple) + illustrative keep-half ceiling (45 nm at p=240) → window **[28, 45] nm**, closing at
-pitch ≈ **151 nm** — *numerically beside this system's optical cutoff ~151 nm,* **a coincidence of
-parameters, not a law** (flagged everywhere). The non-tautological closure: at **NA 0.93** (max
-dry ArF) a **145 nm pitch images fine but cannot survive a rule-abiding bake** (keep 0.47) — the
+**`p_close = λ/(4nc)` ≈ 151 nm**. **The coincidence SHARPENED (2026-06-11 review):** the original
+"~151 ≈ this system's optical cutoff, a coincidence not a law" undersold it. `p_close = λ/(4nc)` is
+**NA-INDEPENDENT** (resist index + keep-floor only); this system's **partial-coherence** optical
+cutoff is **`λ/(NA(1+σ))` = 151.37 nm** (NOT the two-beam floor λ/2NA=113.5 — the demo runs a
+conventional σ=0.5 source; the triple-match 151.37 ≈ computed p_close 151.46 ≈ the hardcoded "~151"
+AND README's own "image goes flat below ~151 nm" all confirm the partial-coherence cutoff is what
+was meant). The two pitches **both scale as λ**, so their ratio **`NA(1+σ)/(4nc)` is λ-INDEPENDENT**
+— at NA 0.85/σ0.5 it is **1.0006** (closure ≈ cutoff to 0.06%, `NA(1+σ)=1.275` vs `4nc=1.274`): a
+**λ-independent coincidence of two INDEPENDENT parameter groups** (lens+source vs resist+keep-floor,
+no law forcing them equal), now **with an NA-mechanism** — not the advisor's "mechanism INSTEAD of
+coincidence" (over-claim; rejected) and NOT the advisor's factor `NA/(2nc)`=1.33 (that's the
+two-beam cutoff, wrong for the σ=0.5 demo). The non-tautological closure: push to **NA 0.93** (max
+dry ArF) and the cutoff slides to **~138 nm** while `p_close` stays **pinned** at 151 — a 138–151 nm
+band where a **145 nm pitch images fine but cannot survive a rule-abiding bake** (keep 0.47) — the
 **lens out-resolves the bake**; the resist blur, not the optics, sets the dense-pitch floor → why
-modern stacks use a **BARC** (the cited ARC/dye/PEB mitigation list). Found the hard way: a first
-closure test at p=150/NA0.85 hit a *flat aerial image* (the optical cutoff) — at NA 0.85 there is
-no optically-alive-but-PEB-dead pitch at the keep-half floor.
+modern stacks use a **BARC** (the cited ARC/dye/PEB mitigation list). (Crossover NA = `4nc/(1+σ)` ≈
+0.8495 for THIS n/σ/keep-floor — not a universal constant; the chosen lens sits right on it.) Found
+the hard way originally: a first closure test at p=150/NA0.85 hit a *flat aerial image* (= that same
+151 nm cutoff) — at NA 0.85 there is no optically-alive-but-PEB-dead pitch at the keep-half floor.
+Demo now **computes** `p_cutoff`/`p_cutoff_hi`/`closure_ratio` (was a hardcoded "~151").
 
 **Scope edges named-not-modelled:** linear exposure (latent acid ∝ I — no Dill bleaching), constant
 D (the CAR reaction–diffusion system with concentration-dependent `D_h` = the cited next rung),
