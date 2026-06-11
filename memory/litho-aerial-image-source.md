@@ -57,4 +57,5 @@ the defocus & DOF lectures. Used by `litho.py` §7 (v1.4) — `defocus_phase`, `
 Related: this is the chip project's one **genuinely-new** module (Fourier optics), chip-local not
 promoted to `engines/` — see [[bigsim-program]]. Sits in the **export-control carve-out** (generic
 textbook Fourier optics, no recipes/targeting). Companions: [[deal-grove-oxidation-source]] (P2),
-[[dopant-diffusivity-source]] (P1a).
+[[dopant-diffusivity-source]] (P1a), [[peb-acid-diffusion-source]] (v1.7 — same Mack corpus + the
+same Kirchauer IUE-Vienna thesis as the NILS≥1 floor pinned here).

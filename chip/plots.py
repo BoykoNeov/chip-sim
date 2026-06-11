@@ -64,6 +64,14 @@ ONAXIS_COLOR = "#2f6fb0"        # the on-axis coherent fundamental (data points 
 PARTIAL_COLOR = "#d4711f"       # the σ-source fundamental — the null softened by partial coherence
 DOF_COLOR = "#c0392b"           # the depth-of-focus event (the φ=π/2 null) marker
 
+# PEB (v1.7) colours — the baked latent image & the PEB window (the bake's trade-off).
+LATENT_COLOR = "#6a3d9a"        # the unbaked aerial/latent image (violet — the litho family)
+BAKE_COLORS = ("#9a7bc0", "#c79fd9", "#e2c7ee")   # the cited 20/40/60 nm series, fading with σ
+RIPPLE_COLOR = "#2f6fb0"        # standing-wave ripple retention (the thing the bake must erase)
+KEEP_COLOR = "#27795b"          # lateral fundamental retention (the thing the bake must keep)
+RULE_COLOR = "#c0392b"          # the cited half-period smoothing rule σ = λ/4n (the floor)
+PEB_WINDOW_COLOR = "#27795b"    # the open PEB window (smooth enough ∧ image kept)
+
 # Device (Phase 4) colours — the V_t waterfall (where the threshold voltage comes from).
 VFB_COLOR = "#8e44ad"           # the flat-band voltage term (gate work function)
 BAND_COLOR = "#2f6fb0"          # the 2φ_F surface-potential term
@@ -709,5 +717,87 @@ def defocus_figure(
 
     fig.suptitle("Microchip v1.4: lithographic defocus — the Bossung curve & the depth of focus "
                  "(within the litho module)", fontsize=12.5, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    return fig
+
+
+def peb_figure(
+    data: dict,
+    wavelength_nm: float,
+    NA: float,
+    sigma_src: float,
+    pitch_nm: float,
+    n_resist: float,
+    keep_floor: float,
+) -> "plt.Figure":
+    """The banked v1.7 artifact: the baked latent image & the PEB window (acid-diffusion blur).
+
+    ``data`` is the :func:`demo_peb.compute` bundle (plain arrays/scalars — no live solver object,
+    ADR 0002). Two panels:
+
+    Left panel (**the banked readout** — the latent image dissolving): the aerial image at the demo
+    pitch and its post-bake latent images over the cited 20/40/60 nm diffusion-length series, with
+    the blur-invariant mean clip drawn once — *the harmonics die as exp(−2π²k²σ²/p²), the profile
+    collapses toward its conserved mean, and the CD walks onto the pure-fundamental p/2 readout.*
+
+    Right panel (**the mechanism** — the PEB window): retention vs σ for the bake's two jobs —
+    erasing the standing-wave depth ripple (period λ/2n) and keeping the lateral image fundamental
+    (period p) — engine points riding the two analytic heat-kernel envelopes; the cited half-period
+    smoothing rule marks the floor, and the open window is shaded. One bake, two clocks: the same σ
+    sits on both curves, so the window is wherever the blue curve is dead and the green one alive.
+    """
+    fig, (ax_i, ax_w) = plt.subplots(1, 2, figsize=(13, 6))
+
+    # --- left: the aerial image + the cited baked family --------------------------------
+    x = np.asarray(data["x"])
+    ax_i.plot(x, data["aerial"], color=LATENT_COLOR, lw=2.4, zorder=4,
+              label="aerial image (σ = 0 — unbaked)")
+    series = [s for s in data["family_sigmas"] if s > 0.0]
+    for s, color in zip(series, BAKE_COLORS):
+        cd = data["features"][s].cd_nm
+        ax_i.plot(x, data["family"][s], color=color, lw=2.0, zorder=3,
+                  label=f"baked σ = {s:.0f} nm   (CD {cd:.1f} nm)")
+    ax_i.axhline(data["dose"], color=THRESHOLD_COLOR, ls="--", lw=1.4, alpha=0.85,
+                 label="mean clip (dose) — blur-invariant")
+    cd0 = data["features"][0.0].cd_nm
+    ax_i.set_xlim(float(x[0]), float(x[-1]))
+    ax_i.set_xlabel("position  $x$  (nm)")
+    ax_i.set_ylabel("intensity / latent acid  (a.u.)")
+    ax_i.set_title(f"the latent image dissolving  (pitch {pitch_nm:.0f} nm; unbaked CD {cd0:.1f} nm)")
+    ax_i.legend(loc="lower center", fontsize=8.3, framealpha=0.95)
+    ax_i.grid(True, alpha=0.18)
+
+    # --- right: the PEB window — two retentions, one σ ----------------------------------
+    sig = np.asarray(data["sigmas"])
+    ax_w.plot(sig, data["ripple_analytic"], color=RIPPLE_COLOR, lw=2.2, zorder=3,
+              label=f"standing-wave ripple (period λ/2n = {data['t_sw']:.0f} nm) — erase me")
+    ax_w.plot(sig[::4], np.asarray(data["ripple_engine"])[::4], "o", color=RIPPLE_COLOR, ms=4.5,
+              zorder=5, label="engine (peb_blur along z)")
+    ax_w.plot(sig, data["keep_analytic"], color=KEEP_COLOR, lw=2.2, zorder=3,
+              label=f"image fundamental (pitch {pitch_nm:.0f} nm) — keep me")
+    ax_w.plot(sig[::4], np.asarray(data["keep_engine"])[::4], "s", color=KEEP_COLOR, ms=4.5,
+              zorder=5, label="engine (peb_blur along x)")
+    rule, keep_edge = data["sigma_rule"], data["sigma_keep"]
+    ax_w.axvline(rule, color=RULE_COLOR, ls="--", lw=1.5,
+                 label=f"cited smoothing rule σ = λ/4n = {rule:.0f} nm")
+    ax_w.axvspan(rule, keep_edge, color=PEB_WINDOW_COLOR, alpha=0.12, zorder=1,
+                 label=f"the PEB window  [{rule:.0f}, {keep_edge:.0f}] nm "
+                       f"(≥{keep_floor:.0%} fundamental kept)")
+    ax_w.axhline(keep_floor, color="#888888", lw=0.8, ls=":")
+    ax_w.text(0.985, 0.62, f"window closes at\npitch ≈ {data['p_close']:.0f} nm\n"
+                           f"(at NA 0.93, 145 nm images\nbut cannot survive the bake\n→ use a BARC)",
+              fontsize=8, color="#444444", ha="right", va="center", transform=ax_w.transAxes,
+              bbox=dict(boxstyle="round", fc="white", ec="#cccccc", alpha=0.9))
+    ax_w.set_xlim(float(sig[0]), float(sig[-1]))
+    ax_w.set_ylim(0.0, 1.05)
+    ax_w.set_xlabel("acid diffusion length  σ = √(2Dt)  (nm)")
+    ax_w.set_ylabel("modulation retention  (per heat kernel)")
+    ax_w.set_title("the PEB window: erase the ridges, keep the image")
+    ax_w.legend(loc="upper right", fontsize=8.0, framealpha=0.95)
+    ax_w.grid(True, alpha=0.18)
+
+    fig.suptitle("Microchip v1.7: PEB acid-diffusion blur — the resist back-end rides the engine "
+                 f"(λ = {wavelength_nm:.0f} nm, NA = {NA:.2f}, σ_src = {sigma_src:.2f}, "
+                 f"resist n = {n_resist:.2f})", fontsize=12.5, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     return fig

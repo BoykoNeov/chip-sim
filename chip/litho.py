@@ -43,7 +43,9 @@ Validation triad (plan §3) — what is asserted tight vs loose
   treatment), an **aberration-free pupil apart from defocus** (the **defocus** phase is modelled in
   **v1.4** — see below — but no other Zernikes: coma/astigmatism/spherical are out), **Abbe not
   Hopkins** (a *method* choice — same answer, different cost — named because Hopkins is the tar pit), a
-  **constant-threshold resist** (no acid diffusion / PEB blur / development kinetics), a **1-D
+  **constant-threshold resist** (the **PEB acid-diffusion blur** is modelled in **v1.7** — see §8
+  below — but development kinetics are not: the clip is still a constant threshold, now applied to
+  the *post-bake latent* image), a **1-D
   line/space** mask (no 2-D contacts / line-ends / OPC), and a **1-D uniform source line** (not the
   chord-weighted projection of a real 2-D circular σ-disk). These are named, not papered over — the same
   discipline as oxidation's Massoud thin-dry anomaly.
@@ -115,6 +117,44 @@ returns the v1 image bit-for-bit (the degenerate seam). The mini-triad:
   with ``|z|``; the usable defocus is the Rayleigh ``DOF = k₂·λ/NA²`` (:meth:`Imaging.depth_of_focus`),
   ``k₂ = 0.5`` **derived** from the ``φ = π/2`` fundamental null at the resolution-limited pitch
   (``sinθ → NA`` ⇒ ``z = λ/2NA²``), not cited cold — the same validated-as-a-consequence split as ``k₁``.
+
+v1.7 (§8) — PEB acid-diffusion blur: the resist back-end is a diffusion solve (the promoted edge)
+--------------------------------------------------------------------------------------------------
+The §-named "constant-threshold resist (no acid diffusion / PEB blur)" edge, promoted — and the
+finding inverts this module's founding line: litho, the chip's one module that "does not touch the
+engine", now **rides it** — because the post-exposure bake IS the program's PDE. Exposure writes a
+**latent acid image** (∝ the aerial image — the linear-exposure idealization, named below); the
+bake diffuses it (Fick's law on the acid/PAC concentration); development clips the **diffused
+latent image**, not the aerial image. That bake is ``engines.diffusion`` in **acid mode** — ``u`` =
+latent acid, constant ``D``, ``Neumann(0)`` both faces (the cited sealed-film "no out-diffusion"
+BC, Kirchauer §7.1.2) — run by :func:`peb_blur` on the **half-period symmetry cell** ``[0, p/2]``,
+whose no-flux faces are the even image's mirror planes and whose Neumann eigenmodes ``cos(2πjx/p)``
+are exactly the image's harmonics: the bounded engine solve IS the infinite periodic blur, not an
+approximation of it. One knob survives: the **diffusion length** ``σ = √(2·D·t)``
+(:func:`peb_diffusion_length`). The mini-triad:
+
+* **Analytic (tight).** (a) The degenerate seam — ``σ = 0`` is the unblurred path **bit-for-bit**
+  (:func:`peb_blur` returns its input untouched; ``expose_grating``'s default never enters the PEB
+  branch). (b) **Per-harmonic Gaussian attenuation:** the engine blur multiplies each image
+  harmonic ``cos(2πkx/p)`` by ``exp(−2π²k²σ²/p²)`` — the closed-form periodic heat kernel — to the
+  discretization floor (the FV eigenvalue gap ``(kΔx)²/12`` + the CN time error); a bare Neumann
+  eigenmode decays by exactly its eigenvalue exponential.
+* **Conservation (tight).** No-flux ⇒ the bake conserves acid dose ⇒ the image **mean** — and with
+  it the v1 Parseval power balance ``mean(image) = Σ|c_m|² = transmitted_power`` — survives the
+  bake at **every** σ to machine precision: blur redistributes the latent image, it neither makes
+  nor loses acid. (Corollary: the default mean-clip dose is blur-invariant.)
+* **Benchmark (loose) + the PEB window.** Contrast/NILS/CD degrade monotonically with σ (the cited
+  20/40/60 nm PEB simulation series, Mack); and the **trade-off that defines the bake**: smoothing
+  **standing waves** (depth ripple of period ``λ/2n`` — :func:`standing_wave_period`, Mack's
+  eq. (12), blurred by the *same* :func:`peb_blur` along ``z``) needs ``σ ≳ λ/4n`` (the cited
+  half-period rule), while keeping the lateral image needs ``σ ≪ p`` — the **PEB window**, which
+  closes at dense pitch (at 193 nm / n 1.7 / a keep-half-the-fundamental floor: ~151 nm —
+  numerically near this system's v1 resolution cutoff, a coincidence of these parameters, not a
+  law). Scope edges, named: **linear exposure** (latent acid ∝ I — no Dill bleaching/saturation),
+  **constant D** (the CAR reaction–diffusion system — concentration-dependent ``D(h)``, acid loss,
+  deprotection kinetics — is the cited next rung), development still a constant threshold, and the
+  lateral blur is 1-D in ``x`` while the standing-wave smoothing is 1-D in ``z`` (no coupled 2-D
+  ``(x,z)`` resist volume — the engine's own last deferred regime).
 """
 from __future__ import annotations
 
@@ -122,6 +162,8 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
+
+from engines.diffusion import Diffusion1D, Neumann, uniform_grid
 
 # --------------------------------------------------------------------------- #
 # Constants — unit conversion + the cited resolution / printability benchmarks
@@ -140,6 +182,12 @@ NILS_PRINTABLE = 2.0
 # φ = π/2 (see §7), which at the resolution-limited pitch (the ±1 orders riding the pupil rim, sinθ→NA)
 # lands at z = λ/(2·NA²) → k₂ = 0.5 — the same validated-as-a-consequence honest split as k₁.
 K2_DOF = 0.5
+
+# PEB diffusion-length teaching series (nm), pinned to peb-acid-diffusion-source (Mack, lithobasics):
+# the profile-simulation series Mack uses to show PEB smoothing (20/40/60 nm) — the v1.7 demo's sweep
+# scale and the loose "tens of nanometres" benchmark band. The smoothing *rule* is separate (cited,
+# Mack's glossary): σ must exceed the standing-wave HALF period λ/4n to erase the ridges.
+PEB_DIFFUSION_SERIES_NM = (20.0, 40.0, 60.0)
 
 # Pupil-edge inclusion tolerance: an order landing *exactly* on the rim |f|=f_cut is physically
 # collected, so include it despite floating-point round-off (load-bearing for the k₁ limit cases,
@@ -484,8 +532,10 @@ class PrintedFeature:
     ``cd_nm`` is the printed critical dimension (line width, nm); ``cd_um`` the same in **µm** (the
     cross-module length currency → the Phase-4 MOS channel geometry). ``contrast`` and ``nils`` are the
     image-quality metrics; ``threshold`` the resist clip level; ``pitch_nm`` the grating pitch; ``resolved``
-    whether the image modulates at all (contrast above a small floor). Plain scalars — the loose-coupling
-    currency Phase 4 consumes.
+    whether the image modulates at all (contrast above a small floor). ``peb_diffusion_length_nm`` (v1.7)
+    is the bake's acid diffusion length σ — when nonzero, every metric above reads the **post-bake
+    latent** image, not the aerial image (0.0 = the v1 aerial-image readout). Plain scalars — the
+    loose-coupling currency Phase 4 consumes.
     """
 
     pitch_nm: float
@@ -493,6 +543,7 @@ class PrintedFeature:
     contrast: float
     nils: float
     threshold: float
+    peb_diffusion_length_nm: float = 0.0
 
     @property
     def cd_um(self) -> float:
@@ -515,6 +566,8 @@ def expose_grating(
     threshold: float | None = None,
     n_x: int = 512,
     defocus_nm: float = 0.0,
+    peb_diffusion_length_nm: float = 0.0,
+    peb_n_steps: int = 200,
 ) -> PrintedFeature:
     """Image a line/space grating and read the printed feature — the Phase-3 'recipe in, CD out' entry.
 
@@ -526,11 +579,40 @@ def expose_grating(
     ``defocus_nm`` (v1.4) images out of focus (``z = 0`` is the in-focus default, bit-for-bit v1) — sweep
     it at a fixed ``threshold`` to trace a **Bossung** CD-vs-defocus curve. The high-level entry mirroring
     :func:`oxidation.grow_oxide`. Returns a :class:`PrintedFeature`.
+
+    ``peb_diffusion_length_nm`` (v1.7) bakes the resist before development: the latent acid image
+    (∝ the aerial image — the linear-exposure scope edge) is diffused by :func:`peb_blur` on the
+    half-period symmetry cell ``[0, p/2]``, and **every metric then reads the post-bake latent
+    image** (the diffused-image resist model). Because the blur's no-flux faces must be cell *faces*,
+    this path samples the period at the half-offset cell centers ``x = (j+½)·p/n_x`` — still a
+    uniform full-period sampling, so the mean/projections stay exact; the ``σ → 0`` limit approaches
+    the v1 metrics within sampling resolution, while the ``σ = 0`` default IS the v1 path bit-for-bit
+    (the degenerate seam). Requires an even ``n_x`` and an **even (symmetric) image** — a symmetric
+    grating under a symmetric source; an off-axis pole under defocus shifts the fringe (v1.4) off the
+    mirror planes and is refused. Conservation makes the default mean-clip dose blur-invariant.
     """
     orders = grating_orders(pitch_nm, n_orders=n_orders, duty=duty)
-    x = np.linspace(0.0, pitch_nm, n_x, endpoint=False)
-    intensity = abbe_image(x, orders, imaging, source_fs=source_fs, n_source=n_source,
-                           defocus_nm=defocus_nm)
+    if peb_diffusion_length_nm != 0.0:
+        if n_x % 2:
+            raise ValueError(f"PEB blur needs an even n_x (half-period symmetry cells), got {n_x}")
+        x = (np.arange(n_x) + 0.5) * (pitch_nm / n_x)
+        aerial = abbe_image(x, orders, imaging, source_fs=source_fs, n_source=n_source,
+                            defocus_nm=defocus_nm)
+        if not np.allclose(aerial, aerial[::-1], rtol=1e-8, atol=1e-9 * float(aerial.max())):
+            raise ValueError(
+                "PEB blur requires an even (symmetric) aerial image — a symmetric grating under a "
+                "symmetric source. An asymmetric image (e.g. an off-axis pole under defocus — the "
+                "v1.4 fringe shift) has no mirror plane at x=0/p/2, so the half-period no-flux "
+                "domain does not represent its periodic blur."
+            )
+        half = n_x // 2
+        blurred = peb_blur(aerial[:half], pitch_nm / 2.0, peb_diffusion_length_nm,
+                           n_steps=peb_n_steps)
+        intensity = np.concatenate([blurred, blurred[::-1]])   # mirror back: even about p/2
+    else:
+        x = np.linspace(0.0, pitch_nm, n_x, endpoint=False)
+        intensity = abbe_image(x, orders, imaging, source_fs=source_fs, n_source=n_source,
+                               defocus_nm=defocus_nm)
     contrast = image_contrast(intensity)
     edge_nm = duty * pitch_nm / 2.0
     linewidth_nm = (1.0 - duty) * pitch_nm
@@ -539,4 +621,71 @@ def expose_grating(
     cd = print_cd(x, intensity, clip, polarity="dark")
     return PrintedFeature(
         pitch_nm=pitch_nm, cd_nm=cd, contrast=contrast, nils=image_nils, threshold=clip,
+        peb_diffusion_length_nm=peb_diffusion_length_nm,
     )
+
+
+# --------------------------------------------------------------------------- #
+# 8. v1.7 — PEB acid-diffusion blur: the resist back-end rides the engine
+# --------------------------------------------------------------------------- #
+def standing_wave_period(wavelength_nm: float, n_resist: float) -> float:
+    """Standing-wave intensity period in the resist, ``λ/(2·n_resist)`` (nm) — Mack's eq. (12).
+
+    Interference between the wave travelling down through the resist and its substrate reflection
+    makes the exposure intensity oscillate with **depth** as ``cos(4π·n·z/λ)`` — period ``λ/2n``
+    (Mack, *Lithography Tutor* Spring 1994, eqs. (11)–(12) / *Applied Optics* 25:1958 1986; the
+    cited ``[[peb-acid-diffusion-source]]``). The classic PEB job is to smooth these ridges; the
+    cited rule of thumb (Mack's glossary) is a diffusion length of at least the standing-wave
+    **half period** ``λ/4n`` — the lower edge of the v1.7 PEB window. (The cited mitigation list —
+    ARC / dyed resist / PEB — is why modern stacks lean on a BARC where the window closes.)
+    """
+    return wavelength_nm / (2.0 * n_resist)
+
+
+def peb_diffusion_length(diffusivity_nm2_s: float, t_seconds: float) -> float:
+    """PEB diffusion length ``σ = √(2·D·t)`` (nm) — the one knob the whole bake recipe reduces to.
+
+    The 1-D diffusion length of the acid (chemically amplified resist) or photoactive compound
+    (conventional resist) over a bake of ``t_seconds`` at diffusivity ``D`` (nm²/s) — the cited
+    ``σ_PEB = √(2·D_PEB·t_PEB)`` (Kirchauer §7.1.2 / Mack 1995). Only the *product* ``D·t`` enters
+    a constant-D blur, so :func:`peb_blur` takes σ directly; this is the recipe-facing map onto it
+    (bake hotter or longer → larger σ — same blur).
+    """
+    if diffusivity_nm2_s < 0.0 or t_seconds < 0.0:
+        raise ValueError(f"need D ≥ 0 and t ≥ 0, got D={diffusivity_nm2_s}, t={t_seconds}")
+    return math.sqrt(2.0 * diffusivity_nm2_s * t_seconds)
+
+
+def peb_blur(latent, length_nm: float, diffusion_length_nm: float,
+             n_steps: int = 200, method: str = "crank_nicolson") -> np.ndarray:
+    """Diffuse a latent resist profile through one bake — ``engines.diffusion`` in **acid mode** (v1.7).
+
+    ``latent`` samples a 1-D latent image (acid / PAC concentration, arbitrary units) at the **cell
+    centers** of a sealed film domain ``[0, length_nm]`` (cell ``i`` at ``(i+½)·Δx``): the engine
+    solves Fick's law ``∂a/∂t = D·∂²a/∂x²`` with ``Neumann(0)`` at both faces — the cited
+    homogeneous-Neumann "no out-diffusion through the resist surface" BC (Kirchauer §7.1.2). For the
+    lateral image that sealed domain is the **half-period symmetry cell**: the faces at ``x = 0`` and
+    ``x = p/2`` are an even periodic image's mirror planes, and its cosine harmonics ``cos(2πjx/p)``
+    are exactly the domain's Neumann eigenmodes — so the bounded solve IS the infinite periodic blur
+    (each harmonic decays by the periodic heat kernel ``exp(−2π²j²σ²/p²)``), not an approximation of
+    it. The same primitive smooths the **standing-wave depth ripple** (a film-thickness domain along
+    ``z`` — the acid physically *cannot* leave the film, so there no-flux is the literal BC, not a
+    symmetry trick).
+
+    Physically only ``D·t`` enters (``σ² = 2·D·t``), so the blur takes the **diffusion length** σ
+    directly and marches a unit bake at ``D = σ²/2``. ``diffusion_length_nm = 0`` returns the input
+    **unchanged** (bit-for-bit, never touching the engine — the degenerate seam).
+    ``method="crank_nicolson"`` by default — the contract's stated CN use case (temporal accuracy on
+    a smooth, band-limited profile at moderate dt; the harmonics that survive the bake sit far below
+    CN's oscillation scale), which is what makes the per-harmonic analytic anchor tight; conservation
+    is structural (telescoping fluxes) under either method.
+    """
+    a = np.asarray(latent, dtype=float)
+    if diffusion_length_nm < 0.0:
+        raise ValueError(f"diffusion_length_nm must be ≥ 0, got {diffusion_length_nm}")
+    if diffusion_length_nm == 0.0:
+        return a.copy()
+    grid = uniform_grid(length_nm, a.size)
+    solver = Diffusion1D(grid, 0.5 * diffusion_length_nm ** 2,
+                         Neumann(0.0), Neumann(0.0), method=method)
+    return solver.solve(a, 1.0, 1.0 / n_steps)

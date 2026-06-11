@@ -55,7 +55,8 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   `docs/figures/chip-thin-oxide.png`.
 - **To work on lithography (Phase 3):** `litho.py` + `tests/test_litho.py`, the demo `demo_litho.py`
   + `tests/test_demo_litho.py`, and `plots.litho_figure`. The chip's **one genuinely-new module** —
-  **Fourier optics**, chip-local (not promoted to `engines/`); **does not touch the engine**.
+  **Fourier optics**, chip-local (not promoted to `engines/`); the *imaging* path does not touch the
+  engine (its v1.7 **PEB resist back-end does** — see below).
   Core: `coherent_image` (the `|Σ orders|²` primitive) → `two_beam_image` (the exact `4cos²(πx/p)`
   anchor) + `abbe_image` (the partially-coherent **Abbe sum-over-source** workhorse, with
   `conventional_source`/`offaxis_source`); `rayleigh_resolution` (`R=k₁λ/NA`), `transmitted_power` (the
@@ -73,6 +74,19 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   (the `⟨I,cos(2πx/p)⟩` projector — the defocus-clean observable). The module docstring §7 is its contract
   (the symmetric-dipole infinite-DOF anchor, the three-beam fundamental `4c₀c₁cosφ` nulling at φ=π/2, the
   unitary power-conservation leg, the derived-not-cited `k₂=0.5`). Saves `docs/figures/chip-defocus.png`.
+- **To work on the PEB acid-diffusion blur (v1.7 — Phase 3's "constant-threshold resist" scope edge,
+  promoted):** `litho.py` §8 + `tests/test_peb.py`, the demo `demo_peb.py` + `tests/test_demo_peb.py`,
+  and `plots.peb_figure`. The post-exposure bake IS a diffusion solve, so litho's resist back-end
+  **rides the engine** (the finding that inverts the module's founding line): `peb_blur` runs
+  `engines.diffusion` in **acid mode** — `u` = latent acid, constant `D`, `Neumann(0)` both faces (the
+  cited sealed-film BC) — on the **half-period symmetry cell** `[0, p/2]`, whose Neumann eigenmodes are
+  exactly the even image's cosine harmonics (the bounded solve IS the infinite periodic blur);
+  `peb_diffusion_length` (`σ=√(2Dt)`), `standing_wave_period` (`λ/2n`), `PEB_DIFFUSION_SERIES_NM`,
+  threaded as `expose_grating(..., peb_diffusion_length_nm=σ)` (every metric then reads the post-bake
+  latent image; `σ=0` → v1 bit-for-bit). The module docstring §8 is its contract (the per-harmonic heat
+  kernel `exp(−2π²k²σ²/p²)`, the dose-conservation/power-balance leg, the **PEB window** — erase the
+  `λ/2n` ripple, keep the image — and the linear-exposure / constant-`D` / no-`(x,z)`-volume scope
+  edges). Saves `docs/figures/chip-peb.png`.
 - **To work on the device (Phase 4):** `device.py` + `tests/test_device.py`, the demo
   `demo_device.py` + `tests/test_demo_device.py`, and `plots.device_figure`. The **process → device**
   payoff — a chip-local compact closed form (**does not touch the engine**): `threshold_voltage`
@@ -242,6 +256,34 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   now **built** (invariant 6); 2-D / explicit stay the deferred regimes. The box physics + demo numbers are
   unchanged (v1.3's `picard_iters=2` was already ~converged), so the v1.3 banked figure stands. **No new ADR**
   — ADR 0004 names native nonlinear `D(u)` as *the* example of an ordinary test-gated edit.
+- **v1.7 — PEB acid-diffusion blur (Phase 3's "constant-threshold resist" scope edge, promoted): BUILT**
+  (2026-06-11; v1.6 was the engine's explicit `forward_euler` amendment — no chip surface). `litho.py`
+  §8 — and the architecture finding **inverts litho's founding line**: the post-exposure bake IS the
+  program's PDE (Fick's law on the latent acid/PAC — Kirchauer §7.1.2: `σ=√(2Dt)`, Gaussian-kernel
+  solution, sealed-film homogeneous-Neumann BC), so the chip's one engine-free module now runs its
+  resist back-end on `engines.diffusion` in **acid mode** (no engine amendment — pure consumer; the
+  spine's third chip use). `peb_blur` solves on the **half-period symmetry cell** `[0, p/2]` (no-flux
+  faces = the even image's mirror planes; Neumann eigenmodes = the image's cosine harmonics → the
+  bounded solve IS the infinite periodic blur), threaded as `expose_grating(...,
+  peb_diffusion_length_nm=σ)` — development then clips the **post-bake latent image** (the
+  diffused-image resist model; `σ=0` → v1 **bit-for-bit**). + `demo_peb.py` + `plots.peb_figure`.
+  Banked artifact: the **latent image dissolving** over the cited 20/40/60 nm series beside the **PEB
+  window** (engine retention points riding the two analytic heat kernels — erase the `λ/2n`
+  standing-wave ripple, keep the pitch-`p` fundamental) (`docs/figures/chip-peb.png`); 193 nm ArF,
+  NA 0.85, 240 nm pitch, n_resist 1.70 → window σ ∈ [28, 45] nm, closing at ≈151 nm pitch — and at
+  NA 0.93 a 145 nm pitch **images fine but cannot survive a ridge-erasing bake** (the lens
+  out-resolves the bake → why modern stacks use a BARC; the cited ARC/dye/PEB mitigation list).
+  **17-test mini-triad** (12 module + 5 demo): *analytic* = the **σ=0 bit-for-bit seam** + σ→0
+  continuity, a bare **Neumann eigenmode decaying by its exact eigenvalue exponential**, a realistic
+  Abbe image attenuated **per harmonic** by the periodic heat kernel `exp(−2π²k²σ²/p²)` (engine vs
+  closed form, ~2e-6 floor), max-principle bounds; *conservation* = **the bake conserves acid dose**
+  → the v1 Parseval power balance survives every σ to machine precision (corollary: the mean-clip
+  dose is blur-invariant); *benchmark* = monotone contrast/NILS/CD degradation over the cited series
+  (NILS through the cited ≥1 floor), the CD collapsing onto the pure-fundamental `p/2` readout, the
+  **half-period smoothing rule** opening the window at 240 nm and closing it at dense pitch.
+  Asymmetric images (off-axis pole + defocus — no mirror plane) are **refused, not mis-blurred**;
+  linear exposure (no Dill), constant `D` (no CAR reaction–diffusion), and the uncoupled `x`/`z`
+  treatment stay the named scope edges.
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated
@@ -278,12 +320,12 @@ not correctness**: the per-phase triads already validate the numbers.
 
 ```powershell
 # from repo root
-./run_tests.ps1 -m "not slow" -n auto   # routine commit gate (fast lane, PARALLEL — ~11–13 s vs ~26 s serial; -n auto capped at half the logical cores)
+./run_tests.ps1 -m "not slow" -n auto   # routine commit gate (fast lane, PARALLEL — ~12 s vs ~39 s serial; -n auto capped at half the logical cores)
 ./run_tests.ps1 chip   # scope to chip while iterating
 ```
 
 `pyproject.toml`'s `testpaths` already carries `chip`, so `chip/tests/` is collected
 with no config change; `pythonpath = ["."]` lets chip import the engine as `engines.diffusion…`.
 The notebook smoke-test (`tests/test_chip_notebook.py`) is `slow`-marked, so the fast lane deselects it
-(and `-n auto` therefore rides only the fast lane, never co-scheduling the notebook with the 188 —
+(and `-n auto` therefore rides only the fast lane, never co-scheduling the notebook with the 218 —
 **the pin**, ADR 0003 amendment); it runs in the serial full gate (bare `./run_tests.ps1`).

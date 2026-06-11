@@ -54,7 +54,9 @@ Bossung CD/NILS degradation + `DOF=k₂λ/NA²`, `k₂=0.5` **derived** from the
 **Scope edges named-not-modelled:** Zernike aberrations (coma/astigmatism/spherical — only *defocus*
 is added); immersion NA≥1 (the scalar model's evanescent edge / the named vector tar pit); the
 constant-threshold resist — **no acid-diffusion/PEB blur**, flagged as the *next* litho promotion
-candidate (the "PEB blur = a Gaussian = a diffusion solve → potential **frozen-engine reuse**" angle).
+candidate (the "PEB blur = a Gaussian = a diffusion solve → potential **frozen-engine reuse**" angle)
+— **BUILT 2026-06-11 as v1.7** → [[litho-peb-v17]] (the reuse angle confirmed: engine in acid mode,
+pure consumer, no amendment).
 The docstring's old "no defocus phase, no Zernikes" scope line was amended to "aberration-free apart
 from defocus." Units stay litho-native **nm**; notebook gains no section (as v1.1/v1.2/v1.3). Source
 pin (DOF / k₂ / Bossung / frequency doubling) appended to [[litho-aerial-image-source]] (Mack).
