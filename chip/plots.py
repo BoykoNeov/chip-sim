@@ -537,7 +537,7 @@ def coupling_figure(cases: list[dict]) -> "plt.Figure":
         verb = "depletes" if case["sign"] == "depletion" else "piles up"
         ax.annotate(
             f"surface {verb} vs OED\n×{ratio:.2f}  (m = {case['m']})",
-            xy=(x_um[0], coupled.surface_concentration),
+            xy=(x_um[coupled.surface_index], coupled.surface_concentration),
             # text low-centre, well clear of the upper-right legend (arrow runs to the surface cell).
             xytext=(x_um[-1] * 0.34, coupled.surface_concentration * 0.10),
             color=sig_color, fontsize=9.5, ha="center",
@@ -552,10 +552,12 @@ def coupling_figure(cases: list[dict]) -> "plt.Figure":
         ax.set_title(f"{case['name']} — {case['sign']} ($f_I$ = {case['f_I']})")
         ax.legend(loc="upper right", fontsize=8.3, framealpha=0.95)
         ax.grid(True, which="both", alpha=0.18)
-        # Own the scope edge on the artifact itself: pile-up magnitude carries the fixed-grid
-        # swept-sliver double-count (direction real, ~2× high); depletion (boron) is robust.
-        note = ("robust (oxide-uptake-dominated)" if case["sign"] == "depletion"
-                else "direction real; magnitude ~2× high\n(fixed-grid swept-sliver edge)")
+        # The moving boundary (default) recedes the silicon surface 0.44·x_ox as oxide grows, so the
+        # swept-sliver double-count is gone — both signatures are quantitative now. Note the recession.
+        recede_nm = coupled.interface_depth / CM_PER_UM * 1e3
+        note = (f"robust (oxide-uptake-dominated)\nsurface receded {recede_nm:.0f} nm"
+                if case["sign"] == "depletion"
+                else f"quantitative (moving boundary)\nsurface receded {recede_nm:.0f} nm")
         ax.text(0.03, 0.03, note, transform=ax.transAxes, fontsize=7.6, va="bottom", ha="left",
                 color="#555555", style="italic",
                 bbox=dict(boxstyle="round", fc="white", ec="#dddddd", alpha=0.85))

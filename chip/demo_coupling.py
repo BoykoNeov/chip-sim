@@ -22,12 +22,13 @@ the same dissertation as the Massoud pin). The OED *amplitude* is calibrated (fl
 demo's enhancement magnitude is illustrative; the **directions** (enhanced; deplete vs pile-up) are
 the validated content.
 
-**Honesty caveat owned on the figure (the swept-sliver scope edge).** The segregation flux is a
-moving-*interface* mass balance run on a non-moving grid, which double-counts the swept silicon
-sliver (:mod:`coupling` docstring). So the **boron depletion is robust** (it is oxide-uptake-
-dominated — the device-relevant case), while the **phosphorus pile-up direction is real but its
-magnitude is ~2× inflated** (pile-up is intrinsically a moving-boundary effect). The demo presents
-boron as the trustworthy case and phosphorus as the qualitative sign-contrast.
+**The moving boundary (default).** The segregation flux is a moving-*interface* mass balance, and
+the demo runs it on a **receding** silicon grid (``moving_boundary=True`` — the Si/SiO₂ interface
+advances ``0.44·x_ox`` into the silicon as oxide grows, :mod:`coupling` docstring). This retires the
+v1.2 swept-sliver double-count: **both** signatures are now quantitative — boron depletion (robust
+all along, oxide-uptake-dominated) **and** phosphorus pile-up (no longer ~2× inflated; ~+17 % → ~+7 %
+at the demo conditions). The legacy fixed-grid path is still available (``moving_boundary=False``) as
+the documented "before" — see the per-leg tests.
 
 Run headless (saves the figure, prints the table):
 
@@ -108,13 +109,16 @@ def print_summary(cases: list[dict]) -> None:
               f"surface {inert.surface_concentration:.3e} → {oed.surface_concentration:.3e}")
         print(f"      segregation (vs OED): surface {oed.surface_concentration:.3e} → "
               f"{coupled.surface_concentration:.3e} cm⁻³  (×{surf_ratio:.2f}, {c['sign']})")
+        recede_nm = coupled.interface_depth / dd.CM_PER_UM * 1e3
+        print(f"      moving boundary: Si surface receded {recede_nm:.1f} nm (0.44·x_ox); "
+              f"oxide uptake {coupled.oxide_uptake:.2e} cm⁻²")
         print(f"      conservation: Si + oxide-reservoir residual / dose = "
               f"{coupled.conservation_residual / coupled.si_dose_initial:.1e}  (machine-exact)\n")
     print("  → oxidation is not a bystander: it ENHANCES the diffusion (OED) and PARTITIONS the\n"
           "    dopant at the moving interface — boron depletes, phosphorus piles up.\n"
-          "  (scope edge: the fixed grid double-counts the swept silicon sliver, so the boron\n"
-          "   depletion is robust [oxide-uptake-dominated, device-relevant] but the phosphorus\n"
-          "   pile-up MAGNITUDE is ~2× inflated — direction real, a moving-boundary effect.)\n")
+          "  (moving boundary on: the silicon surface recedes 0.44·x_ox as oxide grows, so the\n"
+          "   swept silicon sliver leaves the domain — both signatures quantitative, no swept-\n"
+          "   sliver inflation. moving_boundary=False reproduces the legacy ~2×-high pile-up.)\n")
 
 
 def save_figure(cases: list[dict]) -> Path:

@@ -27,7 +27,11 @@ decisive architecture finding, and *why* this was reachable without an engine am
     named scope edge of :mod:`diffusion_dopant`). Here OED is a clean ``D(t)`` the engine already
     promises.
   * Segregation is a **time-dependent surface flux** at the interface, i.e. a ``Neumann(flux(t))``
-    boundary — also supported (BC parameters accept callables).
+    boundary — also supported (BC parameters accept callables) — applied on a **receding** silicon
+    domain (the moving Si/SiO₂ interface), which is itself within the contract: a per-sub-step
+    non-uniform :func:`grid_from_edges` sub-grid (the engine conserves on non-uniform grids,
+    CONTRACT invariant 2). The engine stays **pure-diffusion, fixed-grid per step, untouched** — the
+    mesh recession is consumer-side bookkeeping, *not* an engine amendment.
 
 The unified degenerate anchor (the seam the whole module recovers v1 through)
 -----------------------------------------------------------------------------
@@ -53,35 +57,36 @@ Validation triad (plan §3) — what is asserted tight vs loose
   ``a₀ + ∫ D_eff dt`` (:func:`effective_Dt`) — OED's **real** analytic leg, not merely degenerate
   recovery. **Scope edge, named:** the OED enhancement is taken **uniform in depth** (the
   interstitial recombination length ≫ a shallow junction, so the supersaturation is ~flat across
-  the profile) — the depth-decay / lateral OED is the unmodeled regime; and the fixed grid neglects
-  **interface recession** (see conservation).
+  the profile) — the depth-decay / lateral OED is the unmodeled regime. (**Interface recession** —
+  the v1.2 swept-sliver edge — is no longer a scope edge: it is **built** as the moving boundary
+  (default ``moving_boundary=True``); see conservation.)
 * **Conservation — an accounting identity for the coupled case, NOT a magnitude validation
   (the honest downgrade).**
   - *OED alone, sealed surface (genuinely tight):* dose ``∫N dx`` conserved to **machine precision**
     (no-flux both ends — the engine's structural guarantee, here exercised with a *time-varying*
     ``D``). This one *is* a real conservation check.
-  - *OED + segregation (an identity, not a check):* ``Si_dose + oxide_uptake`` closes to machine
-    precision — but ``oxide_uptake ≡ −Σ dt·flux(left)`` is *defined* from the same flux bookkeeping
-    the engine guarantees (``Δ Si_dose = Σ dt·flux(left)``), so the sum closes for **any** surface
-    flux, even a wrong one. It catches an accounting *leak*; it does **not** validate the
-    segregation *magnitude*. Stated plainly because the magnitude is **not** exact — see the
-    swept-sliver edge.
-  - *Scope edge — the swept-sliver double-count (the dominant honesty caveat).* The segregation flux
+  - *OED + segregation, the moving boundary (default) — now a genuine magnitude check.* With
+    ``moving_boundary=True`` the silicon domain **recedes** as oxide grows (``s(t) = 0.44·(x_ox − x_initial)``;
+    a truncated-first-cell active sub-grid), supplying the geometric ``−v·N_surf`` term the fixed grid
+    omitted. Silicon then loses **exactly** the oxide uptake ``C_ox·R`` (``C_ox = N_surf/m``), so
+    ``Si_dose + oxide_uptake = si_dose_initial`` still closes to machine precision **and**
+    ``oxide_uptake`` is now the *real* oxide content ``≈ ∫ C_ox·R dt`` — an **independent** magnitude
+    (no longer the flux-defined reservoir). Pinned two ways: the ``m → ∞`` inert-oxide limit now
+    **conserves** (:func:`test_inert_oxide_conserves_with_moving_boundary`; the spurious gain → 0,
+    O(dt) in ``n_steps``), and ``oxide_uptake`` matches an independently-reconstructed ``∫C_ox·R dt``
+    within a few % (:func:`test_moving_boundary_conserves_total_dopant`).
+  - *The retired scope edge — the swept-sliver double-count (now built out).* The segregation flux
     ``N_surf·(0.44 − 1/m)·R`` is a **moving-interface** mass balance: the ``0.44·R`` term is dopant
     *freed by consumed silicon*, which physically exists **only if** the swept region ``[0, 0.44·x_ox]``
-    *leaves* the silicon. The fixed grid keeps that region in the domain **and** re-injects its
-    dopant as the surface flux → the swept sliver is **counted twice**. Pinned by the ``m → ∞``
-    inert-oxide diagnostic (:func:`test_inert_oxide_reveals_swept_sliver_artifact`): an inert oxide
-    can only snowplow, so silicon dopant must be *conserved* — yet the model spuriously **gains**
-    ≈ ``∫N_surf·0.44·R dt`` (~10 % of the dose at the demo conditions). Consequences, owned not
-    hidden: **surface enhancement — especially phosphorus pile-up — is overstated by
-    O(recession/profile-width) ≈ 2×** (the *direction* is real and *needs* the ``0.44`` term; the
-    *magnitude* is inflated), while **boron depletion is robust** because it is oxide-uptake-
-    dominated (``1/m = 3.3`` vs the ``0.44`` double-count ≈ 13 %). That is why **boron — the
-    device-relevant MOS channel — is the trustworthy case**, and phosphorus is the qualitative sign-
-    contrast. The real fix (advance the interface, remap the ~1-cell swept region each step) is a
-    Stefan-problem treatment the pure-diffusion engine cannot express; for an educational tool the
-    edge is named, not silently carried.
+    *leaves* the silicon. The legacy **fixed-grid** path (``moving_boundary=False``) keeps that region
+    in the domain **and** re-injects its dopant as the surface flux → the swept sliver is **counted
+    twice**, so it spuriously **gains** ≈ ``∫N_surf·0.44·R dt`` (~13 % of the dose at the demo
+    conditions) and **overstates phosphorus pile-up ~2×** (boron depletion stays robust — it is
+    oxide-uptake-dominated, ``1/m = 3.3`` vs the ``0.44`` double-count). That path is **retained
+    only as the documented "before"** (:func:`test_fixed_grid_still_shows_swept_sliver_artifact`); the
+    default recedes the interface and the artifact is gone. (Historically — through v1.4 — the fix was
+    deferred as "a Stefan-problem the pure-diffusion engine cannot express"; it is in fact a
+    *consumer-side receding mesh*, the engine untouched and still pure-diffusion per step.)
 * **Benchmark (loose / calibrated — the honest split).** What is *cited* vs *calibrated*:
   - *Cited (the form + the sign pattern):* the **half-power law** ``Δ ∝ (dx_ox/dt)^0.5`` (IUE-Vienna
     OEDS / Antoniadis & Moskowitz 1982), the per-dopant **fractional interstitialcy** ``f_I`` (B
@@ -104,7 +109,7 @@ Validation triad (plan §3) — what is asserted tight vs loose
   magnitude is named-not-claimed (the advisor's blocking call: no Sb number from a B/P-calibrated
   form). Sb is **not** a demo dopant; it is the scope-edge illustration.
 
-The segregation boundary condition (a moving-interface mass balance, on a non-moving grid)
+The segregation boundary condition (a moving-interface mass balance, on a *receding* grid)
 ------------------------------------------------------------------------------------------
 As the interface advances into silicon at ``v_Si = 0.44·dx_ox/dt`` (the :data:`oxidation.SI_SIO2_RATIO`
 the Phase-2 conservation leg already pins), of the dopant *freed* by the consumed silicon
@@ -118,15 +123,17 @@ for phosphorus ``m > 1`` (``0.44 − 0.1 > 0``). **No free transport coefficient
 fixed by the cited ``m`` and the ``0.44`` already in :mod:`oxidation`. The exact closed-interface-
 equilibrium form is the cited segregation BC (Hollauer §4.1 / Plummer–Deal–Griffin), and the robust
 fact ``m → ∞ ≠ sealed`` (an inert oxide *snowplows*, it does not re-seal) holds across formulations.
-**But the ``0.44`` term is the interface *recession***, and the grid does not recede: the swept
-region is kept in the domain *and* its dopant re-injected at the surface, double-counting it (the
-swept-sliver scope edge above — direction right, surface magnitude ~2× high; boron robust because it
-is oxide-uptake-dominated). So this BC is the correct *interface balance* applied to a fixed grid: an
-educational reduction whose error is **named, not erased**. Because ``J_surface`` depends on the
-*evolving* surface value ``N_surf(t)``
-(which the engine does not expose to a BC), it is applied **explicitly (lagged one sub-step)**: an
-``O(dt)`` accuracy choice that leaves conservation **machine-exact** (the engine applies whatever
-flux it is handed, exactly) — refine ``n_steps`` for fidelity, never for closure.
+``J_surface`` is the **diffusive** flux at the *moving* interface — this is exactly right **as long as
+the grid recedes with it**. The default ``moving_boundary=True`` does: each sub-step the silicon
+domain is clipped to ``[s(t), L]`` (``s = 0.44·(x_ox − x_initial)``), so the ``0.44·R`` recession is
+realized as the **mesh motion** (the swept sliver leaves the domain into the oxide reservoir), not
+double-counted as re-injected surface flux. Net silicon loss is then exactly ``C_ox·R`` — the oxide
+uptake — for every ``m``. (The legacy ``moving_boundary=False`` applies the same flux on a fixed grid,
+which double-counts the sliver — the retired swept-sliver edge above.) Because ``J_surface`` depends
+on the *evolving* surface value ``N_surf(t)`` (which the engine does not expose to a BC), it is applied
+**explicitly (lagged one sub-step)**: an ``O(dt)`` accuracy choice that leaves the
+``Si_dose + oxide_uptake`` identity **machine-exact** (flux + swept-sliver are booked exactly), the
+inert-oxide conservation O(dt) — refine ``n_steps`` for fidelity, never for closure.
 
 Units — semiconductor CGS-cm (the diffusion side; the oxidation rate converted at the boundary)
 -----------------------------------------------------------------------------------------------
@@ -153,7 +160,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from engines.diffusion import Diffusion1D, Grid, Neumann, uniform_grid
+from engines.diffusion import Diffusion1D, Grid, Neumann, grid_from_edges
 
 from .diffusion_dopant import (
     CM_PER_UM,
@@ -255,6 +262,59 @@ def oxidation_rate_um_per_hr(
     raise ValueError(f"model must be 'deal-grove' or 'massoud', got {model!r}")
 
 
+def oxide_thickness_um(
+    ambient, T_celsius: float, orientation: str = "100",
+    *, model: str = "deal-grove", x_initial: float = 0.0,
+):
+    """Build ``x_ox(t_seconds) → oxide thickness`` (µm) — the companion of the rate provider.
+
+    Where :func:`oxidation_rate_um_per_hr` gives ``dx_ox/dt``, this gives the **position** of the
+    Si/SiO₂ front, ``x_ox(t)``. The silicon consumed *by this anneal* is
+    ``SI_SIO2_RATIO·(x_ox(t) − x_initial)`` — the moving-boundary recession that the segregation
+    BC's ``0.44·R`` term accounts for. Used by :func:`oxidize_couple` to advance the receding
+    interface geometrically (the closed form, Phase-2-consistent — not a ``Σ dt·R`` re-integration).
+    """
+    if model == "deal-grove":
+        rates = oxide_rate_constants(ambient, T_celsius, orientation)
+
+        def X(t_seconds: float) -> float:
+            t_hr = t_seconds / SEC_PER_HOUR
+            return float(oxide_thickness(t_hr, rates.B, rates.A, x_initial=x_initial))
+
+        return X
+
+    if model == "massoud":
+        mrates = massoud_rate_constants(T_celsius, orientation)
+
+        def X(t_seconds: float) -> float:
+            t_min = t_seconds / 60.0
+            return float(oxide_thickness_massoud(t_min, mrates, x_initial=x_initial))
+
+        return X
+
+    raise ValueError(f"model must be 'deal-grove' or 'massoud', got {model!r}")
+
+
+def _swept_dose(edges: np.ndarray, N: np.ndarray, s0: float, s1: float) -> float:
+    """``∫_{s0}^{s1} N dx`` over the cell-averaged profile ``N`` on ``edges`` (cm⁻², ``s1 ≥ s0``).
+
+    The dopant in the silicon sliver the interface sweeps in one sub-step ``[s0, s1]`` — removed
+    from the silicon domain (the recession), accounted into the oxide reservoir. Piecewise-constant
+    over the original cells, so it telescopes with the engine's own cell-sum to machine precision.
+    """
+    if s1 <= s0:
+        return 0.0
+    k = max(int(np.searchsorted(edges, s0, side="right")) - 1, 0)
+    lo = s0
+    total = 0.0
+    while lo < s1 and k < N.size:
+        hi = min(s1, float(edges[k + 1]))
+        total += float(N[k]) * (hi - lo)
+        lo = hi
+        k += 1
+    return total
+
+
 # --------------------------------------------------------------------------- #
 # 3. OED — the interstitial supersaturation and the enhancement factor
 # --------------------------------------------------------------------------- #
@@ -350,16 +410,23 @@ class CoupledResult:
     """The dopant profile after an oxidizing anneal, with its silicon/oxide dose bookkeeping.
 
     ``x``/``N`` are the cell-centre depths (**cm**) and the evolved profile (**cm⁻³**) — the plain
-    ``(x, N)`` pair :mod:`junction` consumes downstream. ``dopant``/``T_celsius``/``t_seconds`` echo
-    the step; ``oed``/``segregation`` which effects were active; ``model`` the oxidation law.
-    ``D_inert`` (cm²/s) is the unenhanced diffusivity; ``effective_Dt`` (cm²) the ``∫D_eff dt`` the
-    OED solve actually integrated. The accounting (cm⁻²): ``si_dose`` is the final ``∫N dx``;
-    ``oxide_uptake`` the reservoir ``−Σ dt·flux(left)`` (positive = dopant taken **into** the oxide
-    → depletion; negative = **rejected toward** silicon → pile-up); ``si_dose_initial`` the starting
-    dose. ``si_dose + oxide_uptake = si_dose_initial`` closes to machine precision — but this is an
-    **accounting identity** (``oxide_uptake`` is *defined* from the same flux bookkeeping), not a
-    magnitude check: the reservoir carries the swept-sliver double-count (module docstring), so the
-    *phosphorus* surface magnitude is ~2× high (direction real). The *boron* case is robust.
+    ``(x, N)`` pair :mod:`junction` consumes downstream. With the moving boundary active the silicon
+    surface has **receded** to ``interface_depth`` (cm); cells shallower than it are consumed silicon
+    (zeroed in ``N``), ``surface_index`` is the first live cell, and ``surface_concentration`` reads
+    the value there. ``dopant``/``T_celsius``/``t_seconds`` echo the step; ``oed``/``segregation``
+    which effects were active; ``model`` the oxidation law. ``D_inert`` (cm²/s) is the unenhanced
+    diffusivity; ``effective_Dt`` (cm²) the ``∫D_eff dt`` the OED solve integrated.
+
+    The accounting (cm⁻²): ``si_dose`` is the final silicon ``∫N dx`` over the *receded* domain;
+    ``oxide_uptake`` the dopant **content of the grown oxide** = the diffusive part ``−Σ dt·flux(left)``
+    **plus** the recession part ``Σ`` (swept-sliver dose). With the moving boundary this is the real
+    physical oxide uptake ``≈ ∫ C_ox·(dx_ox/dt) dt`` (``C_ox = N_surf/m``) and is **≥ 0 for both
+    dopants** — the oxide is always a small sink; phosphorus still *piles up locally* (surface value
+    rises) while the total silicon dose slightly drops. ``si_dose + oxide_uptake = si_dose_initial``
+    closes to machine precision: still an exact bookkeeping identity (regression-safe), but now the
+    moving boundary makes ``oxide_uptake`` *independently* meaningful — comparing it to ``∫C_ox·R dt``
+    is a genuine magnitude check, no longer the swept-sliver-inflated reservoir of the fixed-grid path
+    (``moving_boundary=False``, the named scope edge that path still carries).
     """
 
     x: np.ndarray
@@ -376,19 +443,24 @@ class CoupledResult:
     si_dose: float
     oxide_uptake: float
     length: float
+    interface_depth: float = 0.0
+    surface_index: int = 0
 
     @property
     def surface_concentration(self) -> float:
-        """The evolved surface cell value ``N(0)`` (cm⁻³) — depleted (B) or piled-up (P)."""
-        return float(self.N[0])
+        """The evolved surface cell value (cm⁻³) at the (possibly receded) interface — depleted
+        (B) or piled-up (P). ``surface_index`` is 0 when the surface has not receded."""
+        return float(self.N[self.surface_index])
 
     @property
     def conservation_residual(self) -> float:
-        """``|si_dose + oxide_uptake − si_dose_initial|`` (cm⁻²) — the accounting-leak check.
+        """``|si_dose + oxide_uptake − si_dose_initial|`` (cm⁻²) — the bookkeeping-leak check.
 
-        Machine-zero by construction (``oxide_uptake`` is defined from the engine's flux bookkeeping,
-        so the sum closes for *any* flux). It catches an accounting leak, **not** the segregation
-        magnitude — the reservoir carries the named swept-sliver double-count (class docstring).
+        Machine-zero by construction (silicon dose lost per step = diffusive flux + swept sliver,
+        both booked into ``oxide_uptake``), so it closes for *any* flux. It catches a leak, not the
+        magnitude — but unlike the fixed-grid path, the moving boundary makes ``oxide_uptake`` itself
+        a real magnitude (``≈ ∫C_ox·R dt``), so the *magnitude* check is ``oxide_uptake`` vs that
+        integral (see :func:`oxidize_couple`), not this identity.
         """
         return abs(self.si_dose + self.oxide_uptake - self.si_dose_initial)
 
@@ -405,6 +477,7 @@ def oxidize_couple(
     oed: bool = True,
     segregation: bool = True,
     segregation_m: float | None = None,
+    moving_boundary: bool = True,
     model: str = "deal-grove",
     x_initial_oxide: float = 0.0,
     n_steps: int = 600,
@@ -415,7 +488,21 @@ def oxidize_couple(
     same time**. Unlike :func:`diffusion_dopant.drive_in` (a sealed inert anneal), here the oxidizing
     interface (i) **enhances** the diffusivity via OED (the time-varying ``D_eff(t)`` callable the
     engine accepts) and (ii) **segregates** dopant across the moving boundary (a lagged
-    ``Neumann(flux(t))`` surface BC). The far end stays no-flux (semi-infinite).
+    ``Neumann(flux(t))`` surface BC) which **recedes into the silicon** as oxide grows. The far end
+    stays no-flux (semi-infinite).
+
+    The moving boundary (``moving_boundary=True``, default)
+    ------------------------------------------------------
+    The segregation flux ``J = N_surf·(0.44 − 1/m)·(dx_ox/dt)`` is the **diffusive** flux at the
+    *moving* Si/SiO₂ interface. Applied on a fixed grid it double-counts the swept silicon sliver
+    (the ``0.44·R`` recession term — the named scope edge). The fix recedes the silicon domain to
+    ``s(t) = 0.44·(x_ox(t) − x_initial)`` each sub-step (a truncated-first-cell active sub-grid via
+    :func:`grid_from_edges`; deeper cells untouched ⇒ no bulk interpolation), keeping the *same*
+    flux: the mesh motion supplies the missing geometric ``−v·N_surf`` term. Silicon then loses
+    exactly the oxide's uptake ``C_ox·R`` (``C_ox = N_surf/m``), so ``oxide_uptake`` becomes the real
+    physical oxide content (``≥ 0`` for both dopants) and conservation upgrades from an identity to a
+    magnitude (``oxide_uptake ≈ ∫C_ox·R dt``). ``moving_boundary=False`` keeps the legacy fixed-grid
+    path (the swept-sliver artifact, ~2× phosphorus pile-up) — retained for the before/after contrast.
 
     Parameters
     ----------
@@ -424,18 +511,24 @@ def oxidize_couple(
     dopant, ambient, T_celsius, t_minutes
         Species, oxidizing ambient (``"dry"``/``"wet"``), temperature (°C), and anneal time (min).
     orientation, model, x_initial_oxide
-        Passed to the oxidation-rate provider (``"deal-grove"``/``"massoud"``; ``massoud`` is dry-
-        only thin-oxide; an initial oxide shifts the rate via Phase-2's ``τ``/seed machinery).
+        Passed to the oxidation rate/thickness providers (``"deal-grove"``/``"massoud"``; ``massoud``
+        is dry-only thin-oxide; an initial oxide shifts the rate via Phase-2's ``τ``/seed machinery —
+        and the recession counts only the silicon consumed *by this anneal*, ``x_ox − x_initial``).
     oed, segregation
         Toggle each effect (both on by default). ``oed=False, segregation=False`` ⇒ a plain inert
         drive-in (and ``dx_ox/dt → 0`` makes the two *physically* coincide — the degenerate anchor).
     segregation_m
         Override the cited segregation coefficient ``m`` (default: the registry value for the
         dopant). Lets a learner explore the partition — and drives the ``m → ∞`` inert-oxide
-        diagnostic that exposes the named swept-sliver double-count.
+        diagnostic (which conserves under the moving boundary, but exposes the artifact when
+        ``moving_boundary=False``).
+    moving_boundary
+        Recede the Si/SiO₂ interface as oxide grows (default ``True`` — the accuracy fix). Active only
+        with ``segregation=True``; the OED-only path is a deliberate sealed-surface ``∫D dt`` anchor
+        and never recedes. ``False`` reproduces the legacy fixed-grid swept-sliver behaviour.
     n_steps
         Sub-steps of the explicit (lagged) segregation coupling; refine for fidelity (conservation
-        is machine-exact at any ``n_steps`` — the engine applies the handed flux exactly).
+        is machine-exact at any ``n_steps`` — flux + recession sliver are booked exactly).
     """
     d = DOPANTS[dopant] if isinstance(dopant, str) else dopant
     D_inert = diffusivity(d, T_celsius)
@@ -465,29 +558,77 @@ def oxidize_couple(
     oxide_uptake = 0.0
     dt = t_seconds / n_steps
     t = 0.0
+
+    # The receding Si/SiO₂ interface (moving boundary). Active only with segregation — the OED-only
+    # path is the deliberate sealed-surface ∫D dt anchor. ``s`` is the interface position (cm); the
+    # silicon consumed BY THIS ANNEAL is 0.44·(x_ox(t) − x_initial), so s(0)=0 even with a seed oxide.
+    edges = grid.edges
+    recede = segregation and moving_boundary
+    x_ox_um = (oxide_thickness_um(ambient, T_celsius, orientation,
+                                  model=model, x_initial=x_initial_oxide)
+               if recede else None)
+    s = 0.0
+
     for _ in range(n_steps):
+        if recede:
+            # Truncated-first-cell active sub-grid [s, L]: first cell clipped to [s, edges[k0+1]],
+            # deeper cells are the originals (no interpolation in the bulk). N[k0] (intensive
+            # concentration) is unchanged by recession — only the cell's WIDTH shrinks.
+            k0 = max(int(np.searchsorted(edges, s, side="right")) - 1, 0)
+            active_edges = np.concatenate(([s], edges[k0 + 1:]))
+            active_grid = grid_from_edges(active_edges)
+            active_N = N[k0:]
+        else:
+            k0 = 0
+            active_grid = grid
+            active_N = N
+
         # Lagged segregation flux from the CURRENT surface value (explicit coupling): O(dt) in
-        # fidelity, machine-exact in conservation (the engine applies this flux exactly).
+        # fidelity. This is the diffusive flux at the moving interface — UNCHANGED by the fix; the
+        # mesh recession (below) supplies the geometric −v·N_surf term the fixed grid omitted.
         if segregation:
             R_cm_s = R_um_hr(t) * CM_PER_UM / SEC_PER_HOUR
-            J_left = segregation_flux(float(N[0]), R_cm_s, m)
+            J_left = segregation_flux(float(active_N[0]), R_cm_s, m)
             left_bc = Neumann(J_left)
         else:
             J_left = 0.0
             left_bc = Neumann(0.0)
-        solver = Diffusion1D(grid, D_of_t, left_bc, Neumann(0.0))
-        N = solver.step(N, dt, t0=t)
-        # Reservoir = dopant that left silicon across the surface. Neumann flux(left) is exactly the
-        # prescribed J_left, so Si_dose change = dt·J_left and oxide_uptake = −dt·J_left closes the
-        # balance to machine precision (the engine's flux-bookkeeping identity).
+
+        solver = Diffusion1D(active_grid, D_of_t, left_bc, Neumann(0.0))
+        stepped = solver.step(active_N, dt, t0=t)
+        # Diffusive part: the engine applies exactly J_left, so the active-domain dose changes by
+        # dt·J_left → book −dt·J_left into the oxide reservoir (machine-exact).
         oxide_uptake += -dt * J_left
+
+        if recede:
+            N[k0:] = stepped
+            # Advance the interface geometrically (the closed-form x_ox, Phase-2-consistent) and
+            # remove the freshly-swept silicon sliver [s, s_new] from the domain into the oxide
+            # reservoir. Together with the diffusive part this makes the net silicon loss = C_ox·R.
+            s_new = max(SI_SIO2_RATIO * (x_ox_um(t + dt) - x_initial_oxide) * CM_PER_UM, s)
+            oxide_uptake += _swept_dose(edges, N, s, s_new)
+            s = s_new
+        else:
+            N = stepped
         t += dt
 
-    si_dose = float(np.sum(N * grid.widths))
+    # Silicon dose over the receded domain [s, L] (truncated first cell), and the full-length output
+    # profile with the consumed silicon zeroed for plotting (surface_index = first live cell).
+    if recede:
+        k0 = max(int(np.searchsorted(edges, s, side="right")) - 1, 0)
+        si_dose = float(N[k0] * (edges[k0 + 1] - s) + np.sum(N[k0 + 1:] * grid.widths[k0 + 1:]))
+        N_out = N.copy()
+        N_out[:k0] = 0.0
+        interface_depth, surface_index = s, k0
+    else:
+        si_dose = float(np.sum(N * grid.widths))
+        N_out = N
+        interface_depth, surface_index = 0.0, 0
+
     eff_Dt = effective_Dt(d, T_celsius, t_seconds, R_um_hr, oed=oed, n_steps=n_steps)
     return CoupledResult(
-        x=grid.centers, N=N, dopant=d.name, T_celsius=T_celsius, t_seconds=t_seconds,
+        x=grid.centers, N=N_out, dopant=d.name, T_celsius=T_celsius, t_seconds=t_seconds,
         oed=oed, segregation=segregation, model=model, D_inert=D_inert, effective_Dt=eff_Dt,
         si_dose_initial=si_dose_initial, si_dose=si_dose, oxide_uptake=oxide_uptake,
-        length=grid.length,
+        length=grid.length, interface_depth=interface_depth, surface_index=surface_index,
     )

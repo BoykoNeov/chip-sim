@@ -10,17 +10,19 @@ validate the **coupling instantiation**, not the solver machinery (sealed in
   both effects to plain :func:`diffusion_dopant.drive_in`, bit-for-bit; (b) **OED ≡ the engine's
   ``τ = ∫D dt`` time substitution** — a warm-started analytic Gaussian under OED reproduces the
   analytic Gaussian at the effective age (OED's *real* analytic leg, not just degenerate recovery).
-* **Conservation — genuine for OED-alone, an accounting identity for the coupled case.** OED-alone-
-  sealed conserves dose to machine precision (a real check). The coupled ``Si_dose + oxide_uptake``
-  identity also closes to machine precision — but ``oxide_uptake`` is *defined* from the same flux
-  bookkeeping, so it closes for any flux (catches a leak, not a magnitude). The **``m → ∞`` inert-
-  oxide diagnostic** exposes what the identity hides: a spurious silicon-dose *gain* — the named
-  swept-sliver double-count (the moving-interface ``0.44·R`` term applied on a non-moving grid).
+* **Conservation — genuine for OED-alone, and (now) a real magnitude for the coupled case.** OED-
+  alone-sealed conserves dose to machine precision (a real check). The coupled
+  ``Si_dose + oxide_uptake`` identity also closes to machine precision (a leak check). The
+  **moving boundary** (default) makes the magnitude real too: the silicon domain recedes ``0.44·x_ox``
+  as oxide grows, so the ``m → ∞`` inert-oxide case now **conserves** (the swept-sliver double-count
+  is gone) and ``oxide_uptake`` matches an **independent** ``∫C_ox·R dt`` within a few %. The legacy
+  fixed-grid path (``moving_boundary=False``) still carries the artifact — pinned as the documented
+  "before."
 * **Benchmark (loose / cited-form).** The cited ``f_I`` (B 0.30, P 0.38, Sb 0.015) reproduces
   **enhanced (B, P) vs un-enhanced (Sb)**; the cited ``m`` (B 0.3, P 10) sets **depletion (B) vs
-  pile-up (P)** — *directions*, asserted; the phosphorus pile-up *magnitude* is ~2× inflated by the
-  swept-sliver edge (boron, oxide-uptake-dominated, is the robust device-relevant case). The OED
-  *amplitude* is calibrated (flagged); the cited constants are pinned exactly (citation-fidelity).
+  pile-up (P)** — *directions*, asserted; with the moving boundary the phosphorus pile-up *magnitude*
+  is quantitative too (no longer the ~2×-inflated fixed-grid value). The OED *amplitude* is calibrated
+  (flagged); the cited constants are pinned exactly (citation-fidelity).
 
 The validated-vs-calibrated split (the standing discipline): the tight legs (degenerate, effective-
 ``∫D dt``, conservation) exercise *machinery* and hold for **any** OED amplitude; the loose legs lean
@@ -100,11 +102,11 @@ def test_oed_alone_sealed_surface_conserves_dose_machine_exact():
 
 
 def test_coupled_silicon_plus_oxide_accounting_closes():
-    # The Si_dose + oxide_uptake = si_dose_initial identity closes to machine precision — but this is
-    # an ACCOUNTING identity (oxide_uptake is DEFINED as −Σ dt·flux(left), the same bookkeeping the
-    # engine guarantees), so it closes for ANY flux. It catches an accounting leak; it does NOT
-    # validate the segregation magnitude (the swept-sliver edge below means the magnitude is NOT
-    # exact). Asserted as such, not dressed up as physical conservation.
+    # The Si_dose + oxide_uptake = si_dose_initial identity closes to machine precision — a bookkeeping
+    # identity (oxide_uptake = the diffusive flux + the swept-sliver recession, both booked exactly),
+    # so it closes for ANY flux. It catches a leak, not the magnitude. (The MAGNITUDE check — that
+    # oxide_uptake is the real oxide content ∫C_ox·R dt — is test_moving_boundary_conserves_total_dopant,
+    # which the moving boundary makes possible; the legacy fixed grid only had this identity.)
     for dop in ("B", "P"):
         seed = dd.predeposit(GRID, dop, 950.0, 15.0 * 60.0).N
         co = cp.oxidize_couple(GRID, seed, dop, "dry", 1000.0, 20.0,
@@ -113,26 +115,41 @@ def test_coupled_silicon_plus_oxide_accounting_closes():
         assert co.oxide_uptake != 0.0             # the surface is genuinely exchanging dopant
 
 
-def test_inert_oxide_reveals_swept_sliver_artifact():
-    # The decisive diagnostic for the named scope edge. An INERT oxide (m → ∞) can only snowplow —
-    # it accepts NO dopant — so the silicon dopant MUST be conserved. The fixed-grid model instead
-    # spuriously GAINS dopant: the segregation flux's 0.44·R term ("freed by consumed silicon") is
-    # the interface recession, but the grid keeps the swept region AND re-injects its dopant, so the
-    # sliver is double-counted. Pin the artifact bound so the scope edge is a test, not just prose.
+def test_inert_oxide_conserves_with_moving_boundary():
+    # The decisive diagnostic, now the FIX. An INERT oxide (m → ∞) accepts NO dopant (C_ox → 0), so
+    # the silicon dopant MUST be conserved. The moving boundary recedes the silicon domain as oxide
+    # grows, so the 0.44·R "freed by consumed silicon" sliver LEAVES the domain (mesh motion) instead
+    # of being re-injected — the swept-sliver double-count is gone and the silicon dose is conserved.
     seed = dd.predeposit(GRID, "P", 950.0, 15.0 * 60.0).N
     co = cp.oxidize_couple(GRID, seed, "P", "dry", 1000.0, 30.0,
                            oed=True, segregation=True, segregation_m=1.0e9, n_steps=600)
     spurious_gain = (co.si_dose - co.si_dose_initial) / co.si_dose_initial
-    # An inert oxide should conserve (≈0); the model gains a few-to-~15% of the dose — the named
-    # swept-sliver artifact. Assert it is POSITIVE (the wrong sign — gain, not the slight loss a
-    # consistent moving boundary gives) and bounded (a regression guard on the edge's size).
-    assert 0.02 < spurious_gain < 0.20
-    # The gain is ≈ the swept-sliver dose N_surf·0.44·x_ox (m-independent — the m-dependence lives in
-    # the oxide-uptake term, which → 0 here): it equals the m=10 case's gain to within the evolving
-    # surface value. This is WHY phosphorus pile-up (×~1.17) is ~2× inflated; boron is robust.
-    co10 = cp.oxidize_couple(GRID, seed, "P", "dry", 1000.0, 30.0,
-                             oed=True, segregation=True, n_steps=600)
-    assert (co10.si_dose - co10.si_dose_initial) > 0.0      # phosphorus dose spuriously rises too
+    # Conserves: the residual is the O(dt) lag of the explicit coupling (it shrinks as n_steps grows —
+    # the "refine for fidelity" caveat), NOT the ~13% fixed-grid artifact. The bookkeeping identity
+    # (Si + oxide reservoir) stays machine-exact regardless.
+    assert abs(spurious_gain) < 5.0e-3
+    assert co.conservation_residual / co.si_dose_initial < 1e-12
+    # And it is O(dt): halving the step roughly halves the residual (first-order, the lagged BC).
+    coarse = cp.oxidize_couple(GRID, seed, "P", "dry", 1000.0, 30.0,
+                               oed=True, segregation=True, segregation_m=1.0e9, n_steps=150)
+    fine = cp.oxidize_couple(GRID, seed, "P", "dry", 1000.0, 30.0,
+                             oed=True, segregation=True, segregation_m=1.0e9, n_steps=600)
+    g_coarse = abs((coarse.si_dose - coarse.si_dose_initial) / coarse.si_dose_initial)
+    g_fine = abs((fine.si_dose - fine.si_dose_initial) / fine.si_dose_initial)
+    assert g_fine < g_coarse                       # refining n_steps tightens the inert-oxide residual
+
+
+def test_fixed_grid_still_shows_swept_sliver_artifact():
+    # The documented "before": moving_boundary=False keeps the legacy fixed-grid path, which DOUBLE-
+    # COUNTS the swept sliver. An inert oxide should conserve, yet the fixed grid spuriously GAINS a
+    # few-to-~15% of the dose (the 0.44·R recession term applied without receding the grid). Pinned as
+    # the regression guard on the retired edge — it is why the legacy phosphorus pile-up was ~2× high.
+    seed = dd.predeposit(GRID, "P", 950.0, 15.0 * 60.0).N
+    co = cp.oxidize_couple(GRID, seed, "P", "dry", 1000.0, 30.0, oed=True, segregation=True,
+                           segregation_m=1.0e9, moving_boundary=False, n_steps=600)
+    spurious_gain = (co.si_dose - co.si_dose_initial) / co.si_dose_initial
+    assert 0.02 < spurious_gain < 0.20             # the wrong-sign gain — the named fixed-grid artifact
+    assert co.interface_depth == 0.0               # the fixed grid does not recede
 
 
 def test_conservation_is_exact_at_any_step_count():
@@ -142,6 +159,97 @@ def test_conservation_is_exact_at_any_step_count():
     co = cp.oxidize_couple(GRID, seed, "B", "dry", 1000.0, 20.0,
                            oed=True, segregation=True, n_steps=40)
     assert co.conservation_residual / co.si_dose_initial < 1e-12
+
+
+# --------------------------------------------------------------------------- #
+# The moving boundary (the v1.2 swept-sliver fix) — recession + the real magnitude check
+# --------------------------------------------------------------------------- #
+def test_interface_recedes_by_silicon_consumed():
+    # The geometry: the Si/SiO₂ interface advances 0.44·x_ox into the silicon as oxide grows (the
+    # SI_SIO2_RATIO the Phase-2 conservation leg pins). The reported interface_depth must equal that
+    # recession at the end of the anneal — an independent check against the closed-form oxide thickness.
+    seed = _boron_seed()
+    co = cp.oxidize_couple(GRID, seed, "B", "dry", 1000.0, 30.0,
+                           oed=True, segregation=True, n_steps=600)
+    x_ox_end = cp.oxide_thickness_um("dry", 1000.0, "100")(30.0 * 60.0) * dd.CM_PER_UM
+    expected = cp.SI_SIO2_RATIO * x_ox_end
+    assert co.interface_depth == pytest.approx(expected, rel=2e-3)
+    assert co.surface_index >= 1                    # at least one cell of silicon has been consumed
+
+
+def test_moving_boundary_conserves_total_dopant():
+    # The conservation leg UPGRADED from an accounting identity to a real magnitude check. With the
+    # moving boundary, oxide_uptake is the genuine oxide dopant content — it must equal an INDEPENDENT
+    # reconstruction of ∫ C_ox·R dt (C_ox = N_surf(t)/m), built from the surface trajectory sampled by
+    # separate runs to each checkpoint — never touching oxide_uptake's own flux bookkeeping.
+    Rp = cp.oxidation_rate_um_per_hr("dry", 1000.0, "100")
+    for dop, m in (("B", 0.3), ("P", 10.0)):
+        seed = dd.predeposit(GRID, dop, 950.0, 15.0 * 60.0).N
+        full = cp.oxidize_couple(GRID, seed, dop, "dry", 1000.0, 30.0,
+                                 oed=True, segregation=True, n_steps=600)
+        assert full.conservation_residual / full.si_dose_initial < 1e-12   # identity still exact
+        ts_min = np.linspace(0.0, 30.0, 21)
+        N_surf = np.array([seed[0] if tm == 0.0 else
+                           cp.oxidize_couple(GRID, seed, dop, "dry", 1000.0, tm,
+                                             oed=True, segregation=True, n_steps=200).surface_concentration
+                           for tm in ts_min])
+        ts_sec = ts_min * 60.0
+        R_cm_s = np.array([Rp(t) * dd.CM_PER_UM / 3600.0 for t in ts_sec])
+        ref = np.trapezoid((N_surf / m) * R_cm_s, ts_sec)          # independent ∫ C_ox·R dt
+        assert full.oxide_uptake > 0.0
+        assert full.oxide_uptake == pytest.approx(ref, rel=0.12)   # within a few % of the real content
+
+
+def test_oxide_uptake_tracks_segregation_coefficient():
+    # The magnitude is governed by C_ox = N_surf/m, so the oxide uptake scales ~ 1/m: doubling m
+    # roughly halves the uptake (the weak-uptake limit, where N_surf barely depends on m). A cheap,
+    # independent confirmation that oxide_uptake is the physical C_ox content, not the flux artifact.
+    seed = dd.predeposit(GRID, "P", 950.0, 15.0 * 60.0).N
+    u10 = cp.oxidize_couple(GRID, seed, "P", "dry", 1000.0, 30.0,
+                            oed=True, segregation=True, segregation_m=10.0, n_steps=400).oxide_uptake
+    u20 = cp.oxidize_couple(GRID, seed, "P", "dry", 1000.0, 30.0,
+                            oed=True, segregation=True, segregation_m=20.0, n_steps=400).oxide_uptake
+    assert u10 > 0.0 and u20 > 0.0
+    assert u10 / u20 == pytest.approx(2.0, rel=0.1)
+
+
+def test_phosphorus_pileup_magnitude_reduced_by_moving_boundary():
+    # The headline physics fix: the moving boundary removes the swept-sliver inflation, so the
+    # phosphorus pile-up (read vs OED-only, as the demo does) is SMALLER than the legacy fixed grid's
+    # — direction preserved (still > 1), magnitude no longer ~2× high. Boron depletion stays robust.
+    seed = dd.predeposit(GRID, "P", 950.0, 15.0 * 60.0).N
+    oed = cp.oxidize_couple(GRID, seed, "P", "dry", 1000.0, 30.0, oed=True, segregation=False)
+    moving = cp.oxidize_couple(GRID, seed, "P", "dry", 1000.0, 30.0,
+                               oed=True, segregation=True, moving_boundary=True)
+    fixed = cp.oxidize_couple(GRID, seed, "P", "dry", 1000.0, 30.0,
+                              oed=True, segregation=True, moving_boundary=False)
+    pileup_moving = moving.surface_concentration / oed.surface_concentration
+    pileup_fixed = fixed.surface_concentration / oed.surface_concentration
+    assert pileup_moving > 1.0                       # still a pile-up (direction real)
+    assert pileup_moving < pileup_fixed              # but the swept-sliver inflation is gone
+
+
+def test_recession_with_initial_oxide_counts_only_this_anneal():
+    # With a pre-existing oxide (x_initial_oxide > 0), the recession must count only the silicon
+    # consumed BY THIS ANNEAL — s(0) = 0 (the seed surface), and interface_depth = 0.44·(x_ox − x_init).
+    # Guards the x_initial_oxide path (else unexercised) against an off-by-a-seed-oxide recession.
+    seed = _boron_seed()
+    x_init = 0.02                                   # µm of seed oxide
+    co = cp.oxidize_couple(GRID, seed, "B", "dry", 1000.0, 30.0, oed=True, segregation=True,
+                           x_initial_oxide=x_init, n_steps=600)
+    x_ox_end = cp.oxide_thickness_um("dry", 1000.0, "100", x_initial=x_init)(30.0 * 60.0)
+    expected = cp.SI_SIO2_RATIO * (x_ox_end - x_init) * dd.CM_PER_UM
+    assert co.interface_depth == pytest.approx(expected, rel=2e-3)
+    assert co.conservation_residual / co.si_dose_initial < 1e-12
+
+
+def test_segregation_off_leaves_no_recession():
+    # Recession is gated on segregation: the OED-only path is the deliberate sealed-surface ∫D dt
+    # anchor and must NOT recede. interface_depth = 0 and the surface stays at index 0.
+    seed = _boron_seed()
+    co = cp.oxidize_couple(GRID, seed, "B", "dry", 1000.0, 20.0, oed=True, segregation=False)
+    assert co.interface_depth == 0.0
+    assert co.surface_index == 0
 
 
 # --------------------------------------------------------------------------- #
@@ -179,8 +287,11 @@ def test_faster_oxidation_gives_stronger_oed():
 def test_boron_depletes_phosphorus_piles_up():
     # The segregation signatures (the cited m sets the sign). Compare the surface concentration with
     # vs without segregation (OED on in both, so the only difference is the surface BC):
-    #   boron (m 0.3 < 1): oxide takes boron → surface DEPLETES → N_surf falls, oxide_uptake > 0;
-    #   phosphorus (m 10 > 1): oxide rejects → surface PILES UP → N_surf rises, oxide_uptake < 0.
+    #   boron (m 0.3 < 1): oxide takes a lot of boron → surface DEPLETES → N_surf falls;
+    #   phosphorus (m 10 > 1): oxide takes little → surface PILES UP → N_surf rises (snowplow).
+    # With the moving boundary, oxide_uptake is the real oxide content C_ox·x_ox > 0 for BOTH (the
+    # oxide is always a sink at C_ox = N_surf/m) — phosphorus piles up locally while still ceding a
+    # little dopant to the oxide. (The legacy fixed grid mislabeled phosphorus uptake as negative.)
     seed_B = dd.predeposit(GRID, "B", 950.0, 15.0 * 60.0).N
     base_B = cp.oxidize_couple(GRID, seed_B, "B", "dry", 1000.0, 20.0, oed=True, segregation=False)
     seg_B = cp.oxidize_couple(GRID, seed_B, "B", "dry", 1000.0, 20.0, oed=True, segregation=True)
@@ -191,7 +302,9 @@ def test_boron_depletes_phosphorus_piles_up():
     base_P = cp.oxidize_couple(GRID, seed_P, "P", "dry", 1000.0, 20.0, oed=True, segregation=False)
     seg_P = cp.oxidize_couple(GRID, seed_P, "P", "dry", 1000.0, 20.0, oed=True, segregation=True)
     assert seg_P.surface_concentration > base_P.surface_concentration
-    assert seg_P.oxide_uptake < 0.0
+    assert seg_P.oxide_uptake > 0.0                 # the oxide is a (small) sink, not a source
+    # Boron (small m → large C_ox) cedes far more to the oxide than phosphorus (large m → small C_ox).
+    assert seg_B.oxide_uptake > seg_P.oxide_uptake
 
 
 def test_segregation_flux_sign_follows_the_mass_balance():

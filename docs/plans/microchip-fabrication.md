@@ -668,6 +668,43 @@ from a 100 %-complete Steel to Chip.
 > already ~converged, ~0.1%): `x_j` 0.34→0.76 µm, ×42/×486 surface enhancement — the banked figure stands.
 > SHARED-FILE ASKS: update the `chip-highconc-v13` + `engine-unfrozen` memory notes (the promotion landed).
 
+> **v1.2-revision — the swept-sliver scope edge RETIRED (the segregation moving boundary): BUILT
+> (2026-06-11).** Not a new regime — the **accuracy fix v1.2 deferred**. v1.2's dominant honesty caveat
+> (the advisor's blocking call) was the **swept-sliver double-count**: the segregation flux
+> `J = N_surf·(0.44 − 1/m)·(dx_ox/dt)` is a moving-*interface* mass balance, but applied on a **fixed**
+> grid it re-injects the `0.44·R` "dopant freed by consumed silicon" term into a domain that still holds
+> that silicon → counted twice → **phosphorus pile-up ~2× inflated** (boron robust, oxide-uptake-dominated).
+> v1.2 named the fix "a Stefan-problem the pure-diffusion engine can't express" and carried the edge. **It
+> is in fact a consumer-side receding mesh — the engine untouched, still pure-diffusion per step.** The
+> decisive derivation: `J` is the *correct diffusive flux at the moving interface* (Leibniz on
+> `Q_Si = ∫_{s(t)}^L N dx`, `v = ds/dt = 0.44·R`: `dQ_Si/dt = J − v·N_surf = −(N_surf/m)·R = −C_ox·R` —
+> silicon loses *exactly* the oxide's uptake, conserved); the fixed grid only omits the geometric
+> `−v·N_surf` Leibniz term. The fix recedes the silicon domain to `s(t) = 0.44·(x_ox − x_initial)` each
+> sub-step — a **truncated-first-cell `grid_from_edges` active sub-grid** `[s, L]` (deeper cells are the
+> originals → **zero bulk interpolation**; conservation holds on the non-uniform grid, CONTRACT invariant
+> 2) — keeping the **same flux**: the mesh motion supplies the missing term. Default **`moving_boundary=True`**;
+> `moving_boundary=False` keeps the legacy fixed-grid path as the documented "before." **Conservation
+> upgraded from an accounting identity to a real magnitude check:** the `m→∞` inert oxide now **conserves**
+> (spurious gain 0.137 → ~6e-4, **O(dt)** in `n_steps` — the lag, not a leak; the `Si+oxide` identity stays
+> machine-exact), and `oxide_uptake` is now the genuine oxide content — it matches an **independent**
+> `∫C_ox·R dt` (surface trajectory from checkpoint re-runs) within a few % (B 1.4%, P 2.7%), and is **≥ 0
+> for both dopants** (the oxide is always a sink at `C_ox = N_surf/m` — **phosphorus's `oxide_uptake` sign
+> FLIPPED** from the v1.2 fixed-grid `−2.35e14` to `+6.5e13`: it piles up *locally* while still ceding a
+> little dopant). `CoupledResult` gains `interface_depth` + `surface_index` (output `N` full-length, consumed
+> cells zeroed for plotting). Demo: phosphorus pile-up **×1.17 → ×1.06** (the ~2× inflation gone), boron
+> **×0.33** unchanged (robust), surface **receded 9.1 nm**; the banked figure regenerated. **No engine touch
+> (`engines/diffusion`, `CONTRACT.md`, ADRs all unchanged) → no new ADR** (ADR 0004 governs the *engine*;
+> this is consumer-side). Tests: `test_inert_oxide_reveals_swept_sliver_artifact` **split** into
+> `…_conserves_with_moving_boundary` (the fix; gain→~0, O(dt)) + `test_fixed_grid_still_shows_swept_sliver_artifact`
+> (the pinned "before"); `oxide_uptake` sign assertions updated (both > 0, boron > phosphorus); **+6 new**
+> (interface-recedes-by-silicon-consumed, moving-boundary-conserves-total-dopant [the independent `∫C_ox·R dt`],
+> oxide-uptake-tracks-`m` [~1/m scaling], phosphorus-pileup-reduced-vs-fixed, segregation-off-no-recession,
+> recession-with-initial-oxide [the `x_initial_oxide>0` path]).
+> Coupling suite **19 → 26** (`test_coupling` 15→22; `test_demo_coupling` 4 unchanged); whole-repo fast lane
+> **188 → 195**. Advisor timed out (twice) — proceeded on the Leibniz derivation, **verified empirically in
+> both limits** (inert net→0; boron net `−C_ox·R`). SHARED-FILE ASK: update the `chip-coupling-v12` memory note
+> (the swept-sliver edge is retired; the fixed-grid path is the "before").
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **`engines/diffusion`**
 engine in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**
