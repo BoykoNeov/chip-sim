@@ -50,9 +50,24 @@ content is the **new conditional-CFL stability invariant** the suite couldn't ex
 conditionally-stable method to contrast against unconditional stability). Additive: only the θ=0
 branch is new, the **28 prior invariants pass UNMODIFIED**. `test_explicit.py` (6 tests); engine suite
 **28→34**, fast lane **195→201**; no new ADR. Advisor: **build explicit NOT 2-D** (anti-over-build —
-2-D has no consumer, would guess an unvalidated API; **2-D is now the LAST deferred regime**, waits
-for a real consumer = lateral diffusion under a mask edge). The `Not in v1` line is now just **2-D /
-3-D** (nonlinear `D(u)` ✓v1.5, explicit ✓v1.6).
+2-D has no consumer, would guess an unvalidated API; **2-D waits for a real consumer = lateral
+diffusion under a mask edge**). After v1.6 the `Not in v1` line was just **2-D / 3-D** (nonlinear
+`D(u)` ✓v1.5, explicit ✓v1.6).
+
+**THIRD AMENDMENT LANDED (2026-06-12, v1.8): the 2-D regime is BUILT** — see [[lateral-diffusion-2d]]
+for the full record. The consumer v1.6 told us to wait for **arrived** (lateral dopant diffusion under
+a mask edge), so 2-D was built — a *new module* `engines/diffusion/diffusion2d.py` (`Diffusion2D`,
+tensor-product `Grid2D`/`uniform_grid_2d`, the `MaskedSurface` window/mask edge BC), **backward-Euler
+only**, sparse 5-point FV, `splu` cached per dt. `(I−dt·A)` is an M-matrix → unconditional stability +
+monotonicity + structural conservation carry over from 1-D verbatim. **Additive by construction:** it
+imports the 1-D primitives but executes **no 1-D code path**, so the **34 prior invariants pass
+UNMODIFIED** (new seal `tests/test_diffusion2d.py`, 11 tests, invariant 7). Engine suite **34→45**,
+fast lane **218→238**; no new ADR (ADR 0004 pre-authorizes 2-D). The decisive findings: the tight
+anchor is the **dimensional-collapse seam** (a 2-D run uniform+no-flux in one direction == the 1-D
+engine in the other, machine precision), NOT the outer-product theorem (discrete BE breaks it at
+O(dt²) — a Kronecker sum); and the genuinely-2-D piece is the non-separable `MaskedSurface` BC. The
+`Not in v1` / "Not built" line is now just **3-D** (nonlinear `D(u)` ✓v1.5, explicit ✓v1.6, 2-D ✓v1.8)
+— **3-D is the engine's only remaining deferred regime.**
 
 **What did NOT change (keep the gate, drop the seal):**
 - The **test suite still gates.** Every amendment re-runs `engines/diffusion/tests/` and

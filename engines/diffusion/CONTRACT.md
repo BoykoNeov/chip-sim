@@ -1,4 +1,4 @@
-# `engines.diffusion` — 1-D conservative parabolic solver — CONTRACT
+# `engines.diffusion` — 1-D + 2-D conservative parabolic solver — CONTRACT
 
 > **Status: ACTIVE — unfrozen 2026-06-10** (originally FROZEN 2026-06-08, Steel
 > Phase 1a). Validated behind its passing suite (`engines/diffusion/tests/`, run
@@ -15,7 +15,11 @@
 > the 18 prior invariants pass unmodified. **Second amendment landed 2026-06-11:
 > explicit `forward_euler` (θ=0) stepping (invariant 3)** — additive (only the
 > θ=0 branch is new; the implicit paths are byte-for-byte unchanged, the 28 prior
-> invariants pass unmodified); **2-D / 3-D remain the deferred regimes.**
+> invariants pass unmodified). **Third amendment landed 2026-06-12: the 2-D regime
+> (`Diffusion2D`, invariant 7)** — a *new module* (`diffusion2d.py`), tensor-product
+> finite volume, backward-Euler only; additive by construction (it imports the 1-D
+> primitives but touches no 1-D code path, so the 34 prior invariants pass unmodified);
+> **3-D is now the last deferred regime.**
 
 ## What it solves
 
@@ -96,6 +100,35 @@ J     = solver.flux(state, end, t=0.0)            # end ∈ {"left","right"}
     ends (the expected quench). Series-resistance coefficient
     `U_eff = 1/(Δx/2D + 1/h)`.
 
+### 2-D API (the third amendment)
+
+```python
+from engines.diffusion import (
+    Diffusion2D, Grid2D, uniform_grid_2d, MaskedSurface,
+    Dirichlet, Neumann, Robin,            # the 1-D edge BCs are reused unchanged
+)
+
+grid   = uniform_grid_2d(length_x, length_y, nx, ny)   # or Grid2D(x=grid1, y=grid2)
+solver = Diffusion2D(grid, D,                           # D scalar or (nx, ny) array
+                     bc_xlo, bc_xhi, bc_ylo, bc_yhi,    # each edge: a scalar BC …
+                     source=None, method="backward_euler")
+
+state = solver.step(state, dt, t0=0.0)            # state is a 2-D (nx, ny) ndarray
+state = solver.solve(state, t_end, dt, t0=0.0)
+q     = solver.total(state)                       # ∫∫u dA = Σ uᵢⱼ Δxᵢ Δyⱼ
+```
+
+- **`state`** is a plain 2-D `ndarray` of shape `(nx, ny)` (`state[i,j]` = `u` at lateral
+  index `i`/`x`, depth index `j`/`y`); flattened C-order `k = i·ny + j` internally. Same
+  ADR-0001 boundary as 1-D — the array, and only it, crosses the per-step boundary.
+- **Edge BCs** `bc_xlo/bc_xhi/bc_ylo/bc_yhi`: a scalar `Dirichlet`/`Neumann`/`Robin`
+  (applied uniformly along the whole edge), **or** `MaskedSurface(value, open_mask)` — a
+  per-cell **Dirichlet under the window / no-flux under the mask** edge (`open_mask` a bool
+  array of length = the cells along that edge). The masked surface is the one new BC, and
+  the piece that makes the mask-edge problem non-separable.
+- **Backward-Euler only** here; `D` time-independent. CN / explicit / nonlinear `D(u)` /
+  anisotropic-tensor `D` are deferred (no consumer yet) — the named next 2-D amendments.
+
 ### Sign convention
 
 Flux is `J = −D ∂u/∂x` (Fick), positive in **+x**. So at `"left"` `J>0` is inflow,
@@ -166,6 +199,21 @@ layer (ADR 0002) consumes the same `state` — never a live solver object.
    model-independent self-similar anchor). **Additive:** only `StateDependent` enters
    the Picard loop, so invariants 1–5 pass **unmodified** (their tests are unchanged).
 
+7. **2-D regime** (`Diffusion2D`, `tests/test_diffusion2d.py`, added 2026-06-12): the
+   tensor-product backward-Euler solver (`Grid2D`, `MaskedSurface`, `uniform_grid_2d`).
+   Asserted: the **dimensional-collapse seam** — a 2-D run uniform + no-flux in one
+   direction reproduces the blessed 1-D engine solution in the other to **machine
+   precision** (the tight anchor tying 2-D back to the spine; `< 1e-12`); **exact
+   conservation** of `Σ uᵢⱼ Δxᵢ Δyⱼ` under no-flux on uniform *and* non-uniform grids
+   (`≤ 1e-12`, telescoping per-direction); **isotropy** (a symmetric Gaussian spreads
+   equally in x and y, `< 1e-12`); **monotonicity / bounds** at huge dt (the M-matrix
+   maximum principle, no new extrema); **O(dt) operator-splitting convergence** to the
+   outer product of two 1-D runs (a *convergence* check, not a seam — the discrete BE 2-D
+   operator is a Kronecker *sum*, so the split-step product differs at O(dt²)); and that
+   `MaskedSurface` is genuinely non-separable while only `backward_euler` is accepted.
+   **Additive by construction:** `diffusion2d.py` imports the 1-D primitives but executes
+   no 1-D code path, so invariants 1–6 pass **unmodified**.
+
 ## Validation boundary (what 1a does *not* claim)
 
 Phase 1a validates the **solver machinery** with constant/given `D`. The
@@ -182,6 +230,10 @@ TTT/Jominy data (Steel plan §3, Phases 1–2). The validation suite here promis
   pass `StateDependent(func)`; each step is Picard-solved (invariant 6).
 - **Explicit `forward_euler` stepping is built** (2026-06-11, the second amendment):
   `method="forward_euler"` (θ=0), conditionally stable under the CFL limit (invariant 3).
-- **Not built:** 2-D/3-D. The array-`state` boundary is the seam where that deferred
+- **2-D is built** (2026-06-12, the third amendment): `Diffusion2D` (`diffusion2d.py`),
+  tensor-product finite volume, backward-Euler only (invariant 7). A separate module that
+  reuses the 1-D primitives — the array-`state` boundary held, so it slotted in without
+  touching the 1-D code path or any consumer.
+- **Not built:** 3-D. The array-`state` boundary is the seam where that last deferred
   heavy regime (or a compiled core) is later slotted without touching consumers
   (ARCHITECTURE.md §8, ADR 0001).

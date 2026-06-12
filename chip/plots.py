@@ -803,3 +803,103 @@ def peb_figure(
                  f"resist n = {n_resist:.2f})", fontsize=12.5, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     return fig
+
+
+# Lateral diffusion (v1.8) colours — the 2-D mask-edge regime.
+JUNCTION_CONTOUR_COLOR = "#c0392b"   # the N = N_B junction contour (crimson — same as the 1-D junction)
+MASK_BAR_COLOR = "#555555"           # the masking film on the surface (the sealed region)
+WINDOW_BAR_COLOR = "#e07b39"         # the open window (warm — where the source enters, like the predep)
+RATIO_CURVE_COLOR = "#2f6fb0"        # the engine lateral/vertical ratio vs contour
+RATIO_BAND_COLOR = "#27795b"         # the cited 0.75–0.85 rule-of-thumb band
+DEVICE_JUNCTION_COLOR = "#6a3d9a"    # the realistic device junction (the headline contour)
+
+
+def lateral_diffusion_figure(data) -> "plt.Figure":
+    """The banked 2-D artifact: the junction curving under the mask, beside the ratio-vs-contour.
+
+    Left panel (**the banked readout** — the genuinely-2-D junction): the boron field ``N(x, y)``
+    (log fill, depth downward), the mask drawn on the surface (open window | hatched mask), and the
+    device ``N = N_B`` junction contour overlaid — flat/deep under the window, wrapping up under the
+    mask at the edge. The **vertical** (window centre) and **lateral** (under-mask reach) extents
+    are marked; their ratio is the headline.
+
+    Right panel (**the mechanism** — the contour-dependence): the engine lateral/vertical ratio vs
+    ``C_B/N_s``. The shallow contours sit in the cited **0.75–0.85 band** (shaded) and the ratio
+    **rises toward deeper contours** (Kennedy–O'Brien 1965); the curve runs a touch *above* the band
+    deeper, so the device junction reaches ~0.9 — the model's own deep-contour value (a *loose*
+    benchmark — within the read-off uncertainty of the cited graph, not a sourced number).
+
+    Consumes plain arrays / the demo dict (ADR 0002) — no live solver object.
+    """
+    p = data["profile"]
+    dev = data["device"]
+    x_um = p.x / CM_PER_UM
+    y_um = p.y / CM_PER_UM
+    x_edge_um = p.x_edge / CM_PER_UM
+    N = p.N
+
+    fig, (ax_f, ax_r) = plt.subplots(1, 2, figsize=(13, 6))
+
+    # --- left: the 2-D field + the junction contour curving under the mask ----------
+    floor = max(data["N_B_device"] * 1e-2, 1.0)
+    logN = np.log10(np.maximum(N.T, floor))             # transpose → (ny, nx): rows = depth
+    X, Y = np.meshgrid(x_um, y_um)
+    cf = ax_f.contourf(X, Y, logN, levels=24, cmap="magma")
+    cb = fig.colorbar(cf, ax=ax_f, pad=0.02)
+    cb.set_label("$\\log_{10} N$  (cm⁻³)")
+    # the device junction contour N = N_B
+    ax_f.contour(X, Y, N.T, levels=[data["N_B_device"]], colors=[JUNCTION_CONTOUR_COLOR],
+                 linewidths=2.2)
+    # the mask on the surface (a thin bar at y≈0): open window then hatched mask
+    span = y_um[-1] - y_um[0]
+    bar_h = 0.035 * span
+    ax_f.add_patch(plt.Rectangle((x_um[0], -bar_h), x_edge_um - x_um[0], bar_h,
+                                 color=WINDOW_BAR_COLOR, alpha=0.9, zorder=4, clip_on=False))
+    ax_f.add_patch(plt.Rectangle((x_edge_um, -bar_h), x_um[-1] - x_edge_um, bar_h,
+                                 facecolor=MASK_BAR_COLOR, hatch="//", edgecolor="white",
+                                 alpha=0.95, zorder=4, clip_on=False))
+    ax_f.axvline(x_edge_um, color="white", ls=":", lw=1.2, alpha=0.7)
+    ax_f.text((x_um[0] + x_edge_um) / 2, -bar_h * 0.5, "window", ha="center", va="center",
+              fontsize=8.5, color="white", zorder=5)
+    ax_f.text((x_edge_um + x_um[-1]) / 2, -bar_h * 0.5, "mask", ha="center", va="center",
+              fontsize=8.5, color="white", zorder=5)
+    # vertical (window-centre) and lateral (under-mask) extents
+    ax_f.annotate("", xy=(x_um[0] + 0.02, dev.vertical_um), xytext=(x_um[0] + 0.02, 0),
+                  arrowprops=dict(arrowstyle="<->", color="white", lw=1.6))
+    ax_f.text(x_um[0] + 0.08, dev.vertical_um * 0.5, f"vertical\n{dev.vertical_um:.2f} µm",
+              color="white", fontsize=9, va="center")
+    ax_f.annotate("", xy=(x_edge_um + dev.lateral_um, 0.06 * span),
+                  xytext=(x_edge_um, 0.06 * span),
+                  arrowprops=dict(arrowstyle="<->", color=JUNCTION_CONTOUR_COLOR, lw=1.6))
+    ax_f.text(x_edge_um + dev.lateral_um * 0.5, 0.12 * span,
+              f"lateral {dev.lateral_um:.2f} µm", color=JUNCTION_CONTOUR_COLOR, fontsize=9,
+              ha="center")
+    ax_f.set_ylim(y_um[-1], -bar_h)                     # depth downward, surface (and bar) at top
+    ax_f.set_xlabel("lateral position $x$  (µm)")
+    ax_f.set_ylabel("depth $y$  (µm)")
+    ax_f.set_title(f"{p.dopant} junction under a mask edge "
+                   f"($N_B$ = {data['N_B_device']:.0e}, ratio = {dev.ratio:.2f})")
+
+    # --- right: the lateral/vertical ratio vs contour (the dependence) ----------------
+    fracs, ratios = data["fracs"], data["ratios"]
+    lo, hi = data["ratio_band"]
+    ax_r.axhspan(lo, hi, color=RATIO_BAND_COLOR, alpha=0.16,
+                 label=f"cited rule {lo:.2f}–{hi:.2f}")
+    ax_r.semilogx(fracs, ratios, "o-", color=RATIO_CURVE_COLOR, lw=2, ms=7,
+                  label="engine: lateral / vertical")
+    frac_dev = data["N_B_device"] / p.N_surface
+    ax_r.semilogx([frac_dev], [dev.ratio], "D", color=DEVICE_JUNCTION_COLOR, ms=10, zorder=5,
+                  label=f"device junction ($C_B/N_s$ = {frac_dev:.0e})")
+    ax_r.invert_xaxis()                                 # deeper contours (smaller C_B/N_s) to the right
+    ax_r.set_xlabel("contour level  $C_B / N_s$")
+    ax_r.set_ylabel("lateral / vertical ratio")
+    ax_r.set_title("the ratio is contour-dependent (rises toward deeper contours)")
+    ax_r.set_ylim(0.6, 1.0)
+    ax_r.legend(loc="lower left", fontsize=9, framealpha=0.95)
+    ax_r.grid(True, which="both", alpha=0.18)
+
+    fig.suptitle("Microchip v1.8: lateral diffusion under a mask edge — the 2-D regime, "
+                 f"banked  ({p.dopant}, {p.T_celsius:.0f} °C / {p.t / 60:.0f} min)",
+                 fontsize=12.5, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    return fig

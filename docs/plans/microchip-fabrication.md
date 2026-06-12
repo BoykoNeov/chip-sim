@@ -749,6 +749,59 @@ from a 100 %-complete Steel to Chip.
 > ordinary edit; this entry is the record). SHARED-FILE ASKS: a `engine-explicit-stepping-v16` memory note
 > + update `engine-unfrozen` (the second amendment landed; 2-D is the last deferred regime).
 
+> **v1.8 — the 2-D regime, the THIRD exercise of the unfreeze, finally pulled in by its named consumer:
+> BUILT (2026-06-12).** Unlike v1.5/v1.6 (pure engine amendments with no consumer), this is the
+> regime v1.6's advisor explicitly told us to *wait* for — "2-D waits for a real consumer (the named
+> demo: lateral diffusion under a mask edge, the cited lateral/vertical ≈ 0.8 rule)". That consumer
+> arrived, so v1.8 is **both** the third engine amendment **and** a chip phase in one. **Engine:** a
+> *new module* `engines/diffusion/diffusion2d.py` — `Diffusion2D` on a tensor-product `Grid2D`
+> (x-grid ⊗ y-grid, so non-uniform grids + `grid_from_edges` are inherited per direction), a 5-point
+> cell-centered finite-volume operator, **backward-Euler only**, sparse `splu` factorization cached
+> per `dt` (`A` is time-independent → reused across a fixed-`dt` march for free), harmonic-mean faces.
+> `(I − dt·A)` is an **M-matrix**, so the 1-D engine's headline guarantees — unconditional stability,
+> monotonicity (discrete maximum principle), structural conservation of `Σ uᵢⱼΔxᵢΔyⱼ` — carry over
+> *verbatim*. The one new BC is `MaskedSurface(value, open_mask)`: **Dirichlet under the window,
+> no-flux under the mask** (per-cell along an edge). **Additive by construction** — the module imports
+> the 1-D primitives (`Grid`, `Dirichlet/Neumann/Robin`, `_eval`) but executes **no 1-D code path**,
+> so the **34 prior engine invariants pass UNMODIFIED**; new seal `tests/test_diffusion2d.py`
+> (**11 tests**, invariant 7). **Chip consumer:** `chip/diffusion_2d.py` (`lateral_diffusion`,
+> `junction_geometry`, `MaskEdgeProfile`/`JunctionGeometry`) + the banked anchor demo
+> `chip/demo_lateral_diffusion.py` (boron, 1100 °C / 60 min, Trumbore-`N_s` constant source through a
+> 2 µm-edge mask window) + `plots.lateral_diffusion_figure` → `docs/figures/chip-lateral-diffusion.png`;
+> mini-triad `chip/tests/test_diffusion_2d.py` (**5**) + `test_demo_lateral_diffusion.py` (**4**).
+> **Durable advisor calls / findings: (1) the design blocker — a sealed drive-in from a windowed
+> initial condition (all four edges no-flux) is SEPARABLE**, i.e. exactly the outer product of two 1-D
+> runs → it would *not* need a 2-D engine at all (hollow). The genuinely-2-D configuration is the
+> **piecewise `MaskedSurface`** (constant-source window step beside no-flux mask); that non-separability
+> *is* the reason the regime exists, and the lateral-under-mask curvature is its signature. **(2) the
+> seam subtlety — the textbook "2-D = outer product of two 1-D runs" theorem is continuous-only**; the
+> *discrete* backward-Euler 2-D operator is a Kronecker **sum** in the exponent, so
+> `(I−dt(Lx⊕Ly))⁻¹ ≠ (I−dtLx)⁻¹⊗(I−dtLy)⁻¹` (they differ at O(dt²)). So the machine-precision **tight
+> anchor is the dimensional-collapse seam** (a 2-D run uniform + no-flux in one direction reproduces
+> the blessed 1-D engine in the other, `<1e-12`), **not** the outer product — that is demoted to an
+> O(dt) *convergence* check (splitting error empirically halves with dt). **(3) the benchmark is
+> LOOSE, and honesty matters more than a tidy number** (this session's advisor): the lateral/vertical
+> ratio is **domain-converged** (DEFAULT 4×2.5 µm vs WIDE 8×5 µm came out **bit-identical** — the
+> reflecting far wall has nothing to reflect because the field is ~zero before it, so the earlier
+> "walls inflate the ratio" worry is *dead*). At the one cited point — **≈ 0.82 at C_B/N_s = 1e-4**,
+> after **Kennedy–O'Brien 1965** (the original numerical reflecting-mask solution; read via a secondary
+> fabrication text, not K-O directly) — the model runs **~5–10 % high** (0.87), and finer grids nudge
+> it *up*, not toward 0.82. So: the mid/shallow contours sit in the cited **0.75–0.85** band, the ratio
+> **rises toward deeper contours** (K-O's own finding — the junction sits closer to its source at the
+> surface than in the bulk), and the realistic device deep-contour ratio **~0.90 is the model's own
+> value within the read-off uncertainty of a 1965 graph — NOT a sourced number, and NOT a claim of
+> being "more accurate" than K-O** (same reflecting BC; higher ≠ better). The validation weight is
+> carried by the **tight erfc anchor** (the window-centre column == the analytic `erfcinv(C_B/N_s)·2√(Dt)`
+> junction to numerical precision), not by hitting 0.8. Also pinned: for this constant-source geometry
+> the **maximum lateral encroachment is at the surface** (surface-lateral ≡ max-over-depth). `CONTRACT.md`
+> amended (title → "1-D + 2-D", status-banner third-amendment line, invariant 7, the 2-D API subsection,
+> the "2-D built" / "Not built: 3-D" lines); engine + chip READMEs updated. Engine suite **34 → 45**;
+> whole-repo fast lane **218 → 238**. **No new ADR** (ADR 0004 pre-authorizes the engine amendment as an
+> ordinary suite-gated edit; the chip phase is an ordinary build — this entry is the record). SHARED-FILE
+> ASKS: a new `[[lateral-diffusion-source]]` memory note (K-O 1965 + the constant-source ≈0.8
+> contour-dependent ratio, flagged secondary-text) + a `lateral-diffusion-2d` project note + update
+> `engine-unfrozen` (the third amendment landed; **3-D is the last deferred regime**).
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **`engines/diffusion`**
 engine in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**

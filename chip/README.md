@@ -87,6 +87,19 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   kernel `exp(−2π²k²σ²/p²)`, the dose-conservation/power-balance leg, the **PEB window** — erase the
   `λ/2n` ripple, keep the image — and the linear-exposure / constant-`D` / no-`(x,z)`-volume scope
   edges). Saves `docs/figures/chip-peb.png`.
+- **To work on lateral diffusion under a mask edge (v1.8 — the 2-D regime, the engine's last deferred
+  regime pulled in):** `chip/diffusion_2d.py` + `tests/test_diffusion_2d.py`, the demo
+  `demo_lateral_diffusion.py` + `tests/test_demo_lateral_diffusion.py`, and
+  `plots.lateral_diffusion_figure`. The consumer that finally pulls in the **2-D engine**
+  (`engines/diffusion/diffusion2d.py` — `Diffusion2D`/`Grid2D`/`MaskedSurface`, the third exercise of
+  the unfreeze; its CONTRACT invariant 7 is the seal). `lateral_diffusion` runs a boron constant source
+  through a mask **window** (`MaskedSurface`: Dirichlet `N_s` under the window, no-flux under the mask;
+  other three edges `Neumann(0)`) — that piecewise surface BC is what makes the problem **non-separable**;
+  `junction_geometry` reads the vertical (window-centre) and lateral (under-mask) junctions and their
+  ratio. The module docstring is its contract (the dimensional-collapse seam to the 1-D engine = the
+  tight anchor; the lateral/vertical ratio = the **loose** cited benchmark, ≈0.82 at `C_B/N_s=1e-4`
+  after Kennedy–O'Brien 1965, the model running slightly high; the constant-source / isotropic-`D` /
+  3-D scope edges). Saves `docs/figures/chip-lateral-diffusion.png`.
 - **To work on the device (Phase 4):** `device.py` + `tests/test_device.py`, the demo
   `demo_device.py` + `tests/test_demo_device.py`, and `plots.device_figure`. The **process → device**
   payoff — a chip-local compact closed form (**does not touch the engine**): `threshold_voltage`
@@ -287,6 +300,32 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   Asymmetric images (off-axis pole + defocus — no mirror plane) are **refused, not mis-blurred**;
   linear exposure (no Dill), constant `D` (no CAR reaction–diffusion), and the uncoupled `x`/`z`
   treatment stay the named scope edges.
+- **v1.8 — lateral diffusion under a mask edge (the 2-D regime, the engine's last deferred regime,
+  finally pulled in): BUILT** (2026-06-12; the THIRD exercise of the unfreeze, and the consumer
+  v1.6's advisor said to *wait* for). `engines/diffusion` gained a *new module* `diffusion2d.py`
+  (`Diffusion2D`, tensor-product `Grid2D`, the `MaskedSurface` window/mask edge BC — see the engine
+  CONTRACT invariant 7); the chip consumer is `chip/diffusion_2d.py` (`lateral_diffusion`,
+  `junction_geometry`). A boron constant source (Trumbore `N_s`, 1100 °C / 60 min) enters through a
+  mask window and diffuses **down and sideways under the mask**; the pn junction is a 2-D contour that
+  curves up under the mask edge. **The design crux (advisor): the problem is only genuinely 2-D
+  because of the piecewise `MaskedSurface` BC** — a sealed drive-in from a windowed IC would be
+  separable (the outer product of two 1-D runs) and would not need the regime. **The tight anchor is
+  the dimensional-collapse seam** (the window-centre column == the analytic 1-D `erfc` junction
+  `erfcinv(C_B/N_s)·2√(Dt)` to numerical precision), **not** the outer-product theorem (continuous-only;
+  discrete BE breaks it at O(dt²) — a Kronecker sum, demoted to an O(dt) convergence check).
+  + `demo_lateral_diffusion.py` + `plots.lateral_diffusion_figure`. Banked artifact: the `N(x,y)`
+  field with the junction curving under the mask, beside the **lateral/vertical ratio vs C_B/N_s**
+  (`docs/figures/chip-lateral-diffusion.png`); device junction → vertical ≈ 0.85 µm, ratio ≈ 0.90.
+  **9-test mini-triad** (5 consumer + 4 demo). **The benchmark is honestly LOOSE** (advisor): the
+  ratio is **domain-converged** (a 2× domain is bit-identical → not a wall artifact), the shallow
+  contours sit in the cited **0.75–0.85** band and the ratio **rises toward deeper contours**
+  (Kennedy–O'Brien 1965 — the junction sits closer to its source at the surface); but at the one cited
+  point (≈ 0.82 at `C_B/N_s = 1e-4`) the model runs ~5–10 % high, so the device deep-contour ~0.90 is
+  the **model's own value within the read-off uncertainty of a 1965 graph, not a sourced number** — the
+  validation weight is the tight erfc anchor, not hitting 0.8. (For this constant-source geometry the
+  maximum lateral encroachment is at the surface — surface ≡ max-over-depth.) Engine suite **34→45**;
+  whole-repo fast lane **218→238**. **No new ADR** (ADR 0004 pre-authorizes the engine amendment).
+  Anisotropic / time-dependent `D`, Gaussian (limited-source) lateral, and 3-D stay the scope edges.
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated
