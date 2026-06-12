@@ -239,6 +239,16 @@ thing).
   the device readout. **Oxygen → thermal donors is the first contamination story** (§5a bucket 4)
   — CZ-native, and it rides the existing net-doping flow once the donor kinetics give the active
   fraction.
+  > **G2 BUILT (2026-06-12).** `chip/czochralski.py` — Scheil `C_s(z)=N_seed·(1−z)^(k−1)`
+  > (**seed-end** parameterized so the `z=0` slice is `1e17` *exactly* → the `demo_device` seam
+  > survives), cited Trumbore `k` (B 0.80 / P 0.35 verified), the boule + axial resistivity (reusing
+  > the Masetti `μ(N)` of `junction.py`), triad-tested (`test_czochralski.py`, 12). Wired into
+  > `fab_game` (`CzochralskiKnobs`; `channel_N_A` is now a boule-slice **property**; `run_batch` down
+  > the boule); banked artifact `fab_game/demo_boule.py` — the Scheil V_t walk (0.547→0.747 over
+  > z=0→0.9) scraps the boule tail purely from substrate doping. **Oxygen→thermal-donors was
+  > DEFERRED** to a fenced G2 follow-on / G4: its `k` is contested (~0.25–1.4) and the donor kinetics
+  > are calibrated, so folding it into the same module would borrow Scheil's tight anchors for a loose
+  > number (advisor). Fast lane 314→**338** (+24); no engine amendment, no ADR, no chip gallery card.
 - **G3 — Wafer prep + particles + the die map made physical.** Defect events placed at
   locations on the across-wafer map; killer-defect functional yield; geometry (TTV/bow)
   bookkeeping.
@@ -329,13 +339,19 @@ end — banking the "one bad knob → a dead die, with the failure trail" artifa
 All reuse, zero new physics: prove the mechanism first, then add Czochralski/Scheil (G2).
 
 **Open questions to settle at G1 (named, not pre-decided):**
-- **The unit of a roguelike run — one wafer/slice vs one boule/batch.** The synced answers
-  *single-wafer roguelike* and *boule→batch* are in tension: do you follow one slice at axial
-  position `z` (the boule just sets your starting resistivity), or process the whole batch
-  (which leans tycoon)? A pedagogical wrinkle rides on it — Scheil's payoff is seeing
-  resistivity vary *down the boule*, which a strictly single-wafer view never shows; a clean
-  reconciliation is "single-wafer run, but surface where your slice sits on the boule's Scheil
-  curve." Does not block G1 (no boule there); becomes load-bearing at **G2**.
+- **The unit of a roguelike run — one wafer/slice vs one boule/batch. → RESOLVED at G2
+  (2026-06-12).** The synced answers *single-wafer roguelike* and *boule→batch* were in tension: do
+  you follow one slice at axial position `z` (the boule just sets your starting resistivity), or
+  process the whole batch (which leans tycoon)? A pedagogical wrinkle rode on it — Scheil's payoff is
+  seeing resistivity vary *down the boule*, which a strictly single-wafer view never shows. **The
+  reconciliation built is the one this bullet anticipated: the unit of a run is one wafer at axial
+  `slice_z`** (a `CzochralskiKnobs.slice_z` field; the boule is *shared context* that sets that
+  wafer's starting substrate via the `channel_N_A` Scheil-slice property). The boule→batch view is
+  **`run_batch`** — an analysis/demo sweep down the boule that surfaces where each slice sits on the
+  Scheil curve (the `demo_boule` artifact), **not** the roguelike loop. So "single-wafer run, but
+  surface where your slice sits on the boule's Scheil curve" is realized: single-wafer stays the
+  unit; the batch is a view. (The axial boule story is per-wafer, so it composes orthogonally with
+  the radial die-map story; G1's "diffusion once, broadcast" survives within each wafer.)
 - The exact `WaferState` schema and the die-grid resolution (how many sites per wafer).
 - The spec-window source — cited where possible (device targets), house numbers where not.
 - The variation-magnitude defaults (the stochastic layer's σ's) — cited vs calibrated-flagged.

@@ -115,15 +115,21 @@ class Die:
 class WaferState:
     """An immutable snapshot of the wafer: its die map, substrate doping, and append-only provenance.
 
-    ``channel_N_A`` (cm⁻³) is the starting p-type substrate doping (the Phase-1 wafer — a scalar
-    in G1, becomes the Scheil-varying boule slice at G2). ``dies`` is the die map (fixed order —
-    the determinism contract). ``provenance`` is the append-only wafer-level :class:`StepRecord`
-    trail; ``rework_log`` accumulates rework events (see :mod:`fab_game.pipeline`).
+    ``channel_N_A`` (cm⁻³) is the starting p-type substrate doping. As of G2 it is the **Scheil slice
+    of the boule** at this wafer's axial position ``slice_z`` (the fraction solidified, ``[0, 1)``);
+    ``resistivity_ohm_cm`` is the substrate resistivity that doping implies (the fab characterization
+    currency). Both are wafer-level — ``slice_z`` is constant across the die map (the axial boule
+    story composes orthogonally with the radial die-map story). They default to ``None`` so a bare
+    G1-style wafer is still constructible. ``dies`` is the die map (fixed order — the determinism
+    contract); ``provenance`` is the append-only wafer-level :class:`StepRecord` trail; ``rework_log``
+    accumulates rework events (see :mod:`fab_game.pipeline`).
     """
 
     wafer_id: str
     channel_N_A: float
     dies: tuple[Die, ...]
+    slice_z: float | None = None                             # axial fraction solidified (G2 boule slice)
+    resistivity_ohm_cm: float | None = None                  # substrate resistivity at this slice (Ω·cm)
     provenance: tuple[StepRecord, ...] = ()
     rework_log: tuple = ()                                    # tuple[ReworkRecord, ...] (avoids an import cycle)
 

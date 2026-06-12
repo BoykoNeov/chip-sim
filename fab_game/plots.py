@@ -65,6 +65,76 @@ def _nils_vs_radius(ax, wafer: WaferState) -> None:
     ax.legend(fontsize=8, loc="upper right")
 
 
+# --------------------------------------------------------------------------- #
+# G2 — the boule → batch artifact (the Scheil spread down the boule)
+# --------------------------------------------------------------------------- #
+def _scheil_panel(ax, result) -> None:
+    """Axial substrate doping N_A(z) down the boule (Scheil), with resistivity on a twin axis."""
+    import numpy as np
+
+    b = result.batch
+    boule = b.boule
+    z = np.linspace(0.0, max(b.z_positions), 200)
+    ax.plot(z, boule.axial_doping(z), color="#2f6db5", lw=2.0, label=f"Scheil N_A(z), k={boule.k:.2f}")
+    ax.axhline(boule.N_seed, color="0.6", ls=":", lw=1.0, label="k→1 (no segregation)")
+    ax.scatter(b.z_positions, b.channel_N_As, c="#2f6db5", s=22, zorder=3)
+    ax.set_xlabel("axial position z (fraction solidified)", fontsize=9)
+    ax.set_ylabel("substrate N_A (cm⁻³)", fontsize=9, color="#2f6db5")
+    ax.set_title("Czochralski boule: boron piles up down the boule", fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+    rax = ax.twinx()
+    rax.plot(b.z_positions, b.resistivities, color="#d62728", lw=1.4, marker="o", ms=3)
+    rax.set_ylabel("resistivity ρ (Ω·cm)", fontsize=9, color="#d62728")
+
+
+def _vt_window_panel(ax, result) -> None:
+    """Device V_t vs axial z, with the spec window shaded — the Scheil walk across the limit."""
+    b = result.batch
+    z = list(b.z_positions)
+    vt = [b.mean_V_t(w) for w in b.wafers]
+    lo, hi = result.v_t_lo, result.v_t_hi
+    ax.axhspan(lo, hi, color="#2ca02c", alpha=0.12, label=f"V_t spec [{lo:.2f}, {hi:.2f}]")
+    in_spec = [lo <= v <= hi for v in vt]
+    ax.plot(z, vt, color="0.4", lw=1.2, zorder=2)
+    ax.scatter([zz for zz, ok in zip(z, in_spec) if ok], [v for v, ok in zip(vt, in_spec) if ok],
+               c="#2ca02c", s=26, zorder=3, label="pass")
+    ax.scatter([zz for zz, ok in zip(z, in_spec) if not ok], [v for v, ok in zip(vt, in_spec) if not ok],
+               c="#d62728", s=26, zorder=3, label="scrapped")
+    ax.set_xlabel("axial position z (fraction solidified)", fontsize=9)
+    ax.set_ylabel("device V_t (V)", fontsize=9)
+    ax.set_title("Rising substrate doping walks V_t out of spec", fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+
+
+def _yield_panel(ax, result) -> None:
+    """Per-wafer yield down the boule — the consequence: the tail is scrapped."""
+    b = result.batch
+    ax.step(b.z_positions, [100 * y for y in b.yields], where="mid", color="#1c2530", lw=1.6)
+    ax.scatter(b.z_positions, [100 * y for y in b.yields],
+               c=["#2ca02c" if y >= 1.0 else "#d62728" for y in b.yields], s=26, zorder=3)
+    if result.scrap_z is not None:
+        ax.axvline(result.scrap_z, color="#d62728", ls="--", lw=1.0)
+        ax.text(result.scrap_z + 0.01, 50, f"scrap from z≈{result.scrap_z:.2f}", fontsize=8, color="#d62728")
+    ax.set_xlabel("axial position z (fraction solidified)", fontsize=9)
+    ax.set_ylabel("wafer yield (%)", fontsize=9)
+    ax.set_ylim(-5, 105)
+    ax.set_title("Yield down the boule", fontsize=10)
+
+
+def boule_figure(result):
+    """Assemble the G2 boule artifact from a :class:`~fab_game.demo_boule.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.6))
+    _scheil_panel(axes[0], result)
+    _vt_window_panel(axes[1], result)
+    _yield_panel(axes[2], result)
+    fig.suptitle("G2 — one boule, sliced down its length: Scheil segregation → V_t spread → "
+                 "the tail is scrapped", fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    return fig
+
+
 def fab_game_figure(result):
     """Assemble the 2×2 G1 artifact figure from a :class:`~fab_game.demo_fab_game.DemoResult`."""
     import matplotlib.pyplot as plt

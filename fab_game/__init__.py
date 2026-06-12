@@ -30,6 +30,7 @@ from .state import (
 )
 from .recipe import (
     DEFAULT_RECIPE,
+    CzochralskiKnobs,
     DeviceKnobs,
     DiffusionKnobs,
     LithoKnobs,
@@ -39,11 +40,13 @@ from .recipe import (
 from .variation import NO_VARIATION, DiePerturbation, Variation
 from .spec import DEFAULT_SPECS, SpecSet, SpecWindow
 from .pipeline import (
+    BatchResult,
     LineResult,
     ReworkRecord,
     diagnose,
     initial_wafer,
     rework_litho,
+    run_batch,
     run_line,
     wafer_yield,
 )
@@ -52,12 +55,13 @@ __all__ = [
     # state
     "Die", "DieStepRecord", "StepRecord", "Verdict", "WaferState", "build_die_map",
     # recipe
-    "Recipe", "DiffusionKnobs", "OxidationKnobs", "LithoKnobs", "DeviceKnobs", "DEFAULT_RECIPE",
+    "Recipe", "CzochralskiKnobs", "DiffusionKnobs", "OxidationKnobs", "LithoKnobs", "DeviceKnobs",
+    "DEFAULT_RECIPE",
     # variation
     "Variation", "DiePerturbation", "NO_VARIATION",
     # spec
     "SpecSet", "SpecWindow", "DEFAULT_SPECS",
     # pipeline
-    "run_line", "initial_wafer", "wafer_yield", "diagnose", "rework_litho",
-    "LineResult", "ReworkRecord",
+    "run_line", "run_batch", "initial_wafer", "wafer_yield", "diagnose", "rework_litho",
+    "LineResult", "BatchResult", "ReworkRecord",
 ]

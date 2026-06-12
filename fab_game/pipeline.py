@@ -18,6 +18,8 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
+from chip.czochralski import Boule
+
 from .recipe import DEFAULT_RECIPE, Recipe
 from .spec import DEFAULT_SPECS, SpecSet
 from .state import Die, StepRecord, Verdict, WaferState, build_die_map
@@ -35,10 +37,12 @@ def initial_wafer(
     edge_exclusion: float = 0.95,
     wafer_id: str = "W1",
 ) -> WaferState:
-    """A fresh wafer: the die map + the substrate doping, no process steps run yet."""
+    """A fresh wafer: the die map + the boule-sliced substrate doping/resistivity, no steps run yet."""
     return WaferState(
         wafer_id=wafer_id,
         channel_N_A=recipe.channel_N_A,
+        slice_z=recipe.czochralski.slice_z,
+        resistivity_ohm_cm=recipe.substrate_resistivity_ohm_cm,
         dies=build_die_map(grid_n=grid_n, edge_exclusion=edge_exclusion),
     )
 
@@ -109,6 +113,84 @@ def run_line(
 
     # 5. Test — apply the spec windows → the verdicts (and the running yield in provenance).
     return _test_wafer(wafer, specs)
+
+
+# --------------------------------------------------------------------------- #
+# The boule → batch sweep (the G2 unit-of-run reconciliation)
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class BatchResult:
+    """A batch of wafers sliced down one boule — the Scheil spread made visible (the G2 artifact).
+
+    ``boule`` the grown crystal; ``z_positions`` the axial fractions sliced; ``wafers`` the scored
+    :class:`WaferState` at each (same order). Boron's ``k<1`` raises ``N_A`` (and hence ``V_t``)
+    toward the tail, so the tail wafers drift out of the ``V_t`` window — :attr:`yields` falls down
+    the boule. The substrate doping is the **only** thing that changes between wafers (same seed,
+    same recipe), so the trend is the clean Scheil signal.
+    """
+
+    boule: Boule
+    z_positions: tuple[float, ...]
+    wafers: tuple[WaferState, ...]
+
+    @property
+    def yields(self) -> tuple[float, ...]:
+        """Per-wafer yield down the boule (``good/total`` at each ``z``)."""
+        return tuple(wafer_yield(w) for w in self.wafers)
+
+    @property
+    def channel_N_As(self) -> tuple[float, ...]:
+        """Per-wafer substrate doping (cm⁻³) — the Scheil profile sampled at ``z_positions``."""
+        return tuple(w.channel_N_A for w in self.wafers)
+
+    @property
+    def resistivities(self) -> tuple[float, ...]:
+        """Per-wafer substrate resistivity (Ω·cm) down the boule."""
+        return tuple(w.resistivity_ohm_cm for w in self.wafers)
+
+    def mean_V_t(self, wafer: WaferState) -> float:
+        """Mean device ``V_t`` over a wafer's working dies (the Scheil consequence the spec scores)."""
+        vts = [d.V_t for d in wafer.dies if d.V_t is not None]
+        return float(np.mean(vts)) if vts else float("nan")
+
+
+def run_batch(
+    recipe: Recipe = DEFAULT_RECIPE,
+    *,
+    z_positions: tuple[float, ...] | None = None,
+    n_wafers: int = 6,
+    z_max: float = 0.85,
+    seed: int = 0,
+    variation: Variation = NO_VARIATION,
+    specs: SpecSet = DEFAULT_SPECS,
+    grid_n: int = 5,
+    edge_exclusion: float = 0.95,
+) -> BatchResult:
+    """Slice a wafer batch down the boule and run each through the line → :class:`BatchResult`.
+
+    The G2 unit-of-run reconciliation (plan §10): a *run* is still one wafer; a **batch** is the same
+    boule sliced at several axial positions, each wafer starting at its own Scheil doping. Each wafer
+    runs ``recipe`` with ``czochralski.slice_z`` set to its ``z`` (so ``channel_N_A`` differs per
+    wafer); within a wafer the substrate is uniform, so G1's "diffusion once, broadcast" survives.
+
+    Defaults to :data:`NO_VARIATION` so the batch isolates the **axial Scheil effect** — the only
+    difference between wafers is the substrate doping, so ``V_t`` vs ``z`` is the clean segregation
+    signal and yield steps as ``V_t`` crosses the spec window (real within-wafer variation, G1, would
+    blur that threshold). All wafers share ``seed``; the Scheil path consumes no RNG.
+    """
+    if z_positions is None:
+        z_positions = tuple(float(z) for z in np.linspace(0.0, z_max, n_wafers))
+    else:
+        z_positions = tuple(float(z) for z in z_positions)
+    wafers = tuple(
+        run_line(
+            replace(recipe, czochralski=replace(recipe.czochralski, slice_z=z)),
+            seed=seed, variation=variation, specs=specs,
+            grid_n=grid_n, edge_exclusion=edge_exclusion, wafer_id=f"W_z{z:04.2f}",
+        )
+        for z in z_positions
+    )
+    return BatchResult(boule=recipe.boule, z_positions=z_positions, wafers=wafers)
 
 
 def _test_wafer(wafer: WaferState, specs: SpecSet) -> WaferState:
