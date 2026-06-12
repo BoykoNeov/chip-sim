@@ -65,6 +65,14 @@ python -m chip.demo_junction            # → prints the table, saves docs/figur
 > Use the `python -m chip.demo_*` form, **not** `python chip/demo_*.py` — the demos are package
 > modules (relative imports), so the bare-path form fails with *"attempted relative import."*
 
+**Prefer to click?** A self-contained **interactive gallery** of all twelve — thumbnails linking to
+the full figures, each with its run command and source — is generated to
+[`docs/index.html`](docs/index.html) by `python -m chip.gallery`. Enable GitHub Pages (*Settings →
+Pages → `main` / `/docs`*) to serve it at `https://boikoneov.github.io/chip-sim/`. The page is
+generated from the demo modules (figure paths introspected, never hand-typed) and guarded by a
+fast-lane test (`chip/tests/test_gallery.py`), so it can't drift: add a demo and the gate stays red
+until the page is rebuilt.
+
 **The spine — the four process phases, in build order (start here):**
 
 | Run (`python -m …`) | Shows | Figure |

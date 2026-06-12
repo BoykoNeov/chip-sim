@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>chip-sim — visualization &amp; demo gallery</title>
+  <style>
+      :root {
+        --bg: #f6f7f9; --card: #ffffff; --ink: #1c2530; --muted: #5b6772;
+        --line: #e2e6ea; --accent: #2f6db5; --code: #0b3a66; --shot-bg: #fafbfc;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink);
+             font: 16px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      header { padding: 2.6rem 1.5rem 1.4rem; border-bottom: 1px solid var(--line);
+               background: linear-gradient(180deg, #fff, var(--bg)); }
+      .wrap { max-width: 1180px; margin: 0 auto; }
+      h1 { margin: 0 0 .25rem; font-size: 1.9rem; letter-spacing: -.01em; }
+      .tagline { margin: 0 0 1rem; color: var(--muted); font-size: 1.05rem; }
+      .lead { margin: 0 0 1rem; max-width: 70ch; }
+      .quick { margin: 0; padding: .7rem .9rem; background: #0d1b2a; color: #e6edf3;
+               border-radius: 8px; overflow-x: auto; font: .85rem/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; }
+      .quick .c { color: #7fb0e0; }
+      .repo { display: inline-block; margin-top: .8rem; font-weight: 600; }
+      main { max-width: 1180px; margin: 0 auto; padding: 1.6rem 1.5rem 3rem; }
+      section { margin-top: 2.2rem; }
+      h2 { font-size: 1.3rem; margin: 0 0 .2rem; }
+      .sub { margin: 0 0 1.1rem; color: var(--muted); }
+      .grid { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              overflow: hidden; display: flex; flex-direction: column;
+              transition: box-shadow .15s ease, transform .15s ease; }
+      .card:hover { box-shadow: 0 8px 24px rgba(20,40,70,.12); transform: translateY(-2px); }
+      .shot { display: block; background: var(--shot-bg); border-bottom: 1px solid var(--line); }
+      .shot img { display: block; width: 100%; height: auto; }
+      .body { padding: .9rem 1rem 1rem; display: flex; flex-direction: column; gap: .55rem; flex: 1; }
+      .tag { align-self: flex-start; font-weight: 700; font-size: .76rem; letter-spacing: .03em;
+             text-transform: uppercase; color: var(--accent); background: #eaf2fb;
+             border-radius: 999px; padding: .12rem .6rem; }
+      .blurb { margin: 0; flex: 1; }
+      .links { display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+               margin-top: .2rem; padding-top: .6rem; border-top: 1px dashed var(--line); }
+      .links code { color: var(--code); background: #eef3f8; border-radius: 6px;
+                    padding: .2rem .45rem; font: .8rem ui-monospace, "Cascadia Code", Consolas, monospace;
+                    overflow-x: auto; }
+      .src { white-space: nowrap; font-size: .85rem; }
+      .deeper { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+      .deeper .item { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+                      padding: .9rem 1rem; }
+      .deeper .item h3 { margin: 0 0 .25rem; font-size: 1rem; }
+      .deeper .item p { margin: 0; color: var(--muted); font-size: .9rem; }
+      footer { border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem;
+               padding: 1.4rem 1.5rem 2.4rem; }
+      footer code { background: #eef3f8; border-radius: 5px; padding: .1rem .35rem;
+                    font: .82rem ui-monospace, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>chip-sim &mdash; the gallery</h1>
+      <p class="tagline"><em>Process recipe in, device out.</em> An educational microchip-fabrication simulator.</p>
+      <p class="lead">Every fab step ships a self-contained demo that prints a cited validation table and
+        banks a figure. This page is the clickable front door to all of it: the
+        <strong>visualizations</strong> (click any figure for full size), the <strong>demos</strong> that
+        produce them (run command + source), the v1.x <strong>experiments</strong>, and the guided
+        <strong>notebook</strong>. The figures below are pre-committed, so the gallery browses without
+        running anything.</p>
+      <pre class="quick"><span class="c"># clone, install the figure stack, run any demo</span>
+pip install -e ".[viz]"
+python -m chip.demo_junction   <span class="c"># prints the table, banks docs/figures/chip-junction.png</span></pre>
+      <a class="repo" href="https://github.com/BoykoNeov/chip-sim">View the repository on GitHub&nbsp;&#8599;</a>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>The process spine</h2>
+      <p class="sub">The four phases, in build order &mdash; start here.</p>
+      <div class="grid">
+        <article class="card">
+          <a class="shot" href="figures/chip-junction.png" title="open the full figure">
+            <img src="figures/chip-junction.png" alt="Phase 1a — demo_junction figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">Phase 1a</span>
+            <p class="blurb">A pn junction from a two-step boron diffusion: junction depth x_j + sheet resistance R_s.</p>
+            <div class="links">
+              <code>python -m chip.demo_junction</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_junction.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/chip-oxidation.png" title="open the full figure">
+            <img src="figures/chip-oxidation.png" alt="Phase 2 — demo_oxidation figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">Phase 2</span>
+            <p class="blurb">Deal–Grove thermal oxide, wet vs dry, the linear→parabolic bend.</p>
+            <div class="links">
+              <code>python -m chip.demo_oxidation</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_oxidation.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/chip-litho.png" title="open the full figure">
+            <img src="figures/chip-litho.png" alt="Phase 3 — demo_litho figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">Phase 3</span>
+            <p class="blurb">The aerial image assembling from its diffraction orders + contrast-vs-pitch.</p>
+            <div class="links">
+              <code>python -m chip.demo_litho</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_litho.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/chip-device.png" title="open the full figure">
+            <img src="figures/chip-device.png" alt="Phase 4 — demo_device figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">Phase 4</span>
+            <p class="blurb">The whole process→device chain → MOS threshold voltage V_t.</p>
+            <div class="links">
+              <code>python -m chip.demo_device</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_device.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>The deepenings &mdash; experiments</h2>
+      <p class="sub">Optional depth: each promotes a named scope edge of its phase. (v1.5&ndash;v1.6 are
+        engine-internal amendments &mdash; native nonlinear D(u) and explicit stepping &mdash; with no chip
+        demo of their own.)</p>
+      <div class="grid">
+        <article class="card">
+          <a class="shot" href="figures/chip-thin-oxide.png" title="open the full figure">
+            <img src="figures/chip-thin-oxide.png" alt="v1.1 — demo_thin_oxide figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">v1.1</span>
+            <p class="blurb">Massoud thin-dry oxide correction — gate-oxide before/after, the V_t shift.</p>
+            <div class="links">
+              <code>python -m chip.demo_thin_oxide</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_thin_oxide.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/chip-oed-segregation.png" title="open the full figure">
+            <img src="figures/chip-oed-segregation.png" alt="v1.2 — demo_coupling figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">v1.2</span>
+            <p class="blurb">Phase 1↔2 back-coupling: OED deepening + segregation (boron depletes / phosphorus piles up).</p>
+            <div class="links">
+              <code>python -m chip.demo_coupling</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_coupling.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/chip-highconc.png" title="open the full figure">
+            <img src="figures/chip-highconc.png" alt="v1.3 — demo_diffusion_highconc figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">v1.3</span>
+            <p class="blurb">Concentration-dependent diffusivity D(N) — the high-concentration box.</p>
+            <div class="links">
+              <code>python -m chip.demo_diffusion_highconc</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_diffusion_highconc.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/chip-defocus.png" title="open the full figure">
+            <img src="figures/chip-defocus.png" alt="v1.4 — demo_defocus figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">v1.4</span>
+            <p class="blurb">Lithographic defocus — the depth of focus &amp; the Bossung curve.</p>
+            <div class="links">
+              <code>python -m chip.demo_defocus</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_defocus.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/chip-peb.png" title="open the full figure">
+            <img src="figures/chip-peb.png" alt="v1.7 — demo_peb figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">v1.7</span>
+            <p class="blurb">PEB acid-diffusion blur: the latent image dissolving + the PEB window.</p>
+            <div class="links">
+              <code>python -m chip.demo_peb</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_peb.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/chip-lateral-diffusion.png" title="open the full figure">
+            <img src="figures/chip-lateral-diffusion.png" alt="v1.8 — demo_lateral_diffusion figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">v1.8</span>
+            <p class="blurb">2-D lateral diffusion under a mask edge — the junction curving under the mask.</p>
+            <div class="links">
+              <code>python -m chip.demo_lateral_diffusion</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_lateral_diffusion.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/chip-car.png" title="open the full figure">
+            <img src="figures/chip-car.png" alt="v1.9 — demo_car figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">v1.9</span>
+            <p class="blurb">CAR reaction–diffusion PEB — the chemically-amplified bake.</p>
+            <div class="links">
+              <code>python -m chip.demo_car</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_car.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/chip-zernike.png" title="open the full figure">
+            <img src="figures/chip-zernike.png" alt="v1.10 — demo_zernike figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">v1.10</span>
+            <p class="blurb">Zernike aberrations (coma / astigmatism / spherical) — a pupil phase.</p>
+            <div class="links">
+              <code>python -m chip.demo_zernike</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_zernike.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Go deeper</h2>
+      <p class="sub">The interactive tour and the written record.</p>
+      <div class="deeper">
+        <a class="item" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/chip.ipynb">
+          <h3>The teaching notebook &#8599;</h3>
+          <p>chip/chip.ipynb &mdash; one section per phase with live ipywidgets sliders, ending on the
+            coherent process&rarr;device flow.</p>
+        </a>
+        <a class="item" href="https://github.com/BoykoNeov/chip-sim/blob/main/README.md">
+          <h3>README &amp; quickstart &#8599;</h3>
+          <p>Layout, the tiered test gate, and the text Demonstrations catalog.</p>
+        </a>
+        <a class="item" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/README.md#status">
+          <h3>Status writeups &#8599;</h3>
+          <p>Per-phase / per-version depth: cited references, headline numbers, scope edges, findings.</p>
+        </a>
+        <a class="item" href="https://github.com/BoykoNeov/chip-sim/tree/main/docs/decisions">
+          <h3>Decision records &#8599;</h3>
+          <p>ADRs 0001&ndash;0004 &mdash; language/perf, visualization/UX, test policy, the engine unfreeze.</p>
+        </a>
+        <a class="item" href="https://github.com/BoykoNeov/chip-sim/blob/main/docs/plans/microchip-fabrication.md">
+          <h3>The build plan &#8599;</h3>
+          <p>microchip-fabrication.md &mdash; the full process&rarr;device pedagogy and build order.</p>
+        </a>
+        <a class="item" href="https://github.com/BoykoNeov/chip-sim/tree/main/engines/diffusion">
+          <h3>The diffusion engine &#8599;</h3>
+          <p>The separately-validated 1-D/2-D solver spine the whole simulator reuses.</p>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">Generated from the demo modules by <code>python -m chip.gallery</code> &mdash;
+      figure paths are introspected, never hand-typed, so this gallery stays in lock-step with the demos.</div>
+  </footer>
+</body>
+</html>
