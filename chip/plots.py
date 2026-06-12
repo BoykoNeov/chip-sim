@@ -1102,3 +1102,113 @@ def car_figure(
                  f"APEX-E, dose {acid_dose:.2f})", fontsize=12.5, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     return fig
+
+
+# 2-D MOSFET cross-section (v1.11) — lateral S/D diffusion → the effective channel length.
+GATE_BAR_COLOR = "#444444"        # the poly gate drawn on the surface (the S/D's self-aligned mask)
+LEFF_TRUE_COLOR = "#2f6fb0"       # the honest two-window L_eff = 2·x_j (markers)
+LEFF_APPROX_COLOR = "#888888"     # the textbook subtraction L_drawn − 2·ΔL (line)
+PUNCHTHROUGH_COLOR = "#a93226"    # the punchthrough knee (the S/D fronts merge, channel closed)
+VT_FLAT_COLOR = "#27795b"         # V_t across the sweep (flat — the boundary, no rolloff)
+
+
+def device_2d_figure(result) -> "plt.Figure":
+    """The banked v1.11 artifact: the 2-D MOSFET cross-section beside the L_eff-vs-L_drawn mechanism.
+
+    Left panel (**the banked readout** — the S/D curving under the gate): the n⁺ dopant field
+    ``N(x, y)`` (log fill, depth downward), the half-cell solve **mirrored** into the full device — the
+    poly **gate** on the surface, the open **S/D windows** either side, the ``N = N_channel`` junction
+    contour wrapping **under the gate edges**. The drawn gate ``L_drawn`` and the shortened **effective
+    channel** ``L_eff`` (the surface gap the gate controls) are marked.
+
+    Right panel (**the mechanism** — validation + the boundary): the honest two-window ``L_eff_true``
+    (markers) lies on the textbook ``L_drawn − 2·ΔL`` (line) and both reach **punchthrough** at
+    ``L_drawn ≈ 2·ΔL``; on the twin axis ``V_t`` runs **flat** — the lateral diffusion moves the
+    channel *length* / drive *current*, never the *threshold* (the named DIBL tar pit stays out).
+
+    Consumes the demo's plain :class:`~chip.demo_device_2d.CrossSectionResult` (arrays — ADR 0002).
+    """
+    r = result
+    d = r.device
+    xh, y, N = d.x_um, d.y_um, d.N
+    full_x = np.concatenate([-xh[::-1], xh])             # mirror the half-cell into the full device
+    full_N = np.concatenate([N[::-1, :], N], axis=0)     # (2·nx, ny)
+    gate_half = 0.5 * d.L_drawn_um
+    x_j = 0.5 * d.L_eff_true_um                          # surface junction position (|x| = x_j)
+
+    fig, (ax_f, ax_m) = plt.subplots(1, 2, figsize=(13, 6))
+
+    # --- left: the 2-D MOSFET cross-section -----------------------------------------
+    floor = max(d.channel_N_A * 1e-2, 1.0)
+    logN = np.log10(np.maximum(full_N.T, floor))         # (ny, 2·nx): rows = depth
+    X, Y = np.meshgrid(full_x, y)
+    cf = ax_f.contourf(X, Y, logN, levels=24, cmap="magma")
+    cb = fig.colorbar(cf, ax=ax_f, pad=0.02)
+    cb.set_label("$\\log_{10} N$  (cm⁻³)")
+    ax_f.contour(X, Y, full_N.T, levels=[d.channel_N_A], colors=[JUNCTION_CONTOUR_COLOR], linewidths=2.2)
+
+    # the surface: S/D windows (warm) either side of the gate (dark) — a thin bar at y≈0
+    span = float(y[-1] - y[0])
+    bar_h = 0.045 * span
+    ax_f.add_patch(plt.Rectangle((full_x[0], -bar_h), -gate_half - full_x[0], bar_h,
+                                 color=WINDOW_BAR_COLOR, alpha=0.9, zorder=4, clip_on=False))
+    ax_f.add_patch(plt.Rectangle((gate_half, -bar_h), full_x[-1] - gate_half, bar_h,
+                                 color=WINDOW_BAR_COLOR, alpha=0.9, zorder=4, clip_on=False))
+    ax_f.add_patch(plt.Rectangle((-gate_half, -bar_h), 2 * gate_half, bar_h,
+                                 facecolor=GATE_BAR_COLOR, edgecolor="white", alpha=0.97, zorder=4,
+                                 clip_on=False))
+    ax_f.text(0.0, -bar_h * 0.5, "gate", ha="center", va="center", fontsize=8.5, color="white", zorder=5)
+    for xc in ((gate_half + full_x[-1]) / 2, (full_x[0] - gate_half) / 2):
+        ax_f.text(xc, -bar_h * 0.5, "S/D", ha="center", va="center", fontsize=8.5, color="white", zorder=5)
+
+    # L_drawn (the gate width, above the bar) and L_eff (the surface junction gap, just inside Si)
+    ax_f.annotate("", xy=(gate_half, -1.7 * bar_h), xytext=(-gate_half, -1.7 * bar_h),
+                  arrowprops=dict(arrowstyle="<->", color="0.25", lw=1.6), clip_on=False)
+    ax_f.text(0.0, -2.4 * bar_h, f"$L_{{drawn}}$ = {d.L_drawn_um:.2f} µm", ha="center", va="center",
+              fontsize=9, color="0.2", clip_on=False)
+    ax_f.annotate("", xy=(x_j, 0.05 * span), xytext=(-x_j, 0.05 * span),
+                  arrowprops=dict(arrowstyle="<->", color=JUNCTION_CONTOUR_COLOR, lw=2.0))
+    ax_f.text(0.0, 0.11 * span, f"$L_{{eff}}$ = {d.L_eff_true_um:.2f} µm", ha="center",
+              color=JUNCTION_CONTOUR_COLOR, fontsize=9.5, fontweight="bold")
+    ax_f.set_ylim(span, -2.8 * bar_h)                    # depth downward; room above for the bars/label
+    ax_f.set_xlabel("lateral position $x$  (µm)")
+    ax_f.set_ylabel("depth $y$  (µm)")
+    ax_f.set_title(f"n⁺ S/D curving under the gate  ($L_{{eff}}$ {d.shortening_frac * 100:.0f}% < "
+                   f"$L_{{drawn}}$)")
+
+    # --- right: L_eff vs L_drawn (validation) + V_t flat (the boundary) --------------
+    Ld, true, approx = r.L_drawn_sweep, r.L_eff_true_sweep, r.L_eff_approx_sweep
+    open_ = true > 0.0
+    ax_m.plot(Ld, Ld, ":", color="#bbbbbb", lw=1.3, label="$L_{eff}=L_{drawn}$ (no diffusion)")
+    ax_m.plot(Ld, approx, "-", color=LEFF_APPROX_COLOR, lw=2.4, label="textbook  $L_{drawn}-2\\Delta L$")
+    ax_m.plot(Ld[open_], true[open_], "o", color=LEFF_TRUE_COLOR, ms=7, zorder=5,
+              label="two-window solve  $2x_j$ (honest)")
+    ax_m.axvspan(float(Ld.min()) - 0.02, r.two_delta_L_um, color=PUNCHTHROUGH_COLOR, alpha=0.10)
+    ax_m.axvline(r.two_delta_L_um, color=PUNCHTHROUGH_COLOR, ls="--", lw=1.5)
+    ax_m.text(r.two_delta_L_um, 0.62 * float(Ld.max()), "punchthrough\n$L_{drawn}\\approx2\\Delta L$",
+              color=PUNCHTHROUGH_COLOR, fontsize=8.5, ha="center")
+    ax_m.plot([d.L_drawn_um], [d.L_eff_true_um], "D", color=DEVICE_JUNCTION_COLOR, ms=11, zorder=6,
+              label=f"device  ($L_{{drawn}}$ = {d.L_drawn_um:.2f} µm)")
+    ax_m.set_xlim(float(Ld.min()) - 0.02, float(Ld.max()) + 0.02)
+    ax_m.set_ylim(0.0, float(Ld.max()) + 0.02)
+    ax_m.set_xlabel("drawn gate length  $L_{drawn}$  (µm)")
+    ax_m.set_ylabel("effective channel  $L_{eff}$  (µm)")
+    ax_m.set_title("the two routes agree, then punch through together at $2\\Delta L$")
+    ax_m.grid(True, alpha=0.18)
+
+    ax_v = ax_m.twinx()                                  # V_t flat across the sweep — the boundary
+    ax_v.plot(Ld, np.full_like(Ld, r.V_t), "-", color=VT_FLAT_COLOR, lw=2.2,
+              label=f"$V_t$ = {r.V_t:.2f} V (flat — long-channel, no DIBL)")
+    ax_v.set_ylabel("$V_t$  (V)", color=VT_FLAT_COLOR)
+    ax_v.tick_params(axis="y", labelcolor=VT_FLAT_COLOR)
+    ax_v.set_ylim(0.0, max(1.0, r.V_t * 2.0))
+
+    h1, l1 = ax_m.get_legend_handles_labels()
+    h2, l2 = ax_v.get_legend_handles_labels()
+    ax_m.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=8.3, framealpha=0.95)
+
+    fig.suptitle("Microchip v1.11: the 2-D MOSFET cross-section — lateral S/D diffusion → effective "
+                 f"channel length  (n⁺ {d.sd_dopant}, {d.sd_T_celsius:.0f} °C / {d.sd_t_min:.0f} min)",
+                 fontsize=12.5, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    return fig

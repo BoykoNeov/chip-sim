@@ -35,11 +35,11 @@ jupyter lab chip/chip.ipynb             # the teaching notebook (needs .[viz,not
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow" -n auto     # routine fast lane — 254 tests, PARALLEL (~16 s vs ~53 s serial)
-./run_tests.ps1                           # full gate — 255 tests, SERIAL (adds the slow notebook smoke-test)
+./run_tests.ps1 -m "not slow" -n auto     # routine fast lane — 286 tests, PARALLEL (~16 s vs ~58 s serial)
+./run_tests.ps1                           # full gate — 287 tests, SERIAL (adds the slow notebook smoke-test)
 ```
 
-`-n auto` (pytest-xdist) fans the 254 CPU-bound tests across cores — **capped at half the logical
+`-n auto` (pytest-xdist) fans the 286 CPU-bound tests across cores — **capped at half the logical
 cores** (`conftest.py`: the suite floors on one module, so the back half buys ~nothing; the cap is
 an Amdahl throughput knob, not notebook headroom), and **only on the fast lane.**
 The one `slow` test executes `chip.ipynb` in a fresh kernel over a zmq/asyncio comms layer that
@@ -48,7 +48,7 @@ and CI — where it self-skips). The full gate stays **serial**, so the notebook
 xdist (the pin is structural, not a convention). It also self-skips under CI (a known infra hang
 on the GitHub runner — the kernel goes idle but `nbclient` never returns, not a content failure).
 `-n auto` is the blessed *command*, not baked into config, so single-test `-s`/pdb stays serial.
-The suite is **255 tests** (254 fast + 1 slow), all green; optional stacks are importorskip-gated,
+The suite is **287 tests** (286 fast + 1 slow), all green; optional stacks are importorskip-gated,
 so a headless checkout skips rather than errors.
 
 ## Demonstrations
@@ -94,6 +94,7 @@ until the page is rebuilt.
 | `chip.demo_lateral_diffusion` | **v1.8** — 2-D lateral diffusion under a mask edge (the junction curving under the mask) | [chip-lateral-diffusion.png](docs/figures/chip-lateral-diffusion.png) |
 | `chip.demo_car` | **v1.9** — CAR reaction–diffusion PEB (the chemically-amplified bake) | [chip-car.png](docs/figures/chip-car.png) |
 | `chip.demo_zernike` | **v1.10** — Zernike aberrations (coma / astigmatism / spherical), a pupil phase | [chip-zernike.png](docs/figures/chip-zernike.png) |
+| `chip.demo_device_2d` | **v1.11** — 2-D MOSFET cross-section: lateral S/D diffusion shortens the channel (`L_eff`), not `V_t` | [chip-device-2d.png](docs/figures/chip-device-2d.png) |
 
 *(v1.5–v1.6 are engine-internal amendments — native nonlinear `D(u)` and explicit stepping — with no
 chip demo of their own; they surface through `engines/diffusion`'s own test suite.)*

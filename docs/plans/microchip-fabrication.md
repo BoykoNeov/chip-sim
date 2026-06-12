@@ -883,6 +883,45 @@ from a 100 %-complete Steel to Chip.
 > module-docstring updated; whole-repo fast lane **254 → 269**. **No new ADR.** SHARED-FILE ASKS: a
 > `litho-zernike-v110` project memory note + the Zernike pin appended to `[[litho-aerial-image-source]]`.
 
+> **v1.11 — the 2-D MOSFET cross-section (lateral S/D diffusion → effective channel length): BUILT
+> (2026-06-12).** The composition that wires the engine's **2-D regime** (v1.8, `diffusion_2d`) into the
+> **process→device** payoff (Phase 4, `device`) — `chip/device_2d.py`, chip-local, **no engine edit, no new
+> ADR** (a composition of two already-validated modules). The physics: a self-aligned MOSFET forms its S/D
+> with **the gate as the mask**, so the n⁺ S/D diffuses *down and sideways under the gate edges*, shrinking
+> the drawn channel to an **effective** length `L_eff = L_drawn − 2·ΔL`. That `L_eff` is the honest place
+> 2-D geometry moves a device number — it feeds the drive current (`I_Dsat ∝ W/L`) while **`V_t` stays
+> long-channel**: short-channel rolloff / DIBL is the inherently-2-D electrostatics tar pit (plan §5 /
+> Phase-4 scope edge), left out — and a **regression guard** asserts `L` never leaks into `V_t`. **The
+> decisive finding (advisor-framed): this is a *validation* deepening, not new-physics.** The independent
+> **two-window half-cell** solve (gate centre = a no-flux symmetry plane, S/D window *outside* the gate —
+> exactly the right half of the symmetric two-S/D device) reads the channel **directly**,
+> junction-to-junction (`L_eff_true = 2·x_j`), and it **confirms** the textbook subtraction across the open
+> range *and* the **punchthrough** limit at `L_drawn ≈ 2·ΔL`. Its worth over "subtraction + clamp" is
+> **physical grounding** (a real `N = N_channel` crossing → a hard `L_eff = 0` floor at front-merge, where
+> the subtraction only clamps an unphysical negative) and **independence** (a *different BC topology* — two
+> windows + a symmetry plane vs one semi-infinite edge — so the agreement fails on a config/topology bug or if
+> superposition broke). The front-interaction effect that *would* split the two near the knee (the fronts
+> piling up under the no-flux gate) is **below the resolved scale here** — checked, no resolvable divergence
+> — so it is named, not featured (the advisor's reconcile, on the data: an earlier "smooth divergence"
+> guess was grid-noise). Banked artifact (`demo_device_2d.py` + `plots.device_2d_figure` →
+> `docs/figures/chip-device-2d.png`): the n⁺ S/D **curving under the gate** (the half-cell mirrored into the
+> full device, `L_drawn`/`L_eff` marked) beside the `L_eff`-vs-`L_drawn` mechanism — the two routes
+> coinciding down to the shaded punchthrough knee, with `V_t` running **flat** on the twin axis (the
+> boundary made visible). Coherent ~0.5 µm node: p-channel `N_A = 1e17`, dry gate oxide ~11 nm, n⁺-P S/D
+> 1000 °C / 6 min → `x_j` 0.12 µm, `ΔL` 0.10 µm (ratio 0.86); headline `L_drawn` 0.50 µm → **`L_eff` 0.29 µm
+> (42 % shorter)**, `I_Dsat` **×1.72**, `V_t` **0.38 V flat**; punchthrough ~0.21 µm. **13-test triad** (9
+> module + 4 demo): *analytic* = the exact **`lateral=False` seam** (recovers Phase 4 **bit-for-bit**, the
+> σ=0/z=0/K=0 pattern) + **two-window ≡ subtraction asserted *down toward the knee*** (the genuine
+> cross-check — different BC topology, not a wide-gate triviality); *conservation* = the **`V_t`∥L and
+> `I_Dsat ∝ 1/L` guards** (by-construction — billed as guards, **not** anchors, the device.py
+> self-consistency-leg framing); *benchmark (loose)* = the v1.8 cited lateral/vertical ratio → the ~40 %
+> shortening + the punchthrough threshold `≈ 2·ΔL`. Scope edges named: no short-channel `V_t`/DIBL
+> (guarded), the **isolated-edge / superposition approximation** (the divergence below the resolved scale),
+> punchthrough **refused**, constant-D S/D (the 2-D engine has no `D(N)` path), and the 1-D vertical device
+> / ideal self-aligned mask. Cited: `L_eff = L_drawn − 2·L_{D,lateral}` (Sze / Plummer / Taur–Ning) + v1.8's
+> `[[lateral-diffusion-source]]`. Whole-repo fast lane **273 → 286**. SHARED-FILE ASKS: a
+> `chip-device-2d-v111` project memory note.
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **`engines/diffusion`**
 engine in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**

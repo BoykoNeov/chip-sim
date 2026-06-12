@@ -128,6 +128,18 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   **loose** signatures = coma placement error / astig H↔V best-focus split / spherical pitch-dependent
   focus; scope edges = the 1-D pupil slice, paraxial-astig degeneracy, no asserted Strehl). Saves
   `docs/figures/chip-zernike.png`.
+- **To work on the 2-D MOSFET cross-section (v1.11 — the 2-D engine wired into the device flow):**
+  `device_2d.py` + `tests/test_device_2d.py`, the demo `demo_device_2d.py` +
+  `tests/test_demo_device_2d.py`, and `plots.device_2d_figure`. Composes **v1.8** (`diffusion_2d`, the
+  masked 2-D diffusion) with **Phase 4** (`device`): the gate is the S/D's self-aligned mask, so the
+  lateral encroachment `ΔL` shortens the channel to `L_eff = L_drawn − 2·ΔL`, which feeds `I_Dsat`
+  (`V_t` stays long-channel — the guarded boundary). `mosfet_cross_section` (the headline, with the
+  `lateral=False` Phase-4 seam + the punchthrough refusal), `effective_channel_um` (the cheap two-window
+  sweep), and the `_isolated_edge` / `_two_window_solve` internals. A **validation deepening** — the
+  two-window solve **confirms** the textbook `L_drawn − 2·ΔL` and the punchthrough limit `≈ 2·ΔL`; the
+  module docstring is its contract (tight = the bit-for-bit seam + two-window≡subtraction toward the
+  knee; guards = `V_t`∥L and `I_Dsat ∝ 1/L`; loose = the cited lateral ratio + punchthrough). Saves
+  `docs/figures/chip-device-2d.png`.
 - **To work on the device (Phase 4):** `device.py` + `tests/test_device.py`, the demo
   `demo_device.py` + `tests/test_demo_device.py`, and `plots.device_figure`. The **process → device**
   payoff — a chip-local compact closed form (**does not touch the engine**): `threshold_voltage`
@@ -407,6 +419,37 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   astig≡defocus degeneracy (exact only as NA→0), and a **Strehl/Maréchal number left un-asserted** (needs
   the 2-D pupil-disk integral, not 1-D slice samples; λ/14 quoted only as scale). Whole-repo fast lane
   **254→269**. **No new ADR.**
+- **v1.11 — the 2-D MOSFET cross-section (lateral S/D diffusion → effective channel length): BUILT**
+  (2026-06-12). `device_2d.py` — the composition that wires the engine's **2-D regime** (v1.8,
+  `diffusion_2d`) into the **process→device** payoff (Phase 4, `device`). A real self-aligned MOSFET
+  forms its S/D with **the gate as the mask**, so the n⁺ S/D diffuses *down and sideways under the gate
+  edges*, shrinking the drawn channel to an **effective** length `L_eff = L_drawn − 2·ΔL`. That `L_eff`
+  is the honest place 2-D geometry moves a device number — it feeds the drive current (`I_Dsat ∝ W/L`,
+  a shorter channel drives more current) while **`V_t` stays long-channel** (short-channel rolloff /
+  DIBL is the named 2-D-electrostatics tar pit, left out — and a regression guard asserts `L` never
+  leaks into `V_t`). A **validation deepening** (advisor-framed): the independent **two-window half-cell**
+  solve (gate centre = a no-flux symmetry plane, S/D window *outside* — exactly the right half of the
+  symmetric two-S/D device) reads the channel **directly** junction-to-junction (`L_eff_true = 2·x_j`)
+  and **confirms** the textbook subtraction across the open range *and* the **punchthrough** limit at
+  `L_drawn ≈ 2·ΔL`; its worth over "subtraction + clamp" is **physical grounding** (a real `N = N_channel`
+  crossing → a hard `L_eff = 0` floor at front-merge) and **independence** (a *different BC topology*, so
+  the agreement fails on a config/topology bug or if superposition broke). The front-interaction effect that would
+  split the two near the knee is **below the resolved scale** (checked, not featured). Coherent ~0.5 µm
+  node: p-channel `N_A = 1e17`, dry gate oxide ~11 nm, n⁺-P S/D 1000 °C / 6 min → `x_j` 0.12 µm, `ΔL`
+  0.10 µm (ratio 0.86); headline `L_drawn` 0.50 µm → **`L_eff` 0.29 µm (42 % shorter)**, `I_Dsat` **×1.72**,
+  `V_t` **0.38 V flat**; punchthrough ~0.21 µm. **13-test triad** (9 module + 4 demo): *analytic* = the
+  exact **`lateral=False` seam** (recovers Phase 4 **bit-for-bit**, the σ=0/z=0/K=0 pattern) + **two-window
+  ≡ subtraction asserted *down toward the knee*** (the genuine cross-check — different BC topology, not a
+  wide-gate triviality); *conservation* = the **`V_t`∥L and `I_Dsat ∝ 1/L` guards** (by-construction —
+  billed as guards, **not** anchors, the device.py self-consistency-leg framing); *benchmark (loose)* =
+  the v1.8 cited lateral/vertical ratio → the ~40 % shortening + the punchthrough threshold `≈ 2·ΔL`.
+  `demo_device_2d.py` + `plots.device_2d_figure` → `docs/figures/chip-device-2d.png` (the n⁺ S/D curving
+  under the gate beside the `L_eff`-vs-`L_drawn` validation with `V_t` flat). Scope edges named: no
+  short-channel `V_t`/DIBL (guarded), the **isolated-edge / superposition approximation** (the divergence
+  is below the resolved scale here), punchthrough **refused**, constant-D S/D (the 2-D engine has no
+  `D(N)` path), and the 1-D vertical device / ideal self-aligned mask. Cited: `L_eff = L_drawn −
+  2·L_{D,lateral}` (Sze / Plummer / Taur–Ning) + v1.8's `[[lateral-diffusion-source]]`. Whole-repo fast
+  lane **273→286**. **No engine edit, no new ADR** (chip-local composition of two validated modules).
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated
@@ -450,5 +493,5 @@ not correctness**: the per-phase triads already validate the numbers.
 `pyproject.toml`'s `testpaths` already carries `chip`, so `chip/tests/` is collected
 with no config change; `pythonpath = ["."]` lets chip import the engine as `engines.diffusion…`.
 The notebook smoke-test (`tests/test_chip_notebook.py`) is `slow`-marked, so the fast lane deselects it
-(and `-n auto` therefore rides only the fast lane, never co-scheduling the notebook with the 254 —
+(and `-n auto` therefore rides only the fast lane, never co-scheduling the notebook with the 286 —
 **the pin**, ADR 0003 amendment); it runs in the serial full gate (bare `./run_tests.ps1`).

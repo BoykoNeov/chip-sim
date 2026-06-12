@@ -85,6 +85,8 @@ DEEPENINGS = [
          "CAR reaction–diffusion PEB — the chemically-amplified bake."),
     Demo("demo_zernike", "v1.10",
          "Zernike aberrations (coma / astigmatism / spherical) — a pupil phase."),
+    Demo("demo_device_2d", "v1.11",
+         "2-D MOSFET cross-section — lateral S/D diffusion shortens the channel (L_eff), not V_t."),
 ]
 
 ALL_DEMOS = SPINE + DEEPENINGS
