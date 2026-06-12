@@ -129,20 +129,79 @@ some are flagged phenomenology, the yield/defect parts are explicitly stochastic
 
 | # | Step | Physics | Fidelity | Reuse / New | Rework | A failure looks like |
 |---|---|---|---|---|---|---|
-| 1 | **Silicon purification** (MGS → Siemens TCS CVD → EGS; opt. zone refining) | distillation / segregation → residual contamination field | **Low** (phenomenological, calibrated-flagged) | **New** (chip-sim) | re-refine (costly) | high C/O/metals → ↑ `D`, ↓ lifetime downstream |
-| 2 | **Czochralski growth** (pull rate, rotation, melt T, seed) → boule | **Scheil** axial dopant segregation; oxygen; dislocation-free (Dash neck) | **Scheil = High** (closed form, exact `k→1` limit + conservation); dislocation/oxygen Low | **New** (chip-sim) | irreversible (scrap/low-grade) | too-fast pull → dislocations / striations / resistivity spread |
+| 1 | **Silicon purification** (grade knob MGS/solar/EGS) **+ zone refining** | **segregation** (Pfann/Scheil) scrubs metals → a contamination *vector*; distillation = a grade knob, not a column sim (§5a) | **segregation High** (closed form, cited `k`); distillation/CVD Low (knob) | **New** (chip-sim) | re-refine / more zone passes (costly) | high C/O/metals → effect depends on species (§5a) |
+| 2 | **Czochralski growth** (pull rate, rotation, melt T, seed) → boule | **Scheil** axial dopant segregation; **crucible oxygen → thermal donors** (§5a); dislocation-free (Dash neck) | **Scheil/O-segregation High**; donor kinetics Mid; dislocation Low | **New** (chip-sim) | irreversible (scrap/low-grade) | too-fast pull → dislocations / striations / resistivity spread |
 | 3 | **Wafer prep** (slice → lap → etch → CMP → edge round → clean) | geometric/mechanical bookkeeping + particle statistics | geometry exact, **particles stochastic** | **New** (chip-sim) | re-polish/re-clean (costly, eats thickness) | TTV/bow out of spec; particle map seeds killer defects |
 | 4 | **Oxidation** (Deal–Grove / Massoud, wet/dry) | the validated oxide-growth closed form → local `t_ox` | **High** ✓ | **Reuse** `chip/oxidation.py` | strip & regrow oxide | `t_ox` out of window → `V_t` error |
 | 5 | **Lithography** (aerial image + defocus/Zernike + PEB/CAR) | the validated optics → printed CD + overlay | **High** ✓ | **Reuse** `chip/litho.py` | strip resist, re-coat & re-expose | defocus/overlay → CD out of spec → wrong `L_eff`/misalign |
 | 6 | **Dopant diffusion / implant + anneal → junction** | the engine + `D(N)` + 2-D lateral → profile, `x_j`, `R_s`, `L_eff` | **High** ✓ | **Reuse** `engines/diffusion`, `chip/diffusion_dopant.py`, `junction.py` | irreversible (can't un-diffuse) | over/under-drive → wrong `x_j`; lateral → punchthrough |
 | 7 | **Etch & deposition (+ CMP planarization)** | rate × time + anisotropy/selectivity/conformality/uniformity fields | **Low** (phenomenological, honest) | **New** (chip-sim) | depo sometimes strippable; over-etch irreversible | over/under-etch; non-conformal step coverage |
-| 8 | **Device extraction** (MOS `V_t`, `I_Dsat`, `L_eff` via 2-D) | the validated compact model, per die | **High** ✓ | **Reuse** `chip/device.py`, `device_2d.py` | n/a (a readout) | parametric out of spec for that die |
+| 8 | **Device extraction** (MOS `V_t`, `I_Dsat`, `L_eff`; **+ τ / leakage**) | the validated compact model **+ a new SRH lifetime + junction-leakage output** (§5a Tier 2) | `V_t`/`I_Dsat` **High** ✓; τ/leakage Mid (cited, loose) | **Reuse** `device.py`/`device_2d.py` **+ new `lifetime.py`** | n/a (a readout) | parametric OR lifetime/leakage out of spec |
 | 9 | **Packaging & test** (dice → attach → wire-bond → encapsulate → final test → bin) | assembly-yield + parametric/functional test against spec | **stochastic** yield model | **New** (chip-sim) | limited (rebond rare; cracked die = scrap) | dicing/bond defects; parametric bin-out |
 
 **The propagation web (the pedagogy).** Contamination → `D` & minority-carrier lifetime;
 Scheil resistivity → `V_t` spread across the batch; defocus/overlay → `L_eff`/misalignment;
 over-drive → punchthrough; particles → killer defects → dead dies. These edges are *physics
 wired through the state*, not scripted sad-faces — that is what makes it a simulation.
+
+### 5a. Contamination & purification — the consequence model
+
+*(The feasibility analysis behind steps 1–2 — where "badly purified materials" becomes physics.
+Advisor-reviewed; the physics claims below are verified.)*
+
+**The crux — propagation is gated by the device's *receiving variable*, not the engine.** The
+diffusion engine carries any impurity for free: one independent species run per contaminant,
+its own cited Arrhenius `D` (the engine is single-field, so multi-species = independent runs
+combined at the end — confirmed against `CONTRACT.md`). But a contaminant only propagates to a
+device number *as far as some device variable can receive it.* Today that variable is **net
+doping** — so "simulate bad purification" is really **"extend the consequence model,"** not
+"diffuse more species."
+
+**Four buckets — the *effect* differs, not the transport:**
+
+| Bucket | Example | Effect | Propagates today? | Cost |
+|---|---|---|---|---|
+| Shallow dopant | residual B/P | **net doping** | **free** — add to the net profile; `junction.py`/`device.py` already read it | nil |
+| Mobile ion | Na | **oxide charge** | **near-free** — lift `device.py`'s named `Q_ox=0` edge: `ΔV_FB = −Q_ox/C_ox` | trivial |
+| Deep-level metal | Fe/Cu/Ni | **SRH recombination center** (lifetime, leakage) — *not* doping | **no** — needs a new device output | Tier-2 module |
+| Reactive/aggregating | **oxygen** (crucible) | **thermal donors** via ~450 °C kinetics → net doping | **yes — once kinetics give the active fraction** | small kinetics |
+
+- **Metals: the diffusion solve is nearly pointless.** A fast interstitial (≈10 orders faster
+  than substitutional B/P) gives a *flat* profile — so model a metal as an **areal-dose budget +
+  active fraction + SRH consequence**, not a transport run. Its real fate (gettering /
+  precipitation at junctions, the actual device-killer) is a named **Tier-3** edge.
+- **The unifying thread** is the repo's existing **active-vs-chemical** scope edge
+  (`junction.py` full-activation; v1.3's `n_active_max` plateau), generalized: *chemical
+  concentration → electrically-active fraction → device effect*, the mapping differing by
+  species (dopant ≈100 % net doping; metal ≈0 % doping / X % recombination; oxygen
+  donor-kinetics-gated). This makes contamination a **backbone**, not a bolt-on.
+
+**Purification is segregation — the verifiable win.** Zone refining and CZ purify by `k<1`
+segregation: single-pass **Pfann** `C(x)/C₀ = 1 − (1−k)·e^(−kx/L)`, **Scheil**
+`C_s(z) = k·C₀·(1−z)^{k−1}` — closed-form, triad-able, cited `k` (**Trumbore 1960 — already in
+our citations** for solid solubility, also tabulates distribution coefficients). The tiny `k`
+for metals (Fe ~1e-5, Cu ~1e-4) vs near-unity for B/P (~0.8 / ~0.35) is *why* refining scrubs
+metals superbly and barely touches B/P — a teachable result straight from the `k` table. Tight
+legs: the `k→1` limit + mass conservation; calibrated edge: `k_eff(v)` (Burton–Prim–Slichter,
+growth-rate/stirring). The **Siemens chlorosilane distillation is a different domain**
+(separations, weak coupling to the device payoff) → model it as a **grade knob** (MGS / solar /
+EGS → a starting impurity vector), **not** a column sim.
+
+**Build tiers:**
+- **Tier 1 — build, cheap *and* verifiable.** Segregation purification (Pfann/Scheil) + dopant
+  & oxygen contaminants through net doping + Na → `Q_ox`. Most of the "bad purification" story,
+  and the verifiable part.
+- **Tier 2 — one bounded new module (`lifetime.py`), worth it.** SRH lifetime `τ(N_metal)` +
+  junction reverse-leakage as **new device outputs** — because the game wants "**does it
+  work?**" beyond `V_t` anyway (a leaky, low-lifetime diode is how a metal contaminant kills
+  yield). Cited (Sze; Graff, *Metal Impurities in Silicon*), magnitudes **loose**.
+- **Tier 3 — name and flag, do not first-principles.** Gettering/precipitation, oxide
+  breakdown / `D_it` degradation, the Siemens distillation column.
+
+**Validation honesty.** The **tight** leg of the whole contamination feature is the
+**segregation math** (Pfann/Scheil — exact `k→1` + mass conservation). The **metal
+device-degradation magnitudes** (capture cross-sections, active fractions, `D_it`) are
+**calibrated/loose** — flagged, not asserted with Scheil's anchors.
 
 ---
 
@@ -160,15 +219,22 @@ thing).
   banked artifact: one bad knob → a dead die, with the failure trail. **All reuse, zero new
   physics** — proves the mechanism. *(This is the `process.py` that was never built, now with
   state, variation, and yield.)*
-- **G2 — Czochralski + Scheil + boule→batch.** The first new physics, in chip-sim: the
-  **Scheil** equation (the verifiable front-of-line win — see §7), the boule with axial
-  resistivity variation, slicing into a wafer batch where each wafer starts different; wire
-  resistivity into the device readout.
+- **G2 — Czochralski + Scheil + boule→batch (+ the first contamination demo).** The first new
+  physics, in chip-sim: the **Scheil** equation (the verifiable front-of-line win — see §7 / §5a)
+  for axial dopant *and* **crucible-oxygen** segregation, the boule with axial resistivity
+  variation, slicing into a wafer batch where each wafer starts different; wire resistivity into
+  the device readout. **Oxygen → thermal donors is the first contamination story** (§5a bucket 4)
+  — CZ-native, and it rides the existing net-doping flow once the donor kinetics give the active
+  fraction.
 - **G3 — Wafer prep + particles + the die map made physical.** Defect events placed at
   locations on the across-wafer map; killer-defect functional yield; geometry (TTV/bow)
   bookkeeping.
-- **G4 — Silicon purification + the contamination field.** The residual-impurity field, wired
-  to `D` and lifetime downstream — the longest-range propagation edge.
+- **G4 — Silicon purification + the contamination consequence model (§5a).** **Segregation
+  purification** as real physics (Pfann zone-refining `C/C₀ = 1−(1−k)e^(−kx/L)` + cited `k`; the
+  *grade knob* for the Siemens route). Then the contamination buckets wired to their
+  consequences: dopant & Na ride the existing flow (Tier 1); the **Tier-2 device output** — a new
+  `lifetime.py` (SRH `τ(N_metal)` + junction leakage) — lands the metals' effect that net doping
+  can't carry. Gettering/precipitation stays a named edge (Tier 3).
 - **G5 — Etch / deposition / CMP.** The missing mid-line operations (phenomenological, honest).
 - **G6 — Packaging & test & binning.** The back-end assembly yield + parametric/functional test.
 - **G7 — Roguelike framing + scoring + a Textual TUI; sandbox mode.** The game shell over the
@@ -186,8 +252,11 @@ thing).
   pattern and is the one genuinely-verifiable front-of-line physics win. Caveat the
   **benchmark leg** owns: `C_s` diverges as `z→1` (you never solidify the full melt), so the
   realistic resistivity-*spread* numbers are the loose/calibrated leg — the tight legs are the
-  `k→1` limit and the conservation integral, not a number near the tail. Purification, etch,
-  and packaging are **flagged phenomenology** — honest, calibrated, scope-edge named.
+  `k→1` limit and the conservation integral, not a number near the tail. For **contamination**
+  (§5a) the same split holds: segregation purification (Pfann/Scheil) is the *tight* leg, while
+  the metal device-degradation magnitudes (SRH cross-sections, active fractions, `D_it`) are
+  the *loose/calibrated* leg. Etch and packaging are **flagged phenomenology** — honest,
+  calibrated, scope-edge named.
 - **Game mechanics (`fab_game`) — invariants, not magnitudes** (ADR 0005): the
   import-direction guard; **determinism** under a fixed seed; **propagation actually wired**
   (a worse inherited field never yields a better downstream observable where physics forbids

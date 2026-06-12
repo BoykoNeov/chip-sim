@@ -44,6 +44,25 @@ single-wafer view never shows. Clean reconcile = single-wafer run that surfaces 
 sits on the boule's Scheil curve. Other G1 opens: WaferState schema + die-grid resolution,
 spec-window sources, variation σ defaults, pipeline-vs-state-machine, seeded-RNG home.
 
+**CONTAMINATION/PURIFICATION feasibility (folded into plan §5a, advisor-verified 2026-06-12):**
+THE crux = propagation is gated by the **device's receiving variable, NOT the engine** — today
+that's **net doping**, so "simulate bad purification" = **extend the consequence model**, not
+diffuse more species (engine is single-field, multi-species = independent runs). **Four buckets:**
+(1) shallow dopant B/P → net doping → rides existing flow **FREE**; (2) Na → oxide charge → lift
+`device.py`'s named `Q_ox=0` edge (`ΔV_FB=−Q_ox/C_ox`) **near-free**; (3) deep-level metal Fe/Cu/Ni
+→ **SRH recombination center** (lifetime/leakage) NOT doping → propagates to **NOTHING today** (needs
+new device output); (4) **oxygen** (crucible) → **thermal donors** via ~450°C kinetics → net doping
+(the CZ-native first contamination demo). Metals: fast interstitial → flat profile → diffusion solve
+**nearly pointless** → model as areal-dose budget + active fraction + SRH, NOT transport; fate
+(gettering/precip) = Tier-3 edge. Unifying thread = the repo's existing **active-vs-chemical** edge
+generalized. **Purification = segregation** (Pfann `C/C₀=1−(1−k)e^(−kx/L)` / Scheil), triad-able,
+cited `k` (**Trumbore 1960 — ALREADY a repo citation**; Fe~1e-5/Cu~1e-4 vs B~0.8/P~0.35 = why
+refining scrubs metals not B/P); Siemens distillation = a **grade knob**, NOT a column sim. **Tiers:**
+T1 segregation+dopant/O+Na (cheap+verifiable), T2 a new `lifetime.py` SRH τ+leakage device output
+(loose magnitudes), T3 gettering/oxide-breakdown/distillation (name+flag). Tight leg = segregation;
+loose = metal magnitudes.
+
 Inherits chip-sim's tar pits (no TCAD/EMF, microchip §5) + the export-control **educational
 carve-out** (generic textbook physics, no real recipes/targeting). [[engine-unfrozen]] is the
-reusable engine spine; [[lateral-diffusion-2d]]/[[chip-device-2d-v111]] are the 2-D reuse.
+reusable engine spine; [[lateral-diffusion-2d]]/[[chip-device-2d-v111]] are the 2-D reuse;
+[[dopant-solid-solubility-source]] (Trumbore 1960) already covers the segregation `k`.
