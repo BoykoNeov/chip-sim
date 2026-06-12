@@ -19,8 +19,10 @@ engines/diffusion/   # the 1-D diffusion/heat solver (+ its own tests)
 chip/                # the simulator: diffusion_dopant, junction, oxidation, litho, device,
                      #   coupling (Phase 1↔2 OED + segregation), diffusion_highconc (v1.3 D(N) box),
                      #   plots, demos, chip.ipynb
-docs/decisions/      # ADRs 0001–0004 (language/perf, visualization/UX, test policy, engine unfreeze)
-docs/plans/          # microchip-fabrication.md — the full build plan
+docs/decisions/      # ADRs 0001–0005 (language/perf, visualization/UX, test policy, engine unfreeze,
+                     #   fab-game layering)
+docs/plans/          # microchip-fabrication.md — the full build plan;
+                     #   fab-game.md — the gamified full-line simulator (a new direction, on top of chip-sim)
 docs/figures/        # banked figures (chip-*.png)
 ```
 
