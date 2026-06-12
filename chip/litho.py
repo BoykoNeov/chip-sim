@@ -40,8 +40,9 @@ Validation triad (plan §3) — what is asserted tight vs loose
   selects **exactly {0, +1}**, so the two-beam cos² *falls out of the Abbe workhorse itself*. **Scope
   edge, named (the §5 risk-phase gradient, *inside* the module):** v1 is **scalar** diffraction (no
   vector/polarization — honest only at low/moderate NA; immersion NA>1 needs the vector + index
-  treatment), an **aberration-free pupil apart from defocus** (the **defocus** phase is modelled in
-  **v1.4** — see below — but no other Zernikes: coma/astigmatism/spherical are out), **Abbe not
+  treatment), an **aberration-free pupil apart from defocus and the low-order Zernikes** (the
+  **defocus** phase is modelled in **v1.4** — see below — and **coma/astigmatism/spherical** as a
+  Zernike pupil phase in **v1.10** — see §10 below), **Abbe not
   Hopkins** (a *method* choice — same answer, different cost — named because Hopkins is the tar pit), a
   **constant-threshold resist** (the **PEB acid-diffusion blur** is modelled in **v1.7** — see §8
   below — but development kinetics are not: the clip is still a constant threshold, now applied to
@@ -207,6 +208,53 @@ Development clips the **deprotection profile** ``1−m`` (the chemically-faithfu
   Scope edges still named: **linear exposure** (no Dill), **constant-threshold development** (no Mack
   dissolution-rate kinetics), the free-volume ``D_h,1`` coefficient **uncalibrated** (illustrative;
   default constant ``D``), and the ``x``/``z`` blurs uncoupled (no 2-D resist volume).
+
+v1.10 (§10) — Zernike aberrations: coma, astigmatism & spherical, a pupil phase (the promoted edge)
+---------------------------------------------------------------------------------------------------
+The §-named "aberration-free pupil apart from defocus" edge, promoted — and it lands on the **same
+finding as v1.4**: a Zernike aberration is a pure **phase** on the pupil, so :func:`coherent_image`
+already images through it with no new path. Each line/space order rides the pupil at the normalized
+1-D slice coordinate ``u = f_total/f_cut`` (``f_total = f_m + f_s``, ``|u| ≤ 1`` for a collected
+order), and :func:`zernike_phase` multiplies it by ``exp(i·2π·W(u))`` with the wavefront error the
+sum of the standard **balanced-Zernike** radial polynomials on that θ = 0/π slice (in waves)::
+
+    W(u) = coma·(3u³−2u)·cos φ_g  +  astigmatism·u²·cos 2φ_g  +  spherical·(6u⁴−6u²)
+
+— coma the **odd** ``3u³−2u`` (with a built-in tilt balance), astigmatism/spherical **even** (the
+spherical ``−6u²`` is the defocus balance). The coefficients are an :class:`Aberrations` frozen
+dataclass (in waves), threaded through :func:`abbe_image`/:func:`expose_grating` as ``aberrations=None``;
+the unaberrated default short-circuits to the float ``1.0`` so the image is v1 **bit-for-bit**. Kept
+**separate from** ``defocus_nm`` (waves/paraxial-Zernike here vs v1.4's exact nm ``1 − cosθ``). The
+mini-triad:
+
+* **Analytic (tight).** (a) The degenerate seam — all-zero (or ``aberrations=None``) is the v1 image
+  **bit-for-bit**. (b) **Parity.** An EVEN aberration (astigmatism, spherical) leaves a symmetric image
+  symmetric — a symmetric two-beam pair carrying *equal* even phase has it factor out of ``|Σ|²`` → the
+  image is unchanged to machine precision (astig at the pupil rim, spherical at an *interior* pair — the
+  rim is *trivial* for spherical, whose balanced form is 0 at ``u = ±1``, so the interior pair is the
+  real test). The ODD coma instead gives the two beams *opposite* phase → a **pure lateral fringe
+  shift**, contrast preserved (the dipole the v1.4 *defocus* left invariant, coma *translates*). (c)
+  **The coma↔defocus discriminator (the load-bearing anchor).** For the on-axis three-beam image both
+  defocus and coma give the *same* fundamental magnitude ``4c₀c₁cos φ`` — the cos-only
+  :func:`fundamental_amplitude` cannot tell them apart. The **complex** fundamental
+  (:func:`fundamental_complex`) can: its phase is **exactly** the ±1 order's aberration phase — ``0`` for
+  even defocus, the coma shift for odd coma — to machine precision.
+* **Conservation (tight) — aberrations are unitary.** Phase-only ⇒ ``|amplitude|²`` is untouched ⇒ the
+  power balance ``mean(image) = Σ|c_m|² =`` :func:`transmitted_power` holds at **every** aberration level
+  to machine precision (``transmitted_power`` never sees the phase — a real check the build added *phase*,
+  not amplitude). The v1.4 defocus conservation leg, extended for free.
+* **Benchmark (loose) — the litho-native signatures (not a Strehl number).** Coma → **pattern placement
+  error** (the fringe shift ∝ the coma coefficient) and an **asymmetric image** (which the v1.7/v1.9 PEB
+  symmetry cell **refuses**, the same way it refuses the v1.4 off-axis-defocus fringe shift). Astigmatism
+  → an **H↔V best-focus split** (``φ_g = 0`` vs 90° shift best focus in *opposite* directions; a plain
+  defocus offset does not) — the signature that makes astig ≠ defocus in 1-D. Spherical → **pitch-
+  dependent best focus** (the balanced ``−6u²`` makes the best-focus defocus offset depend on where the
+  orders ride the pupil; pure-defocus best focus is pitch-independent at ``z = 0``). Scope edges, named:
+  the **1-D pupil slice** of the 2-D Zernikes (the orders sample only the ``f_x`` axis), the coefficient
+  on the *peak* (Seidel-balanced) polynomial in waves (not the Noll RMS-normalized 2-D coefficient),
+  astig's degeneracy with a **paraxial** ``u²`` defocus (exact only as ``NA → 0``, since v1.4's defocus
+  is the full ``1 − cosθ``), and a Strehl/Maréchal number left **un-asserted** (it needs the 2-D pupil-disk
+  integral, not a handful of slice samples — the honest discrete-1-D caveat).
 """
 from __future__ import annotations
 
@@ -430,7 +478,7 @@ def defocus_phase(f_total, imaging: Imaging, defocus_nm: float):
 
 
 def abbe_image(x_nm, orders, imaging: Imaging, source_fs=None, n_source: int = 21,
-               defocus_nm: float = 0.0):
+               defocus_nm: float = 0.0, aberrations: "Aberrations | None" = None):
     """Partially-coherent aerial image by the **Abbe sum over source points** (not Hopkins TCC).
 
     For each source point ``f_s`` (an illumination direction), the mask spectrum shifts so order ``m``
@@ -439,12 +487,13 @@ def abbe_image(x_nm, orders, imaging: Imaging, source_fs=None, n_source: int = 2
     frequencies ``f_m`` (the common illumination carrier ``exp(2πi·f_s·x)`` has unit modulus and drops
     out of the intensity). The partially-coherent image is the **incoherent average** over the source::
 
-        I(x) = (1/N_s)·Σ_{f_s} | Σ_m c_m·P(f_m + f_s)·D(f_m + f_s; z)·exp(2πi·f_m·x) |²
+        I(x) = (1/N_s)·Σ_{f_s} | Σ_m c_m·P(f_m + f_s)·D·A·exp(2πi·f_m·x) |²
 
-    where ``D`` is the :func:`defocus_phase` of each collected order (``z = defocus_nm``; ``D ≡ 1`` and the
-    image is **bit-for-bit** the in-focus one when ``z = 0`` — the v1.4 degenerate seam). The defocus phase
-    keys on the **full pupil coordinate** ``f_m + f_s`` (the order's true propagation angle), so an off-axis
-    source point shifts an order's defocus sensitivity along with its pupil position.
+    where ``D`` is the :func:`defocus_phase` and ``A`` the :func:`zernike_phase` of each collected order,
+    both keyed to the **full pupil coordinate** ``f_m + f_s`` (the order's true propagation angle / slice
+    position). ``z = defocus_nm`` and ``aberrations`` (coma/astigmatism/spherical, v1.10) are both pure
+    phase: ``D ≡ A ≡ 1`` and the image is **bit-for-bit** the unaberrated, in-focus one when ``z = 0`` and
+    ``aberrations`` is ``None`` (the degenerate seam).
 
     ``source_fs`` is an explicit array of source spatial frequencies (build it with
     :func:`conventional_source`, :func:`on_axis_source`, or :func:`offaxis_source`); if omitted, a
@@ -459,7 +508,8 @@ def abbe_image(x_nm, orders, imaging: Imaging, source_fs=None, n_source: int = 2
     x = np.asarray(x_nm, dtype=float)
     total = np.zeros(x.shape, dtype=float)
     for fs in source_fs:
-        passed = [(f, c * defocus_phase(f + fs, imaging, defocus_nm))
+        passed = [(f, c * defocus_phase(f + fs, imaging, defocus_nm)
+                   * zernike_phase(f + fs, imaging, aberrations))
                   for (f, c) in orders if abs(f + fs) <= cutoff]
         total = total + coherent_image(x, passed)
     return total / len(source_fs)
@@ -618,6 +668,7 @@ def expose_grating(
     threshold: float | None = None,
     n_x: int = 512,
     defocus_nm: float = 0.0,
+    aberrations: "Aberrations | None" = None,
     peb_diffusion_length_nm: float = 0.0,
     peb_n_steps: int = 200,
 ) -> PrintedFeature:
@@ -629,8 +680,10 @@ def expose_grating(
     the constant-threshold CD of the dark line. ``threshold`` defaults to the **image mean** (a balanced
     clip → nominal duty on a well-resolved image); pass a fixed value to sweep pitch at constant dose.
     ``defocus_nm`` (v1.4) images out of focus (``z = 0`` is the in-focus default, bit-for-bit v1) — sweep
-    it at a fixed ``threshold`` to trace a **Bossung** CD-vs-defocus curve. The high-level entry mirroring
-    :func:`oxidation.grow_oxide`. Returns a :class:`PrintedFeature`.
+    it at a fixed ``threshold`` to trace a **Bossung** CD-vs-defocus curve. ``aberrations`` (v1.10) adds a
+    Zernike pupil phase (coma/astigmatism/spherical — :class:`Aberrations`, ``None`` = unaberrated,
+    bit-for-bit v1); coma's asymmetric image is **refused** by the PEB path below (no mirror plane). The
+    high-level entry mirroring :func:`oxidation.grow_oxide`. Returns a :class:`PrintedFeature`.
 
     ``peb_diffusion_length_nm`` (v1.7) bakes the resist before development: the latent acid image
     (∝ the aerial image — the linear-exposure scope edge) is diffused by :func:`peb_blur` on the
@@ -649,7 +702,7 @@ def expose_grating(
             raise ValueError(f"PEB blur needs an even n_x (half-period symmetry cells), got {n_x}")
         x = (np.arange(n_x) + 0.5) * (pitch_nm / n_x)
         aerial = abbe_image(x, orders, imaging, source_fs=source_fs, n_source=n_source,
-                            defocus_nm=defocus_nm)
+                            defocus_nm=defocus_nm, aberrations=aberrations)
         if not np.allclose(aerial, aerial[::-1], rtol=1e-8, atol=1e-9 * float(aerial.max())):
             raise ValueError(
                 "PEB blur requires an even (symmetric) aerial image — a symmetric grating under a "
@@ -664,7 +717,7 @@ def expose_grating(
     else:
         x = np.linspace(0.0, pitch_nm, n_x, endpoint=False)
         intensity = abbe_image(x, orders, imaging, source_fs=source_fs, n_source=n_source,
-                               defocus_nm=defocus_nm)
+                               defocus_nm=defocus_nm, aberrations=aberrations)
     contrast = image_contrast(intensity)
     edge_nm = duty * pitch_nm / 2.0
     linewidth_nm = (1.0 - duty) * pitch_nm
@@ -962,3 +1015,97 @@ def expose_grating_car(
         pitch_nm=pitch_nm, cd_nm=cd, contrast=contrast, nils=image_nils,
         develop_threshold=develop_threshold, peak_deprotection=float(deprotection.max()),
     )
+
+
+# --------------------------------------------------------------------------- #
+# 10. v1.10 — Zernike aberrations: coma, astigmatism & spherical (a pupil phase)
+# --------------------------------------------------------------------------- #
+# Cited Zernike convention (litho-aerial-image-source — Mack, *Optical Lithography Modeling*; Born &
+# Wolf §9.2 / Noll 1976 for the polynomials). The low-order aberrations as the standard piston-/tilt-
+# balanced Zernike radial polynomials, evaluated on the 1-D pupil slice the line/space orders ride
+# (θ = 0/π, the f_x axis), in the normalized coordinate u = f_total/f_cut:
+#
+#   defocus      Z4   2ρ²−1        → (modelled exactly already, as defocus_phase's 1−cosθ form)
+#   astigmatism  Z5   ρ²cos2θ      → u²·cos(2φ_g)         (EVEN; ≡ a paraxial-defocus curvature along x)
+#   coma         Z7   (3ρ³−2ρ)cosθ → (3u³−2u)·cos(φ_g)    (ODD; shifts the fringe → placement error)
+#   spherical    Z9   6ρ⁴−6ρ²+1    → 6u⁴−6u²              (EVEN; the −6u² balance → pitch-dependent focus)
+#
+# Coefficients are in WAVES (wavefront error / λ); the pupil phase is exp(i·2π·W(u)). Piston drops (a
+# phase common to all orders factors out of |Σ|²). Like defocus this is pure PHASE → fits coherent_image
+# with no new path, conserves power (unitary), and no-aberration is the v1 image bit-for-bit.
+@dataclass(frozen=True)
+class Aberrations:
+    """Low-order Zernike wavefront aberrations on the pupil — coma, astigmatism, spherical (v1.10).
+
+    Coefficients in **waves** (wavefront error in units of λ): ``coma`` (Z7 x-coma, the ODD ``3u³−2u``
+    term — a fringe shift / pattern-placement error), ``astigmatism`` (Z5 0°/90°, the EVEN ``u²·cos2φ_g``
+    term — orientation-dependent best focus), ``spherical`` (Z9 primary, the EVEN ``6u⁴−6u²`` term —
+    pitch-dependent best focus). ``grating_azimuth_deg`` (``φ_g``) is the line/space orientation relative
+    to the aberration axis: it projects coma by ``cos φ_g`` and astigmatism by ``cos 2φ_g`` (``φ_g = 0`` =
+    horizontal lines, 90° = vertical — astigmatism **flips sign** between them, which is exactly what
+    distinguishes it from a plain defocus offset), and leaves the rotationally-symmetric spherical term
+    unchanged. All-zero (the default) is the unaberrated pupil: :func:`zernike_phase` returns the literal
+    ``1.0`` and the image is v1 bit-for-bit. Plain scalars — recipe knobs, like :class:`Imaging`. Kept
+    **separate from** ``defocus_nm`` (a different convention: waves/paraxial-Zernike here vs the exact nm
+    ``1 − cosθ`` defocus of v1.4 — folding them would muddy both).
+    """
+
+    coma: float = 0.0
+    astigmatism: float = 0.0
+    spherical: float = 0.0
+    grating_azimuth_deg: float = 0.0
+
+    @property
+    def is_zero(self) -> bool:
+        """Whether every aberration coefficient vanishes (the unaberrated pupil → the bit-for-bit seam)."""
+        return self.coma == 0.0 and self.astigmatism == 0.0 and self.spherical == 0.0
+
+
+def zernike_phase(f_total, imaging: Imaging, aberrations: "Aberrations | None"):
+    """Pupil **aberration phase** ``exp(i·2π·W(u))`` from low-order Zernikes, on the 1-D order slice (v1.10).
+
+    The companion to :func:`defocus_phase`: a collected order at full pupil frequency ``f_total``
+    (``f_m + f_s``) rides the pupil at the normalized slice coordinate ``u = f_total/f_cut`` (``|u| ≤ 1``),
+    and the wavefront error there (in waves) is the sum of the standard **balanced-Zernike** radial
+    polynomials evaluated on that θ = 0/π slice::
+
+        W(u) = coma·(3u³−2u)·cos φ_g  +  astigmatism·u²·cos 2φ_g  +  spherical·(6u⁴−6u²)
+
+    — coma **odd** (it shifts the fringe), astigmatism/spherical **even**. The pupil phase is
+    ``exp(i·2π·W)`` (waves → radians). Phase-only, so ``|amplitude|²`` is unchanged and aberrations
+    **conserve power** (the §-conservation leg) exactly like defocus. Returns the literal float ``1.0``
+    when ``aberrations`` is ``None`` or all-zero — so the unaberrated path is the v1 image **bit-for-bit**
+    (the degenerate seam). ``f_total`` may be a scalar or array (1/nm).
+
+    Scope edge (named, the §3/§7 discipline): this is the **1-D pupil slice** of the 2-D Zernikes (the
+    line/space orders sample only the ``f_x`` axis), with the coefficient on the **peak** (Seidel-balanced)
+    polynomial in waves — not the Noll RMS-normalized 2-D coefficient. Astigmatism along ``φ_g`` is
+    degenerate with a **paraxial** ``u²`` defocus, while v1.4's :func:`defocus_phase` is the *exact*
+    ``1 − cosθ`` — so the degeneracy is exact only as ``NA → 0``; the ``φ_g`` projection makes the H↔V
+    best-focus split (which a defocus offset cannot mimic) the testable signature of astigmatism.
+    """
+    if aberrations is None or aberrations.is_zero:
+        return 1.0
+    u = np.asarray(f_total, dtype=float) / imaging.f_cut
+    phi_g = math.radians(aberrations.grating_azimuth_deg)
+    W = (aberrations.coma * (3.0 * u ** 3 - 2.0 * u) * math.cos(phi_g)
+         + aberrations.astigmatism * u ** 2 * math.cos(2.0 * phi_g)
+         + aberrations.spherical * (6.0 * u ** 4 - 6.0 * u ** 2))
+    return np.exp(2j * np.pi * W)
+
+
+def fundamental_complex(x_nm, intensity, pitch_nm: float) -> complex:
+    """The image's **complex** fundamental Fourier coefficient at ``1/pitch`` — ``2·⟨I, e^{−2πix/p}⟩`` (v1.10).
+
+    The quadrature-aware companion to :func:`fundamental_amplitude`, and the **coma↔defocus discriminator**
+    the cos-only projection cannot see. Its **real part is exactly** :func:`fundamental_amplitude` (the
+    ``cos`` projection), and its **phase is the lateral fringe shift**. For the on-axis three-beam image
+    both defocus (even) and coma (odd) give the same fundamental *magnitude* ``4c₀c₁cos φ`` — invisible to
+    the v1.4 metric — but defocus leaves the image even (phase 0, zero quadrature) while coma translates
+    the fringe (the fundamental phase is **exactly** the ±1 order's odd aberration phase). ``np.angle`` of
+    this is that shift; ``abs`` its magnitude. A balanced Fourier projection over one period on a uniform
+    grid sampling ``endpoint=False`` — exact for the band-limited image.
+    """
+    x = np.asarray(x_nm, dtype=float)
+    intensity = np.asarray(intensity, dtype=float)
+    return complex(2.0 * np.mean(intensity * np.exp(-2j * np.pi * x / pitch_nm)))

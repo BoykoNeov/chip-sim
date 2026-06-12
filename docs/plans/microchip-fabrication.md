@@ -621,7 +621,8 @@ from a 100 %-complete Steel to Chip.
 > the φ=π/2 null gives `z=λ/2NA²` → `k₂=0.5` falls out — but that is **paraxial**, so at NA 0.85 the exact full-cosθ
 > null (±119 nm) sits ~24% inside the paraxial DOF (±134 nm) and **converges** onto it as NA→0 (pinned across
 > NA=0.85→0.15: ratio 0.76→0.99) — the honest high-NA caveat, owned in code+test. **Scope edges named-not-modelled:**
-> Zernike aberrations (coma/astigmatism/spherical) — only **defocus** is added; immersion NA≥1 (the scalar model's
+> Zernike aberrations (coma/astigmatism/spherical) — only **defocus** is added here (**the rest BUILT in v1.10**,
+> the same pupil-phase finding → [[litho-zernike-v110]] below); immersion NA≥1 (the scalar model's
 > evanescent edge / the named vector tar pit); the constant-threshold resist (no acid-diffusion/PEB blur — the
 > *next* litho promotion candidate, the "blur = a diffusion solve → engine reuse" angle). The docstring's
 > old "no defocus phase, no Zernikes" scope line was amended to "aberration-free apart from defocus." Units: the §7
@@ -846,6 +847,41 @@ from a 100 %-complete Steel to Chip.
 > `D_h,1`, the uncoupled `x`/`z` blurs. README + module-docstring updated; whole-repo fast lane
 > **238 → 254**. **No new ADR.** SHARED-FILE ASKS: a `litho-car-v19` project memory note + update
 > `peb-acid-diffusion-source` (the CAR scope edge is now BUILT, used by `[[litho-car-v19]]`).
+
+> **v1.10 — Zernike aberrations (coma, astigmatism & spherical), a pupil phase: BUILT (2026-06-12).**
+> Phase 3's §-named "aberration-free pupil apart from defocus" scope edge, **promoted** — and it lands on
+> the **same finding as v1.4**: a Zernike aberration is a pure **phase** on the pupil, so `coherent_image`
+> images through it with no new path (cf. defocus). `litho.py` §10: an `Aberrations` frozen dataclass
+> (coma / astigmatism / spherical in **waves**, + a `grating_azimuth_deg` φ_g), `zernike_phase` (the
+> standard **balanced-Zernike** radial polynomials on the 1-D pupil slice the orders ride,
+> `u = f_total/f_cut`: coma `(3u³−2u)·cosφ_g` ODD, astig `u²·cos2φ_g` EVEN, spherical `6u⁴−6u²` EVEN →
+> phase `exp(i·2π·W)`), and `fundamental_complex` (the quadrature-aware fundamental). Both threaded through
+> `abbe_image`/`expose_grating` as `aberrations=None`, the unaberrated seam **bit-for-bit** (literal `1.0`),
+> kept **separate from** `defocus_nm` (waves/paraxial-Zernike vs v1.4's exact nm `1−cosθ`). + `demo_zernike.py`
+> + `plots.zernike_figure` → `docs/figures/chip-zernike.png` (the three signatures: coma's placement shift +
+> the linear Δx-vs-coma inset, the astigmatism H↔V best-focus split, the spherical through-focus family).
+> **15-test mini-triad** (11 `tests/test_zernike.py` + 4 `tests/test_demo_zernike.py`). **Durable advisor
+> findings: (1) THE load-bearing trap — the cos-only `fundamental_amplitude` returns `4c₀c₁cosφ` for BOTH
+> coma and defocus** (it cannot tell them apart); the discriminator is the **complex-fundamental PHASE** =
+> exactly the ±1 order's aberration phase (0 for even defocus, the coma shift for odd coma) → coma is a
+> *placement* error, the v1.4 "assert the right observable" analogue. **(2) the spherical rim-zero trap** —
+> balanced `6u⁴−6u²` is 0 at the pupil rim `u=±1`, so the even-invariance dipole test is *trivially* 0=0
+> there; the real test uses an **interior pair** `u=±1/√2` (where it peaks at −1.5), with astig-at-rim the
+> clean nonzero rim case. **(3) astig ≡ defocus is PARAXIAL only** (`u²` vs v1.4's exact `1−cosθ`), named
+> honestly. **(4) use the balanced Zernike forms** (the cited definition; spherical's built-in `−6u²` gives
+> the pitch-dependent-focus signature for free) and **add the one φ_g scalar** (so astig's H↔V split — the
+> thing a defocus offset cannot mimic — is testable). **Tight** anchors: the no-aberration **bit-for-bit
+> seam**, the **parity pair** (even astig/spherical leave a symmetric dipole invariant to machine precision;
+> odd coma pure-shifts it, contrast preserved), the **coma↔defocus phase discriminator** (machine precision),
+> and **unitary conservation** (`mean(image)=Σ|c_m|²=transmitted_power` at every coefficient — the v1.4 leg
+> extended for free, `transmitted_power` never sees the phase). **Loose** benchmark: the litho-native
+> signatures — coma → pattern **placement error** (∝ coefficient) + an asymmetric image the v1.7/v1.9 PEB
+> cell **refuses**; astig → the **H↔V best-focus split**; spherical → **pitch-dependent best focus** — and a
+> **Strehl/Maréchal number left un-asserted** (it needs the 2-D pupil-disk integral, not a handful of 1-D
+> slice samples — the honest discrete-1-D caveat; λ/14 quoted only as scale). Scope edges named: the 1-D
+> pupil slice of the 2-D Zernikes, the peak (not Noll RMS) coefficient, paraxial astig, no Strehl. README +
+> module-docstring updated; whole-repo fast lane **254 → 269**. **No new ADR.** SHARED-FILE ASKS: a
+> `litho-zernike-v110` project memory note + the Zernike pin appended to `[[litho-aerial-image-source]]`.
 
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **`engines/diffusion`**
 engine in mass mode (`diffusion_dopant.py`): a constant-source

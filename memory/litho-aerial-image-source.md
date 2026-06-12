@@ -54,6 +54,24 @@ coefficient**, not the max−min contrast. Source: Mack, lithoguru *Optical Lith
 the defocus & DOF lectures. Used by `litho.py` §7 (v1.4) — `defocus_phase`, `depth_of_focus`,
 `fundamental_amplitude`; see [[litho-defocus-v14]].
 
+**v1.10 addendum — Zernike aberrations (coma, astigmatism, spherical)** (pinned 2026-06-12). The
+**balanced (piston-/tilt-balanced) low-order Zernike radial polynomials** and their lithographic
+signatures (Mack, *Optical Lithography Modeling* / lithoguru; the polynomial convention corroborated by
+**Born & Wolf §9.2** and **Noll 1976**, JOSA 66:207). The forms used (the standard ones, dropping
+piston): defocus `2ρ²−1`, **astigmatism** `ρ²cos2θ`, **coma** `(3ρ³−2ρ)cosθ`, **spherical**
+`6ρ⁴−6ρ²+1`. Evaluated on the **1-D pupil slice** the line/space orders ride (θ=0/π, the f_x axis) in
+the normalized coord `u = f_total/f_cut`: astig `u²·cos2φ_g` (EVEN), coma `(3u³−2u)·cosφ_g` (ODD),
+spherical `6u⁴−6u²` (EVEN); coefficient in **waves** on the *peak* (Seidel-balanced) polynomial, **not**
+the Noll RMS-normalized 2-D coefficient. Signatures (the loose benchmark, cited not derived): **coma →
+pattern placement error** (an odd phase shifts the fringe — an overlay error, not a contrast loss);
+**astigmatism → orientation-dependent best focus** (horizontal vs vertical lines focus at opposite
+planes — `cos2φ_g` flips sign); **spherical → feature-size/pitch-dependent best focus** (the balanced
+`−6u²` term). The **Maréchal "diffraction-limited" criterion** (RMS wavefront error < **λ/14 ≈ 0.07
+waves**, Strehl > 0.8; Born & Wolf §9.3) is quoted only as a **scale**, deliberately **NOT asserted as a
+Strehl threshold** — the 1-D slice samples the pupil at a handful of order positions, not the 2-D disk,
+so an honest RMS/Strehl is out of model (the named discrete-1-D caveat). Used by `litho.py` §10 (v1.10)
+— `Aberrations`, `zernike_phase`, `fundamental_complex`; see [[litho-zernike-v110]].
+
 Related: this is the chip project's one **genuinely-new** module (Fourier optics), chip-local not
 promoted to `engines/` — see [[bigsim-program]]. Sits in the **export-control carve-out** (generic
 textbook Fourier optics, no recipes/targeting). Companions: [[deal-grove-oxidation-source]] (P2),

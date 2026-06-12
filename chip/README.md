@@ -114,6 +114,20 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   anchors = the no-reaction → v1.7-blur bit-for-bit seam and the flat-field exact-ODE; the catalyst
   `∫h` conservation; the **loose** amplification-sharpens / diffusion-loss-degrade benchmark; the linear-
   exposure / constant-threshold-develop / uncalibrated-`D_h1` scope edges). Saves `docs/figures/chip-car.png`.
+- **To work on Zernike aberrations (v1.10 — Phase 3's "aberration-free pupil apart from defocus" scope
+  edge, promoted):** `litho.py` §10 + `tests/test_zernike.py`, the demo `demo_zernike.py` +
+  `tests/test_demo_zernike.py`, and `plots.zernike_figure`. The **same finding as v1.4 defocus** — a
+  Zernike aberration is a pure **phase** on the pupil, so `coherent_image` images through it with no new
+  path. An `Aberrations` dataclass (coma / astigmatism / spherical in **waves** + a `grating_azimuth_deg`
+  φ_g) → `zernike_phase` (the balanced-Zernike radial polynomials on the 1-D pupil slice: coma ODD
+  `3u³−2u`, astig EVEN `u²cos2φ_g`, spherical EVEN `6u⁴−6u²`) threaded through `abbe_image`/`expose_grating`
+  as `aberrations=None`; `fundamental_complex` is the quadrature-aware fundamental that **distinguishes
+  coma from defocus** (its phase = the coma fringe shift, where the cos-only `fundamental_amplitude` is
+  blind). The module docstring is its contract (the tight anchors = the no-aberration bit-for-bit seam,
+  the even/odd **parity pair**, the coma↔defocus phase discriminator, and unitary power conservation; the
+  **loose** signatures = coma placement error / astig H↔V best-focus split / spherical pitch-dependent
+  focus; scope edges = the 1-D pupil slice, paraxial-astig degeneracy, no asserted Strehl). Saves
+  `docs/figures/chip-zernike.png`.
 - **To work on the device (Phase 4):** `device.py` + `tests/test_device.py`, the demo
   `demo_device.py` + `tests/test_demo_device.py`, and `plots.device_figure`. The **process → device**
   payoff — a chip-local compact closed form (**does not touch the engine**): `threshold_voltage`
@@ -369,6 +383,30 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   images are **refused** (the half-period cell, as v1.7); linear exposure (no Dill), constant-threshold
   development (no Mack dissolution kinetics), the uncalibrated free-volume `D_h,1`, and the uncoupled
   `x`/`z` blurs stay the named scope edges. Whole-repo fast lane **238→254**.
+- **v1.10 — Zernike aberrations (coma, astigmatism & spherical), a pupil phase: BUILT** (2026-06-12).
+  `litho.py` §10 — Phase 3's "aberration-free pupil apart from defocus" scope edge, promoted on the
+  **same finding as v1.4**: a Zernike aberration is a pure **phase** on the pupil, so `coherent_image`
+  images through it with no new path. An `Aberrations` dataclass (coma / astigmatism / spherical in
+  **waves** + a `grating_azimuth_deg` φ_g) and `zernike_phase` (the balanced-Zernike radial polynomials
+  on the 1-D pupil slice `u = f_total/f_cut`: coma `(3u³−2u)cosφ_g` ODD, astig `u²cos2φ_g` EVEN,
+  spherical `6u⁴−6u²` EVEN → `exp(i·2π·W)`), threaded through `abbe_image`/`expose_grating` as
+  `aberrations=None` (the unaberrated seam **bit-for-bit**), kept **separate from** `defocus_nm`
+  (waves/paraxial-Zernike vs v1.4's exact nm `1−cosθ`). + `fundamental_complex` + `demo_zernike.py` +
+  `plots.zernike_figure` → `docs/figures/chip-zernike.png` (coma's placement shift + the Δx-vs-coma
+  inset, the astigmatism H↔V best-focus split, the spherical through-focus family). **15-test mini-triad**
+  (11 module + 4 demo): *analytic* = the no-aberration **bit-for-bit seam**, the **parity pair** (even
+  astig/spherical leave a symmetric dipole invariant; odd coma pure-shifts it, contrast preserved — the
+  spherical case on an **interior** pair, since balanced `6u⁴−6u²` is trivially 0 at the rim), and **THE
+  coma↔defocus discriminator** (the cos-only `fundamental_amplitude` returns `4c₀c₁cosφ` for *both*; the
+  **complex** fundamental's phase is the coma fringe shift exactly — the v1.4 "assert the right observable"
+  analogue, advisor); *conservation* = aberrations are **unitary** (`mean(image)=Σ|c_m|²=transmitted_power`
+  at every coefficient — the v1.4 leg extended for free); *benchmark (loose)* = the litho-native signatures
+  — coma → **placement error** + an asymmetric image the PEB cell **refuses**, astig → the **H↔V best-focus
+  split** (what a defocus offset cannot mimic), spherical → **pitch-dependent best focus**. Scope edges
+  named: the 1-D pupil slice of the 2-D Zernikes, the peak (not Noll RMS) coefficient, the **paraxial**
+  astig≡defocus degeneracy (exact only as NA→0), and a **Strehl/Maréchal number left un-asserted** (needs
+  the 2-D pupil-disk integral, not 1-D slice samples; λ/14 quoted only as scale). Whole-repo fast lane
+  **254→269**. **No new ADR.**
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated

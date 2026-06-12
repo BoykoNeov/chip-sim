@@ -64,6 +64,13 @@ ONAXIS_COLOR = "#2f6fb0"        # the on-axis coherent fundamental (data points 
 PARTIAL_COLOR = "#d4711f"       # the σ-source fundamental — the null softened by partial coherence
 DOF_COLOR = "#c0392b"           # the depth-of-focus event (the φ=π/2 null) marker
 
+# Zernike aberrations (v1.10) colours — coma placement, astig H↔V split, spherical pitch drift.
+CLEAN_COLOR = "#888888"         # the unaberrated reference (grey — the no-aberration baseline)
+COMA_COLOR = "#a93226"          # the comatic image, shifted (crimson — the placement-error signature)
+ASTIG_H_COLOR = "#2f6fb0"       # horizontal lines (φ_g=0) through focus
+ASTIG_V_COLOR = "#d4711f"       # vertical lines (φ_g=90°) through focus — the opposite-plane peak
+SPHERICAL_COLOR = "#6a3d9a"     # best focus vs pitch under spherical (violet — the litho family)
+
 # PEB (v1.7) colours — the baked latent image & the PEB window (the bake's trade-off).
 LATENT_COLOR = "#6a3d9a"        # the unbaked aerial/latent image (violet — the litho family)
 BAKE_COLORS = ("#9a7bc0", "#c79fd9", "#e2c7ee")   # the cited 20/40/60 nm series, fading with σ
@@ -718,6 +725,109 @@ def defocus_figure(
     fig.suptitle("Microchip v1.4: lithographic defocus — the Bossung curve & the depth of focus "
                  "(within the litho module)", fontsize=12.5, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
+    return fig
+
+
+def zernike_figure(
+    data: dict,
+    wavelength_nm: float,
+    NA: float,
+    pitch_nm: float,
+) -> "plt.Figure":
+    """The banked v1.10 artifact: the three Zernike aberration signatures (coma / astigmatism / spherical).
+
+    ``data`` is the :func:`demo_zernike.compute` bundle (plain arrays/scalars — no live imaging object,
+    ADR 0002). Three panels, each an aberration's *named signature* (the thing that identifies it):
+
+    Left (**coma → pattern placement error**): the unaberrated aerial image (centred) vs the comatic
+    image (laterally **shifted**) over one+ period, the displacement Δx arrowed; inset, Δx growing
+    linearly with the coma coefficient. *Overlay error, not a contrast loss.*
+
+    Middle (**astigmatism → the H↔V best-focus split**): the through-focus fundamental for horizontal
+    (``φ_g=0``) and vertical (``φ_g=90°``) lines, peaking at **opposite** defocus planes straddling
+    ``z=0``. *A plain defocus offset moves both the same way — the split is what tells astigmatism from
+    a focus error.*
+
+    Right (**spherical → pitch-dependent best focus**): the through-focus fundamental for a few pitches,
+    each a positive hump peaking at its **own** best-focus plane (which drifts with pitch); unaberrated
+    every pitch would peak at ``z=0``. *You cannot focus a mix of feature sizes at once.*
+    """
+    fig, (ax_c, ax_a, ax_s) = plt.subplots(1, 3, figsize=(17, 5.2))
+
+    # --- left: coma — the pattern placement error --------------------------------------
+    x = np.asarray(data["x"])
+    p = pitch_nm
+    # tile to ~1.5 periods so the lateral shift reads clearly
+    xt = np.concatenate([x, x + p])
+    clean = np.concatenate([data["image_clean"], data["image_clean"]])
+    coma = np.concatenate([data["image_coma"], data["image_coma"]])
+    keep = xt <= 1.5 * p
+    ax_c.plot(xt[keep], clean[keep], color=CLEAN_COLOR, lw=2.2, label="unaberrated")
+    ax_c.plot(xt[keep], coma[keep], color=COMA_COLOR, lw=2.4,
+              label=f"coma {data['coma_demo']:.2f} waves")
+    # arrow the peak displacement near the first peak
+    dx = data["placement_demo"]
+    i_clean = int(np.argmax(data["image_clean"]))
+    x0 = float(x[i_clean])
+    y_arrow = float(np.max(data["image_clean"])) * 1.02
+    ax_c.annotate("", xy=(x0 + dx, y_arrow), xytext=(x0, y_arrow),
+                  arrowprops=dict(arrowstyle="->", color=COMA_COLOR, lw=1.8))
+    ax_c.text(x0 + dx / 2.0, y_arrow * 1.04, f"Δx = {dx:+.0f} nm", color=COMA_COLOR,
+              fontsize=9, ha="center", va="bottom")
+    ax_c.set_xlim(0.0, 1.5 * p)
+    ax_c.set_xlabel("position  $x$  (nm)")
+    ax_c.set_ylabel("aerial image  $I(x)$")
+    ax_c.set_title("coma → pattern placement error (the fringe shifts)")
+    ax_c.legend(loc="lower right", fontsize=8.5, framealpha=0.95)
+    ax_c.grid(True, alpha=0.18)
+    # inset: placement error grows linearly with coma
+    axin = ax_c.inset_axes([0.12, 0.62, 0.36, 0.34])
+    axin.plot(data["coma_sweep"], data["placement_sweep"], color=COMA_COLOR, lw=1.8)
+    axin.set_title("Δx vs coma", fontsize=7.5)
+    axin.set_xlabel("waves", fontsize=7)
+    axin.set_ylabel("Δx (nm)", fontsize=7)
+    axin.tick_params(labelsize=6.5)
+    axin.grid(True, alpha=0.18)
+
+    # --- middle: astigmatism — the H↔V best-focus split --------------------------------
+    z = np.asarray(data["zabs"])
+    ax_a.plot(z, data["fund_h"], color=ASTIG_H_COLOR, lw=2.3, label="horizontal lines (φ$_g$=0°)")
+    ax_a.plot(z, data["fund_v"], color=ASTIG_V_COLOR, lw=2.3, label="vertical lines (φ$_g$=90°)")
+    ax_a.axvline(0.0, color="#444444", lw=0.8, ls="-")
+    for bf, col in ((data["bf_h"], ASTIG_H_COLOR), (data["bf_v"], ASTIG_V_COLOR)):
+        ax_a.axvline(bf, color=col, ls=":", lw=1.5)
+    split = abs(data["bf_h"] - data["bf_v"])
+    ax_a.annotate("", xy=(data["bf_h"], 0.02), xytext=(data["bf_v"], 0.02),
+                  arrowprops=dict(arrowstyle="<->", color="#444444", lw=1.4))
+    ax_a.text(0.0, 0.035, f"split {split:.0f} nm", fontsize=8.5, ha="center", va="bottom", color="#333333")
+    ax_a.set_xlim(float(z[0]), float(z[-1]))
+    ax_a.set_xlabel("defocus  $z$  (nm)")
+    ax_a.set_ylabel("image fundamental  $|\\langle I, e^{-2\\pi i x/p}\\rangle|$")
+    ax_a.set_title(f"astigmatism {data['astig_demo']:.2f} waves → H/V focus at opposite planes")
+    ax_a.legend(loc="upper right", fontsize=8.5, framealpha=0.95)
+    ax_a.grid(True, alpha=0.18)
+
+    # --- right: spherical — best focus shifts with pitch (a through-focus family) ------
+    pitches = list(data["spherical_pitches"])
+    shades = ["#c9b3e0", "#9163c4", "#5b2d8c"]   # light→dark violet, fine→coarse pitch
+    for pp, shade in zip(pitches, shades):
+        c = np.asarray(data["sph_curves"][pp])
+        ax_s.plot(z, c, color=shade, lw=2.2, label=f"pitch {pp:.0f} nm")
+        bf = data["sph_bf"][pp]
+        ax_s.axvline(bf, color=shade, ls=":", lw=1.4)
+        ax_s.plot([bf], [c.max()], "o", color=shade, ms=6)
+    ax_s.axvline(0.0, color="#444444", lw=0.8, label="unaberrated best focus (all pitches)")
+    ax_s.axhline(0.0, color="#999999", lw=0.6)
+    ax_s.set_xlim(float(z[0]), float(z[-1]))
+    ax_s.set_xlabel("defocus  $z$  (nm)")
+    ax_s.set_ylabel("image fundamental  $4c_0c_1\\cos\\varphi$")
+    ax_s.set_title(f"spherical {data['spherical_demo']:.2f} waves → best focus shifts with pitch")
+    ax_s.legend(loc="lower center", fontsize=8.0, framealpha=0.95)
+    ax_s.grid(True, alpha=0.18)
+
+    fig.suptitle("Microchip v1.10: lithographic Zernike aberrations — coma, astigmatism & spherical "
+                 "(pure pupil phase, within the litho module)", fontsize=12.5, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
     return fig
 
 
