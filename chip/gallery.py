@@ -255,11 +255,17 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
       <h2>Go deeper</h2>
       <p class="sub">The interactive tour and the written record.</p>
       <div class="deeper">
-        <a class="item" href="{nb}">
-          <h3>The teaching notebook &#8599;</h3>
+        <div class="item">
+          <h3>The teaching notebook</h3>
           <p>chip/chip.ipynb &mdash; one section per phase with live ipywidgets sliders, ending on the
-            coherent process&rarr;device flow.</p>
-        </a>
+            coherent process&rarr;device flow. GitHub renders it <em>read-only</em> (no live kernel); for the
+            interactive widgets, install the notebook extra (<code>pip install -e ".[viz,notebook]"</code>)
+            and launch it locally:</p>
+          <div class="links">
+            <code>jupyter lab chip/chip.ipynb</code>
+            <a class="src" href="{nb}">view on GitHub&nbsp;&#8599;</a>
+          </div>
+        </div>
         <a class="item" href="{_BLOB}/README.md">
           <h3>README &amp; quickstart &#8599;</h3>
           <p>Layout, the tiered test gate, and the text Demonstrations catalog.</p>
