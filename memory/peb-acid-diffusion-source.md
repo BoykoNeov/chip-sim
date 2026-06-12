@@ -22,10 +22,18 @@ the NILS≥1 floor in [[litho-aerial-image-source]]):
   distribution function" (→ our per-harmonic heat kernel `exp(−2π²k²σ²/p²)` on a period).
 - BC: "**homogeneous Neumann** conditions (no out-diffusion across resist surface)" — the
   sealed-film `Neumann(0)` is **cited, not invented**. Typical ~100 °C, ~10 min (oven).
-- **CAR = the named scope edge** (the cited next rung, deliberately NOT built): coupled
+- **CAR = the named scope edge in v1.7 — now BUILT in v1.9** ([[litho-car-v19]]): coupled
   reaction–diffusion — deprotection rate ∝ acid^n, **concentration-dependent `D_h`**, acid loss,
   surface evaporation BC; IBM APEX-E @ 90 °C: `k₁=2.0 s⁻¹`, `k₂=0.0033 s⁻¹`, `n=1.8`,
-  `D_h,0=0.0933 nm²/s`. Our v1.7 is the **linear-exposure, constant-D** teaching reduction.
+  `D_h,0=0.0933 nm²/s`. v1.7 was the **linear-exposure, constant-D** teaching reduction. **Verbatim
+  from the live Kirchauer node (fetched 2026-06-12 for v1.9):** `∂m/∂t = −k_peb,1·m·hⁿ` (the `n` sits
+  on **`hⁿ·m`**, NOT `(h·m)ⁿ`) and `∂h/∂t = −k_peb,2·h + div(D_h·grad h)` — **acid loss is FIRST-ORDER
+  `−k₂·h`, with NO `h·m` sink** (acid is a pure **catalyst** → `∫h` conserved/exact-decay, the load-
+  bearing conservation fact for v1.9); `D_h = D_h0 + D_h1·(1−m)` [linear] or `D_h0·exp(−w(1−m))`
+  [exponential free-volume]; surface-evap BC `∂h/∂t = −k_evap(h−h_air)`; IC `m=1`, `h=h_exp`. (Only
+  `D_h0` is a cited value → v1.9 defaults constant `D`; `D_h1` left illustrative.) The Ferguson/Zuniga
+  3-field variant — acid `+` base **quencher** `B`, loss `∝klHB`, `∂B/∂t=klHB` — is a DIFFERENT (more
+  complex) model NOT used; v1.9 uses the simpler cited 2-field Kirchauer form.
 
 **Acid diffusion in CAR + the small-vs-feature rule** — **Mack, "Lithographic Effects of Acid
 Diffusion in Chemically Amplified Resists" (1995)** (lithoguru.com litho_papers #48): σ=√(2Dt),
@@ -57,5 +65,6 @@ Neumann eigenmodes = the cosine harmonics) is *proved by that anchor*, not assum
 calibrations** are σ=√(2Dt) (a definition), the sealed-film BC, the 20/40/60 nm series, and the
 λ/4n smoothing rule (loose benchmark legs). Non-circular: the engine never sees the kernel.
 
-Used by [[litho-peb-v17]]. Companions: [[litho-aerial-image-source]] (P3/v1.4 — same Mack corpus,
+Used by [[litho-peb-v17]] (the v1.7 linear blur) and [[litho-car-v19]] (the v1.9 CAR reaction–diffusion
+— the scope edge, now built). Companions: [[litho-aerial-image-source]] (P3/v1.4 — same Mack corpus,
 same Kirchauer thesis family), [[massoud-thin-oxide-source]] (the coherent-set precedent).

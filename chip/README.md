@@ -100,6 +100,20 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   tight anchor; the lateral/vertical ratio = the **loose** cited benchmark, ≈0.82 at `C_B/N_s=1e-4`
   after Kennedy–O'Brien 1965, the model running slightly high; the constant-source / isotropic-`D` /
   3-D scope edges). Saves `docs/figures/chip-lateral-diffusion.png`.
+- **To work on the CAR reaction–diffusion PEB (v1.9 — Phase 3's "constant-`D`" scope edge, promoted):**
+  `litho.py` §9 + `tests/test_car.py`, the demo `demo_car.py` + `tests/test_demo_car.py`, and
+  `plots.car_figure`. Where v1.7 found the bake IS the engine's pure linear PDE, the realistic
+  chemically-amplified bake is a coupled **two-field** reaction–diffusion system (acid `h` +
+  blocked-site fraction `m`) that does **not** fit the single-field engine natively, so it rides the
+  engine **consumer-side by operator splitting** (the v1.2 moving-boundary move; no engine amendment):
+  the engine carries only the acid-**diffusion** sub-step (`Neumann(0)` sealed faces, `D_h(m)` array-`D`
+  frozen per step), while `litho._car_react` integrates the local reaction (acid-catalyzed deprotection
+  + first-order acid loss) in **closed form**. `CARBake` (the cited APEX-E recipe) → `car_peb` (the
+  Strang-split bake, returning `(deprotection, acid)`) → `expose_grating_car` (develop on the
+  deprotection `1−m`, the chemically-faithful resist). The module docstring is its contract (the tight
+  anchors = the no-reaction → v1.7-blur bit-for-bit seam and the flat-field exact-ODE; the catalyst
+  `∫h` conservation; the **loose** amplification-sharpens / diffusion-loss-degrade benchmark; the linear-
+  exposure / constant-threshold-develop / uncalibrated-`D_h1` scope edges). Saves `docs/figures/chip-car.png`.
 - **To work on the device (Phase 4):** `device.py` + `tests/test_device.py`, the demo
   `demo_device.py` + `tests/test_demo_device.py`, and `plots.device_figure`. The **process → device**
   payoff — a chip-local compact closed form (**does not touch the engine**): `threshold_voltage`
@@ -326,6 +340,35 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   maximum lateral encroachment is at the surface — surface ≡ max-over-depth.) Engine suite **34→45**;
   whole-repo fast lane **218→238**. **No new ADR** (ADR 0004 pre-authorizes the engine amendment).
   Anisotropic / time-dependent `D`, Gaussian (limited-source) lateral, and 3-D stay the scope edges.
+- **v1.9 — CAR reaction–diffusion PEB (Phase 3's "constant-`D`" scope edge, promoted): BUILT**
+  (2026-06-12). `litho.py` §9 — and where v1.7 found the bake IS the engine's pure linear PDE, the
+  realistic chemically-amplified bake is a coupled **two-field** reaction–diffusion system (Kirchauer
+  §7.1.2, the same thesis as v1.7 — `[[peb-acid-diffusion-source]]`): on the blocked-site fraction `m`
+  (1→0) and the acid `h`, `∂m/∂t = −k_amp·m·hⁿ` (deprotection) and `∂h/∂t = −k_loss·h + ∂ₓ(D_h(m)∂ₓh)`
+  (acid: first-order loss + diffusion). It does **not** fit the single-field engine natively (the
+  `−k_loss·h` loss is ∝`u`; `m` is a second field; `D_h` depends on `m` not `h`), so it is built
+  **consumer-side by operator splitting** (the v1.2 moving-boundary move; **no engine amendment, no
+  ADR**): the engine carries only the acid-**diffusion** sub-step (`Neumann(0)` sealed faces, `D_h(m)`
+  array-`D` frozen per step from the lagged deprotection), while `_car_react` integrates the local
+  reaction in **closed form**. `car_peb` Strang-splits the bake (½-react · diffuse · ½-react) and
+  `expose_grating_car` develops on the **deprotection** `1−m` (the chemically-faithful resist, where
+  v1.7 clipped the acid). **The diffusion sub-step is backward Euler — NOT v1.7's CN** (advisor):
+  `hⁿ` with non-integer `n` NaNs on any negative ring, and BE's max principle keeps `h≥0` so the bake
+  never NaNs *and* keeps `∫h` conservation exact (a CN ring would need a mass-adding clamp). +
+  `demo_car.py` + `plots.car_figure`. Banked artifact: the **latent image developing** (the deprotection
+  edge sharpening above the acid) beside the **PEB process window** (CD vs bake time + the exact
+  acid-loss decay) (`docs/figures/chip-car.png`); 193 nm ArF, NA 0.85, 240 nm pitch, cited APEX-E @
+  90 °C (`k_amp=2.0/s`, `k_loss=0.0033/s`, `n=1.8`, `D_h,0=0.0933 nm²/s`; the exposure dose + bake
+  times are illustrative knobs). **16-test mini-triad** (11 module + 5 demo): *analytic* = the
+  **no-reaction → v1.7-blur bit-for-bit seam** and the **flat-field exact-ODE** (a uniform acid sees
+  identity diffusion ⇒ the split is the closed-form reaction flow, machine precision); *conservation*
+  = **acid is a pure catalyst** (no `h·m` sink) ⇒ `∫h` conserved at `k_loss=0` / decays exactly
+  `e^{−k_loss·t}`, deprotection bounded in `[0,1]` and monotone in bake; *benchmark (loose)* =
+  **amplification sharpens** (the superlinear `hⁿ` edge steeper than the acid's — NILS up, the regime,
+  not a law) vs **diffusion + loss + over-bake degrade** (the acutely bake-sensitive CD). Asymmetric
+  images are **refused** (the half-period cell, as v1.7); linear exposure (no Dill), constant-threshold
+  development (no Mack dissolution kinetics), the uncalibrated free-volume `D_h,1`, and the uncoupled
+  `x`/`z` blurs stay the named scope edges. Whole-repo fast lane **238→254**.
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated
@@ -362,12 +405,12 @@ not correctness**: the per-phase triads already validate the numbers.
 
 ```powershell
 # from repo root
-./run_tests.ps1 -m "not slow" -n auto   # routine commit gate (fast lane, PARALLEL — ~12 s vs ~39 s serial; -n auto capped at half the logical cores)
+./run_tests.ps1 -m "not slow" -n auto   # routine commit gate (fast lane, PARALLEL — ~16 s vs ~53 s serial; -n auto capped at half the logical cores)
 ./run_tests.ps1 chip   # scope to chip while iterating
 ```
 
 `pyproject.toml`'s `testpaths` already carries `chip`, so `chip/tests/` is collected
 with no config change; `pythonpath = ["."]` lets chip import the engine as `engines.diffusion…`.
 The notebook smoke-test (`tests/test_chip_notebook.py`) is `slow`-marked, so the fast lane deselects it
-(and `-n auto` therefore rides only the fast lane, never co-scheduling the notebook with the 218 —
+(and `-n auto` therefore rides only the fast lane, never co-scheduling the notebook with the 254 —
 **the pin**, ADR 0003 amendment); it runs in the serial full gate (bare `./run_tests.ps1`).

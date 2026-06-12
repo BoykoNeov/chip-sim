@@ -903,3 +903,92 @@ def lateral_diffusion_figure(data) -> "plt.Figure":
                  fontsize=12.5, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     return fig
+
+
+# CAR (v1.9) colours — the chemically-amplified reaction–diffusion bake.
+ACID_COLOR = "#6a3d9a"           # the latent acid image (violet — the litho/latent family)
+DEPRO_COLORS = ("#2f6fb0", "#1f8a5b", "#d4711f")   # deprotection over the bake series (cool→warm = more bake)
+DEVELOP_COLOR = "#c0392b"        # the develop threshold (the dissolution contour) + nominal CD
+CD_CURVE_COLOR = "#2f6fb0"       # the CD-vs-bake sensitivity curve
+CAR_WINDOW_COLOR = "#27795b"     # the PEB process window (the bake latitude holding CD near nominal)
+ACIDLOSS_COLOR = "#a93226"       # the exact acid-loss decay e^{−k_loss·t} (the catalyst leg, visible)
+ACID_NILS_COLOR = "#999999"      # the unbaked acid-edge NILS reference (what amplification beats)
+
+
+def car_figure(
+    data: dict,
+    wavelength_nm: float,
+    NA: float,
+    sigma_src: float,
+    pitch_nm: float,
+    acid_dose: float,
+) -> "plt.Figure":
+    """The banked v1.9 artifact: the latent image developing & the PEB process window (CAR PEB).
+
+    ``data`` is the :func:`demo_car.compute` bundle (plain arrays/scalars — no live solver object,
+    ADR 0002). Two panels:
+
+    Left panel (**amplification sharpens** — the latent image developing): the dose-normalized latent
+    acid image and the deprotection profiles ``1−m`` it grows over a bake-time series, with the develop
+    threshold drawn once — *the superlinear hⁿ map steepens the edge above the acid's (NILS up), and
+    development clips the deprotection where v1.7 clipped the acid.*
+
+    Right panel (**the PEB process window** — CD is acutely bake-sensitive): the developed CD vs bake
+    time (steep — the cited "control is critical"), the ±tol window holding CD near nominal shaded, and
+    the exact acid-loss decay ``e^{−k_loss·t}`` (engine points on the analytic curve — the catalyst /
+    conservation leg made visible) overlaid on a twin axis.
+    """
+    fig, (ax_i, ax_w) = plt.subplots(1, 2, figsize=(13, 6))
+
+    # --- left: the latent acid image + the developing deprotection family --------------
+    x = np.asarray(data["x"])
+    ax_i.plot(x, data["acid"], color=ACID_COLOR, lw=2.4, zorder=4,
+              label=f"latent acid (unbaked, NILS {data['acid_nils']:.2f})")
+    for t, color in zip(data["family_times"], DEPRO_COLORS):
+        f = data["features"][t]
+        ax_i.plot(x, data["family"][t], color=color, lw=2.0, zorder=3,
+                  label=f"deprotection, bake {t:.0f} s  (CD {f.cd_nm:.0f} nm, NILS {f.nils:.2f})")
+    ax_i.axhline(data["develop_threshold"], color=DEVELOP_COLOR, ls="--", lw=1.4, alpha=0.85,
+                 label=f"develop at {data['develop_threshold']:.0%} deprotection")
+    ax_i.set_xlim(float(x[0]), float(x[-1]))
+    ax_i.set_ylim(0.0, 1.02)
+    ax_i.set_xlabel("position  $x$  (nm)")
+    ax_i.set_ylabel("latent acid  /  deprotection  $1-m$   (a.u.)")
+    ax_i.set_title(f"the latent image developing — amplification sharpens  (pitch {pitch_nm:.0f} nm)")
+    ax_i.legend(loc="center right", fontsize=8.2, framealpha=0.95)
+    ax_i.grid(True, alpha=0.18)
+
+    # --- right: the CD-vs-bake sensitivity + the window + the acid-loss decay ----------
+    t = np.asarray(data["times"])
+    ax_w.plot(t, data["cd_of_t"], color=CD_CURVE_COLOR, lw=2.4, zorder=4, label="developed CD")
+    ax_w.axhline(data["nominal_cd"], color=DEVELOP_COLOR, ls=":", lw=1.3,
+                 label=f"nominal CD {data['nominal_cd']:.0f} nm")
+    ax_w.axvspan(data["t_win_lo"], data["t_win_hi"], color=CAR_WINDOW_COLOR, alpha=0.14, zorder=1,
+                 label=f"PEB window  [{data['t_win_lo']:.0f}, {data['t_win_hi']:.0f}] s "
+                       f"(CD ±{(data['window_hi'] / data['nominal_cd'] - 1.0):.0%})")
+    ax_w.axhspan(data["window_lo"], data["window_hi"], color=CAR_WINDOW_COLOR, alpha=0.07, zorder=0)
+    ax_w.set_xlim(float(t[0]), float(t[-1]))
+    ax_w.set_ylim(0.0, max(float(np.max(data["cd_of_t"])), data["window_hi"]) * 1.05)
+    ax_w.set_xlabel("post-exposure bake time  $t$  (s)")
+    ax_w.set_ylabel("developed CD  (nm)")
+    ax_w.set_title("the PEB process window — CD is acutely bake-sensitive")
+    ax_w.grid(True, alpha=0.18)
+
+    ax_a = ax_w.twinx()                                  # the acid-loss decay (the catalyst leg)
+    ax_a.plot(t, data["acid_loss_analytic"], color=ACIDLOSS_COLOR, lw=1.8, ls="-", alpha=0.9, zorder=3,
+              label=r"acid $\int h$ : exact $e^{-k_{loss} t}$")
+    ax_a.plot(data["sample_t"], data["acid_loss_engine"], "o", color=ACIDLOSS_COLOR, ms=5, zorder=5,
+              label="engine (catalyst: dose only lost)")
+    ax_a.set_ylim(0.0, 1.05)
+    ax_a.set_ylabel(r"acid retention  $\int h(t)\,/\int h(0)$", color=ACIDLOSS_COLOR)
+    ax_a.tick_params(axis="y", labelcolor=ACIDLOSS_COLOR)
+
+    h1, l1 = ax_w.get_legend_handles_labels()
+    h2, l2 = ax_a.get_legend_handles_labels()
+    ax_w.legend(h1 + h2, l1 + l2, loc="upper right", fontsize=8.0, framealpha=0.95)
+
+    fig.suptitle("Microchip v1.9: CAR reaction–diffusion PEB — amplification vs diffusion + loss "
+                 f"(λ = {wavelength_nm:.0f} nm, NA = {NA:.2f}, σ_src = {sigma_src:.2f}, "
+                 f"APEX-E, dose {acid_dose:.2f})", fontsize=12.5, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    return fig

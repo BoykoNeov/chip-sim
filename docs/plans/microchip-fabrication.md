@@ -802,6 +802,51 @@ from a 100 %-complete Steel to Chip.
 > contour-dependent ratio, flagged secondary-text) + a `lateral-diffusion-2d` project note + update
 > `engine-unfrozen` (the third amendment landed; **3-D is the last deferred regime**).
 
+> **v1.9 — CAR reaction–diffusion PEB, Phase 3's "constant-`D`" scope edge promoted: BUILT
+> (2026-06-12).** The §8-named CAR edge of v1.7, promoted — and the architecture finding **inverts
+> v1.7's**: where v1.7 found the bake IS the engine's pure linear PDE, the *realistic* chemically-
+> amplified bake is a coupled **two-field** reaction–diffusion system that does **not** fit the
+> single-field engine natively, so it is built **consumer-side by operator splitting** (the v1.2
+> moving-boundary move; **no engine amendment, no ADR**). The cited model (Kirchauer §7.1.2, the same
+> thesis as v1.7 — `[[peb-acid-diffusion-source]]`) on the blocked-site fraction `m` (1→0) and the
+> acid `h`: `∂m/∂t = −k_amp·m·hⁿ` (acid-catalyzed deprotection) and
+> `∂h/∂t = −k_loss·h + ∂ₓ(D_h(m)∂ₓh)` (acid: first-order loss + Fickian diffusion). `litho.py` §9:
+> `CARBake` (the cited APEX-E @ 90 °C recipe: `k_amp=2.0/s`, `k_loss=0.0033/s`, `n=1.8`,
+> `D_h,0=0.0933 nm²/s`) → `car_peb` (the bake) → `expose_grating_car` (develop on the **deprotection**
+> `1−m`, the chemically-faithful resist, where v1.7 clipped the acid). The engine carries only the
+> acid-**diffusion** sub-step (`Neumann(0)` sealed faces on the same v1.7 half-period symmetry cell;
+> `D_h(m)` array-`D` frozen per step from the lagged deprotection), while `_car_react` integrates the
+> local reaction. + `demo_car.py` + `plots.car_figure` → `docs/figures/chip-car.png` (the latent image
+> developing — the deprotection edge sharpening above the acid — beside the PEB process window: CD vs
+> bake time + the exact acid-loss decay). **16-test mini-triad** (11 `tests/test_car.py` + 5
+> `tests/test_demo_car.py`). **Durable advisor calls / findings: (1) operator splitting is FORCED, not
+> just convenient** — the `−k_loss·h` loss is ∝`u` (the engine's `source` is additive `S(x,t)`, can't
+> express it), `m` is a second field, and `D_h` depends on `m` not `h`; none fits the single-field
+> engine, so the consumer-side split (engine = diffusion sub-step only) is the architecture. **(2) the
+> diffusion sub-step is backward Euler — NOT v1.7's celebrated CN** (a deliberate departure): `hⁿ` with
+> non-integer `n` NaNs on any negative ring, and BE's discrete maximum principle keeps `h≥0` so the
+> bake both never NaNs *and* keeps `∫h` conservation **exact** (a CN ring would force a mass-adding
+> clamp that breaks the tightest conservation anchor). That caps the scheme at O(dt) (BE-limited),
+> honestly first-order — not claimed as the Strang split's formal O(dt²). **(3) the cited model makes
+> acid a PURE CATALYST** — the `h` equation has no `h·m` sink (deprotection consumes blocked sites,
+> not acid) — so `∫h dx` is conserved at `k_loss=0` and decays *exactly* `e^{−k_loss·t}` otherwise
+> (the tightest leg), and the **local reaction integrates in closed form** (a semigroup → Strang
+> sub-steps compose to machine precision), so the **flat-field anchor is machine-precision-exact**, not
+> integrator-tol. **Tight** anchors: the no-reaction → v1.7-blur **bit-for-bit seam** + the flat-field
+> exact-ODE + the catalyst `∫h` conservation + deprotection bounded `[0,1]` & monotone in bake.
+> **Loose** benchmark: **amplification sharpens** (the superlinear `hⁿ` edge steeper than the acid's —
+> NILS up, framed as a *regime* not a monotone law, the v1.8 own-the-gap discipline) vs **diffusion +
+> loss + over-bake degrade** (the acutely bake-sensitive CD — the cited "control of the PEB is extremely
+> critical"). With the cited tiny `D` (σ~nm) the acid diffusion is **negligible vs the ~150 nm optical
+> resolution** — CAR makes *sharp* features (the resist out-resolves the optics; the diffusion floor
+> only bites sub-50 nm). The **exposure dose + bake times are illustrative knobs** (tuned so nominal
+> CD lands at a realistic ~60 s bake); only the four reaction–diffusion constants are cited. Asymmetric
+> images are **refused** (the half-period cell, as v1.7). Scope edges still named: linear exposure (no
+> Dill), constant-threshold development (no Mack dissolution kinetics), the uncalibrated free-volume
+> `D_h,1`, the uncoupled `x`/`z` blurs. README + module-docstring updated; whole-repo fast lane
+> **238 → 254**. **No new ADR.** SHARED-FILE ASKS: a `litho-car-v19` project memory note + update
+> `peb-acid-diffusion-source` (the CAR scope edge is now BUILT, used by `[[litho-car-v19]]`).
+
 **Phase 1a — dopant diffusion & the pn junction.** Instantiate the **`engines/diffusion`**
 engine in mass mode (`diffusion_dopant.py`): a constant-source
 **predeposition** (Dirichlet `N_s`) → `erfc`, and a sealed-surface **drive-in**

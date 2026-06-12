@@ -158,10 +158,55 @@ approximation of it. One knob survives: the **diffusion length** ``σ = √(2·D
   to ~138 nm while ``p_close`` stays pinned at 151 — a band where the lens images but the bake cannot
   hold it (the lens out-resolves the bake; why the BARC). Scope edges, named: **linear exposure**
   (latent acid ∝ I — no Dill bleaching/saturation),
-  **constant D** (the CAR reaction–diffusion system — concentration-dependent ``D(h)``, acid loss,
-  deprotection kinetics — is the cited next rung), development still a constant threshold, and the
-  lateral blur is 1-D in ``x`` while the standing-wave smoothing is 1-D in ``z`` (no coupled 2-D
-  ``(x,z)`` resist volume — the engine's own last deferred regime).
+  **constant linear-blur D** (the **CAR reaction–diffusion** system — acid-catalyzed deprotection,
+  first-order acid loss, free-volume ``D(m)`` — is **promoted in v1.9**, see §9 below), development
+  still a constant threshold, and the lateral blur is 1-D in ``x`` while the standing-wave smoothing
+  is 1-D in ``z`` (no coupled 2-D ``(x,z)`` resist volume — the engine's own last deferred regime).
+
+v1.9 (§9) — CAR reaction–diffusion PEB: chemical amplification competes with diffusion + loss
+----------------------------------------------------------------------------------------------
+The §8-named "constant D (no CAR reaction–diffusion)" edge, promoted — and where v1.7 found the bake
+*is* the engine's pure linear PDE, the **realistic** chemically-amplified bake is a coupled
+**two-field reaction–diffusion** system that does **not** fit the single-field engine natively, so it
+is built **consumer-side by operator splitting** with the engine carrying only the acid-diffusion
+sub-step (the v1.2 moving-boundary move; no engine amendment). The cited model (Kirchauer §7.1.2,
+the same thesis as §8 — ``[[peb-acid-diffusion-source]]``), on the blocked-site fraction ``m`` (1→0)
+and the acid ``h``::
+
+    ∂m/∂t = −k_amp · m · hⁿ                         (deprotection: acid catalyzes the cleavage)
+    ∂h/∂t = −k_loss · h + ∂ₓ(D_h(m) ∂ₓh)            (acid: first-order loss + Fickian diffusion)
+
+Two facts make the split clean. (1) **Acid is a pure catalyst** — the ``h`` equation has *no* ``h·m``
+sink (deprotection consumes blocked sites, not acid), so ``∫h dx`` is conserved at ``k_loss = 0`` and
+decays *exactly* ``e^{−k_loss·t}`` otherwise — the tight conservation anchor. (2) The **local reaction
+flow integrates in closed form** (``h`` decays exactly; ``m = m·exp(−k_amp·hⁿ·Φ)``,
+``Φ = (1−e^{−n·k_loss·dt})/(n·k_loss)``) and is a semigroup, so composing Strang sub-steps reproduces
+the single flow to machine precision. :func:`car_peb` Strang-splits a bake (½-reaction · diffuse ·
+½-reaction): the engine diffuses ``h`` (``Neumann(0)`` sealed faces, ``D_h(m)`` frozen per step from
+the lagged deprotection — the array-``D`` path) and :func:`_car_react` applies the exact reaction.
+The diffusion sub-step is **backward Euler, NOT v1.7's Crank–Nicolson**: ``hⁿ`` with non-integer ``n``
+is a NaN trap on any negative ring, and BE's discrete maximum principle keeps ``h ≥ 0`` so the bake
+both never NaNs *and* keeps the ``∫h`` conservation exact (a CN ring would force a mass-adding clamp).
+Development clips the **deprotection profile** ``1−m`` (the chemically-faithful resist model —
+:func:`expose_grating_car`), where v1.7 clipped the acid image. The mini-triad:
+
+* **Analytic (tight).** (a) The degenerate seam — ``k_amp = k_loss = 0`` is the v1.7 linear blur
+  **bit-for-bit** (``car_peb`` short-circuits to :func:`peb_blur`; ``m`` stays 1, deprotection 0).
+  (b) A **spatially-flat** acid sees identity diffusion (``Neumann(0)``), so the split is the exact
+  reaction flow — the deprotection matches the closed-form ODE to **machine precision** (both
+  ``k_loss = 0`` and ``k_loss > 0``).
+* **Conservation (tight).** Acid is a catalyst ⇒ ``∫h dx`` is conserved (``k_loss = 0``) or decays
+  exactly ``e^{−k_loss·t}`` — on flat *and* structured images, to machine precision — and the
+  deprotection ``1−m`` stays in ``[0, 1]`` and is monotone in bake time (``m`` only ever decreases).
+* **Benchmark (loose).** **Chemical amplification sharpens** — in the amplification-dominated (small-
+  ``D``) regime the superlinear ``hⁿ`` map makes the deprotection edge *steeper* than the acid's
+  (``NILS`` up), the signature that makes CAR high-resolution; while **diffusion + loss degrade** the
+  latent image (``contrast``/``NILS`` fall with ``D·t`` and over-bake) — the competition that sets the
+  CAR resolution floor. A *regime* claim, not a monotone law (at large ``σ`` blur wins). Cited APEX-E
+  @ 90 °C constants (``k_amp = 2.0/s``, ``k_loss = 0.0033/s``, ``n = 1.8``, ``D_h,0 = 0.0933 nm²/s``).
+  Scope edges still named: **linear exposure** (no Dill), **constant-threshold development** (no Mack
+  dissolution-rate kinetics), the free-volume ``D_h,1`` coefficient **uncalibrated** (illustrative;
+  default constant ``D``), and the ``x``/``z`` blurs uncoupled (no 2-D resist volume).
 """
 from __future__ import annotations
 
@@ -703,3 +748,217 @@ def peb_blur(latent, length_nm: float, diffusion_length_nm: float,
     solver = Diffusion1D(grid, 0.5 * diffusion_length_nm ** 2,
                          Neumann(0.0), Neumann(0.0), method=method)
     return solver.solve(a, 1.0, 1.0 / n_steps)
+
+
+# --------------------------------------------------------------------------- #
+# 9. v1.9 — CAR reaction–diffusion PEB: amplification competes with diffusion + loss
+# --------------------------------------------------------------------------- #
+# Cited APEX-E (IBM) @ 90 °C constants for the two-field CAR PEB model (peb-acid-diffusion-source,
+# Kirchauer §7.1.2 — the same thesis as the v1.7 linear blur). k_peb,1 = the deprotection
+# (amplification) rate constant, k_peb,2 = the first-order acid-loss rate constant, n = the acid
+# reaction order in the deprotection rate, D_h,0 = the base acid diffusivity.
+CAR_K_AMP_APEX_E = 2.0          # 1/s   — k_peb,1, the acid-catalyzed deprotection rate constant
+CAR_K_LOSS_APEX_E = 0.0033      # 1/s   — k_peb,2, the first-order acid-loss rate constant
+CAR_REACTION_ORDER_APEX_E = 1.8  # —     — n, the acid order in the deprotection rate ∝ hⁿ·m
+CAR_D_H0_APEX_E = 0.0933        # nm²/s — D_h,0, the base acid diffusivity at 90 °C
+
+
+@dataclass(frozen=True)
+class CARBake:
+    """A chemically-amplified-resist post-exposure-bake recipe — the cited two-field model (v1.9).
+
+    The Kirchauer §7.1.2 reaction–diffusion system (``[[peb-acid-diffusion-source]]``) on the
+    blocked-site fraction ``m`` (1 → 0 as the resist deprotects) and the acid concentration ``h``::
+
+        ∂m/∂t = −k_amp · m · hⁿ                       (deprotection: acid catalyzes the cleavage)
+        ∂h/∂t = −k_loss · h + ∂ₓ(D_h(m) ∂ₓh)          (acid: first-order loss + Fickian diffusion)
+
+    Acid is a **pure catalyst** (no ``h·m`` sink on the ``h`` equation — deprotection consumes blocked
+    sites, not acid), which is what makes ``∫h dx`` conserved at ``k_loss = 0`` (the tight conservation
+    leg). The diffusivity is the cited **linear free-volume** model ``D_h = D_h0 + D_h1·(1−m)`` — only
+    ``D_h0`` is a cited value, so ``D_h1`` defaults to 0 (constant ``D``); ``D_h1 > 0`` (the polymer
+    diffuses acid faster as it deprotects) is **illustrative, not calibrated**. Defaults are the cited
+    APEX-E @ 90 °C constants. ``t_bake_s`` is the bake duration (seconds) — unlike the v1.7 blur, where
+    only the product ``D·t`` mattered, here the bake time independently sets the deprotection and the
+    acid loss, so it is a separate knob.
+    """
+
+    t_bake_s: float
+    k_amp: float = CAR_K_AMP_APEX_E
+    k_loss: float = CAR_K_LOSS_APEX_E
+    reaction_order: float = CAR_REACTION_ORDER_APEX_E
+    D_h0_nm2_s: float = CAR_D_H0_APEX_E
+    D_h1_nm2_s: float = 0.0
+
+
+@dataclass(frozen=True)
+class CARFeature:
+    """The line/space readout from a CAR-baked, developed grating — the v1.9 chemically-faithful resist.
+
+    Where :class:`PrintedFeature` reads the aerial (or v1.7 post-bake latent acid) image, this reads
+    the **deprotection profile** ``1−m`` that survives the reaction–diffusion bake: ``cd_nm`` is the
+    printed critical dimension (the line — the *low*-deprotection / still-protected region —
+    developed at ``develop_threshold`` on ``1−m``), ``contrast`` / ``nils`` the deprotection-image
+    quality, ``peak_deprotection`` the brightest-point conversion (a check the bake is in the partial,
+    not fully-saturated, regime). Plain scalars — the Phase-4 loose-coupling currency.
+    """
+
+    pitch_nm: float
+    cd_nm: float
+    contrast: float
+    nils: float
+    develop_threshold: float
+    peak_deprotection: float
+
+    @property
+    def cd_um(self) -> float:
+        """Printed CD in micrometres (``cd_nm·1e-3``) — the cross-module length currency."""
+        return self.cd_nm * UM_PER_NM
+
+    @property
+    def resolved(self) -> bool:
+        """Whether the deprotection image modulates at all (contrast above a small floor)."""
+        return self.contrast > 1.0e-3
+
+
+def _car_react(m: np.ndarray, h: np.ndarray, dt: float, bake: CARBake):
+    """The exact local reaction flow over ``dt`` — acid first-order loss + acid-catalyzed deprotection.
+
+    The reaction operator (the Strang split's non-diffusive half) integrates in **closed form**: the
+    acid decays ``h(τ) = h·e^{−k_loss·τ}``, and the deprotection, driven by that decaying acid, is
+    ``m(dt) = m·exp(−k_amp·hⁿ·Φ)`` with ``Φ = ∫₀^{dt} e^{−n·k_loss·τ} dτ = (1−e^{−n·k_loss·dt})/(n·k_loss)``
+    (``→ dt`` as ``k_loss → 0``). This is the exact flow of a semigroup, so composing sub-steps
+    reproduces the single-shot flow to machine precision — which is why the spatially-flat anchor
+    (where diffusion is identity) lands on the analytic ODE exactly. ``h`` is clamped ``≥ 0`` before
+    the ``hⁿ`` (defensive; the backward-Euler diffusion sub-step already guarantees it).
+    """
+    n = bake.reaction_order
+    h_pos = np.maximum(np.asarray(h, dtype=float), 0.0)
+    phi = ((1.0 - math.exp(-n * bake.k_loss * dt)) / (n * bake.k_loss)
+           if bake.k_loss > 0.0 else dt)
+    m_new = m * np.exp(-bake.k_amp * h_pos ** n * phi)
+    h_new = h_pos * math.exp(-bake.k_loss * dt)
+    return m_new, h_new
+
+
+def car_peb(acid, length_nm: float, bake: CARBake, n_steps: int = 200):
+    """Reaction–diffusion PEB bake on a sealed film ``[0, length_nm]`` — Strang operator splitting (v1.9).
+
+    The realistic chemically-amplified bake is a coupled two-field system (acid ``h`` + blocked-site
+    fraction ``m``) that does not fit the single-field engine natively (the ``−k_loss·h`` loss is
+    proportional to ``u``; ``m`` is a second field; ``D_h`` depends on ``m`` not ``h``), so it is built
+    **consumer-side by operator splitting** — the engine carries only the acid-**diffusion** sub-step
+    (``engines.diffusion``, ``Neumann(0)`` sealed faces, ``D_h(m) = D_h0 + D_h1·(1−m)`` frozen per step
+    from the lagged deprotection — the array-``D`` path), while :func:`_car_react` applies the **exact**
+    local reaction. Each Strang step is ½-reaction · diffuse · ½-reaction.
+
+    The diffusion sub-step is **backward Euler — not v1.7's Crank–Nicolson**: ``hⁿ`` with non-integer
+    ``n`` NaNs on any negative ring, and BE's discrete maximum principle keeps ``h ≥ 0`` so the bake
+    never NaNs *and* keeps ``∫h`` conservation exact (a CN ring would need a mass-adding clamp). That
+    caps the time accuracy at first order (BE-limited), not the Strang split's formal second — honest,
+    and the tight anchors do not depend on it. The **no-reaction limit** (``k_amp = k_loss = 0``)
+    short-circuits to :func:`peb_blur` (the v1.7 linear blur, ``σ = √(2·D_h0·t)``) **bit-for-bit** —
+    CAR reduces to the linear acid-diffusion blur there (``m`` stays 1, deprotection 0).
+
+    Returns ``(deprotection, acid)`` — ``deprotection = 1 − m`` (the developable latent image) and the
+    final acid field, both cell-centered arrays the size of ``acid``.
+    """
+    a = np.asarray(acid, dtype=float)
+    if bake.t_bake_s < 0.0:
+        raise ValueError(f"t_bake_s must be ≥ 0, got {bake.t_bake_s}")
+    if n_steps < 1:
+        raise ValueError(f"n_steps must be ≥ 1, got {n_steps}")
+    if bake.k_amp == 0.0 and bake.k_loss == 0.0:
+        # No reaction: m stays 1 (deprotection 0), and the acid is a pure linear blur with constant
+        # D_h0 (m≡1 ⇒ the D_h1 term vanishes) — the v1.7 path, reproduced bit-for-bit.
+        sigma = math.sqrt(2.0 * bake.D_h0_nm2_s * bake.t_bake_s)
+        return np.zeros_like(a), peb_blur(a, length_nm, sigma, n_steps=n_steps)
+    if bake.t_bake_s == 0.0:
+        return np.zeros_like(a), a.copy()
+    if bake.D_h0_nm2_s <= 0.0:
+        raise ValueError(
+            f"D_h0_nm2_s must be > 0 for the active-reaction diffusion sub-step "
+            f"(the harmonic-mean face diffusivity is undefined at D=0), got {bake.D_h0_nm2_s}"
+        )
+
+    grid = uniform_grid(length_nm, a.size)
+    h = a.copy()
+    m = np.ones_like(a)
+    dt = bake.t_bake_s / n_steps
+    constant_D = bake.D_h1_nm2_s == 0.0
+    solver = (Diffusion1D(grid, bake.D_h0_nm2_s, Neumann(0.0), Neumann(0.0),
+                          method="backward_euler") if constant_D else None)
+    for _ in range(n_steps):
+        m, h = _car_react(m, h, 0.5 * dt, bake)
+        if not constant_D:                       # D_h(m) frozen at the current deprotection (array-D)
+            Dc = bake.D_h0_nm2_s + bake.D_h1_nm2_s * (1.0 - m)
+            solver = Diffusion1D(grid, Dc, Neumann(0.0), Neumann(0.0), method="backward_euler")
+        h = solver.step(h, dt)
+        m, h = _car_react(m, h, 0.5 * dt, bake)
+    return 1.0 - m, h
+
+
+def expose_grating_car(
+    imaging: Imaging,
+    pitch_nm: float,
+    bake: CARBake,
+    source_fs=None,
+    n_source: int = 21,
+    n_orders: int = 15,
+    duty: float = 0.5,
+    acid_dose: float = 1.0,
+    develop_threshold: float = 0.5,
+    n_x: int = 512,
+    defocus_nm: float = 0.0,
+    n_steps: int = 200,
+) -> CARFeature:
+    """Image a grating, bake it through the CAR reaction–diffusion PEB, and develop on the deprotection.
+
+    The v1.9 chemically-faithful resist back-end (the §9 counterpart of :func:`expose_grating`): the
+    Abbe aerial image writes a **latent acid** image (``∝`` the image — the linear-exposure scope edge —
+    normalized so its peak is ``acid_dose``, the exposure knob), :func:`car_peb` runs the reaction–
+    diffusion bake on the **half-period symmetry cell** ``[0, p/2]`` (the same v1.7 construction — the
+    reaction is pointwise so an even acid stays even: even ``h`` → even ``m`` → even ``D_h``), and
+    development clips the **deprotection profile** ``1−m`` at ``develop_threshold`` (the still-protected,
+    low-deprotection region prints as the resist line — the ``"dark"`` polarity). Returns a
+    :class:`CARFeature` whose ``contrast``/``nils``/``cd_nm`` read that developed deprotection image.
+
+    Requires an even ``n_x`` and an **even (symmetric) aerial image** — an off-axis pole under defocus
+    shifts the fringe (v1.4) off the mirror planes and is **refused**, not silently mis-baked (the same
+    Massoud refuse-outside-the-fit discipline as the v1.7 PEB path).
+
+    **Dose × bake-time must be co-tuned** (the recipe footgun): ``acid_dose`` and the ``bake.t_bake_s``
+    are coupled through the cited amplification ``k_amp·hⁿ·t``. The default ``acid_dose = 1.0`` (peak
+    latent acid = the full blocked-site density) is the *over-exposed extreme* — paired with a
+    realistic ~60 s bake at the cited ``k_amp = 2.0/s`` it saturates **every** pixel (``1−m → 1``
+    everywhere → a flat, contrast-0 deprotection → ``cd = 0``). Use a small dose for a long bake (the
+    demo uses ``acid_dose ≈ 0.13`` at ~60 s — photoacid is a small fraction of the blocked-site
+    density), or a short bake at dose 1.0; ``peak_deprotection`` on the returned :class:`CARFeature`
+    flags the regime (well below 1.0 ⇒ partial / well-formed; pinned at 1.0 ⇒ saturated).
+    """
+    if n_x % 2:
+        raise ValueError(f"CAR PEB needs an even n_x (half-period symmetry cells), got {n_x}")
+    orders = grating_orders(pitch_nm, n_orders=n_orders, duty=duty)
+    x = (np.arange(n_x) + 0.5) * (pitch_nm / n_x)
+    aerial = abbe_image(x, orders, imaging, source_fs=source_fs, n_source=n_source,
+                        defocus_nm=defocus_nm)
+    if not np.allclose(aerial, aerial[::-1], rtol=1e-8, atol=1e-9 * float(aerial.max())):
+        raise ValueError(
+            "CAR PEB requires an even (symmetric) aerial image — a symmetric grating under a "
+            "symmetric source. An asymmetric image (e.g. an off-axis pole under defocus — the v1.4 "
+            "fringe shift) has no mirror plane at x=0/p/2, so the half-period sealed-cell bake does "
+            "not represent its periodic reaction–diffusion."
+        )
+    h0 = acid_dose * aerial / float(aerial.max())    # latent acid ∝ image, peak = the exposure dose
+    half = n_x // 2
+    depro_half, _ = car_peb(h0[:half], pitch_nm / 2.0, bake, n_steps=n_steps)
+    deprotection = np.concatenate([depro_half, depro_half[::-1]])   # mirror back: even about p/2
+    contrast = image_contrast(deprotection)
+    edge_nm = duty * pitch_nm / 2.0
+    linewidth_nm = (1.0 - duty) * pitch_nm
+    image_nils = nils(x, deprotection, edge_nm, linewidth_nm)
+    cd = print_cd(x, deprotection, develop_threshold, polarity="dark")
+    return CARFeature(
+        pitch_nm=pitch_nm, cd_nm=cd, contrast=contrast, nils=image_nils,
+        develop_threshold=develop_threshold, peak_deprotection=float(deprotection.max()),
+    )
