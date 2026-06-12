@@ -43,6 +43,18 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 CHIP_DIR = _REPO_ROOT / "chip"
 DOCS_DIR = _REPO_ROOT / "docs"
 OUTPUT_HTML = DOCS_DIR / "index.html"
+OUTPUT_LOCAL_HTML = DOCS_DIR / "index.local.html"
+
+# --- the local edition (docs/index.local.html) -------------------------------------------------
+# A second, deterministic render whose links open in a *running* JupyterLab instead of on GitHub,
+# so the teaching-notebook card becomes a real click->live-notebook launch (the one thing GitHub's
+# read-only viewer can't do). These are fixed localhost strings — no machine path — so this page
+# stays as golden-testable as the public one. It does NOT replace index.html: the public Pages
+# gallery is untouched; you open this file locally (a browser tab over file://, or via the lab).
+# A click can only REACH a server that is already up — it cannot start `jupyter lab` for you.
+_LOCAL_PORT = 8888
+_LAB = f"http://localhost:{_LOCAL_PORT}/lab/tree"   # "open this repo-relative path in JupyterLab"
+_LAB_ROOT = f"http://localhost:{_LOCAL_PORT}/lab"
 
 
 @dataclass(frozen=True)
@@ -119,12 +131,13 @@ def figure_relpath(demo: Demo) -> str:
     return Path(mod.DOCS_FIGURE).relative_to(DOCS_DIR).as_posix()  # e.g. "figures/chip-oed-segregation.png"
 
 
-def _card(demo: Demo) -> str:
+def _card(demo: Demo, local: bool = False) -> str:
     fig = figure_relpath(demo)
     label = html.escape(demo.label)
     blurb = html.escape(demo.blurb)
     run = html.escape(f"python -m chip.{demo.module}")
-    src = f"{_BLOB}/chip/{demo.module}.py"
+    src = f"{_LAB}/chip/{demo.module}.py" if local else f"{_BLOB}/chip/{demo.module}.py"
+    tgt = ' target="_blank" rel="noopener"' if local else ""   # launch in a new tab, keep the gallery open
     return f"""        <article class="card">
           <a class="shot" href="{fig}" title="open the full figure">
             <img src="{fig}" alt="{label} — {html.escape(demo.module)} figure" loading="lazy">
@@ -134,14 +147,14 @@ def _card(demo: Demo) -> str:
             <p class="blurb">{blurb}</p>
             <div class="links">
               <code>{run}</code>
-              <a class="src" href="{src}">source&nbsp;&#8599;</a>
+              <a class="src" href="{src}"{tgt}>source&nbsp;&#8599;</a>
             </div>
           </div>
         </article>"""
 
 
-def _grid(demos: list[Demo]) -> str:
-    return "\n".join(_card(d) for d in demos)
+def _grid(demos: list[Demo], local: bool = False) -> str:
+    return "\n".join(_card(d, local) for d in demos)
 
 
 # Deterministic by construction: the output depends only on the manifest + introspected figure
@@ -199,17 +212,67 @@ _STYLE = """\
                     font: .82rem ui-monospace, Consolas, monospace; }"""
 
 
-def render_html() -> str:
-    """Render the whole gallery to a deterministic HTML string (no dates, no machine paths)."""
-    spine = _grid(SPINE)
-    deepenings = _grid(DEEPENINGS)
-    nb = f"{_BLOB}/chip/chip.ipynb"
+def render_html(local: bool = False) -> str:
+    """Render the whole gallery to a deterministic HTML string (no dates, no machine paths).
+
+    ``local=True`` renders ``docs/index.local.html``: the same gallery, but every link that would go
+    to GitHub instead opens in a *running* JupyterLab (``localhost``) — so the notebook card becomes a
+    real click->live-notebook launch. The public ``index.html`` (``local=False``) is byte-for-byte
+    unchanged. Both depend only on the manifest + fixed strings, so both stay golden-testable.
+    """
+    spine = _grid(SPINE, local)
+    deepenings = _grid(DEEPENINGS, local)
+    item_attr = ' target="_blank" rel="noopener"' if local else ""  # local: launch alongside the gallery
+    if local:
+        title = "chip-sim &mdash; gallery (local edition)"
+        repo_link = f'<a class="repo" href="{_LAB_ROOT}"{item_attr}>Open the repo in Jupyter&nbsp;Lab&nbsp;&#8599;</a>'
+        note = (
+            '\n      <p class="lead" style="background:#fff7e6;border:1px solid #f0d8a8;border-radius:8px;'
+            'padding:.6rem .8rem;margin-top:1rem;"><strong>Local edition.</strong> Every link here opens in '
+            "your <strong>running JupyterLab</strong> &mdash; locally and live, not a static read-only page. "
+            "Start it once from the repo root (<code>jupyter lab</code>), then click anything below: the "
+            f"notebook card opens <em>live</em>, sliders and all. Links target <code>localhost:{_LOCAL_PORT}"
+            "</code>; a click can&rsquo;t start the server, only reach one already running.</p>"
+        )
+        notebook_card = f"""<a class="item" href="{_LAB}/chip/chip.ipynb"{item_attr}>
+          <h3>The teaching notebook &rarr; open it live</h3>
+          <p>chip/chip.ipynb &mdash; one section per phase with live ipywidgets sliders, ending on the
+            coherent process&rarr;device flow. Clicking opens it <strong>interactively in your running
+            JupyterLab</strong> &mdash; start <code>jupyter lab</code> from the repo root first; the link
+            targets port&nbsp;{_LOCAL_PORT}.</p>
+        </a>"""
+        readme = f"{_LAB}/README.md"
+        status = f"{_LAB}/chip/README.md"
+        decisions = f"{_LAB}/docs/decisions"
+        build_plan = f"{_LAB}/docs/plans/microchip-fabrication.md"
+        engine = f"{_LAB}/engines/diffusion"
+    else:
+        title = "chip-sim — visualization &amp; demo gallery"
+        repo_link = f'<a class="repo" href="{_REPO_URL}">View the repository on GitHub&nbsp;&#8599;</a>'
+        note = ""
+        nb = f"{_BLOB}/chip/chip.ipynb"
+        notebook_card = f"""<div class="item">
+          <h3>The teaching notebook</h3>
+          <p>chip/chip.ipynb &mdash; one section per phase with live ipywidgets sliders, ending on the
+            coherent process&rarr;device flow. GitHub renders it <em>read-only</em> (no live kernel); for the
+            interactive widgets, install the notebook extra (<code>pip install -e ".[viz,notebook]"</code>)
+            and launch it locally:</p>
+          <div class="links">
+            <code>jupyter lab chip/chip.ipynb</code>
+            <a class="src" href="{nb}">view on GitHub&nbsp;&#8599;</a>
+          </div>
+        </div>"""
+        readme = f"{_BLOB}/README.md"
+        status = f"{_BLOB}/chip/README.md#status"
+        decisions = f"{_TREE}/docs/decisions"
+        build_plan = f"{_BLOB}/docs/plans/microchip-fabrication.md"
+        engine = f"{_TREE}/engines/diffusion"
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>chip-sim — visualization &amp; demo gallery</title>
+  <title>{title}</title>
   <style>
 {_STYLE}
   </style>
@@ -228,7 +291,7 @@ def render_html() -> str:
       <pre class="quick"><span class="c"># clone, install the figure stack, run any demo</span>
 pip install -e ".[viz]"
 python -m chip.demo_junction   <span class="c"># prints the table, banks docs/figures/chip-junction.png</span></pre>
-      <a class="repo" href="{_REPO_URL}">View the repository on GitHub&nbsp;&#8599;</a>
+      {repo_link}{note}
     </div>
   </header>
 
@@ -255,34 +318,24 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
       <h2>Go deeper</h2>
       <p class="sub">The interactive tour and the written record.</p>
       <div class="deeper">
-        <div class="item">
-          <h3>The teaching notebook</h3>
-          <p>chip/chip.ipynb &mdash; one section per phase with live ipywidgets sliders, ending on the
-            coherent process&rarr;device flow. GitHub renders it <em>read-only</em> (no live kernel); for the
-            interactive widgets, install the notebook extra (<code>pip install -e ".[viz,notebook]"</code>)
-            and launch it locally:</p>
-          <div class="links">
-            <code>jupyter lab chip/chip.ipynb</code>
-            <a class="src" href="{nb}">view on GitHub&nbsp;&#8599;</a>
-          </div>
-        </div>
-        <a class="item" href="{_BLOB}/README.md">
+        {notebook_card}
+        <a class="item" href="{readme}"{item_attr}>
           <h3>README &amp; quickstart &#8599;</h3>
           <p>Layout, the tiered test gate, and the text Demonstrations catalog.</p>
         </a>
-        <a class="item" href="{_BLOB}/chip/README.md#status">
+        <a class="item" href="{status}"{item_attr}>
           <h3>Status writeups &#8599;</h3>
           <p>Per-phase / per-version depth: cited references, headline numbers, scope edges, findings.</p>
         </a>
-        <a class="item" href="{_TREE}/docs/decisions">
+        <a class="item" href="{decisions}"{item_attr}>
           <h3>Decision records &#8599;</h3>
           <p>ADRs 0001&ndash;0004 &mdash; language/perf, visualization/UX, test policy, the engine unfreeze.</p>
         </a>
-        <a class="item" href="{_BLOB}/docs/plans/microchip-fabrication.md">
+        <a class="item" href="{build_plan}"{item_attr}>
           <h3>The build plan &#8599;</h3>
           <p>microchip-fabrication.md &mdash; the full process&rarr;device pedagogy and build order.</p>
         </a>
-        <a class="item" href="{_TREE}/engines/diffusion">
+        <a class="item" href="{engine}"{item_attr}>
           <h3>The diffusion engine &#8599;</h3>
           <p>The separately-validated 1-D/2-D solver spine the whole simulator reuses.</p>
         </a>
@@ -299,11 +352,15 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
 """
 
 
-def write_html() -> Path:
-    """Write the gallery to ``docs/index.html`` with LF newlines (golden-test stable on Windows + CI)."""
-    OUTPUT_HTML.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_HTML.write_text(render_html(), encoding="utf-8", newline="\n")
-    return OUTPUT_HTML
+def write_html(local: bool = False) -> Path:
+    """Write a gallery edition with LF newlines (golden-test stable on Windows + CI).
+
+    ``local=False`` → the public ``docs/index.html`` (GitHub links, served by Pages);
+    ``local=True``  → ``docs/index.local.html`` (links open in a running JupyterLab)."""
+    out = OUTPUT_LOCAL_HTML if local else OUTPUT_HTML
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_html(local), encoding="utf-8", newline="\n")
+    return out
 
 
 def main() -> None:
@@ -311,8 +368,10 @@ def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")     # the → in the message, on legacy codepages
     assert_manifest_complete()
-    saved = write_html()
-    print(f"Gallery written → {saved.relative_to(_REPO_ROOT)}  ({len(ALL_DEMOS)} demos)")
+    public = write_html()
+    local = write_html(local=True)
+    print(f"Gallery written → {public.relative_to(_REPO_ROOT)} + "
+          f"{local.relative_to(_REPO_ROOT)}  ({len(ALL_DEMOS)} demos)")
 
 
 if __name__ == "__main__":

@@ -43,3 +43,25 @@ def test_committed_html_is_current():
     assert committed == gallery.render_html(), (
         "docs/index.html is stale — regenerate it with `python -m chip.gallery` and commit the result."
     )
+
+
+def test_committed_local_html_is_current():
+    committed = gallery.OUTPUT_LOCAL_HTML.read_text(encoding="utf-8")
+    assert committed == gallery.render_html(local=True), (
+        "docs/index.local.html is stale — regenerate it with `python -m chip.gallery` and commit the result."
+    )
+
+
+def test_local_edition_is_all_local_no_github():
+    """The local edition's whole point: every link is local (a running JupyterLab), none to GitHub."""
+    local = gallery.render_html(local=True)
+    assert "github.com" not in local, "the local gallery must not link to GitHub anywhere"
+    assert f"http://localhost:{gallery._LOCAL_PORT}/lab/tree/chip/chip.ipynb" in local, (
+        "the notebook card must be a click->live-notebook launch into the running JupyterLab"
+    )
+
+
+def test_public_edition_still_points_to_github():
+    """Guard the split: the public Pages gallery keeps its GitHub links (localhost would dead-end there)."""
+    public = gallery.render_html()
+    assert "github.com" in public and "localhost" not in public
