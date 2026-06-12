@@ -32,12 +32,25 @@ you can see *why*."**
 **The dramatic early win (the first banked artifact).** *A wafer carrying a live
 `WaferState` runs the existing, already-validated back end — diffusion → oxidation →
 lithography → device — through the spec/failure/yield harness, and one bad knob visibly
-ripples to a dead die.* Defocus the exposure → the printed CD goes out of window → the
-channel length collapses → `V_t`/`I_Dsat` leave spec → that die fails, and the failure trail
-names defocus as the cause. Built **entirely on physics that already passes triads** (Phases
-1–4 of the microchip plan), so the *mechanism* — state, propagation, spec, yield, rework — is
-proven before a single new equation is added. This is the analogue of the microchip plan's
-"cheapest end-to-end process→device demo," now with failure and yield.
+ripples to a dead die.* Defocus the exposure → the gate image degrades → the die leaves spec →
+that die fails, and the failure trail names defocus as the cause. Built **entirely on physics
+that already passes triads** (Phases 1–4 of the microchip plan), so the *mechanism* — state,
+propagation, spec, yield, rework — is proven before a single new equation is added. This is the
+analogue of the microchip plan's "cheapest end-to-end process→device demo," now with failure and
+yield.
+
+> **G1-built refinement of the defocus chain (the validated mechanism).** The original prose
+> here read *"defocus → CD out of window → channel collapses → `V_t`/`I_Dsat` leave spec"*; G1
+> on the validated `litho.py` shows that is the *extreme*-defocus regime, not the primary one.
+> For a symmetric line/space feature the **CD midpoint is defocus-robust** — defocus's first
+> casualty is **image sharpness (NILS)**, the cited printability metric, which collapses
+> (4.6→1.5 over 0–200 nm) while the CD barely moves. So the banked demo's moderate-defocus
+> failure is **NILS below the printability floor** (an edge ring, via the center-to-edge focus
+> bowl). Only *extreme* defocus finally collapses the CD out of window — and when it does it
+> **raises** `I_Dsat` (shorter channel over-drives → an I_Dsat **ceiling**, not a floor). And
+> **`V_t` is never on the defocus chain** (the device model's own scope edge: `V_t` carries no
+> channel-length term — only the drive current reads the CD). The demo demonstrates *both*: the
+> NILS edge ring at defocus = 90 nm and the literal CD/`I_Dsat` collapse at 320 nm.
 
 ---
 

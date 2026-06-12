@@ -1,14 +1,20 @@
 ---
 name: fab-game
 description: New direction — a gamified full-line fab simulator (sand→chip) layered on top of chip-sim; vision synced + plan/ADR 0005 drafted 2026-06-12
-metadata:
+metadata: 
+  node_type: memory
   type: project
+  originSessionId: dffe5088-7201-43e3-953e-bf624ab3edb8
 ---
 
 **project (2026-06-12):** a NEW direction — a **gamified, full-production-line fab
 simulator** (*sand → packaged chip*) built **on top of** chip-sim, not replacing it. Vision
 synced with the user across two AskUserQuestion rounds, then **`docs/plans/fab-game.md` +
 `docs/decisions/0005-fab-game-layering.md` drafted** (advisor-reviewed; docs-only commit).
+
+**>> G1 BUILT 2026-06-12 → [[fab-game-g1]]** (the harness + vertical slice: `fab_game/` wired
+through the validated back end, "one bad knob → dead die + failure trail", 5 mechanics invariants
+green, fast lane 314). The defocus chain's primary signature = **NILS** not CD (plan §1 corrected).
 
 **The seven synced choices:** (1) **full grand tour** — every distinct step,
 purification→Czochralski→wafer-prep→oxidation→litho→diffusion→etch/depo→device→dice/bond/test,

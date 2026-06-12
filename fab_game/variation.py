@@ -1,0 +1,100 @@
+"""The stochastic spread — process variation as a seeded, reproducible layer (the plan §4).
+
+The deterministic physics core computes the *nominal* output from the knobs; this layer spreads
+it across the die map so yield is honest. Two channels, per the advisor's split:
+
+* **Systematic knob** (center-to-edge trend) is routed *through the physics* — the per-die
+  effective focus is ``defocus + focus_tilt·radius_frac``, so the Bossung CD response is the real
+  optics, not a hand-applied CD shift. This is the channel the "propagation actually wired"
+  invariant constrains.
+* **Die-to-die scatter** is applied at the **output** (a small CD / t_ox jitter), the cheap,
+  honest model of within-wafer non-uniformity — it never needs a second physics solve.
+
+**Determinism contract.** Every random number is drawn from one seeded
+``numpy.random.default_rng`` threaded through the pipeline, consumed in **fixed die order** — so a
+(seed, recipe) pair reproduces the wafer exactly (a roguelike "seed"). When ``enabled`` is False
+*both* channels vanish (trend **and** scatter), so a zero-variation run collapses to one physics
+call per step == :mod:`chip.demo_device` (the seam — trend-off ⇔ variation-off).
+
+The magnitudes here are **house defaults, flagged** — illustrative within-wafer non-uniformity,
+not cited fab numbers (ADR 0005 §5: ``fab_game`` is mechanics, not magnitudes).
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+
+from .state import Die
+
+
+@dataclass(frozen=True)
+class DiePerturbation:
+    """One die's drawn perturbation: a focus-knob delta (through physics) + output jitters.
+
+    ``defocus_nm_delta`` is *added to the litho defocus knob* (systematic tilt + scatter, both
+    genuine focus error → the Bossung optics map it to CD); ``t_ox_factor`` multiplies the grown
+    oxide thickness and ``cd_nm_delta`` is added to the printed CD (output-level non-uniformity).
+    The **identity** ``DiePerturbation(0.0, 1.0, 0.0)`` is the no-variation element (the seam).
+    """
+
+    defocus_nm_delta: float = 0.0
+    t_ox_factor: float = 1.0
+    cd_nm_delta: float = 0.0
+
+
+@dataclass(frozen=True)
+class Variation:
+    """House-default within-wafer process variation (FLAGGED — illustrative, not cited magnitudes).
+
+    Systematic center-to-edge trends (added at ``radius_frac = 1``, linear in radius) plus
+    die-to-die Gaussian scatter. ``enabled=False`` turns **both** off → the seam.
+    """
+
+    enabled: bool = True
+    # Systematic center-to-edge trends (full value at the wafer edge, linear in radius_frac):
+    focus_tilt_nm: float = 55.0        # edge dies sit this many nm out of focus (focus bowl)
+    t_ox_edge_frac: float = -0.025     # edge gate oxide ~2.5 % thinner (furnace non-uniformity)
+    # Die-to-die random scatter (Gaussian σ):
+    focus_sigma_nm: float = 20.0       # focus jitter
+    cd_sigma_nm: float = 1.5           # line-width roughness on the printed CD
+    t_ox_sigma_frac: float = 0.008     # oxide-thickness jitter
+
+    def _trends(self, die: Die) -> tuple[float, float]:
+        """The deterministic center-to-edge trends at this die: (defocus tilt nm, t_ox frac shift)."""
+        r = die.radius_frac
+        return self.focus_tilt_nm * r, self.t_ox_edge_frac * r
+
+    def perturbation(self, die: Die, rng: np.random.Generator) -> DiePerturbation:
+        """Draw this die's full perturbation from ``rng`` — systematic trend **+** scatter.
+
+        Consumes 3 normals in a fixed order (focus, t_ox, CD). With ``enabled=False`` returns the
+        identity perturbation **without touching ``rng``** — so the seam is exact *and* a
+        disabled-variation run does not perturb the random stream.
+        """
+        if not self.enabled:
+            return DiePerturbation()
+        focus_tilt, t_ox_trend = self._trends(die)
+        return DiePerturbation(
+            defocus_nm_delta=focus_tilt + float(rng.normal(0.0, self.focus_sigma_nm)),
+            t_ox_factor=1.0 + t_ox_trend + float(rng.normal(0.0, self.t_ox_sigma_frac)),
+            cd_nm_delta=float(rng.normal(0.0, self.cd_sigma_nm)),
+        )
+
+    def systematic_perturbation(self, die: Die) -> DiePerturbation:
+        """The **trend-only** perturbation — the center-to-edge focus bowl, no random scatter.
+
+        Used by litho **rework**: a re-exposure happens in the same scanner, so the focus bowl (the
+        systematic tilt) *persists* — only the player's global focus offset is corrected. Dropping
+        the random scatter models a fresh, well-controlled re-exposure. Deterministic (no ``rng``),
+        identity when disabled. (So re-exposing at the *same* recipe does **not** rescue an
+        edge-tilt failure — only correcting the focus does — which is what makes rework honest.)
+        """
+        if not self.enabled:
+            return DiePerturbation()
+        focus_tilt, t_ox_trend = self._trends(die)
+        return DiePerturbation(defocus_nm_delta=focus_tilt, t_ox_factor=1.0 + t_ox_trend)
+
+
+# The seam element: variation off → both channels vanish → demo_device bit-for-bit.
+NO_VARIATION = Variation(enabled=False)
