@@ -28,7 +28,7 @@ docs/figures/        # banked figures (chip-*.png)
 
 ```powershell
 pip install -e ".[viz]"                 # compute + figures
-python chip/demo_oxidation.py           # any demo prints its validation table + banks a figure
+python -m chip.demo_oxidation           # any demo prints its validation table + banks a figure
 jupyter lab chip/chip.ipynb             # the teaching notebook (needs .[viz,notebook])
 ```
 
@@ -50,6 +50,53 @@ on the GitHub runner — the kernel goes idle but `nbclient` never returns, not 
 `-n auto` is the blessed *command*, not baked into config, so single-test `-s`/pdb stays serial.
 The suite is **255 tests** (254 fast + 1 slow), all green; optional stacks are importorskip-gated,
 so a headless checkout skips rather than errors.
+
+## Demonstrations
+
+Every fab step ships a **self-contained demo**: run it and it prints a cited validation table and
+banks its figure to `docs/figures/`. The twelve figures are already committed there, so you can
+browse the gallery on GitHub without running anything; the table below maps each one to the demo
+that produced it. Run from the repo root after `pip install -e ".[viz]"`:
+
+```powershell
+python -m chip.demo_junction            # → prints the table, saves docs/figures/chip-junction.png
+```
+
+> Use the `python -m chip.demo_*` form, **not** `python chip/demo_*.py` — the demos are package
+> modules (relative imports), so the bare-path form fails with *"attempted relative import."*
+
+**The spine — the four process phases, in build order (start here):**
+
+| Run (`python -m …`) | Shows | Figure |
+|---|---|---|
+| `chip.demo_junction` | **Phase 1a** — a pn junction from a two-step boron diffusion: junction depth `x_j` + sheet resistance `R_s` | [chip-junction.png](docs/figures/chip-junction.png) |
+| `chip.demo_oxidation` | **Phase 2** — Deal–Grove thermal oxide, wet vs dry, the linear→parabolic bend | [chip-oxidation.png](docs/figures/chip-oxidation.png) |
+| `chip.demo_litho` | **Phase 3** — the aerial image assembling from its diffraction orders + contrast-vs-pitch | [chip-litho.png](docs/figures/chip-litho.png) |
+| `chip.demo_device` | **Phase 4** — the whole process→device chain → MOS threshold voltage `V_t` | [chip-device.png](docs/figures/chip-device.png) |
+
+**The deepenings — optional depth, each promoting a named scope edge of its phase:**
+
+| Run (`python -m …`) | Shows | Figure |
+|---|---|---|
+| `chip.demo_thin_oxide` | **v1.1** — Massoud thin-dry oxide correction (gate-oxide before/after, the `V_t` shift) | [chip-thin-oxide.png](docs/figures/chip-thin-oxide.png) |
+| `chip.demo_coupling` | **v1.2** — Phase 1↔2 back-coupling: OED deepening + segregation (boron depletes / phosphorus piles up) | [chip-oed-segregation.png](docs/figures/chip-oed-segregation.png) |
+| `chip.demo_diffusion_highconc` | **v1.3** — concentration-dependent diffusivity `D(N)`, the high-concentration box | [chip-highconc.png](docs/figures/chip-highconc.png) |
+| `chip.demo_defocus` | **v1.4** — lithographic defocus, the depth of focus & the Bossung curve | [chip-defocus.png](docs/figures/chip-defocus.png) |
+| `chip.demo_peb` | **v1.7** — PEB acid-diffusion blur: the latent image dissolving + the PEB window | [chip-peb.png](docs/figures/chip-peb.png) |
+| `chip.demo_lateral_diffusion` | **v1.8** — 2-D lateral diffusion under a mask edge (the junction curving under the mask) | [chip-lateral-diffusion.png](docs/figures/chip-lateral-diffusion.png) |
+| `chip.demo_car` | **v1.9** — CAR reaction–diffusion PEB (the chemically-amplified bake) | [chip-car.png](docs/figures/chip-car.png) |
+| `chip.demo_zernike` | **v1.10** — Zernike aberrations (coma / astigmatism / spherical), a pupil phase | [chip-zernike.png](docs/figures/chip-zernike.png) |
+
+*(v1.5–v1.6 are engine-internal amendments — native nonlinear `D(u)` and explicit stepping — with no
+chip demo of their own; they surface through `engines/diffusion`'s own test suite.)*
+
+**The full writeup** for any demo — cited references, the headline numbers, the scope edges and the
+design findings — lives in [`chip/README.md`](chip/README.md#status)'s *Status* section, keyed by the
+same phase/version label. This catalog is the launch-pad; that section is the depth.
+
+**The guided interactive tour:** [`chip/chip.ipynb`](chip/chip.ipynb) is the single notebook — one
+section per phase, each with `ipywidgets` sliders re-running a validated module live, ending on the
+coherent process→device flow. `pip install -e ".[viz,notebook]"`, then `jupyter lab chip/chip.ipynb`.
 
 ## Provenance
 
