@@ -72,6 +72,49 @@ def test_p_plus_poly_gate_shifts_flatband_by_one_volt():
 
 
 # --------------------------------------------------------------------------- #
+# Oxide charge — lifting the named Q_ox = 0 edge (the G4 mobile-ion contamination wire)
+# --------------------------------------------------------------------------- #
+def test_zero_oxide_charge_is_byte_for_byte_the_ideal_oxide():
+    # The seam: Q_ox = 0 (the default) reproduces the ideal-oxide V_FB/V_t exactly — the term is skipped,
+    # so no C_ox is needed and nothing changes for every existing caller (demo_device, the MIT example).
+    ideal = dev.threshold_voltage(1e17, 0.015, gate="n+poly")
+    explicit_zero = dev.threshold_voltage(1e17, 0.015, gate="n+poly", Q_ox=0.0)
+    assert explicit_zero.V_FB == ideal.V_FB
+    assert explicit_zero.V_t == ideal.V_t
+    assert ideal.Q_ox == 0.0
+    # flatband_voltage with Q_ox=0 needs no C_ox and equals the no-arg call bit-for-bit.
+    assert dev.flatband_voltage(1e17, "n+poly", Q_ox=0.0) == dev.flatband_voltage(1e17, "n+poly")
+
+
+def test_positive_oxide_charge_shifts_flatband_and_vt_down():
+    # ΔV_FB = −Q_ox/C_ox: positive oxide charge (mobile Na⁺ from imperfect purification) drives V_FB —
+    # and hence V_t — DOWN, by exactly Q_ox/C_ox. The cited MOS relation, the contamination→device wire.
+    m0 = dev.threshold_voltage(1e17, 0.015, gate="n+poly")
+    Q_ox = 3.0e-8                                          # C/cm² (~2e11 cm⁻² mobile ions)
+    m = dev.threshold_voltage(1e17, 0.015, gate="n+poly", Q_ox=Q_ox)
+    assert m.V_FB == pytest.approx(m0.V_FB - Q_ox / m0.C_ox, rel=1e-12)
+    assert m.V_t == pytest.approx(m0.V_t - Q_ox / m0.C_ox, rel=1e-12)
+    assert m.V_t < m0.V_t                                  # driven down
+    assert m.Q_ox == Q_ox
+
+
+def test_oxide_charge_shift_is_only_the_flatband_term():
+    # The whole effect is the flat-band shift: only V_FB moves; φ_F, C_ox, Q_dep, γ are untouched (the
+    # oxide charge does not change the depletion electrostatics, just the gate-voltage reference).
+    m0 = dev.threshold_voltage(1e17, 0.015)
+    m = dev.threshold_voltage(1e17, 0.015, Q_ox=3.0e-8)
+    assert (m.phi_F, m.C_ox, m.Q_dep, m.gamma) == (m0.phi_F, m0.C_ox, m0.Q_dep, m0.gamma)
+    assert (m.V_t - m0.V_t) == pytest.approx(m.V_FB - m0.V_FB, rel=1e-12)
+
+
+def test_nonzero_oxide_charge_without_c_ox_raises():
+    # A non-zero Q_ox needs the oxide capacitance (ΔV_FB = −Q_ox/C_ox); calling flatband_voltage with
+    # Q_ox≠0 and no C_ox is a programming error, not a silent no-op.
+    with pytest.raises(ValueError):
+        dev.flatband_voltage(1e17, "n+poly", Q_ox=3.0e-8)          # no C_ox
+
+
+# --------------------------------------------------------------------------- #
 # Analytical limit: the INDEPENDENT depletion-Poisson solve (the anchor)
 # --------------------------------------------------------------------------- #
 def test_depletion_poisson_recovers_the_closed_form():

@@ -15,6 +15,8 @@ if a wire were cut (the device ignoring ``t_ox`` or ``cd``), these monotonic che
 """
 from __future__ import annotations
 
+from chip.purification import Contamination
+
 from fab_game.recipe import DeviceKnobs
 from fab_game.state import Die
 from fab_game.steps import device_step
@@ -57,3 +59,36 @@ def test_missing_upstream_refuses_the_device():
     bare = Die(site=(0, 0), radius_frac=0.0)
     out = device_step(bare, _DEV, _N_A)
     assert out.V_t is None and out.i_dsat is None
+
+
+# --------------------------------------------------------------------------- #
+# G4 — the contamination reads (Na → Q_ox → V_t; residual dopant → net doping → V_t)
+# --------------------------------------------------------------------------- #
+def test_sodium_contamination_drives_vt_down():
+    """More inherited mobile-ion Na → a larger Q_ox → a strictly smaller V_t (the lifted oxide edge).
+
+    The G4 propagation wire: positive Na⁺ oxide charge shifts the flat-band voltage down. A clean
+    contamination (or None) leaves V_t at the ideal-oxide value (the seam); only Na moves it (the
+    metals ride along with no V_t effect — the named G4b gap)."""
+    clean = device_step(_die_with(0.014, 167.0), _DEV, _N_A, contamination=None)
+    dirty = device_step(_die_with(0.014, 167.0), _DEV, _N_A, contamination=Contamination(Na=1.0e16))
+    dirtier = device_step(_die_with(0.014, 167.0), _DEV, _N_A, contamination=Contamination(Na=2.0e16))
+    assert dirty.V_t < clean.V_t                             # Na drives V_t down
+    assert dirtier.V_t < dirty.V_t                           # monotone in Na
+    # A clean (all-zero) contamination is byte-for-byte the no-contamination V_t (the seam).
+    clean_obj = device_step(_die_with(0.014, 167.0), _DEV, _N_A, contamination=Contamination())
+    assert clean_obj.V_t == clean.V_t
+    # Deep-level metals ride along with NO V_t consequence (the named G4b gap — net doping can't carry it).
+    metal = device_step(_die_with(0.014, 167.0), _DEV, _N_A, contamination=Contamination(Fe=1.0e18))
+    assert metal.V_t == clean.V_t
+
+
+def test_residual_acceptor_raises_vt_via_net_doping():
+    """A higher effective channel doping (residual acceptor folded in by the caller) → a larger V_t.
+
+    The residual-dopant net shift is applied to ``channel_N_A`` *before* device_step (the
+    ``effective_channel_N_A`` path), so here it shows as the device's monotone V_t-vs-N_A response —
+    the same validated :func:`chip.device.threshold_voltage` doping dependence."""
+    base = device_step(_die_with(0.014, 167.0), _DEV, _N_A)
+    doped = device_step(_die_with(0.014, 167.0), _DEV, _N_A + 5.0e16)   # + residual acceptor
+    assert doped.V_t > base.V_t

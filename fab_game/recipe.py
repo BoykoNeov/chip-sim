@@ -22,6 +22,28 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from chip.czochralski import Boule
+from chip.purification import FEEDSTOCK_GRADES, Contamination, zone_refine
+
+
+@dataclass(frozen=True)
+class PurificationKnobs:
+    """Silicon-purification knobs → :mod:`chip.purification` (G4) — the feedstock grade + zone passes.
+
+    ``grade`` is a :data:`chip.purification.FEEDSTOCK_GRADES` key (``"MGS"``/``"solar"``/``"EGS"``/
+    ``"clean"``); zone refining then scrubs that starting impurity vector by each species' cited ``k``
+    over ``zone_passes`` passes (the costly rework knob — more passes, cleaner feed). The purified
+    impurity vector becomes the wafer's wafer-level :class:`chip.purification.Contamination` (uniform
+    across the die map — it composes orthogonally with the boule axial story, like ``slice_z``).
+
+    ``grade`` defaults to **``"clean"``** (the idealized pristine baseline — all-zero impurities) so the
+    seam *and* the G1/G2/G3 banked demos are byte-for-byte unchanged: a clean feed yields a clean
+    contamination vector for any ``zone_passes``, so ``Q_ox = 0`` and the net-doping shift is 0 (the
+    device is the ideal-oxide ``demo_device``). The G4 demo dials in a dirty grade to introduce the
+    mobile-ion (Na→V_t) and residual-dopant stories.
+    """
+
+    grade: str = "clean"               # FEEDSTOCK_GRADES key — "clean" idealized baseline (the seam)
+    zone_passes: int = 1               # zone-refining passes (more = cleaner feed; the costly rework knob)
 
 
 @dataclass(frozen=True)
@@ -123,6 +145,7 @@ class Recipe:
     the seed slice is exactly ``1e17``, matching :mod:`chip.demo_device`'s ``CHANNEL_N_A`` (the seam).
     """
 
+    purification: PurificationKnobs = field(default_factory=PurificationKnobs)
     czochralski: CzochralskiKnobs = field(default_factory=CzochralskiKnobs)
     wafer_prep: WaferPrepKnobs = field(default_factory=WaferPrepKnobs)
     diffusion: DiffusionKnobs = field(default_factory=DiffusionKnobs)
@@ -138,14 +161,46 @@ class Recipe:
                      length_mm=cz.length_mm, diameter_mm=cz.diameter_mm)
 
     @property
+    def contamination(self) -> Contamination:
+        """The wafer's purified impurity vector — the feedstock grade zone-refined ``zone_passes`` times.
+
+        A clean grade (the default) → a clean (all-zero) vector for any number of passes (the seam). The
+        device consumes it as: ``Na`` → gate-oxide ``Q_ox`` (the headline ``V_t`` shift) and ``B``/``P``
+        → :attr:`effective_channel_N_A` (net doping); the metals ride along (the named G4b gap).
+        """
+        return zone_refine(FEEDSTOCK_GRADES[self.purification.grade], self.purification.zone_passes)
+
+    @property
     def channel_N_A(self) -> float:
-        """The substrate doping (cm⁻³) at this wafer's boule slice — exactly ``N_seed`` at ``slice_z=0``."""
+        """The boule's substrate doping (cm⁻³) at this wafer's slice — exactly ``N_seed`` at ``slice_z=0``.
+
+        The *intentional* Scheil doping (no contamination). The device sees :attr:`effective_channel_N_A`.
+        """
         return float(self.boule.axial_doping(self.czochralski.slice_z))
 
     @property
+    def effective_channel_N_A(self) -> float:
+        """The channel doping the device sees: the boule slice **plus** the residual-dopant net shift (cm⁻³).
+
+        ``channel_N_A + contamination.net_doping_shift`` (residual ``B`` raises it, ``P`` lowers it). At a
+        clean grade the shift is 0, so this equals :attr:`channel_N_A` (and is exactly ``N_seed`` at the
+        seed slice — the seam). Fed to *both* the S/D junction (``N_background``) and the device ``V_t``,
+        so the two stay coherent.
+        """
+        return self.channel_N_A + self.contamination.net_doping_shift
+
+    @property
     def substrate_resistivity_ohm_cm(self) -> float:
-        """The substrate resistivity (Ω·cm) at this wafer's boule slice (Masetti ``μ(N)``)."""
-        return float(self.boule.axial_resistivity(self.czochralski.slice_z))
+        """The substrate resistivity (Ω·cm) of the wafer's **effective** doping (Masetti ``μ(N)``).
+
+        Computed from :attr:`effective_channel_N_A` (the boule slice + the residual-dopant net shift),
+        **not** the boule slice alone — so a wafer's reported resistivity is coherent with the doping
+        the device actually sees (else a dirty feed would carry two silently-disagreeing doping-derived
+        fields). At a clean grade the shift is 0, so this is exactly the boule-slice resistivity (the
+        G2 seam — ``demo_boule`` byte-for-byte). The residual shift is small vs an intentional ~1e17
+        substrate, so the net carrier type stays p (boron ``μ(N)`` valid)."""
+        from chip.czochralski import resistivity
+        return float(resistivity(self.effective_channel_N_A, self.czochralski.dopant))
 
 
 # The default recipe IS chip.demo_device's coherent n-MOSFET recipe (the seam anchor): the seed-end

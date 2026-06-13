@@ -22,6 +22,7 @@ from typing import Callable
 
 import numpy as np
 
+from chip.purification import Contamination
 from chip.wafer_prep import WaferGeometry
 
 # --------------------------------------------------------------------------- #
@@ -135,14 +136,18 @@ class Die:
 class WaferState:
     """An immutable snapshot of the wafer: its die map, substrate doping, and append-only provenance.
 
-    ``channel_N_A`` (cm⁻³) is the starting p-type substrate doping. As of G2 it is the **Scheil slice
-    of the boule** at this wafer's axial position ``slice_z`` (the fraction solidified, ``[0, 1)``);
+    ``channel_N_A`` (cm⁻³) is the **effective** p-type substrate doping the device sees. As of G2 its
+    baseline is the **Scheil slice of the boule** at this wafer's axial position ``slice_z`` (the
+    fraction solidified, ``[0, 1)``); as of G4 it includes any **residual-dopant net shift** from
+    imperfect purification (so it is the boule slice + ``contamination.net_doping_shift``).
     ``resistivity_ohm_cm`` is the substrate resistivity that doping implies (the fab characterization
-    currency). Both are wafer-level — ``slice_z`` is constant across the die map (the axial boule
-    story composes orthogonally with the radial die-map story). They default to ``None`` so a bare
-    G1-style wafer is still constructible. ``dies`` is the die map (fixed order — the determinism
-    contract); ``provenance`` is the append-only wafer-level :class:`StepRecord` trail; ``rework_log``
-    accumulates rework events (see :mod:`fab_game.pipeline`).
+    currency). ``contamination`` (G4) is the wafer-level purified **impurity vector** — ``Na`` drives
+    the gate-oxide ``Q_ox`` (the device ``V_t`` shift), the metals ride along (the named G4b gap). All
+    are wafer-level: ``slice_z`` and the contamination are constant across the die map (the axial boule
+    + contamination stories compose orthogonally with the radial die-map story). They default to
+    ``None`` so a bare G1-style wafer is still constructible. ``dies`` is the die map (fixed order — the
+    determinism contract); ``provenance`` is the append-only wafer-level :class:`StepRecord` trail;
+    ``rework_log`` accumulates rework events (see :mod:`fab_game.pipeline`).
     """
 
     wafer_id: str
@@ -151,6 +156,7 @@ class WaferState:
     slice_z: float | None = None                             # axial fraction solidified (G2 boule slice)
     resistivity_ohm_cm: float | None = None                  # substrate resistivity at this slice (Ω·cm)
     geometry: WaferGeometry | None = None                    # prepped thickness/TTV/bow (G3, wafer-level)
+    contamination: Contamination | None = None               # purified impurity vector (G4, wafer-level)
     provenance: tuple[StepRecord, ...] = ()
     rework_log: tuple = ()                                    # tuple[ReworkRecord, ...] (avoids an import cycle)
 

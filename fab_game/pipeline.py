@@ -39,12 +39,16 @@ def initial_wafer(
     edge_exclusion: float = 0.95,
     wafer_id: str = "W1",
 ) -> WaferState:
-    """A fresh wafer: the die map + the boule-sliced substrate doping/resistivity, no steps run yet."""
+    """A fresh wafer: the die map + the boule-sliced substrate doping/resistivity + the purified
+    contamination vector, no steps run yet. ``channel_N_A`` is the **effective** doping (the boule slice
+    plus any residual-dopant net shift from imperfect purification); a clean feed leaves it the boule
+    slice (the seam)."""
     return WaferState(
         wafer_id=wafer_id,
-        channel_N_A=recipe.channel_N_A,
+        channel_N_A=recipe.effective_channel_N_A,
         slice_z=recipe.czochralski.slice_z,
         resistivity_ohm_cm=recipe.substrate_resistivity_ohm_cm,
+        contamination=recipe.contamination,
         dies=build_die_map(grid_n=grid_n, edge_exclusion=edge_exclusion),
     )
 
@@ -85,7 +89,19 @@ def run_line(
     rng = np.random.default_rng(seed)
     wafer = initial_wafer(recipe, grid_n=grid_n, edge_exclusion=edge_exclusion, wafer_id=wafer_id)
 
-    # 0. Wafer prep (front-of-line): the prepped geometry (deterministic) + the killer-particle
+    # 0a. Purification (front-of-line, G4): the feedstock grade zone-refined → the wafer-level
+    #     contamination vector (baked into initial_wafer's channel_N_A + contamination). A wafer-level
+    #     provenance record only — its per-die effect surfaces at the device step (Q_ox). Clean feed ⇒
+    #     a clean vector ⇒ no consequence (the seam).
+    cont = recipe.contamination
+    wafer = wafer.with_step(
+        StepRecord("purification",
+                   {"grade": recipe.purification.grade, "zone_passes": recipe.purification.zone_passes},
+                   {"Na": cont.Na, "Fe": cont.Fe, "net_doping_shift": cont.net_doping_shift,
+                    "channel_N_A": recipe.effective_channel_N_A}),
+        wafer.dies)
+
+    # 0b. Wafer prep (front-of-line): the prepped geometry (deterministic) + the killer-particle
     #    scatter (stochastic, fixed die order). Drawn before the per-die perturbations.
     prep = recipe.wafer_prep
     geometry = prep_geometry(
@@ -106,8 +122,9 @@ def run_line(
     # One perturbation per die, drawn in fixed die order (the determinism contract).
     perts = {d.site: variation.perturbation(d, rng) for d in wafer.dies}
 
-    # 1. Diffusion — die-independent in G1: compute once, broadcast.
-    diff_knobs_in, diff_outputs = diffusion_junction(recipe.diffusion, recipe.channel_N_A)
+    # 1. Diffusion — die-independent in G1: compute once, broadcast. Reads the *effective* channel
+    #    doping (boule slice + residual-dopant net shift) so the junction stays coherent with the device.
+    diff_knobs_in, diff_outputs = diffusion_junction(recipe.diffusion, recipe.effective_channel_N_A)
     dies = tuple(
         d.record("diffusion", diff_knobs_in, diff_outputs,
                  x_j_um=diff_outputs["x_j_um"], R_s=diff_outputs["R_s"])
@@ -131,8 +148,12 @@ def run_line(
                              "pitch_nm": recipe.litho.pitch_nm, "NA": recipe.litho.NA},
                    _aggregate(dies, "cd_nm")), dies)
 
-    # 4. Device — per die, reading the inherited t_ox + cd (the propagation).
-    dies = tuple(device_step(d, recipe.device, recipe.channel_N_A) for d in wafer.dies)
+    # 4. Device — per die, reading the inherited t_ox + cd + the wafer contamination (the propagation:
+    #    Na → Q_ox → V_t; the residual-dopant net shift is already in effective_channel_N_A).
+    dies = tuple(
+        device_step(d, recipe.device, recipe.effective_channel_N_A, contamination=recipe.contamination)
+        for d in wafer.dies
+    )
     wafer = wafer.with_step(
         StepRecord("device", {"gate": recipe.device.gate, "width_um": recipe.device.width_um},
                    _aggregate(dies, "V_t")), dies)
@@ -286,6 +307,12 @@ def diagnose(die: Die) -> str:
     elif device is not None:
         lines.append(f"    ↳ device: V_t {device.outputs.get('V_t', float('nan')):.3f} V, "
                      f"I_Dsat {device.outputs.get('i_dsat', float('nan')) * 1e3:.2f} mA")
+        # The contamination fingerprint (G4): a non-zero gate-oxide charge means mobile-ion (Na)
+        # contamination from imperfect purification shifted V_t — name it as the root cause.
+        Q_ox = device.knobs_in.get("Q_ox", 0.0)
+        if Q_ox:
+            lines.append(f"    ↳ purification: gate-oxide charge Q_ox {Q_ox:.2e} C/cm² (mobile-ion Na "
+                         f"contamination) → V_FB/V_t driven down (purify harder — more zone passes)")
     return "\n".join(lines)
 
 
@@ -342,7 +369,7 @@ def rework_litho(
         # re-run the device on the refreshed CD, and re-score. A die killed by a particle (or a
         # geometry-scrapped wafer) re-tests the same way — litho rework cannot remove a defect.
         red = litho_step(d, corrected, variation.systematic_perturbation(d))
-        red = device_step(red, recipe.device, wafer.channel_N_A)
+        red = device_step(red, recipe.device, wafer.channel_N_A, contamination=wafer.contamination)
         red = _verdict_die(red, specs, geometry_reason)
         new_dies.append(red)
 

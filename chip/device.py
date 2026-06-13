@@ -72,9 +72,12 @@ Named scope edge (the honest ceiling)
   ``W/L``) but does **not** perturb ``V_t``. Short-channel rolloff (charge-sharing / DIBL) is an
   inherently **2-D** effect — exactly the plan §5 tar pit — so it is left outside the line; a
   charge-sharing patch would destroy the exact closed-form anchor. This is *why* CD is geometry-only.
-* **Ideal oxide / uniform channel.** ``Q_ox = 0`` (no fixed oxide charge or interface traps in ``V_FB``),
-  a **uniform** substrate doping (a real V_t-adjust implant is non-uniform — the formula then takes an
-  effective ``N_A``), full dopant activation, and ``n_i = 1.0e10 cm⁻³`` at 300 K (the value that
+* **Ideal oxide by default / uniform channel.** ``Q_ox`` (fixed/mobile oxide charge) defaults to ``0``
+  → the ideal oxide; it is now an **optional** input (``ΔV_FB = −Q_ox/C_ox``) that the G4 purification
+  module drives with mobile-ion (Na) contamination — but **interface traps** ``D_it`` remain out (a
+  separate, capacitance-dispersion effect). A **uniform** substrate doping (a real V_t-adjust implant is
+  non-uniform — the formula then takes an effective ``N_A``), full dopant activation, and
+  ``n_i = 1.0e10 cm⁻³`` at 300 K (the value that
   reproduces the MIT example; ``1.45e10`` shifts ``φ_F`` ~10 mV — a small calibration choice, named).
 * **Degenerate poly gate** pinned at the band edge (``φ_gate = ±0.55 V``); a metal gate would need a
   work-function table (out of v1).
@@ -167,16 +170,28 @@ def oxide_capacitance(t_ox_um: float) -> float:
 
 def flatband_voltage(
     N_A: float, gate: str = "n+poly", T_celsius: float = ROOM_T_CELSIUS, n_i: float = NI_300K,
+    Q_ox: float = 0.0, C_ox: float | None = None,
 ) -> float:
-    """Flat-band voltage ``V_FB = −(φ_gate − φ_bulk)`` (V) for an **ideal** oxide (``Q_ox = 0``).
+    """Flat-band voltage ``V_FB = −(φ_gate − φ_bulk) − Q_ox/C_ox`` (V).
 
-    p-substrate bulk potential ``φ_bulk = −φ_F``, so ``V_FB = −(φ_gate + φ_F)``. For an n⁺-poly gate
-    (``φ_gate = +0.55 V``) on ``N_A = 1e17`` (``φ_F ≈ 0.42 V``): ``V_FB ≈ −0.97 V`` (the MIT value).
-    Fixed oxide charge / interface traps are the named scope edge (not modeled in v1).
+    p-substrate bulk potential ``φ_bulk = −φ_F``, so the ideal-oxide part is ``−(φ_gate + φ_F)``. For an
+    n⁺-poly gate (``φ_gate = +0.55 V``) on ``N_A = 1e17`` (``φ_F ≈ 0.42 V``): ``−0.97 V`` (the MIT value).
+
+    **Oxide charge (lifting the named ``Q_ox = 0`` edge).** A fixed/mobile oxide charge per area
+    ``Q_ox`` (C/cm²) shifts the flat-band voltage by ``−Q_ox/C_ox`` (the standard MOS relation):
+    **positive** oxide charge (e.g. mobile Na⁺ ions, :func:`chip.purification.sodium_oxide_charge`)
+    drives ``V_FB`` — and hence ``V_t`` — **down**. ``Q_ox`` defaults to ``0`` → the ideal-oxide value,
+    byte-for-byte unchanged (the term is skipped entirely, so ``C_ox`` is not needed); when
+    ``Q_ox ≠ 0`` the oxide capacitance ``C_ox`` (F/cm², ``= ε_ox/t_ox``) is required.
     """
     if gate not in GATE_POTENTIAL:
         raise ValueError(f"gate must be one of {sorted(GATE_POTENTIAL)}, got {gate!r}")
-    return -(GATE_POTENTIAL[gate] + fermi_potential(N_A, T_celsius, n_i))
+    V_FB = -(GATE_POTENTIAL[gate] + fermi_potential(N_A, T_celsius, n_i))
+    if Q_ox != 0.0:
+        if C_ox is None or C_ox <= 0.0:
+            raise ValueError(f"a non-zero Q_ox needs a positive C_ox, got C_ox={C_ox}")
+        V_FB -= Q_ox / C_ox
+    return V_FB
 
 
 def depletion_charge(N_A: float, phi_F: float, V_SB: float = 0.0) -> float:
@@ -272,6 +287,7 @@ class MOSDevice:
     Q_dep: float
     gamma: float
     channel_length_um: float | None = None
+    Q_ox: float = 0.0                 # oxide charge per area (C/cm²); 0 = ideal oxide (the default seam)
 
     @property
     def two_phi_F(self) -> float:
@@ -292,6 +308,7 @@ def threshold_voltage(
     channel_length_um: float | None = None,
     T_celsius: float = ROOM_T_CELSIUS,
     n_i: float = NI_300K,
+    Q_ox: float = 0.0,
 ) -> MOSDevice:
     """Compute the MOS threshold voltage from the process knobs → :class:`MOSDevice`.
 
@@ -299,11 +316,14 @@ def threshold_voltage(
     profile's substrate doping), the gate oxide ``t_ox_um`` (µm, a Phase-2 thickness), and the gate
     material. ``V_SB`` (V) applies the body effect (widening ``Q_dep``); ``channel_length_um`` (µm, a
     Phase-3 CD) is recorded as device geometry but does **not** affect ``V_t`` (long-channel, plan §4 /
-    the named scope edge). *Process in, device parameter out* — the chip's structure→properties map.
+    the named scope edge). ``Q_ox`` (C/cm², the fixed/mobile **oxide charge** — e.g. mobile-ion
+    contamination from imperfect purification, :mod:`chip.purification`) enters through the flat-band
+    voltage (``ΔV_FB = −Q_ox/C_ox``); it defaults to ``0`` → the ideal oxide, byte-for-byte the prior
+    ``V_t``. *Process in, device parameter out* — the chip's structure→properties map.
     """
     phi_F = fermi_potential(N_A, T_celsius, n_i)
     C_ox = oxide_capacitance(t_ox_um)
-    V_FB = flatband_voltage(N_A, gate, T_celsius, n_i)
+    V_FB = flatband_voltage(N_A, gate, T_celsius, n_i, Q_ox=Q_ox, C_ox=C_ox)
     gamma = math.sqrt(2.0 * Q_ELEMENTARY * EPS_SI * N_A) / C_ox
     Q_dep = depletion_charge(N_A, phi_F, V_SB)
     V_t = V_FB + 2.0 * phi_F + Q_dep / C_ox
@@ -311,7 +331,7 @@ def threshold_voltage(
     return MOSDevice(
         N_A=N_A, t_ox_um=t_ox_um, gate=gate, V_SB=V_SB, V_t=V_t, V_t0=V_t0,
         V_FB=V_FB, phi_F=phi_F, C_ox=C_ox, Q_dep=Q_dep, gamma=gamma,
-        channel_length_um=channel_length_um,
+        channel_length_um=channel_length_um, Q_ox=Q_ox,
     )
 
 

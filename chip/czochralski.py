@@ -110,9 +110,11 @@ SEGREGATION_K: dict[str, float] = {
     "P": 0.35,     # phosphorus
     "As": 0.30,    # arsenic
     "Sb": 0.023,   # antimony  — strong segregation
-    # Illustrative fast-segregating metals (order-of-magnitude; the scrubbing contrast, flagged):
-    "Fe": 8.0e-6,
-    "Cu": 4.0e-4,
+    # Illustrative fast-segregating impurities (order-of-magnitude; the scrubbing contrast, flagged) —
+    # used by the G4 purification module (:mod:`chip.purification`), which reuses this one table:
+    "Fe": 8.0e-6,  # deep-level metal — scrubbed ~5 orders in one zone pass
+    "Cu": 4.0e-4,  # deep-level metal
+    "Na": 1.0e-2,  # mobile ion (sodium) — strong segregator; the device-poisoning oxide contaminant (G4)
 }
 
 

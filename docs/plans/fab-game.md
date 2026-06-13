@@ -271,6 +271,27 @@ thing).
   consequences: dopant & Na ride the existing flow (Tier 1); the **Tier-2 device output** — a new
   `lifetime.py` (SRH `τ(N_metal)` + junction leakage) — lands the metals' effect that net doping
   can't carry. Gettering/precipitation stays a named edge (Tier 3).
+  > **G4a BUILT (2026-06-13).** Split along the plan §7 tight/loose boundary (advisor): **G4a = the
+  > verifiable purification physics + Tier-1 consequences**; the loose Tier-2 SRH `lifetime.py` is the
+  > fenced **G4b** follow-on. New cited physics `chip/purification.py` — the **Pfann single-pass**
+  > zone-refining closed form `C(u)=C₀[1−(1−k)e^(−k·u)]` (`u=x/L`), reusing czochralski's one
+  > `SEGREGATION_K` table (Na added there), with a full triad: tight `k→1≡C₀` (bit-exact) + the
+  > `C(0)/C₀=k` scrubbing identity + steady-state `C→C₀`; **conservation REFRAMED** — the single-pass
+  > formula omits the final-zone pile-up, so `∫C` falls *short* of the charge by exactly the closed-form
+  > swept-out deficit `(C₀/k)(1−k)(1−e^{−k u})` (verified numerically first; "mass recovers C₀" is the
+  > **named edge**, *not* claimed — unlike Scheil); benchmark = the cited Trumbore `k` + flagged
+  > `FEEDSTOCK_GRADES` (MGS/solar/EGS/clean). `chip/device.py` **lifts the named `Q_ox=0` edge**
+  > (`ΔV_FB=−Q_ox/C_ox`, default 0 → byte-unchanged seam; D_it still out). Wired into `fab_game`:
+  > `PurificationKnobs(grade, zone_passes)` → a wafer-level `Contamination` vector (uniform across the
+  > die map, like `slice_z`); **Na → gate-oxide `Q_ox` → V_t down** (the headline) and **residual B/P →
+  > net doping** (folded into `effective_channel_N_A`); deep-level **metals ride along, scrubbed, with
+  > NO consequence yet** (the G4b gap). Banked `demo_purification`/`fab-game-g4.png`: the scrubbing
+  > contrast (Fe ×8e-6 vs B ×0.8 in one pass) + a dirty **MGS feed → residual Na → V_t crashes to 0.374
+  > → wafer scrapped on V_t**, the trail naming the contamination; **rework = more zone passes** (2nd
+  > pass scrubs the Na → V_t recovers, residual boron persists). Default `grade="clean"` → clean vector
+  > → the G1/G2/G3 demos byte-for-byte unchanged. Fast lane 373→**400** (+27); no engine amendment, no
+  > ADR, no chip gallery card. **G4b (deferred):** `lifetime.py` — SRH `τ(N_metal)` + junction leakage,
+  > the deep-level-metal consequence net doping can't carry (loose/calibrated magnitudes, Tier 2).
 - **G5 — Etch / deposition / CMP.** The missing mid-line operations (phenomenological, honest).
 - **G6 — Packaging & test & binning.** The back-end assembly yield + parametric/functional test.
 - **G7 — Roguelike framing + scoring + a Textual TUI; sandbox mode.** The game shell over the

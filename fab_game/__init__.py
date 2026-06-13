@@ -37,6 +37,7 @@ from .recipe import (
     DiffusionKnobs,
     LithoKnobs,
     OxidationKnobs,
+    PurificationKnobs,
     Recipe,
     WaferPrepKnobs,
 )
@@ -61,8 +62,8 @@ __all__ = [
     "Die", "DieStepRecord", "StepRecord", "Verdict", "WaferState", "build_die_map",
     "DefectEvent", "die_area_cm2",
     # recipe
-    "Recipe", "CzochralskiKnobs", "WaferPrepKnobs", "DiffusionKnobs", "OxidationKnobs",
-    "LithoKnobs", "DeviceKnobs", "DEFAULT_RECIPE",
+    "Recipe", "PurificationKnobs", "CzochralskiKnobs", "WaferPrepKnobs", "DiffusionKnobs",
+    "OxidationKnobs", "LithoKnobs", "DeviceKnobs", "DEFAULT_RECIPE",
     # variation
     "Variation", "DiePerturbation", "NO_VARIATION",
     # spec

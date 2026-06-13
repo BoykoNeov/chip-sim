@@ -215,6 +215,71 @@ def wafer_prep_figure(result):
     return fig
 
 
+# --------------------------------------------------------------------------- #
+# G4 — bad purification → contamination → a dead device (the scrubbing + the V_t walk + the rework)
+# --------------------------------------------------------------------------- #
+def _scrubbing_panel(ax, result) -> None:
+    """One zone pass: feed vs refined per species (log) — metals scrubbed ~5 orders, boron barely."""
+    x = np.arange(len(result.species))
+    feed = [result.feed_vector[s] for s in result.species]
+    refined = [result.refined_vector[s] for s in result.species]
+    ax.bar(x - 0.2, feed, width=0.4, color="#b0b0b0", label="feedstock (MGS)", zorder=2)
+    ax.bar(x + 0.2, refined, width=0.4, color="#2f6db5", label="after 1 zone pass", zorder=2)
+    ax.set_yscale("log")
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{s}\nk={result.k_values[s]:.0e}" for s in result.species], fontsize=8)
+    ax.set_ylabel("concentration (cm⁻³)", fontsize=9)
+    ax.set_title("Zone refining: metals scrubbed ~5 orders,\nboron barely (k≈0.8) — C_front/C₀ = k",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="lower left")
+
+
+def _vt_grade_panel(ax, result) -> None:
+    """V_t down the feedstock-grade ladder (one pass), spec window shaded — MGS falls out the bottom."""
+    x = np.arange(len(result.grades))
+    lo, hi = result.v_t_lo, result.v_t_hi
+    ax.axhspan(lo, hi, color="#2ca02c", alpha=0.12, label=f"V_t spec [{lo:.2f}, {hi:.2f}]")
+    colors = ["#2ca02c" if lo <= v <= hi else "#d62728" for v in result.vt_by_grade]
+    ax.bar(x, result.vt_by_grade, width=0.6, color=colors, zorder=2)
+    ax.set_xticks(x)
+    ax.set_xticklabels(result.grades, fontsize=9)
+    ax.set_ylabel("device V_t (V)", fontsize=9)
+    ax.set_title("Dirtier feed → residual Na → V_t walks down\n(MGS scrapped, one pass)", fontsize=10)
+    ax.legend(fontsize=8, loc="upper right")
+    for i, v in enumerate(result.vt_by_grade):
+        ax.text(i, v + 0.01, f"{v:.2f}", ha="center", fontsize=8)
+
+
+def _rework_panel(ax, result) -> None:
+    """V_t vs zone passes (MGS), spec shaded — more passes scrub the Na → V_t climbs back into spec."""
+    lo, hi = result.v_t_lo, result.v_t_hi
+    ax.axhspan(lo, hi, color="#2ca02c", alpha=0.12, label=f"V_t spec [{lo:.2f}, {hi:.2f}]")
+    p = list(result.mgs_passes)
+    ax.plot(p, result.vt_by_pass, color="0.4", lw=1.2, zorder=2)
+    colors = ["#2ca02c" if lo <= v <= hi else "#d62728" for v in result.vt_by_pass]
+    ax.scatter(p, result.vt_by_pass, c=colors, s=42, zorder=3)
+    ax.set_xticks(p)
+    ax.set_xlabel("zone-refining passes (the rework)", fontsize=9)
+    ax.set_ylabel("device V_t (V)", fontsize=9)
+    ax.set_title("Purify harder: more passes scrub the Na\n→ V_t recovers (residual B persists)", fontsize=10)
+    ax.legend(fontsize=8, loc="lower right")
+
+
+def purification_figure(result):
+    """Assemble the G4 artifact from a :class:`~fab_game.demo_purification.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _scrubbing_panel(axes[0], result)
+    _vt_grade_panel(axes[1], result)
+    _rework_panel(axes[2], result)
+    trail = result.dead_trail.splitlines()[0] if result.dead_trail else ""
+    fig.suptitle("G4 — bad purification → mobile-ion (Na) contamination → V_t out of spec → a dead "
+                 "wafer; rework = purify harder\n" + trail, fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    return fig
+
+
 def fab_game_figure(result):
     """Assemble the 2×2 G1 artifact figure from a :class:`~fab_game.demo_fab_game.DemoResult`."""
     import matplotlib.pyplot as plt

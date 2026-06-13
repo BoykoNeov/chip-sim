@@ -24,10 +24,13 @@ def test_provenance_is_append_only():
     """The wafer provenance and every die history grow by exactly the run's steps, in order."""
     w = run_line(DEFAULT_RECIPE, seed=0, variation=Variation(), grid_n=3)
     steps = [r.step for r in w.provenance]
-    assert steps == ["wafer_prep", "diffusion", "oxidation", "litho", "device", "test"]
+    # Purification (G4) is a *wafer-level* front-of-line step — its contamination vector is wafer-wide
+    # and surfaces per-die only at the device read (Q_ox), so it has no per-die record.
+    assert steps == ["purification", "wafer_prep", "diffusion", "oxidation", "litho", "device", "test"]
+    per_die_steps = ["wafer_prep", "diffusion", "oxidation", "litho", "device", "test"]
     for d in w.dies:
-        # Each die saw every step once, in the same order (append-only, never rewritten).
-        assert [r.step for r in d.history] == steps
+        # Each die saw every per-die step once, in the same order (append-only, never rewritten).
+        assert [r.step for r in d.history] == per_die_steps
 
 
 def test_rework_accounting_closes():
