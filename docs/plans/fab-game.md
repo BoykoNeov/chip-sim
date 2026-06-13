@@ -318,6 +318,53 @@ thing).
 - **G7 — Roguelike framing + scoring + a Textual TUI; sandbox mode.** The game shell over the
   proven sim. (Tycoon deferred — same harness, different objective.)
 
+### 6a. Crystal-growth deepenings (G2 follow-ons — deferred; detailed when their time comes)
+
+Three refinements of the Czochralski step (§5 step 2) — the directions a *"crystal-growth
+simulator"* framing points at (heat diffusion, the crystal interface, pull rate → defects). Each
+is **already fenced today as a named scope edge** (in `chip/czochralski.py` / §8); parked here so it
+has a home and a cited model, **not yet detailed**. Ordered by feasibility against the repo's bar —
+*a cited model + a validation triad + a real device/yield consumer, not physics for its own sake*:
+
+- **CG-1 — Pull rate → effective segregation `k_eff(v)` (Burton–Prim–Slichter).** The easy win,
+  and *already* `czochralski.py`'s #1 named scope edge. A diffusion boundary layer at the interface
+  makes the *effective* coefficient `k_eff = k₀ / [k₀ + (1−k₀)·e^(−v·δ/D)]` rise toward 1 with pull
+  rate `v` (`δ` = boundary-layer thickness, set by rotation). Cited **Burton–Prim–Slichter, J. Chem.
+  Phys. 21:1987 (1953)**. **Fits inside the existing `Boule`/`CzochralskiKnobs` consumer** — `k_eff`
+  replaces the equilibrium `k` in the Scheil profile, turning *pull rate* into a live knob that moves
+  the axial doping (and the V_t walk the G2 demo already exploits). Fidelity **Mid**: `k₀` stays the
+  tight Trumbore anchor, the `v`-dependence (via `δ`) is the calibrated leg. **No engine touch, no
+  ADR** — closed form, consumer-side, like Scheil itself.
+- **CG-2 — Voronkov `V/G` point-defect / void criterion (the unifier).** The high-value one: it
+  ties **pull rate**, the **thermal gradient** (the "heat diffusion" bullet), and **crystallographic
+  defect formation** into one mechanism. The ratio of pull rate `V` to the axial thermal gradient `G`
+  at the interface, against a critical `ξ_t ≈ 0.13 mm²/(K·min)`, decides the grown-in regime:
+  `V/G > ξ_t` → **vacancy-rich** (voids / COPs), `V/G < ξ_t` → **interstitial-rich** (dislocation
+  loops; the OSF ring sits at the V/I boundary). Cited **Voronkov, J. Crystal Growth 59:625 (1982)**.
+  **Where heat earns its place:** `G` is the interface thermal gradient — supplied as a knob or from
+  the **already-shipped heat-mode engine** (`Robin` convective BC; see `test_robin_heat.py` — no new
+  engine physics). **Consumer:** defect type → gate-oxide-integrity degradation → a **killer-defect
+  yield hit that plugs straight into the G3 defect map** (`fab_game/defects.py`). Fidelity **Mid**:
+  the criterion is clean/cited; `ξ_t` and the void→GOI→yield mapping are the loose/flagged leg. **No
+  new engine physics** (algebraic criterion + the existing heat mode); no ADR unless a dedicated
+  thermal solve is added.
+- **CG-3 — Stefan moving-interface solidification (the honest hard one).** The actual solid–liquid
+  front — latent heat, the interface position/shape, facets — as a **free-boundary (Stefan) problem**:
+  `L·ρ·dX/dt = k_s·(∂T/∂x)|_s − k_l·(∂T/∂x)|_l`, the front `X(t)` advancing against the heat-flux
+  jump. This is the **one item that is genuine new *engine* physics**: a moving boundary with a
+  phase-change source, which the parabolic engine does not do (the `MaskedSurface`/`Robin` BCs are
+  fixed-domain). There is a lighter precedent — v1.2 oxide growth handled a moving boundary
+  **consumer-side** with a receding mesh — but a faithful Stefan solve would likely warrant an
+  **engine amendment + ADR**. **Deferred behind a named consequence:** build it only when a
+  device/yield outcome needs it (interface shape → facet/striation → resistivity striations or
+  micro-defects), per the repo's anti-over-build rule (the "build explicit, *not* 2-D" lesson — no
+  regime without its named consumer). Fidelity **Low/flagged**; engine: **likely an ADR**, unlike
+  CG-1/CG-2.
+
+**The synergy (why these three, in this order).** CG-1 makes pull rate move the *doping*; CG-2 makes
+the *same* pull rate (plus the heat field) move the *defect type* and feed yield; CG-3 is the
+underlying front both ride on — and the only one that pays an engine-physics cost, so it waits.
+
 ---
 
 ## 7. Validation discipline
