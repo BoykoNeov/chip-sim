@@ -37,11 +37,11 @@ jupyter lab chip/chip.ipynb             # the teaching notebook (needs .[viz,not
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow" -n auto     # routine fast lane — 286 tests, PARALLEL (~16 s vs ~58 s serial)
-./run_tests.ps1                           # full gate — 287 tests, SERIAL (adds the slow notebook smoke-test)
+./run_tests.ps1 -m "not slow" -n auto     # routine fast lane — 423 tests, PARALLEL (~22 s vs ~78 s serial)
+./run_tests.ps1                           # full gate — 424 tests, SERIAL (adds the slow notebook smoke-test)
 ```
 
-`-n auto` (pytest-xdist) fans the 286 CPU-bound tests across cores — **capped at half the logical
+`-n auto` (pytest-xdist) fans the 423 CPU-bound tests across cores — **capped at half the logical
 cores** (`conftest.py`: the suite floors on one module, so the back half buys ~nothing; the cap is
 an Amdahl throughput knob, not notebook headroom), and **only on the fast lane.**
 The one `slow` test executes `chip.ipynb` in a fresh kernel over a zmq/asyncio comms layer that
@@ -50,7 +50,7 @@ and CI — where it self-skips). The full gate stays **serial**, so the notebook
 xdist (the pin is structural, not a convention). It also self-skips under CI (a known infra hang
 on the GitHub runner — the kernel goes idle but `nbclient` never returns, not a content failure).
 `-n auto` is the blessed *command*, not baked into config, so single-test `-s`/pdb stays serial.
-The suite is **287 tests** (286 fast + 1 slow), all green; optional stacks are importorskip-gated,
+The suite is **424 tests** (423 fast + 1 slow), all green; optional stacks are importorskip-gated,
 so a headless checkout skips rather than errors.
 
 ## Demonstrations

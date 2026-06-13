@@ -92,3 +92,27 @@ def test_residual_acceptor_raises_vt_via_net_doping():
     base = device_step(_die_with(0.014, 167.0), _DEV, _N_A)
     doped = device_step(_die_with(0.014, 167.0), _DEV, _N_A + 5.0e16)   # + residual acceptor
     assert doped.V_t > base.V_t
+
+
+# --------------------------------------------------------------------------- #
+# G4b — the deep-level-metal reads (Fe/Cu → SRH lifetime → junction leakage; V_t untouched)
+# --------------------------------------------------------------------------- #
+def test_metal_contamination_raises_leakage_without_touching_vt():
+    """More inherited deep-level metal → shorter lifetime → strictly more junction leakage — and V_t
+    is a bystander (the device output net doping cannot carry; the G4b wire).
+
+    The device step reads the wafer metals into :func:`chip.lifetime.device_leakage`: positive Fe adds
+    SRH recombination, so ``τ`` falls and ``j_leak`` rises monotonically — while ``V_t``/``I_Dsat`` are
+    bit-for-bit the clean values (metals are neither dopants nor oxide charge)."""
+    clean = device_step(_die_with(0.014, 167.0), _DEV, _N_A, contamination=None)
+    dirty = device_step(_die_with(0.014, 167.0), _DEV, _N_A, contamination=Contamination(Fe=1.0e13))
+    dirtier = device_step(_die_with(0.014, 167.0), _DEV, _N_A, contamination=Contamination(Fe=5.0e13))
+    assert dirty.j_leak > clean.j_leak                       # metal raises leakage
+    assert dirtier.j_leak > dirty.j_leak                     # monotone in [metal]
+    assert dirty.tau < clean.tau                             # …because lifetime falls
+    # V_t / I_Dsat untouched by the metals (the consequence net doping can't carry).
+    assert dirty.V_t == clean.V_t and dirty.i_dsat == clean.i_dsat
+    assert dirtier.V_t == clean.V_t
+    # A clean (or absent) contamination reads the baseline lifetime/leakage (the seam).
+    clean_obj = device_step(_die_with(0.014, 167.0), _DEV, _N_A, contamination=Contamination())
+    assert clean_obj.j_leak == clean.j_leak and clean_obj.tau == clean.tau

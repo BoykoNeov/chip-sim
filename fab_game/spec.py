@@ -22,16 +22,24 @@ from .state import Die, Verdict
 
 @dataclass(frozen=True)
 class SpecWindow:
-    """A one-sided or two-sided spec band on a named parameter. ``None`` bound = open on that side."""
+    """A one-sided or two-sided spec band on a named parameter. ``None`` bound = open on that side.
+
+    ``optional`` windows skip a die that was not scored for this parameter (``value is None`` → no
+    reason) instead of failing it "missing" — used for the **additive** G4b leakage output, which a
+    die only carries once the device step has computed it (a bare/hand-built die is simply not binned
+    on leakage). The core parametrics (``V_t``/CD/NILS) stay non-optional: in the real pipeline a
+    resolved device always sets them, so a missing one there is a genuine fault.
+    """
 
     name: str
     lo: float | None = None
     hi: float | None = None
+    optional: bool = False
 
     def check(self, value: float | None) -> str | None:
         """Return a human reason if ``value`` is out of band (or missing), else ``None``."""
         if value is None:
-            return f"{self.name} missing"
+            return None if self.optional else f"{self.name} missing"
         if self.lo is not None and value < self.lo:
             return f"{self.name} {value:.4g} < {self.lo:.4g} (low)"
         if self.hi is not None and value > self.hi:
@@ -68,13 +76,18 @@ class SpecSet:
     wafer-level **geometry** scrap (TTV/bow out, passed in as ``geometry_reason``) is the outermost
     gate — it fails every die. Otherwise the parametric chain: the defocus chain rides **NILS** (the
     printability floor) and **CD/I_Dsat** (the channel-length chain); ``V_t`` rides the
-    ``t_ox``/``N_A`` channel (the device's own scope edge keeps ``V_t`` off the channel-length chain).
+    ``t_ox``/``N_A`` channel (the device's own scope edge keeps ``V_t`` off the channel-length chain);
+    and (G4b) **leakage** rides the deep-level-metal channel — the junction reverse-leakage that a
+    metal contaminant raises (the device output net doping cannot carry), an *optional* window so a
+    die not scored for leakage is simply not binned on it.
     """
 
     cd_nm: SpecWindow
     i_dsat_mA: SpecWindow
     v_t: SpecWindow
     nils: SpecWindow
+    leakage: SpecWindow = field(
+        default_factory=lambda: SpecWindow("leakage (nA/cm²)", hi=10.0, optional=True))
     geometry: GeometrySpec = field(default_factory=GeometrySpec)
     require_resolved: bool = True
 
@@ -99,19 +112,24 @@ class SpecSet:
                 self.cd_nm.check(die.cd_nm),
                 self.i_dsat_mA.check(die.i_dsat_mA),
                 self.v_t.check(die.V_t),
+                self.leakage.check(die.j_leak_nA_cm2),     # G4b — deep-level-metal junction leakage (optional)
             ) if r is not None
         ]
         return Verdict(passed=not reasons, reasons=tuple(reasons))
 
 
 # House-default windows (FLAGGED), centred on the nominal demo_device device
-# (V_t ≈ 0.55 V, CD ≈ 167 nm, I_Dsat ≈ 3.3 mA, NILS ≈ 4.6). Set so the nominal recipe yields high
-# and a defocused exposure drops it — the dramatic win. The NILS floor (~2.8) is anchored to the
-# cited printability rule of thumb (NILS ≳ 2–3 to print reliably; [[litho-aerial-image-source]]);
-# the CD/I_Dsat/V_t bands are house numbers. Tune in the demo, not the physics.
+# (V_t ≈ 0.55 V, CD ≈ 167 nm, I_Dsat ≈ 3.3 mA, NILS ≈ 4.6, leakage ≈ 0.01 nA/cm²). Set so the nominal
+# recipe yields high and a defocused exposure drops it — the dramatic win. The NILS floor (~2.8) is
+# anchored to the cited printability rule of thumb (NILS ≳ 2–3 to print reliably;
+# [[litho-aerial-image-source]]); the CD/I_Dsat/V_t/leakage bands are house numbers. Tune in the demo,
+# not the physics. The leakage ceiling (10 nA/cm²) sits well above the clean baseline AND above a
+# solar-grade feed's once-refined residual metal (so an intermediate grade still passes), but below
+# the metal-laden G4b demo scenario — the single binding calibration (the metals' device consequence).
 DEFAULT_SPECS = SpecSet(
     nils=SpecWindow("NILS", lo=2.8, hi=None),                # printability floor (the primary defocus catch)
     cd_nm=SpecWindow("CD (nm)", lo=150.0, hi=185.0),         # ±~11 % around 167 nm (extreme-defocus CD collapse)
     i_dsat_mA=SpecWindow("I_Dsat (mA)", lo=2.8, hi=4.2),     # floor < nominal 3.3; ceiling catches CD-collapse over-current
     v_t=SpecWindow("V_t (V)", lo=0.45, hi=0.68),             # the t_ox / N_A channel
+    leakage=SpecWindow("leakage (nA/cm²)", hi=10.0, optional=True),   # G4b deep-level-metal junction leakage
 )

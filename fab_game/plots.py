@@ -280,6 +280,77 @@ def purification_figure(result):
     return fig
 
 
+# --------------------------------------------------------------------------- #
+# G4b — deep-level metals → killed lifetime → a leaky diode (scaling + isolated kill + rework)
+# --------------------------------------------------------------------------- #
+def _lifetime_scaling_panel(ax, result) -> None:
+    """τ (µs) and junction leakage (nA/cm²) vs [Fe] — the cited 1/τ = σ_n·v_th·N_t scaling."""
+    fe = np.asarray(result.fe_sweep)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.plot(fe, result.tau_us_sweep, color="#2f6db5", lw=1.6, label="lifetime τ (µs)")
+    ax.set_xlabel("dissolved iron [Fe] (cm⁻³)", fontsize=9)
+    ax.set_ylabel("minority-carrier lifetime τ (µs)", fontsize=9, color="#2f6db5")
+    ax.tick_params(axis="y", labelcolor="#2f6db5")
+    ax2 = ax.twinx()
+    ax2.set_yscale("log")
+    ax2.plot(fe, result.leak_sweep, color="#d62728", lw=1.6, label="leakage (nA/cm²)")
+    ax2.axhline(result.leak_spec_hi, color="#d62728", ls="--", lw=1.0, alpha=0.7)
+    ax2.set_ylabel("junction leakage (nA/cm²)", fontsize=9, color="#d62728")
+    ax2.tick_params(axis="y", labelcolor="#d62728")
+    ax.set_title("Metals destroy lifetime → raise leakage\n(clean FZ ~ms/pA; [Fe]~1e12 → µs)", fontsize=10)
+
+
+def _leakage_ladder_panel(ax, result) -> None:
+    """Leakage per feed grade (one pass, log) vs spec — only the metal feed blows the window; V_t flat."""
+    x = np.arange(len(result.ladder))
+    hi = result.leak_spec_hi
+    colors = ["#d62728" if lk > hi else "#2ca02c" for lk in result.leak_by_grade]
+    ax.bar(x, result.leak_by_grade, width=0.6, color=colors, zorder=2)
+    ax.axhline(hi, color="#d62728", ls="--", lw=1.1, label=f"leakage spec ≤ {hi:.0f} nA/cm²")
+    ax.set_yscale("log")
+    ax.set_xticks(x)
+    ax.set_xticklabels(result.ladder, fontsize=9)
+    ax.set_ylabel("junction leakage (nA/cm²)", fontsize=9)
+    ax.set_title("Only the metal-laden feed blows the leakage\nwindow — and V_t stays in spec throughout",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+    for i, (lk, vt) in enumerate(zip(result.leak_by_grade, result.vt_by_grade)):
+        ax.text(i, lk * 1.4, f"V_t {vt:.2f}", ha="center", fontsize=7, color="0.3")
+
+
+def _leakage_rework_panel(ax, result) -> None:
+    """Leakage vs zone passes (metal feed, log) — the tiny-k metals scrub fast → leakage recovers."""
+    hi = result.leak_spec_hi
+    p = list(result.metal_passes)
+    ax.plot(p, result.leak_by_pass, color="0.4", lw=1.2, zorder=2)
+    colors = ["#d62728" if lk > hi else "#2ca02c" for lk in result.leak_by_pass]
+    ax.scatter(p, result.leak_by_pass, c=colors, s=46, zorder=3)
+    ax.axhline(hi, color="#d62728", ls="--", lw=1.1, label=f"leakage spec ≤ {hi:.0f} nA/cm²")
+    ax.set_yscale("log")
+    ax.set_xticks(p)
+    ax.set_xlabel("zone-refining passes (the rework)", fontsize=9)
+    ax.set_ylabel("junction leakage (nA/cm²)", fontsize=9)
+    ax.set_title("Purify harder: one extra pass (k² at the lead)\nscrubs the metals → leakage recovers",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper right")
+
+
+def lifetime_figure(result):
+    """Assemble the G4b artifact from a :class:`~fab_game.demo_lifetime.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _lifetime_scaling_panel(axes[0], result)
+    _leakage_ladder_panel(axes[1], result)
+    _leakage_rework_panel(axes[2], result)
+    trail = result.dead_trail.splitlines()[0] if result.dead_trail else ""
+    fig.suptitle("G4b — deep-level metals → killed minority-carrier lifetime → a leaky diode "
+                 "(V_t can't see it); rework = purify harder\n" + trail, fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    return fig
+
+
 def fab_game_figure(result):
     """Assemble the 2×2 G1 artifact figure from a :class:`~fab_game.demo_fab_game.DemoResult`."""
     import matplotlib.pyplot as plt

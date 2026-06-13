@@ -21,6 +21,7 @@ from chip import diffusion_dopant as dd
 from chip import oxidation as ox
 from chip import litho
 from chip import device as dev
+from chip import lifetime as life
 from chip.junction import analyze_junction
 from chip.purification import Contamination, sodium_oxide_charge
 from chip.wafer_prep import WaferGeometry
@@ -131,18 +132,22 @@ def litho_step(die: Die, knobs: LithoKnobs, pert: DiePerturbation) -> Die:
 def device_step(
     die: Die, knobs: DeviceKnobs, channel_N_A: float, contamination: Contamination | None = None,
 ) -> Die:
-    """Device extraction → ``V_t`` and ``I_Dsat``, *reading the inherited* ``t_ox``, ``cd`` *and contamination*.
+    """Device extraction → ``V_t``, ``I_Dsat`` *and* lifetime/leakage, *reading the inherited* ``t_ox``, ``cd``, *contamination*.
 
-    Two propagation reads: :func:`chip.device.threshold_voltage` consumes the local oxide thickness
+    Three propagation reads: :func:`chip.device.threshold_voltage` consumes the local oxide thickness
     (sets ``V_t``) and the printed CD (the channel length — geometry only, ``I_Dsat ∝ W/L``, **not**
-    ``V_t``); and (G4) the wafer's purified ``contamination`` drives the gate-oxide charge ``Q_ox =``
+    ``V_t``); (G4a) the wafer's purified ``contamination`` drives the gate-oxide charge ``Q_ox =``
     :func:`chip.purification.sodium_oxide_charge` ``(Na)`` → a flat-band/``V_t`` shift (positive Na⁺
-    pushes ``V_t`` **down**). The residual-dopant net shift is already folded into ``channel_N_A`` by
-    the caller (``effective_channel_N_A``), so it is *not* re-applied here. If the litho image did not
+    pushes ``V_t`` **down**); and (G4b) the contamination's **deep-level metals** (Fe/Cu) drive the
+    minority-carrier SRH lifetime → junction reverse leakage (:func:`chip.lifetime.device_leakage`) —
+    the device output net doping cannot carry, so a metal-laden feed leaves ``V_t``/``I_Dsat`` fine but
+    the diode **leaky**. The residual-dopant net shift is already folded into ``channel_N_A`` by the
+    caller (``effective_channel_N_A``), so it is *not* re-applied here. If the litho image did not
     resolve (or no ``t_ox``/``cd`` was produced upstream), the device does not exist → the step
-    **refuses** (leaves ``V_t``/``I_Dsat`` ``None``) and records why; the test step scores that a
-    functional fail. A clean/absent ``contamination`` ⇒ ``Q_ox = 0`` ⇒ the exact ``demo_device`` device
-    call (``V_t``, ``I_Dsat`` bit-for-bit — the seam).
+    **refuses** (leaves ``V_t``/``I_Dsat``/leakage ``None``) and records why; the test step scores that
+    a functional fail. A clean/absent ``contamination`` ⇒ ``Q_ox = 0`` and ``τ = τ_bulk`` (baseline
+    leakage) ⇒ the exact ``demo_device`` device call (``V_t``, ``I_Dsat`` bit-for-bit — the seam; the
+    leakage is purely additive and never moves ``V_t``/``I_Dsat``).
     """
     if die.t_ox_um is None or die.cd_um is None or die.resolved is False:
         reason = ("litho image not resolved" if die.resolved is False
@@ -157,10 +162,13 @@ def device_step(
         channel_N_A, die.t_ox_um, gate=knobs.gate, channel_length_um=die.cd_um, Q_ox=Q_ox,
     )
     i_dsat = dev.saturation_current(mos, mos.V_t + knobs.overdrive_V, knobs.width_um)
+    # G4b: the deep-level metals' SRH lifetime → junction reverse leakage (clean ⇒ τ_bulk + baseline).
+    leak = life.device_leakage(contamination, channel_N_A)
     return die.record(
         "device",
         knobs_in={"gate": knobs.gate, "width_um": knobs.width_um, "overdrive_V": knobs.overdrive_V,
                   "Q_ox": Q_ox, "N_A": channel_N_A},
-        outputs={"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox},
-        V_t=mos.V_t, i_dsat=i_dsat,
+        outputs={"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox,
+                 "tau_us": leak.tau_us, "j_leak_nA_cm2": leak.j_leak_nA_cm2},
+        V_t=mos.V_t, i_dsat=i_dsat, tau=leak.tau, j_leak=leak.j_leak,
     )

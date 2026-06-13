@@ -290,8 +290,29 @@ thing).
   > → wafer scrapped on V_t**, the trail naming the contamination; **rework = more zone passes** (2nd
   > pass scrubs the Na → V_t recovers, residual boron persists). Default `grade="clean"` → clean vector
   > → the G1/G2/G3 demos byte-for-byte unchanged. Fast lane 373→**400** (+27); no engine amendment, no
-  > ADR, no chip gallery card. **G4b (deferred):** `lifetime.py` — SRH `τ(N_metal)` + junction leakage,
-  > the deep-level-metal consequence net doping can't carry (loose/calibrated magnitudes, Tier 2).
+  > ADR, no chip gallery card.
+  >
+  > **G4b BUILT (2026-06-13).** The deferred Tier-2 output, landing the deep-level metals' device
+  > consequence net doping cannot carry. New cited physics `chip/lifetime.py` — the **Shockley–Read–Hall**
+  > recombination centre: `1/τ = 1/τ_bulk + Σ σ_n·v_th·N_metal` (the p-type low-injection limit, so the
+  > **electron** cross-section governs) + the generation-limited junction reverse leakage
+  > `J_gen = q·n_i·W/(2τ) ∝ 1/τ ∝ N_metal`, triad-tested (`test_lifetime.py`, 12). The **tight legs are
+  > the SRH machinery, not the magnitudes** (plan §7 loose tier): the analytic leg is the *low-injection
+  > reduction of the full `U(n,p)` statistics* — `σ_p` and `E_t` drop out, leaving `σ_n` (a closed-form
+  > limit, like Czochralski's `k→1`, not solver-grade independence); the conservation leg is **detailed
+  > balance** `U=0` at `p·n=n_i²`, exact for *any* parameters; the benchmark (cited Sze/Graff capture
+  > cross-sections, the clean-FZ `τ~ms`/`[Fe]~1e12→µs` order) is **flagged loose**. Wired into `fab_game`:
+  > the contamination's **Fe/Cu → `chip.lifetime.device_leakage` → a new die leakage field → an optional
+  > leakage spec window** (computed *inside* `device_step`, so the provenance/bookkeeping is unchanged;
+  > the metals **never touch `V_t`/`I_Dsat`**). A new flagged `"metal"` feedstock grade (Na/dopant-clean,
+  > metal-laden) **isolates the story**: one pass → `V_t` reads fine but leakage blows the window → the
+  > wafer is scrapped on **leakage**, the trail naming deep-level-metal SRH (vs G4a's Na→V_t). The single
+  > binding calibration — solar-grade's once-refined residual Cu (~2e12) must clear the 10 nA/cm² window —
+  > holds with margin; rework = more zone passes (the tiny-k metals scrub by `k²`/pass → one extra pass
+  > recovers lifetime/leakage). Banked `demo_lifetime`/`fab-game-g4b.png` (τ/leakage scaling | the isolated
+  > metal kill | the rework). Default `grade="clean"` ⇒ `τ=τ_bulk` + baseline leakage ⇒ the seam + the
+  > G1–G4a demos byte-for-byte unchanged. Fast lane 401→**423** (+22); no engine amendment, no ADR, no chip
+  > gallery card. **Tier-3 (gettering/precipitation, oxide breakdown) stays the named edge.**
 - **G5 — Etch / deposition / CMP.** The missing mid-line operations (phenomenological, honest).
 - **G6 — Packaging & test & binning.** The back-end assembly yield + parametric/functional test.
 - **G7 — Roguelike framing + scoring + a Textual TUI; sandbox mode.** The game shell over the

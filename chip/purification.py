@@ -32,10 +32,10 @@ leg; the metal/ion device-degradation magnitudes are **calibrated/loose**, flagg
    * **residual shallow dopant** ``B`` / ``P`` → **net channel doping** (:attr:`Contamination.net_doping_shift`,
      free — same units as ``N_A``).
 
-   **Deep-level metals** (``Fe`` / ``Cu``) ride along in the vector and are *scrubbed* by refining, but
+   **Deep-level metals** (``Fe`` / ``Cu``) ride along in the vector and are *scrubbed* by refining;
    their device consequence — an **SRH recombination centre** (minority-carrier lifetime, junction
-   leakage) — needs a device output net doping cannot carry: the **named G4b gap** (a future
-   ``lifetime.py``, plan §5a Tier 2). They are tracked now so the state does not guess that API later.
+   leakage) — is the device output net doping cannot carry, now built in :mod:`chip.lifetime` (the
+   **G4b** Tier-2 module, plan §5a; the gap this module's first version named, now wired).
 
 The Siemens chlorosilane distillation route is a different domain (separations, weak device coupling) —
 modelled as a **grade knob**, not a column sim (plan §5a). Gettering / precipitation / oxide breakdown
@@ -73,8 +73,9 @@ Named scope edge (the honest ceiling)
   as Czochralski's.
 * **Calibrated consequence magnitudes.** ``Na → Q_ox`` rides a **flagged** bulk→areal incorporation
   length (:data:`NA_OXIDE_INCORPORATION_CM`); the deep-level-metal consequence (SRH lifetime / leakage)
-  is **not** modelled at all (the G4b gap) — metals are scrubbed and carried, not yet consequential.
-  Oxygen → thermal donors stays the separate, contested-``k`` deferral (Czochralski's scope edge).
+  is built in :mod:`chip.lifetime` (G4b) but its **magnitudes** (capture cross-sections, the clean-bulk
+  lifetime) are likewise the **loose/calibrated** leg — flagged there, not asserted with the segregation
+  anchors. Oxygen → thermal donors stays the separate, contested-``k`` deferral (Czochralski's scope edge).
 * **Full activation / uniform contamination.** The impurity vector is a wafer-level scalar per species
   (uniform across the die map — it composes orthogonally with the boule axial story, like
   Czochralski's ``slice_z``); within-wafer contamination non-uniformity is out.
@@ -165,16 +166,16 @@ class Contamination:
       lifting :mod:`chip.device`'s ``Q_ox = 0`` named edge;
     * ``B`` / ``P`` (residual shallow dopant) → **net doping** (:attr:`net_doping_shift`, free).
 
-    ``Fe`` / ``Cu`` (deep-level metals) ride along — *scrubbed* by refining but with **no device
-    consequence yet**: their SRH lifetime / leakage effect is the named **G4b** gap (plan §5a Tier 2).
-    All fields default to ``0.0`` → :attr:`is_clean` (the pristine baseline, the seam).
+    ``Fe`` / ``Cu`` (deep-level metals) ride along — *scrubbed* by refining — and now drive the
+    **SRH lifetime / junction leakage** consequence in :mod:`chip.lifetime` (the **G4b** Tier-2 output,
+    plan §5a). All fields default to ``0.0`` → :attr:`is_clean` (the pristine baseline, the seam).
     """
 
     Na: float = 0.0      # mobile ion → gate-oxide charge Q_ox (Tier 1, headline)
     B: float = 0.0       # residual acceptor → net p-doping (Tier 1)
     P: float = 0.0       # residual donor → net n-doping (Tier 1)
-    Fe: float = 0.0      # deep-level metal → SRH lifetime/leakage (G4b — rides along, no consequence yet)
-    Cu: float = 0.0      # deep-level metal → SRH (G4b)
+    Fe: float = 0.0      # deep-level metal → SRH lifetime/junction leakage (G4b, chip.lifetime)
+    Cu: float = 0.0      # deep-level metal → SRH lifetime/junction leakage (G4b, chip.lifetime)
 
     def as_dict(self) -> dict[str, float]:
         """The impurity vector as ``{species: cm⁻³}`` (fixed field order)."""
@@ -222,11 +223,19 @@ def zone_refine(feed: Contamination, n_passes: int = 1) -> Contamination:
 # before growth) so the **mobile-ion Na → Q_ox → V_t** consequence is the dominant, edge-lifting story
 # (the advisor's headline) rather than being masked by a net-doping shift; the metals are high so the
 # scrubbing contrast (Fe scrubbed ~5 orders vs B barely) is stark.
+#
+# "metal" is the **G4b isolation scenario** (illustrative): a feed clean in Na *and* the shallow
+# dopants but laden with deep-level transition metals (e.g. crucible/handling contamination *after* the
+# dopants were controlled). It carries NO V_t consequence (Na = 0, net-doping shift = 0) — the device
+# threshold reads fine — yet poisons minority-carrier lifetime → raises junction reverse leakage
+# (:mod:`chip.lifetime`): the consequence net doping cannot carry, the metals' device effect in
+# isolation. Its tiny-k metals scrub fast, so one extra zone pass recovers it.
 FEEDSTOCK_GRADES: dict[str, Contamination] = {
     "clean": Contamination(),                                              # idealized — the seam baseline
     "EGS":   Contamination(Na=1.0e13, B=1.0e13, P=1.0e13, Fe=1.0e12, Cu=1.0e12),   # electronic-grade (clean)
     "solar": Contamination(Na=5.0e16, B=1.0e15, P=1.0e15, Fe=5.0e15, Cu=5.0e15),   # solar-grade (intermediate)
     "MGS":   Contamination(Na=1.0e18, B=1.0e16, P=5.0e15, Fe=1.0e18, Cu=5.0e17),   # metallurgical-grade (dirty)
+    "metal": Contamination(Fe=2.0e18, Cu=1.0e17),                          # G4b: metal-laden, Na/dopant-clean
 }
 
 

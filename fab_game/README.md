@@ -76,29 +76,72 @@ The yield *law* is validated as cited physics in [`chip/tests/test_wafer_prep.py
 Murphy/Stapper forms + an illustrative `D₀` band). **Clustered placement** (a fitted `α`) and the
 **TTV→focus-budget** propagation wire are named scope edges, deferred.
 
+## G4 — silicon purification + the contamination consequence model
+
+The front of the line: a feedstock **grade** is a starting **impurity vector**, and **purification is
+segregation** — [`chip/purification.py`](../chip/purification.py) (triad-tested) is the **Pfann**
+single-pass zone-refining closed form `C(u)/C₀ = 1 − (1−k)e^(−k·u)`, reusing Czochralski's one cited
+Trumbore `k` table. The teachable result is straight off that table: a tiny-`k` metal (Fe `k≈8e-6`) is
+scrubbed ~5 orders in one pass, while boron (`k≈0.8`) is barely touched — segregation cleans metals
+superbly but cannot purify the dopants. Then each surviving impurity reaches a device number **only as
+far as a receiving variable exists** (the crux — propagation is gated by the consequence model, not the
+engine):
+
+- **G4a — Na → oxide charge, residual B/P → net doping.** Mobile-ion **Na** incorporates into the gate
+  oxide as charge `Q_ox`, lifting `chip.device`'s named `Q_ox=0` edge (`ΔV_FB = −Q_ox/C_ox`) → `V_t`
+  **down**; residual **B/P** fold into the effective channel doping. A dirty **MGS** feed (one pass)
+  walks `V_t` out the bottom → scrapped on `V_t`, the trail naming the Na.
+- **G4b — deep-level metals → SRH lifetime → junction leakage** (the consequence net doping *cannot*
+  carry). [`chip/lifetime.py`](../chip/lifetime.py) (triad-tested) is the **Shockley–Read–Hall**
+  recombination centre: `1/τ = 1/τ_bulk + Σ σ_n·v_th·N_metal` (p-type low-injection → the **electron**
+  cross-section governs) and the generation-limited reverse leakage `J_gen = q·n_i·W/(2τ) ∝ N_metal`.
+
+> a **metal-laden but Na/dopant-clean** feed (the flagged `"metal"` grade) → `V_t` reads **fine**, yet
+> the diode is **leaky** → the wafer is scrapped on **leakage**, the trail naming deep-level-metal SRH.
+> *V_t is a bystander* — the device effect net doping can't see. Rework = more zone passes (tiny `k`
+> scrubs by `k²`/pass → one extra pass recovers lifetime/leakage).
+
+The SRH law's **tight legs are the machinery, not the magnitudes** (plan §7 loose tier): the analytic
+leg is the low-injection reduction of the full `U(n,p)` statistics (`σ_p`, `E_t` drop out → `σ_n`); the
+conservation leg is **detailed balance** `U=0` at `p·n=n_i²` (exact for any parameters). The capture
+cross-sections (Sze; Graff) + the clean-FZ `τ~ms` / `[Fe]~1e12→µs` order are **flagged loose**
+([`chip/tests/test_lifetime.py`](../chip/tests/test_lifetime.py)). The leakage is computed *inside* the
+device step (a new die field + an *optional* leakage spec window), so the provenance/bookkeeping is
+unchanged and the metals never touch `V_t`/`I_Dsat`. **Gettering / precipitation / oxide breakdown**
+stay named **Tier-3** edges.
+
 ## Module map
 
 - **`state.py`** — the immutable `WaferState` / `Die` die-map + append-only `DieStepRecord`
   provenance (the "why did this die?" trail). G2 added the substrate fields `slice_z` /
   `resistivity_ohm_cm`; G3 added per-die **`defects`** / `killed_by_defect`, the wafer-level
-  **`geometry`**, the `DefectEvent` type, and the **single** `die_area_cm2` / cell-geometry helpers.
+  **`geometry`**, the `DefectEvent` type, and the **single** `die_area_cm2` / cell-geometry helpers;
+  G4 added the wafer-level **`contamination`** vector and the per-die **`tau`** / **`j_leak`** (G4b).
 - **`recipe.py`** — the per-step knob dataclasses; `DEFAULT_RECIPE` **is** `chip.demo_device`'s
   coherent n-MOSFET recipe (the seam anchor). G2 added **`CzochralskiKnobs`**; G3 added
-  **`WaferPrepKnobs`** (geometry + the killer-defect density, defaulting to a clean line).
+  **`WaferPrepKnobs`** (geometry + the killer-defect density); G4 added **`PurificationKnobs`**
+  (feedstock grade + zone passes, defaulting to a clean feed) + the derived `contamination` /
+  `effective_channel_N_A` recipe properties.
 - **`variation.py`** — the seeded stochastic spread: a center-to-edge trend routed *through the
   physics* + die-to-die output scatter. `NO_VARIATION` collapses to one physics call (the seam).
   Magnitudes are **flagged house defaults**, not cited.
 - **`defects.py`** (G3) — the seeded **per-die Poisson** killer-particle placement (off without
   touching the RNG when the stochastic layer is disabled or the line is clean — the seam).
 - **`spec.py`** — spec windows → the per-die verdict (NILS / CD / I_Dsat / V_t); G3 added the
-  killer-defect **functional** gate and the wafer-level **`GeometrySpec`** (TTV/bow) scrap gate.
-- **`steps.py`** — the deterministic step wrappers; G3 added `wafer_prep_step` (geometry + defects).
-- **`pipeline.py`** — `run_line` (the driver, one seeded RNG in fixed die order; wafer prep is now
-  step 1), `wafer_yield`, `diagnose` (the failure trail, +a killer-defect branch), `rework_litho`,
-  G3's **`rework_polish`** (re-CMP a TTV scrap, eats thickness), and G2's **`run_batch`**.
-- **`demo_fab_game.py`** + **`demo_boule.py`** + **`demo_wafer_prep.py`** + **`plots.py`** — the
-  banked artifacts (`fab-game-g1.png` defocus; `fab-game-g2.png` boule → V_t; `fab-game-g3.png` the
-  particle map + the cited yield law + the TTV scrap/re-polish).
+  killer-defect **functional** gate and the wafer-level **`GeometrySpec`** (TTV/bow) scrap gate; G4b
+  added the *optional* **leakage** window (`SpecWindow.optional` — a die not scored on leakage isn't
+  failed "missing").
+- **`steps.py`** — the deterministic step wrappers; G3 added `wafer_prep_step` (geometry + defects);
+  G4 wired the **device step's contamination reads** (Na→`Q_ox`→`V_t`; G4b Fe/Cu→`chip.lifetime`→the
+  leakage field), all *inside* `device_step` (no new pipeline step).
+- **`pipeline.py`** — `run_line` (the driver, one seeded RNG in fixed die order; the wafer-level
+  purification + wafer-prep run first), `wafer_yield`, `diagnose` (the failure trail, + killer-defect /
+  `Q_ox` / deep-level-metal leakage branches), `rework_litho`, G3's **`rework_polish`**, and G2's
+  **`run_batch`**.
+- **`demo_fab_game.py`** + **`demo_boule.py`** + **`demo_wafer_prep.py`** + **`demo_purification.py`**
+  + **`demo_lifetime.py`** + **`plots.py`** — the banked artifacts (`fab-game-g1.png` defocus;
+  `fab-game-g2.png` boule → V_t; `fab-game-g3.png` particle map + yield law + TTV scrap;
+  `fab-game-g4.png` Na → V_t scrap + rework; `fab-game-g4b.png` metals → leaky diode + rework).
 - **`fab_game.ipynb`** — the thin notebook skin (not in the correctness path).
 
 ## Test discipline (ADR 0005 §5) — mechanics invariants, not cited magnitudes
@@ -119,6 +162,12 @@ Murphy/Stapper forms + an illustrative `D₀` band). **Clustered placement** (a 
   killer-defect → functional-fail wiring.
 - **`test_geometry.py`** (G3) — the TTV/bow **scrap** gate and the `rework_polish` accounting
   (recovers a TTV scrap, eats thickness; cannot fix bow or remove a killer particle).
+- **`test_contamination.py`** (G4a) — purification scrubs the wafer; a dirty feed's Na walks `V_t`
+  out of spec (named), more passes recover, a clean grade is the seam.
+- **`test_leakage.py`** (G4b) — the metals → SRH lifetime → junction-leakage wiring: a metal feed is
+  scrapped on **leakage** (not `V_t`) and named; more passes recover; clean is the baseline seam.
+- **`test_demo_purification.py`** / **`test_demo_lifetime.py`** (G4a/G4b) — the banked artifacts'
+  theses (the Na→`V_t` kill + rework; the isolated metal → leaky-diode kill + rework).
 
 ## Run it
 
@@ -126,6 +175,8 @@ Murphy/Stapper forms + an illustrative `D₀` band). **Clustered placement** (a 
 python -m fab_game.demo_fab_game          # prints the story, banks docs/figures/fab-game-g1.png
 python -m fab_game.demo_boule             # the G2 boule → V_t spread, banks docs/figures/fab-game-g2.png
 python -m fab_game.demo_wafer_prep        # the G3 particle map + yield law + TTV scrap, banks fab-game-g3.png
+python -m fab_game.demo_purification      # the G4a Na → V_t scrap + rework, banks fab-game-g4.png
+python -m fab_game.demo_lifetime          # the G4b metals → leaky diode + rework, banks fab-game-g4b.png
 pytest fab_game/ -q                       # the mechanics suite (rides the fast lane)
 jupyter lab fab_game/fab_game.ipynb       # the interactive skin (needs the [viz,notebook] extras)
 ```

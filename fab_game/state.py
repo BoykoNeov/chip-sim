@@ -108,6 +108,8 @@ class Die:
     R_s: float | None = None
     V_t: float | None = None
     i_dsat: float | None = None
+    tau: float | None = None                    # minority-carrier SRH lifetime (s) — deep-level metals (G4b)
+    j_leak: float | None = None                 # junction reverse-leakage density (A/cm²) — the metal killer (G4b)
     defects: tuple[DefectEvent, ...] = ()       # killer particles caught at wafer prep (G3)
     killed_by_defect: bool | None = None        # set by wafer prep; True ⇒ a functional fail
     verdict: Verdict | None = None
@@ -122,6 +124,16 @@ class Die:
     def i_dsat_mA(self) -> float | None:
         """Saturation drive current in **mA** (the spec-window / readout unit)."""
         return None if self.i_dsat is None else self.i_dsat * 1.0e3
+
+    @property
+    def tau_us(self) -> float | None:
+        """Minority-carrier SRH lifetime in **µs** (the deep-level-metal readout, G4b)."""
+        return None if self.tau is None else self.tau * 1.0e6
+
+    @property
+    def j_leak_nA_cm2(self) -> float | None:
+        """Junction reverse-leakage density in **nA/cm²** (the leakage spec-window unit, G4b)."""
+        return None if self.j_leak is None else self.j_leak * 1.0e9
 
     def record(self, step: str, knobs_in: dict, outputs: dict, **updates) -> "Die":
         """Return a new die with ``updates`` applied and a :class:`DieStepRecord` appended (append-only)."""
@@ -142,7 +154,8 @@ class WaferState:
     imperfect purification (so it is the boule slice + ``contamination.net_doping_shift``).
     ``resistivity_ohm_cm`` is the substrate resistivity that doping implies (the fab characterization
     currency). ``contamination`` (G4) is the wafer-level purified **impurity vector** — ``Na`` drives
-    the gate-oxide ``Q_ox`` (the device ``V_t`` shift), the metals ride along (the named G4b gap). All
+    the gate-oxide ``Q_ox`` (the device ``V_t`` shift) and the deep-level **metals** (Fe/Cu) drive the
+    SRH lifetime → junction leakage (G4b, :mod:`chip.lifetime`; the gap G4a named, now wired). All
     are wafer-level: ``slice_z`` and the contamination are constant across the die map (the axial boule
     + contamination stories compose orthogonally with the radial die-map story). They default to
     ``None`` so a bare G1-style wafer is still constructible. ``dies`` is the die map (fixed order — the

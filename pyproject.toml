@@ -43,7 +43,7 @@ notebook = ["jupyterlab>=4", "ipywidgets>=8", "nbclient", "nbformat", "ipykernel
 # `chip...`) without an install step.
 #
 # Tiered gate (ADR 0003): the routine local gate is the fast lane
-#   `pytest -m "not slow" -n auto`   — the always-on suite (254 tests, ~16 s parallel / ~53 s serial)
+#   `pytest -m "not slow" -n auto`   — the always-on suite (423 tests, ~22 s parallel / ~78 s serial)
 #   `pytest`                         — the full gate, SERIAL (adds the slow notebook smoke-test)
 # `slow` marks the handful of tests that drive a live kernel / subprocess (the notebook execution).
 #

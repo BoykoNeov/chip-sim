@@ -306,13 +306,20 @@ def diagnose(die: Die) -> str:
         lines.append(f"    ↳ device: refused ({device.outputs['refused']}) — no working transistor")
     elif device is not None:
         lines.append(f"    ↳ device: V_t {device.outputs.get('V_t', float('nan')):.3f} V, "
-                     f"I_Dsat {device.outputs.get('i_dsat', float('nan')) * 1e3:.2f} mA")
-        # The contamination fingerprint (G4): a non-zero gate-oxide charge means mobile-ion (Na)
+                     f"I_Dsat {device.outputs.get('i_dsat', float('nan')) * 1e3:.2f} mA, "
+                     f"leakage {device.outputs.get('j_leak_nA_cm2', float('nan')):.2g} nA/cm²")
+        # The contamination fingerprint (G4a): a non-zero gate-oxide charge means mobile-ion (Na)
         # contamination from imperfect purification shifted V_t — name it as the root cause.
         Q_ox = device.knobs_in.get("Q_ox", 0.0)
         if Q_ox:
             lines.append(f"    ↳ purification: gate-oxide charge Q_ox {Q_ox:.2e} C/cm² (mobile-ion Na "
                          f"contamination) → V_FB/V_t driven down (purify harder — more zone passes)")
+        # The deep-level-metal fingerprint (G4b): a leakage failure traces to SRH recombination from
+        # residual Fe/Cu — the device output net doping cannot carry (the gap G4a named, now wired).
+        if any("leakage" in r for r in die.verdict.reasons):
+            lines.append(f"    ↳ purification: junction leakage from deep-level-metal SRH recombination "
+                         f"(minority-carrier lifetime τ {device.outputs.get('tau_us', float('nan')):.2g} µs) "
+                         f"→ a leaky diode (purify harder — zone refining scrubs the metals fast, tiny k)")
     return "\n".join(lines)
 
 
