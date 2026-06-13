@@ -92,11 +92,18 @@ Named scope edge (the honest ceiling)
   transient scenario, no consumer here, so the engine stays untouched, no ADR — per the repo's
   anti-over-build rule and the v1.2 consumer-side receding-mesh precedent), facets / interface
   curvature (1-D here), and ``G_l``'s own ``V``-dependence (the saturation assumes ``G_l`` ⊥ ``V``).
-* **Oxygen / thermal donors are a separate, looser story.** Crucible-oxygen incorporation is *not*
-  dopant segregation (its ``k`` is contested ~0.25–1.4 and incorporation is dissolution-controlled),
-  and the ~450 °C thermal-donor kinetics that make some of it electrically active are a calibrated
-  consequence model — held as the fenced contamination follow-on (plan §5a bucket 4 / G4), **not**
-  asserted with Scheil's anchors.
+* **Oxygen / thermal donors — now BUILT (C1, opt-in), the ELECTRICAL deepening.** Crucible-oxygen
+  incorporation is *not* dopant segregation (its ``k`` is contested ~0.25–1.4 and incorporation is
+  dissolution-controlled), and the ~450 °C thermal-donor kinetics that make some of it electrically
+  active are a calibrated consequence model — so it is built as a **separate, flagged** section (§1e:
+  :func:`thermal_donor_density` / :func:`thermal_donor_formation_rate` / :func:`net_doping_after_donors`)
+  that **does not borrow Scheil's anchors**. The one cited claim is the **Kaiser–Frisch–Reiss (1958)
+  fourth-power initial rate** ``dN_TD/dt|₀ ∝ [O_i]⁴``; the saturating form, the cube-law saturation, and
+  every magnitude are flagged house numbers (ADR 0005 §5). The donors **compensate** the p-substrate
+  (``N_net = N_A − N_TD``, the exact algebra leg) → ``V_t``/resistivity shift through the existing
+  net-doping chain. Off by default (no ``[O_i]`` or no donor anneal → ``N_TD = 0`` exact → the seam).
+  **Still deferred:** ``[O_i] = f(pull/rotation/melt)`` (a flagged input *level*, not a growth model),
+  the higher-T "new donor" / oxygen-precipitation regimes, and type inversion (a guarded named edge).
 * **Full dopant activation at 300 K** (inherited from the Masetti/junction resistivity model): the
   electrically-active concentration is taken equal to the chemical one — fine at the substrate
   ``~1e15–1e17`` here; the active-vs-chemical edge is the repo's standing ceiling.
@@ -416,6 +423,173 @@ def max_voronkov_ratio(
     fixed ``G``. Order-of-magnitude (set by the constants, ``k_l``-independent), not a precise number.
     """
     return (k_solid_W_per_m_K / (latent_heat_J_per_kg * density_kg_per_m3)) * _M2_PER_SK_TO_MM2_PER_KMIN
+
+
+# --------------------------------------------------------------------------- #
+# 1e. Crucible oxygen → thermal donors — the front-of-line ELECTRICAL consequence (C1)
+# --------------------------------------------------------------------------- #
+# CG-1/2/3 deepened the crystal-growth story on the *doping-profile* (Scheil k_eff), *defect*
+# (Voronkov), and *interface* (Stefan) axes. The missing axis is **electrical**: a Czochralski boule
+# dissolves **interstitial oxygen** ``[O_i]`` from the quartz crucible (typical CZ ``[O_i] ~ 1e17–1e18
+# cm⁻³``, ~1e18 the common value), and a subsequent **low-temperature anneal near ~450 °C** nucleates
+# **thermal donors** (TDs) — small oxygen clusters that act as *shallow donors*, adding n-type carriers.
+# In a p-type (boron) substrate the donors **compensate** the acceptors → the net doping ``N_A`` drops
+# → ``φ_F``/``Q_dep`` fall → ``V_t`` shifts (and resistivity rises). This is exactly the established
+# **net-doping → V_t** chain (the G4a residual-dopant story, :attr:`~chip.purification.Contamination.
+# net_doping_shift`): a contaminant net doping *can* carry, on the same device receiving variable.
+#
+# THE CITED FORM (the one load-bearing benchmark claim): the **initial** TD formation rate scales as
+# the **FOURTH POWER of the interstitial-oxygen concentration**, ``dN_TD/dt|₀ ∝ [O_i]⁴`` — the classic
+# result of **Kaiser, Frisch & Reiss (Phys. Rev. 112, 1546, 1958)** for ~450 °C anneals (the fourth
+# power is read as a four-oxygen donor core). That is the asserted-tight cited *direction* (the KFR
+# fourth power); everything else here is a **flagged house consequence model** (ADR 0005 §5 — mechanics,
+# not magnitudes), built for the right limits like the G5 ``AR_crit = SC/(1−SC)`` rule:
+#
+#     N_sat([O_i]) = TD_SAT_AT_REF·([O_i]/O_ref)^p_sat            (saturation TD density, cm⁻³)
+#     rate₀([O_i]) = (TD_SAT_AT_REF/τ_ref)·([O_i]/O_ref)^p_rate   (initial rate, cm⁻³/min — KFR p_rate=4)
+#     τ([O_i])     = N_sat/rate₀ = τ_ref·(O_ref/[O_i])            (formation time const, ∝ 1/[O_i])
+#     N_TD([O_i], t) = N_sat·(1 − e^(−t/τ))                       (saturating exponential)
+#
+# so the initial slope ``dN_TD/dt|₀ = N_sat/τ = rate₀ ∝ [O_i]^p_rate`` carries the cited **fourth**
+# power (``p_rate = TD_RATE_OXYGEN_EXPONENT = 4``), while the **saturation exponent**
+# ``p_sat = TD_SAT_OXYGEN_EXPONENT = 3`` (a reported but more literature-variable cube law) and **every
+# magnitude** (``TD_SAT_AT_REF``, ``τ_ref``, the ``[O_i]`` band) are **flagged house numbers** — NOT
+# asserted with Scheil's anchors (the v1.2/G2 honesty rule the boule's docstring keeps). ``N_TD`` is the
+# **electrically-active donor (carrier) concentration** — the double-donor (≤2 e⁻/cluster) factor is
+# folded into the flagged ``TD_SAT_AT_REF`` — so ``N_A − N_TD`` is unit-consistent with ``net_doping_shift``.
+#
+# HONEST MAGNITUDE (load-bearing, like CG-1's "boron barely segregates"): donors form **only at the
+# ~450 °C anneal**, not during growth — so ``[O_i]`` set with **no anneal** leaves the substrate
+# untouched (a seam lever). The cube law makes the consequence **steep in oxygen** (the teachable
+# "oxygen control matters"): a typical ``[O_i] ≈ 8e17`` + a moderate anneal trims a ~1e17 boron
+# substrate only modestly, but a high ``[O_i] ≈ 1.2e18`` + a long anneal walks ``V_t`` out the bottom
+# of its window (a scrap) — without inverting the type. **Deferred edges (named, not built):** ``[O_i]``
+# as a first-principles function of pull/rotation/melt (incorporation is dissolution-controlled and
+# genuinely contested ~0.25–1.4 ``k`` — held as a flagged input *level*, not a growth model); the
+# "new donors" (~600–800 °C) and oxygen-precipitation regimes (only the ~450 °C TD kinetics are here);
+# and **type inversion** (``N_TD ≥ N_A`` → an n-channel device) — guarded as a raised named edge, not
+# modelled (the demo scraps via the V_t floor, staying p-type — the G4a "residual kept small" rule).
+TD_ANNEAL_PEAK_C: float = 450.0            # °C — the ~450 °C thermal-donor formation peak (narrative)
+TD_OXYGEN_REFERENCE_CM3: float = 1.0e18    # cm⁻³ — reference [O_i] for the flagged magnitudes (common CZ value)
+TD_RATE_OXYGEN_EXPONENT: float = 4.0       # the CITED KFR (1958) fourth-power initial-rate law (load-bearing)
+TD_SAT_OXYGEN_EXPONENT: float = 3.0        # FLAGGED saturation cube law (reported but literature-variable)
+# FLAGGED house magnitudes (ADR 0005 §5) — chosen for teachable VISIBILITY at the game's V_t window, NOT
+# cited TD counts: ~4e16 cm⁻³ saturation at [O_i]=1e18 (TDs reach ~1e16–1e17 in the literature) and a
+# ~1 h formation time constant there. They set the *depth* of the V_t shift, never its on/off (that is
+# pure: no oxygen or no anneal ⇒ no donors). The double-donor electron-count factor is folded in here.
+TD_SATURATION_AT_REF_CM3: float = 4.0e16   # cm⁻³ — saturation active-donor density at O_ref (FLAGGED)
+TD_FORMATION_TAU_AT_REF_MIN: float = 60.0  # min — formation time constant at O_ref (FLAGGED; τ ∝ 1/[O_i])
+
+# Representative incorporated interstitial-oxygen levels (cm⁻³) — FLAGGED illustrative house band, NOT a
+# cited incorporation model (the [O_i]=f(pull/rotation/melt) story is the named deferred edge). The
+# *ordering* (more oxygen → steeper donor formation) is the physics; the numbers are house, spanning the
+# typical CZ ~1e17–1e18 range. "none" is the idealized seam (no oxygen ⇒ no donors for any anneal).
+OXYGEN_BANDS: dict[str, float] = {
+    "none": 0.0,        # idealized oxygen-free (the seam baseline — no donors at any anneal)
+    "low": 5.0e17,      # low-oxygen (e.g. magnetic-CZ / lower crucible dissolution)
+    "typical": 8.0e17,  # a typical CZ interstitial-oxygen level
+    "high": 1.2e18,     # high-oxygen (heavy crucible dissolution) — the steep-donor / scrap case
+}
+
+
+def thermal_donor_saturation(
+    oxygen_cm3: float,
+    *,
+    saturation_at_ref: float = TD_SATURATION_AT_REF_CM3,
+    oxygen_ref: float = TD_OXYGEN_REFERENCE_CM3,
+    exponent: float = TD_SAT_OXYGEN_EXPONENT,
+) -> float:
+    """Saturation thermal-donor density ``N_sat = TD_SAT_AT_REF·([O_i]/O_ref)^p_sat`` (cm⁻³) — FLAGGED.
+
+    The long-anneal ceiling of :func:`thermal_donor_density`. ``0`` at ``[O_i] = 0`` (no oxygen, the
+    seam), rising as the **flagged cube law** (``p_sat = 3`` by default — reported but more
+    literature-variable than the KFR fourth-power *rate*, so flagged, not asserted as an anchor). The
+    coefficient + exponent are house numbers (ADR 0005 §5); only the *direction* (more oxygen → more
+    donors, steeply) is physics. ``N_sat`` is the electrically-active donor (carrier) concentration.
+    """
+    if oxygen_cm3 < 0.0:
+        raise ValueError(f"oxygen concentration must be ≥ 0, got {oxygen_cm3}")
+    return saturation_at_ref * (oxygen_cm3 / oxygen_ref) ** exponent
+
+
+def thermal_donor_formation_rate(
+    oxygen_cm3: float,
+    *,
+    saturation_at_ref: float = TD_SATURATION_AT_REF_CM3,
+    tau_at_ref_min: float = TD_FORMATION_TAU_AT_REF_MIN,
+    oxygen_ref: float = TD_OXYGEN_REFERENCE_CM3,
+    sat_exponent: float = TD_SAT_OXYGEN_EXPONENT,
+    rate_exponent: float = TD_RATE_OXYGEN_EXPONENT,
+) -> float:
+    """Initial thermal-donor formation rate ``dN_TD/dt|₀`` (cm⁻³/min) — the CITED KFR fourth-power law.
+
+    The ``t → 0`` slope of :func:`thermal_donor_density`, ``= N_sat/τ``. With the default exponents it is
+    ``(TD_SAT_AT_REF/τ_ref)·([O_i]/O_ref)^p_rate`` and so scales as the **fourth power of the interstitial
+    oxygen** (``p_rate = TD_RATE_OXYGEN_EXPONENT = 4``) — **Kaiser–Frisch–Reiss (Phys. Rev. 112, 1546,
+    1958)**, the load-bearing cited *direction* (a four-oxygen donor core). ``0`` at ``[O_i] = 0`` (the
+    seam). Exposed as its own function so the fourth-power scaling is asserted **directly** (not via a
+    fixed-``t`` finite difference, which would understate the high-``[O_i]`` ratio once it saturates,
+    since ``τ ∝ 1/[O_i]``). The *coefficient* is a flagged magnitude; the *fourth power* is the citation.
+    """
+    if oxygen_cm3 < 0.0:
+        raise ValueError(f"oxygen concentration must be ≥ 0, got {oxygen_cm3}")
+    if oxygen_cm3 == 0.0:
+        return 0.0
+    n_sat = thermal_donor_saturation(
+        oxygen_cm3, saturation_at_ref=saturation_at_ref, oxygen_ref=oxygen_ref, exponent=sat_exponent)
+    tau = tau_at_ref_min * (oxygen_ref / oxygen_cm3)          # τ ∝ 1/[O_i] → rate₀ = N_sat/τ ∝ [O_i]^(p_sat+1)
+    return n_sat / tau
+
+
+def thermal_donor_density(
+    oxygen_cm3: float,
+    anneal_minutes: float,
+    *,
+    saturation_at_ref: float = TD_SATURATION_AT_REF_CM3,
+    tau_at_ref_min: float = TD_FORMATION_TAU_AT_REF_MIN,
+    oxygen_ref: float = TD_OXYGEN_REFERENCE_CM3,
+    sat_exponent: float = TD_SAT_OXYGEN_EXPONENT,
+) -> float:
+    """Active thermal-donor concentration ``N_TD = N_sat·(1 − e^(−t/τ))`` (cm⁻³) after a ~450 °C anneal.
+
+    A saturating exponential rising from ``0`` toward the (flagged) saturation ceiling
+    :func:`thermal_donor_saturation` with the formation time constant ``τ = τ_ref·(O_ref/[O_i]) ∝
+    1/[O_i]`` (more oxygen → faster *and* higher). Returns ``0.0`` **exactly** when ``[O_i] = 0`` (no
+    oxygen) **or** ``anneal_minutes = 0`` (no anneal) — the seam, by *both* paths (donors form only at
+    the anneal, not during growth), so a boule with oxygen but no donor anneal is byte-for-byte the
+    pre-C1 substrate. The initial slope carries the **cited fourth-power** rate
+    (:func:`thermal_donor_formation_rate`); the form + magnitudes are flagged house numbers.
+    """
+    if oxygen_cm3 < 0.0:
+        raise ValueError(f"oxygen concentration must be ≥ 0, got {oxygen_cm3}")
+    if anneal_minutes < 0.0:
+        raise ValueError(f"anneal time must be ≥ 0, got {anneal_minutes}")
+    if oxygen_cm3 == 0.0 or anneal_minutes == 0.0:
+        return 0.0                                            # the seam (exact): no oxygen or no anneal ⇒ no donors
+    n_sat = thermal_donor_saturation(
+        oxygen_cm3, saturation_at_ref=saturation_at_ref, oxygen_ref=oxygen_ref, exponent=sat_exponent)
+    tau = tau_at_ref_min * (oxygen_ref / oxygen_cm3)
+    return n_sat * (1.0 - math.exp(-anneal_minutes / tau))
+
+
+def net_doping_after_donors(N_A: float, thermal_donor_cm3: float) -> float:
+    """Net p-type doping after donor compensation ``N_net = N_A − N_TD`` (cm⁻³) — the EXACT compensation leg.
+
+    n-type thermal donors compensate the p-type acceptors one-for-one (carrier bookkeeping), so the net
+    acceptor doping the device sees is ``N_A − N_TD`` — **exact** arithmetic (the tight algebra leg, like
+    G4a's ``net_doping_shift``); ``N_TD = 0`` returns ``N_A`` **bit-for-bit** (the seam). **Type
+    inversion** (``N_TD ≥ N_A`` — donors overwhelm the acceptors → the substrate goes n-type) is a
+    **named, guarded edge**: it raises, because the compact device model (p-substrate, boron ``μ(N)``)
+    does not model an n-channel device — the demo stays p-type (scraps via the V_t floor instead).
+    """
+    if thermal_donor_cm3 < 0.0:
+        raise ValueError(f"thermal-donor density must be ≥ 0, got {thermal_donor_cm3}")
+    if thermal_donor_cm3 >= N_A:
+        raise ValueError(
+            f"thermal donors {thermal_donor_cm3:.3e} ≥ substrate doping {N_A:.3e} cm⁻³ — type inversion "
+            "(the substrate would go n-type); the compact p-substrate device does not model this "
+            "(lower the oxygen / shorten the donor anneal)")
+    return N_A - thermal_donor_cm3
 
 
 # --------------------------------------------------------------------------- #

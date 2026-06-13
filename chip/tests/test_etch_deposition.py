@@ -165,3 +165,61 @@ def test_touching_gate_lines_have_no_gap_to_fill():
     # CD ≥ pitch → the gate lines touch → no gap (a degenerate geometry the void model rejects).
     with pytest.raises(ValueError):
         ed.gap_aspect_ratio(150.0, 300.0, 300.0)
+
+
+# --------------------------------------------------------------------------- #
+# D1: under-etch — incomplete clear → residual film → a bridging short. Same
+# flagged-phenomenology tier: the tight leg is the SEAM (UE=0 ⇒ residual 0
+# bit-for-bit), the residual algebra is a regression GUARD, and the bridge
+# threshold magnitude is a FLAGGED house number (only the direction is cited).
+# The mirror of §1's over-etch: a functional SHORT vs the deposition void's OPEN.
+# --------------------------------------------------------------------------- #
+def test_full_clear_leaves_no_residual_bit_for_bit():
+    # The seam (tight): a full clear (UE=0) leaves EXACTLY zero residual for any film thickness
+    # (film·0 == 0 to the last bit) → nothing bridges. The pre-D1 etch is byte-for-byte the identity here.
+    for h in (90.0, 150.0, 220.0):
+        assert ed.under_etch_residual(h, 0.0) == 0.0             # == , not approx — the seam is exact
+        r = ed.under_etch(h, 0.0)
+        assert r.residual_nm == 0.0 and r.bridged is False
+
+
+def test_under_etch_residual_is_ue_times_film_exact():
+    # Machinery (regression guard, NOT a conservation anchor): residual = UE·h, exact and monotone in UE.
+    h = 150.0
+    assert ed.under_etch_residual(h, 0.3) == pytest.approx(0.3 * h)
+    assert ed.under_etch_residual(h, 1.0) == h                   # UE=1 → nothing etched → the whole film
+    res = [ed.under_etch_residual(h, ue) for ue in (0.0, 0.1, 0.3, 0.6, 1.0)]
+    assert res == sorted(res)                                    # more under-etch → thicker residual
+
+
+def test_residual_bridges_above_the_flagged_threshold():
+    # The bridge criterion (FLAGGED magnitude, cited direction): a residual above the threshold is a
+    # continuous short; below it is discontinuous / cleared by the over-etch margin (harmless).
+    thr = ed.BRIDGE_RESIDUAL_THRESHOLD_NM
+    assert ed.residual_bridges(thr + 1.0) is True               # thick residual → a bridge (short)
+    assert ed.residual_bridges(thr - 1.0) is False              # thin residual → harmless
+    assert ed.residual_bridges(thr) is False                    # at the threshold, not over → no bridge
+    assert ed.residual_bridges(0.0) is False                    # a full clear never bridges (the seam)
+
+
+def test_under_etch_bundle_thin_harmless_thick_bridges():
+    # The bundle: a small under-etch (residual below the threshold) is harmless; a large one shorts the
+    # gate lines (a functional kill — the mirror of the deposition void). At a 150 nm film, the
+    # (flagged) ~20 nm threshold makes ~UE>0.13 the bridging regime.
+    thin = ed.under_etch(150.0, 0.1)                            # residual 15 nm < 20 → harmless
+    thick = ed.under_etch(150.0, 0.3)                           # residual 45 nm > 20 → bridges
+    assert thin.bridged is False and thin.residual_nm == pytest.approx(15.0)
+    assert thick.bridged is True and thick.residual_nm == pytest.approx(45.0)
+
+
+def test_under_etch_invalid_inputs_raise():
+    with pytest.raises(ValueError):
+        ed.under_etch_residual(150.0, 1.5)                       # UE must be in [0, 1]
+    with pytest.raises(ValueError):
+        ed.under_etch_residual(150.0, -0.1)
+    with pytest.raises(ValueError):
+        ed.under_etch_residual(0.0, 0.3)                        # film thickness > 0
+    with pytest.raises(ValueError):
+        ed.residual_bridges(-1.0)                               # residual ≥ 0
+    with pytest.raises(ValueError):
+        ed.residual_bridges(30.0, bridge_threshold_nm=0.0)     # threshold > 0

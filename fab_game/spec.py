@@ -131,10 +131,12 @@ class SpeedBins:
 class SpecSet:
     """The full per-die acceptance test: the functional gates + the parametric windows.
 
-    Three functional gates short-circuit before the parametrics, in order: (1) a **killer particle
+    Functional gates short-circuit before the parametrics, in order: (1) a **killer particle
     defect** caught at wafer prep — the transistor exists but is dead (distinct from an unresolved
     litho image, where the device never formed); (2) a litho image that **never resolved**; (3) a
-    **deposition void / pinch-off** (G5 — a poor step coverage failed to fill the gate gap). A
+    **deposition void / pinch-off** (G5 — a poor step coverage failed to fill the gate gap); (3b) an
+    **under-etch residual bridge** (D1 — an incomplete clear left residual film shorting the gate lines,
+    the mirror of the void's open). A
     wafer-level **geometry** scrap (TTV/bow out, passed in as ``geometry_reason``) is the outermost
     gate — it fails every die. Otherwise the parametric chain: the defocus chain rides **NILS** (the
     printability floor) and **CD/I_Dsat** (the channel-length chain); ``V_t`` rides the
@@ -171,6 +173,8 @@ class SpecSet:
             return Verdict(False, ("litho image not resolved (functional fail)",))
         if die.voided is True:                                 # G5 — a deposition keyhole void / pinch-off
             return Verdict(False, ("deposition void / pinch-off (functional fail)",))
+        if die.bridged is True:                                # D1 — an under-etch residual short
+            return Verdict(False, ("under-etch residual bridge / short (functional fail)",))
         reasons = [
             r for r in (
                 self.nils.check(die.nils),

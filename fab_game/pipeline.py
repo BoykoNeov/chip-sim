@@ -190,7 +190,8 @@ def run_line(
     # 4. Device — per die, reading the inherited t_ox + cd + the wafer contamination (the propagation:
     #    Na → Q_ox → V_t; the residual-dopant net shift is already in effective_channel_N_A).
     dies = tuple(
-        device_step(d, recipe.device, recipe.effective_channel_N_A, contamination=recipe.contamination)
+        device_step(d, recipe.device, recipe.effective_channel_N_A, contamination=recipe.contamination,
+                    thermal_donor_density=recipe.czochralski.thermal_donor_density)
         for d in wafer.dies
     )
     wafer = wafer.with_step(
@@ -397,6 +398,12 @@ def diagnose(die: Die) -> str:
             lines.append(f"    ↳ etch/depo: deposition VOID — gap aspect ratio {ar:.2f} > the "
                          f"step-coverage limit {ar_c:.2f} (non-conformal fill → keyhole; a functional "
                          f"kill — deposit more conformally / open the pitch)")
+        elif etch.outputs.get("bridged") is True:
+            res = etch.outputs.get("residual_nm", float("nan"))
+            thr = etch.outputs.get("bridge_threshold_nm", float("nan"))
+            lines.append(f"    ↳ etch/depo: under-etch BRIDGE — residual film {res:.1f} nm > the "
+                         f"{thr:.1f} nm short threshold (incomplete clear → the gate lines short; a "
+                         f"functional kill — etch to completion / add over-etch margin)")
         elif etch.outputs.get("functional_fail"):
             lines.append(f"    ↳ etch/depo: functional fail — {etch.outputs['functional_fail']} "
                          f"(no working gate — back off the over-etch / raise the anisotropy)")
@@ -421,6 +428,13 @@ def diagnose(die: Die) -> str:
         if Q_ox:
             lines.append(f"    ↳ purification: gate-oxide charge Q_ox {Q_ox:.2e} C/cm² (mobile-ion Na "
                          f"contamination) → V_FB/V_t driven down (purify harder — more zone passes)")
+        # The thermal-donor fingerprint (C1): crucible oxygen + the ~450 °C donor anneal nucleated n-type
+        # thermal donors that compensated the p-substrate (lower net N_A → V_t down) — name it as the root.
+        N_TD = device.knobs_in.get("N_TD")
+        if N_TD:
+            lines.append(f"    ↳ crystal growth: thermal donors {N_TD:.2e} cm⁻³ (crucible oxygen + ~450 °C "
+                         f"anneal) compensated the substrate → net N_A down → V_t down (lower the oxygen / "
+                         f"shorten the donor anneal)")
         # The deep-level-metal fingerprint (G4b): a leakage failure traces to SRH recombination from
         # residual Fe/Cu — the device output net doping cannot carry (the gap G4a named, now wired).
         if any("leakage" in r for r in die.verdict.reasons):
@@ -500,7 +514,8 @@ def rework_litho(
         red = litho_step(d, corrected, variation.systematic_perturbation(d))
         red = etch_deposition_step(red, recipe.etch_deposition, recipe.litho.pitch_nm,
                                    variation.systematic_perturbation(d))
-        red = device_step(red, recipe.device, wafer.channel_N_A, contamination=wafer.contamination)
+        red = device_step(red, recipe.device, wafer.channel_N_A, contamination=wafer.contamination,
+                          thermal_donor_density=recipe.czochralski.thermal_donor_density)
         red = _verdict_die(red, specs, geometry_reason)
         new_dies.append(red)
 

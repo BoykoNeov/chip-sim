@@ -88,12 +88,15 @@ Validation triad (plan §7) — what is asserted tight vs loose
 
 Named scope edge (the honest ceiling)
 -------------------------------------
-* **Under-etch is named, not modelled.** Plan §5 step 7 lists "over/under-etch"; this module builds the
-  **over**-etch leg (``over_etch_frac ≥ 0`` → the film always clears, the undercut/CD story). The
-  symmetric **under**-etch failure — an *incomplete clear* leaving residue / sidewall stringers that
-  **bridge** adjacent gate lines into a functional short — is a **deferred scope edge** (it would land
-  as a second functional kill, parallel to the deposition void, gated by an etch-completeness knob), not
-  yet built. Named here so the plan's mechanism is accounted for, per the repo's anti-over-build bar.
+* **Under-etch — now BUILT (D1), the symmetric second failure mode.** Plan §5 step 7 lists
+  "over/under-etch"; §1 builds the **over**-etch leg (``over_etch_frac ≥ 0`` → the film always clears,
+  the undercut/CD story), and §3 now builds the **under**-etch mirror: an *incomplete clear* (an
+  ``under_etch_frac > 0``) leaving **residual film** (``residual = UE·h``) that **bridges** adjacent
+  gate lines into a functional **short** once it exceeds a (flagged) thickness threshold
+  (:func:`under_etch` / :func:`residual_bridges`) — a second functional kill, parallel to the deposition
+  void (an *open*; this is a *short*). Same flagged tier: the *forms* are cited, the bridge-threshold
+  *magnitude* is house. Over- and under-etch are mutually exclusive (the recipe guards both-set). Off by
+  default (``under_etch_frac = 0`` → residual 0, no bridge → the seam).
 * **Phenomenological, not a profile simulator.** No etch-profile / facet / RIE-lag / aspect-ratio-
   dependent-etch (ARDE) model, no Monte-Carlo deposition; the etch is a single scalar bias and the
   deposition a single void verdict. The cited forms set the *direction*; the magnitudes are house.
@@ -288,4 +291,98 @@ def deposit_fill(
         critical_aspect_ratio=ar_crit,
         step_coverage=step_coverage,
         voided=ar > ar_crit,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# 3. Under-etch — incomplete clear → residual film → a bridging short (D1)
+# --------------------------------------------------------------------------- #
+# §1 builds the **over**-etch leg (etch past endpoint → undercut → CD shrink). Its named-but-unbuilt
+# mirror is **under**-etch: an *incomplete* clear that stops before the film is fully removed (low
+# over-etch on a non-uniform film, a slow etch, an early endpoint), leaving **residual film** in the
+# gaps between gate lines. A continuous residual stringer **bridges** adjacent lines into a functional
+# **short** — the symmetric second etch failure mode (the deposition void is a functional *open*; this
+# is a functional *short*). Same flagged-phenomenology tier as §1/§2 (Wolf & Tauber etch chapters;
+# Plummer–Deal–Griffin Ch. 10): the *forms* are cited, the magnitude (the bridge threshold) is house.
+#
+# The endpoint is when the exposed film is just cleared (etched depth = ``h``). An **under-etch
+# fraction** ``UE ∈ [0, 1]`` is the fraction of the film left un-etched at stop (``UE = 0`` clears
+# fully — the seam; ``UE → 1`` barely etches), so the residual film thickness is::
+#
+#     residual = UE · h                                                          (nm)
+#     bridges ⇔ residual > bridge_threshold                                      (a functional short)
+#
+# A **thin** residual (below the threshold) is discontinuous / consumed by the natural over-etch margin
+# — harmless; a **thick** one is a continuous conductive film that shorts the lines (a functional kill).
+# Over- and under-etch are **mutually exclusive** (one etch either stops short of, or runs past,
+# endpoint) — the recipe (:class:`fab_game.recipe.EtchDepositionKnobs`) guards against setting both.
+BRIDGE_RESIDUAL_THRESHOLD_NM: float = 20.0   # nm — FLAGGED: residual above this bridges (a continuous short)
+
+
+def under_etch_residual(film_thickness_nm: float, under_etch_frac: float) -> float:
+    """Residual film thickness ``residual = UE · h`` (nm) left by an incomplete etch — the algebra leg.
+
+    ``film_thickness_nm`` the gate film ``h``; ``under_etch_frac`` ``UE ∈ [0, 1]`` the fraction left
+    un-etched at stop. Returns ``0.0`` **bit-for-bit** at ``UE = 0`` (a full clear — the seam, ``h·0``)
+    and ``h`` at ``UE = 1`` (nothing etched). Exact machinery (a regression guard, not a conservation
+    anchor), mirroring §1's etch-bias algebra. Raises on a non-physical ``UE`` / film thickness.
+    """
+    if not 0.0 <= under_etch_frac <= 1.0:
+        raise ValueError(f"under_etch_frac must be in [0, 1], got {under_etch_frac}")
+    if film_thickness_nm <= 0.0:
+        raise ValueError(f"film_thickness_nm must be > 0, got {film_thickness_nm}")
+    return film_thickness_nm * under_etch_frac
+
+
+def residual_bridges(
+    residual_nm: float, *, bridge_threshold_nm: float = BRIDGE_RESIDUAL_THRESHOLD_NM,
+) -> bool:
+    """Whether a residual film of ``residual_nm`` **bridges** adjacent gate lines into a short — FLAGGED.
+
+    ``True`` iff ``residual_nm > bridge_threshold_nm`` — a continuous conductive stringer spans the gap
+    (a functional short). Below the threshold the residual is discontinuous / cleared by the over-etch
+    margin (harmless). ``residual = 0`` (a full clear) never bridges (the seam). The *direction* (thicker
+    residual → a bridge) is the cited mechanism; the ``bridge_threshold_nm`` magnitude is a house number
+    (ADR 0005 §5), like §2's ``SC/(1−SC)`` pinch-off rule. Raises on a non-physical threshold.
+    """
+    if residual_nm < 0.0:
+        raise ValueError(f"residual_nm must be ≥ 0, got {residual_nm}")
+    if bridge_threshold_nm <= 0.0:
+        raise ValueError(f"bridge_threshold_nm must be > 0, got {bridge_threshold_nm}")
+    return residual_nm > bridge_threshold_nm
+
+
+@dataclass(frozen=True)
+class UnderEtchResult:
+    """The outcome of an (in)complete etch clear: the residual film and whether it bridges the lines.
+
+    ``residual_nm`` the film left un-etched (``UE·h``); ``bridge_threshold_nm`` the (flagged) thickness a
+    residual must exceed to short; ``bridged`` True iff ``residual_nm > bridge_threshold_nm`` — a
+    **functional** kill (a short, parallel to the deposition void's open). At ``under_etch_frac = 0``
+    (a full clear) ``residual_nm == 0`` and ``bridged`` is False (the seam).
+    """
+
+    residual_nm: float
+    bridge_threshold_nm: float
+    bridged: bool
+
+
+def under_etch(
+    film_thickness_nm: float,
+    under_etch_frac: float = 0.0,
+    *,
+    bridge_threshold_nm: float = BRIDGE_RESIDUAL_THRESHOLD_NM,
+) -> UnderEtchResult:
+    """Resolve an incomplete etch clear → the residual film + the bridge verdict → :class:`UnderEtchResult`.
+
+    Computes the residual (:func:`under_etch_residual`) and whether it bridges (:func:`residual_bridges`):
+    a thick residual shorts adjacent gate lines (a functional kill), a thin one is harmless. At
+    ``under_etch_frac = 0`` (the default — a full clear) the residual is **0** and ``bridged`` is False
+    (the seam). The bundle the game's etch step reads, mirroring :func:`deposit_fill`.
+    """
+    residual = under_etch_residual(film_thickness_nm, under_etch_frac)
+    return UnderEtchResult(
+        residual_nm=residual,
+        bridge_threshold_nm=bridge_threshold_nm,
+        bridged=residual_bridges(residual, bridge_threshold_nm=bridge_threshold_nm),
     )

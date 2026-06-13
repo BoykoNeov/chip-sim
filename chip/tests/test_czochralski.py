@@ -392,3 +392,120 @@ def test_stefan_invalid_inputs_raise():
         cz.stefan_interface_gradient(1.0, -2.0)                  # melt gradient ≥ 0
     with pytest.raises(ValueError):
         cz.stefan_interface_gradient(1.0, 2.0, k_solid_W_per_m_K=0.0)  # k_s > 0
+
+
+# --------------------------------------------------------------------------- #
+# C1: crucible oxygen → thermal donors — the ELECTRICAL crystal-growth deepening.
+# Triad shape (the flagged-phenomenology tier, like CG-1/2/3 — NO independent
+# conservation law): the tight legs are the SEAM (no oxygen OR no anneal ⇒ N_TD=0,
+# exact, by BOTH paths) + the EXACT compensation algebra (N_A−N_TD); the one CITED
+# benchmark direction is the Kaiser–Frisch–Reiss FOURTH-power initial rate ∝[O_i]⁴;
+# the saturating form, the cube-law saturation exponent, and EVERY magnitude are
+# FLAGGED house numbers (not asserted with Scheil's anchors). Type inversion is a
+# guarded named edge.
+# --------------------------------------------------------------------------- #
+def test_thermal_donor_seam_zero_by_both_paths_exact():
+    # The seam (tight, EXACT): donors form only at the ~450 °C anneal, not during growth — so N_TD=0
+    # bit-for-bit when there is NO oxygen (any anneal) OR NO anneal (any oxygen). Either path is the
+    # seam lever that keeps the pre-C1 substrate byte-for-byte.
+    for t in (0.0, 60.0, 600.0):
+        assert cz.thermal_donor_density(0.0, t) == 0.0           # no oxygen ⇒ no donors (exact)
+    for O in (0.0, 5e17, 1.2e18):
+        assert cz.thermal_donor_density(O, 0.0) == 0.0           # no anneal ⇒ no donors (exact)
+
+
+def test_thermal_donor_initial_rate_is_the_cited_fourth_power():
+    # The CITED direction (Kaiser–Frisch–Reiss, Phys. Rev. 112, 1546, 1958): the INITIAL formation rate
+    # scales as the FOURTH power of [O_i]. Asserted DIRECTLY on the rate function (not a fixed-t finite
+    # difference, which would understate the high-[O_i] ratio once it saturates, since τ ∝ 1/[O_i]).
+    r1 = cz.thermal_donor_formation_rate(5.0e17)
+    r2 = cz.thermal_donor_formation_rate(1.0e18)                 # doubled oxygen
+    assert r2 / r1 == pytest.approx(2.0 ** 4)                    # 16× — the fourth power
+    r3 = cz.thermal_donor_formation_rate(1.5e18)                 # tripled vs r1
+    assert r3 / r1 == pytest.approx(3.0 ** 4)                    # 81×
+    assert cz.thermal_donor_formation_rate(0.0) == 0.0           # no oxygen ⇒ no rate (the seam)
+    # The exponent constant is pinned to the cited fourth power (not from memory).
+    assert cz.TD_RATE_OXYGEN_EXPONENT == 4.0
+
+
+def test_thermal_donor_small_t_slope_matches_the_initial_rate():
+    # The initial rate IS the t→0 slope of N_TD(t): N_TD(O, dt) ≈ rate₀(O)·dt for dt ≪ τ. Ties the
+    # cited fourth-power rate to the actual density function (the whole composition, not just a constant).
+    O, dt = 8.0e17, 1.0e-3                                       # dt ≪ τ (τ ~ 75 min here)
+    rate0 = cz.thermal_donor_formation_rate(O)
+    assert cz.thermal_donor_density(O, dt) == pytest.approx(rate0 * dt, rel=1e-3)
+
+
+def test_thermal_donor_saturation_is_the_flagged_cube_law():
+    # The saturation (FLAGGED, cube law — reported but more literature-variable than the rate's fourth
+    # power, so not an anchor): N_sat ∝ [O_i]³. The direction (more oxygen → steeply more donors) is the
+    # physics; the coefficient + exponent are house.
+    s1 = cz.thermal_donor_saturation(5.0e17)
+    s2 = cz.thermal_donor_saturation(1.0e18)
+    assert s2 / s1 == pytest.approx(2.0 ** 3)                    # 8× — the cube law
+    assert cz.thermal_donor_saturation(0.0) == 0.0              # no oxygen ⇒ no ceiling (the seam)
+    assert cz.TD_SAT_OXYGEN_EXPONENT == 3.0                      # the flagged saturation exponent
+
+
+def test_thermal_donor_density_saturates_and_is_bounded_monotone():
+    # Machinery: N_TD rises monotonically with anneal time, bounded by N_sat, → N_sat as t→∞ (the
+    # saturating exponential). The cited fourth power is the INITIAL slope; the long-time ceiling is N_sat.
+    O = 8.0e17
+    n_sat = cz.thermal_donor_saturation(O)
+    times = [10.0, 30.0, 60.0, 120.0, 300.0, 1000.0]
+    dens = [cz.thermal_donor_density(O, t) for t in times]
+    assert dens == sorted(dens)                                  # monotone increasing in anneal time
+    assert all(0.0 < d < n_sat for d in dens)                    # bounded below the ceiling
+    assert cz.thermal_donor_density(O, 1.0e6) == pytest.approx(n_sat, rel=1e-6)  # → N_sat as t→∞
+
+
+def test_net_doping_after_donors_is_exact_compensation_with_a_seam():
+    # The EXACT algebra leg: n-type donors compensate the p-substrate one-for-one, N_net = N_A − N_TD.
+    # N_TD=0 returns N_A BIT-FOR-BIT (the seam — 1e17 > 2**53, so only an exact identity survives).
+    assert cz.net_doping_after_donors(1.0e17, 0.0) == 1.0e17     # exact seam
+    assert cz.net_doping_after_donors(1.0e17, 2.0e16) == pytest.approx(8.0e16)   # exact subtraction
+
+
+def test_thermal_donor_type_inversion_is_a_guarded_edge():
+    # Type inversion (N_TD ≥ N_A → the substrate goes n-type) is a NAMED, GUARDED edge: it raises,
+    # because the compact p-substrate device does not model an n-channel device (the demo scraps via the
+    # V_t floor instead, staying p-type).
+    with pytest.raises(ValueError):
+        cz.net_doping_after_donors(1.0e17, 1.0e17)               # exactly compensated → n-type
+    with pytest.raises(ValueError):
+        cz.net_doping_after_donors(1.0e17, 1.2e17)               # over-compensated
+
+
+def test_thermal_donor_cited_constants_and_band_pinned():
+    # The benchmark leg: the ~450 °C donor-formation peak + the common-CZ reference [O_i]=1e18, pinned
+    # (not from memory). The OXYGEN_BANDS span the typical CZ ~1e17–1e18 range, "none" the seam.
+    assert cz.TD_ANNEAL_PEAK_C == pytest.approx(450.0)
+    assert cz.TD_OXYGEN_REFERENCE_CM3 == pytest.approx(1.0e18)
+    assert cz.OXYGEN_BANDS["none"] == 0.0                        # the seam baseline (no oxygen)
+    assert cz.OXYGEN_BANDS["low"] < cz.OXYGEN_BANDS["typical"] < cz.OXYGEN_BANDS["high"]
+    assert 1.0e17 <= cz.OXYGEN_BANDS["typical"] <= 1.0e18        # in the typical CZ range
+
+
+def test_thermal_donor_invalid_inputs_raise():
+    with pytest.raises(ValueError):
+        cz.thermal_donor_density(-1.0, 60.0)                     # oxygen ≥ 0
+    with pytest.raises(ValueError):
+        cz.thermal_donor_density(8e17, -1.0)                     # anneal ≥ 0
+    with pytest.raises(ValueError):
+        cz.net_doping_after_donors(1e17, -1.0)                   # N_TD ≥ 0
+
+
+def test_thermal_donor_realistic_magnitude_shifts_vt_down():
+    # The HONEST magnitude (the load-bearing flag, like CG-1's): a typical [O_i]≈8e17 + a moderate anneal
+    # trims a 1e17 boron substrate only MODESTLY (stays p-type, V_t still near nominal), while a high
+    # [O_i]≈1.2e18 + a long anneal walks the net doping far down (the scrap case) — WITHOUT inverting.
+    from chip.device import threshold_voltage
+    n_typ = cz.thermal_donor_density(8.0e17, 120.0)
+    n_hi = cz.thermal_donor_density(1.2e18, 240.0)
+    eff_typ = cz.net_doping_after_donors(1.0e17, n_typ)
+    eff_hi = cz.net_doping_after_donors(1.0e17, n_hi)            # must NOT raise (stays p-type)
+    assert eff_typ > eff_hi > 0.0                                # both p-type; high oxygen drops it further
+    vt_clean = threshold_voltage(1.0e17, 0.014).V_t
+    vt_typ = threshold_voltage(eff_typ, 0.014).V_t
+    vt_hi = threshold_voltage(eff_hi, 0.014).V_t
+    assert vt_hi < vt_typ < vt_clean                            # donors push V_t monotonically DOWN

@@ -152,7 +152,10 @@ def etch_deposition_step(
     record. The **deposition** then fills the gaps between the gate lines: a poor step coverage voids a
     high-aspect-ratio gap (:func:`chip.etch_deposition.deposit_fill`, the aspect ratio derived from the
     inherited gate height + ``pitch − CD``) → ``voided`` → a **functional** kill (like a killer particle,
-    distinct from a parametric shift).
+    distinct from a parametric shift). (D1) An **under-etch** (``under_etch_frac > 0`` — an incomplete
+    clear) leaves residual film that **bridges** the gate lines into a functional short
+    (:func:`chip.etch_deposition.under_etch`) → ``bridged`` → a second **functional** kill (a *short*,
+    the mirror of the void's *open*); at the default ``under_etch_frac = 0`` nothing bridges (the seam).
 
     The per-die etch-rate non-uniformity rides ``pert.etch_factor`` through the ``bias_factor`` hook (so
     it only moves the CD where the etch is non-ideal, ``anisotropy < 1``). Two graceful degradations
@@ -190,21 +193,32 @@ def etch_deposition_step(
             outputs={"functional_fail": str(exc)},
             voided=True,
         )
+    # D1 under-etch: an incomplete clear leaves residual film (UE·h) that bridges the gate lines into a
+    # functional short once it exceeds the (flagged) threshold. Independent of the over-etch/void path
+    # (over- and under-etch are mutually exclusive, guarded in the knobs); at the default UE=0 the
+    # residual is 0 and nothing bridges (the seam — byte-for-byte the pre-D1 etch).
+    ue = ed.under_etch(knobs.film_thickness_nm, knobs.under_etch_frac)
+    outputs = {"resist_cd_nm": die.cd_nm, "cd_nm": etch.cd_out_nm, "etch_bias_nm": etch.etch_bias_nm,
+               "gate_height_nm": etch.gate_height_nm, "underlayer_loss_nm": etch.underlayer_loss_nm,
+               "aspect_ratio": depo.aspect_ratio, "critical_aspect_ratio": depo.critical_aspect_ratio,
+               "voided": depo.voided, "bridged": ue.bridged}
+    if ue.residual_nm > 0.0:                                 # only record the residual detail when under-etching
+        outputs["residual_nm"] = ue.residual_nm
+        outputs["bridge_threshold_nm"] = ue.bridge_threshold_nm
     return die.record(
         "etch_deposition",
         knobs_in={"anisotropy": knobs.anisotropy, "over_etch_frac": knobs.over_etch_frac,
+                  "under_etch_frac": knobs.under_etch_frac,
                   "film_thickness_nm": knobs.film_thickness_nm, "conformality": knobs.conformality,
                   "etch_factor": pert.etch_factor},
-        outputs={"resist_cd_nm": die.cd_nm, "cd_nm": etch.cd_out_nm, "etch_bias_nm": etch.etch_bias_nm,
-                 "gate_height_nm": etch.gate_height_nm, "underlayer_loss_nm": etch.underlayer_loss_nm,
-                 "aspect_ratio": depo.aspect_ratio, "critical_aspect_ratio": depo.critical_aspect_ratio,
-                 "voided": depo.voided},
-        cd_nm=etch.cd_out_nm, gate_height_nm=etch.gate_height_nm, voided=depo.voided,
+        outputs=outputs,
+        cd_nm=etch.cd_out_nm, gate_height_nm=etch.gate_height_nm, voided=depo.voided, bridged=ue.bridged,
     )
 
 
 def device_step(
     die: Die, knobs: DeviceKnobs, channel_N_A: float, contamination: Contamination | None = None,
+    thermal_donor_density: float = 0.0,
 ) -> Die:
     """Device extraction → ``V_t``, ``I_Dsat`` *and* lifetime/leakage, *reading the inherited* ``t_ox``, ``cd``, *contamination*.
 
@@ -222,6 +236,12 @@ def device_step(
     a functional fail. A clean/absent ``contamination`` ⇒ ``Q_ox = 0`` and ``τ = τ_bulk`` (baseline
     leakage) ⇒ the exact ``demo_device`` device call (``V_t``, ``I_Dsat`` bit-for-bit — the seam; the
     leakage is purely additive and never moves ``V_t``/``I_Dsat``).
+
+    ``thermal_donor_density`` (cm⁻³, C1) is the wafer's crucible-oxygen → ~450 °C thermal-donor density
+    already **subtracted** from ``channel_N_A`` by the caller (``effective_channel_N_A``), so ``V_t`` is
+    not re-shifted here — it is recorded only so the failure trail can name the donor compensation as a
+    ``V_t`` root cause (the C1 fingerprint, like ``Q_ox`` for Na). Defaults to ``0.0`` (no donors → the
+    seam — the record key is added only when donors are present, so a clean device record is unchanged).
     """
     if die.t_ox_um is None or die.cd_um is None or die.resolved is False:
         reason = ("litho image not resolved" if die.resolved is False
@@ -238,10 +258,13 @@ def device_step(
     i_dsat = dev.saturation_current(mos, mos.V_t + knobs.overdrive_V, knobs.width_um)
     # G4b: the deep-level metals' SRH lifetime → junction reverse leakage (clean ⇒ τ_bulk + baseline).
     leak = life.device_leakage(contamination, channel_N_A)
+    knobs_in = {"gate": knobs.gate, "width_um": knobs.width_um, "overdrive_V": knobs.overdrive_V,
+                "Q_ox": Q_ox, "N_A": channel_N_A}
+    if thermal_donor_density > 0.0:                          # C1 fingerprint — only when donors are present
+        knobs_in["N_TD"] = thermal_donor_density            # (so a clean device record is byte-unchanged)
     return die.record(
         "device",
-        knobs_in={"gate": knobs.gate, "width_um": knobs.width_um, "overdrive_V": knobs.overdrive_V,
-                  "Q_ox": Q_ox, "N_A": channel_N_A},
+        knobs_in=knobs_in,
         outputs={"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox,
                  "tau_us": leak.tau_us, "j_leak_nA_cm2": leak.j_leak_nA_cm2},
         V_t=mos.V_t, i_dsat=i_dsat, tau=leak.tau, j_leak=leak.j_leak,

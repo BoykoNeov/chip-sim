@@ -158,3 +158,50 @@ def test_etch_sigma_off_draws_no_rng():
     for _ in range(4):
         rng_d.normal()
     assert rng_c.normal() == rng_d.normal()                  # 4 draws consumed when the channel is on
+
+
+# --------------------------------------------------------------------------- #
+# D1 — under-etch: an incomplete clear leaves residual film that bridges the gate
+# lines into a functional short (the mirror of the deposition void's open).
+# --------------------------------------------------------------------------- #
+def test_default_under_etch_frac_is_the_seam():
+    """At the default ``under_etch_frac=0`` (a full clear) nothing bridges and the CD is unchanged — the
+    step is the identity the seam relies on (byte-for-byte the pre-D1 etch)."""
+    d = Die(site=(0, 0), radius_frac=0.0, cd_nm=167.3, resolved=True)
+    out = etch_deposition_step(d, EtchDepositionKnobs(), pitch_nm=300.0, pert=DiePerturbation())
+    assert out.cd_nm == 167.3                                   # == , not approx — the seam is exact
+    assert out.bridged is False
+
+
+def test_under_etch_bridge_is_a_functional_kill():
+    """A large under-etch leaves residual film that bridges the gate lines → the die fails **functionally**
+    (a short), not parametrically — its V_t/I_Dsat may read fine (parallel to the deposition void)."""
+    w = run_line(Recipe(etch_deposition=EtchDepositionKnobs(under_etch_frac=0.3)),
+                 variation=NO_VARIATION, grid_n=1)
+    d = _center(w)
+    assert d.bridged is True
+    assert d.verdict.failed and any("bridge" in r.lower() or "short" in r.lower() for r in d.verdict.reasons)
+    assert wafer_yield(w) == 0.0
+    # A small under-etch (residual below the threshold) is harmless → the die is good (the contrast).
+    good = run_line(Recipe(etch_deposition=EtchDepositionKnobs(under_etch_frac=0.1)),
+                    variation=NO_VARIATION, grid_n=1)
+    assert _center(good).bridged is False and wafer_yield(good) == 1.0
+
+
+def test_under_etch_bridge_is_named_in_the_diagnosis():
+    """The failure trail names the under-etch bridge as an incomplete-clear short (the 'why did this die?')."""
+    from fab_game import diagnose
+
+    w = run_line(Recipe(etch_deposition=EtchDepositionKnobs(under_etch_frac=0.3)),
+                 variation=NO_VARIATION, grid_n=1)
+    text = diagnose(_center(w))
+    assert "BRIDGE" in text and "residual" in text
+
+
+def test_over_and_under_etch_are_mutually_exclusive():
+    """Setting both over- and under-etch is a recipe misconfiguration (one etch cannot do both) → raises
+    at knob construction (like CzochralskiKnobs' two-``G`` guard)."""
+    import pytest
+
+    with pytest.raises(ValueError):
+        EtchDepositionKnobs(over_etch_frac=0.2, under_etch_frac=0.2)

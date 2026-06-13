@@ -114,6 +114,7 @@ class Die:
     defects: tuple[DefectEvent, ...] = ()       # killer particles caught at wafer prep (G3)
     killed_by_defect: bool | None = None        # set by wafer prep; True ⇒ a functional fail
     voided: bool | None = None                  # set by etch/depo (G5); True ⇒ a depo void → functional fail
+    bridged: bool | None = None                 # set by etch/depo (D1); True ⇒ an under-etch residual short → functional fail
     assembled: bool | None = None               # set by packaging (G6); False ⇒ a back-end assembly scrap
     bin: str | None = None                      # speed/value bin assigned at final test (G6); "reject" ⇒ binned out
     verdict: Verdict | None = None

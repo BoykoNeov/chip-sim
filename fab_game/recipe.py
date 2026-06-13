@@ -86,6 +86,21 @@ class CzochralskiKnobs:
     ``thermal_gradient_K_per_mm`` (CG-2 direct ``G``) **or** ``melt_gradient_K_per_mm`` (CG-3 Stefan-
     derived), not both. ``G_l`` is still a house number (CG-3 adds the coupling + cap, not first
     principles).
+
+    ``oxygen_conc_cm3`` (C1) + ``thermal_donor_anneal_min`` (C1) add the **electrical** crystal-growth
+    deepening: a CZ boule dissolves interstitial oxygen ``[O_i]`` from the quartz crucible, and a
+    ~450 °C **donor anneal** nucleates **thermal donors** (n-type) that **compensate** the p-substrate —
+    so the device sees a *reduced* net ``N_A`` → a lower ``V_t`` and higher resistivity (the same
+    net-doping chain as G4a's residual dopant). ``oxygen_conc_cm3`` is the incorporated ``[O_i]`` (cm⁻³,
+    a flagged input *level* — :data:`chip.czochralski.OXYGEN_BANDS`; the incorporation-vs-pull model is a
+    named deferred edge), and ``thermal_donor_anneal_min`` the ~450 °C anneal time. The donor density is
+    :func:`chip.czochralski.thermal_donor_density` (the cited Kaiser–Frisch–Reiss fourth-power initial
+    rate; saturating form + magnitudes flagged). BOTH default to the seam — ``oxygen_conc_cm3 = None``
+    (no oxygen) **or** ``thermal_donor_anneal_min = 0`` (no anneal) → ``N_TD = 0`` exactly → the
+    substrate is byte-for-byte the pre-C1 boule slice (donors form at the anneal, not during growth).
+    Subtracted from the net doping by :attr:`Recipe.effective_channel_N_A`; over-compensation
+    (``N_TD ≥ N_A`` → type inversion) is a guarded named edge (it raises — keep the oxygen/anneal in the
+    p-type range).
     """
 
     dopant: str = "B"                  # p-type boron substrate
@@ -94,6 +109,8 @@ class CzochralskiKnobs:
     pull_rate_mm_min: float | None = None  # CG-1 pull rate; None = well-mixed k_eff=k₀ (the seam)
     thermal_gradient_K_per_mm: float | None = None  # CG-2 direct interface gradient G; None = off (seam)
     melt_gradient_K_per_mm: float | None = None     # CG-3 melt-side G_l → Stefan-derived G_s; None = off (seam)
+    oxygen_conc_cm3: float | None = None   # C1 incorporated [O_i] (cm⁻³); None = oxygen-free (the seam)
+    thermal_donor_anneal_min: float = 0.0  # C1 ~450 °C donor-anneal time (min); 0 = no anneal (the seam)
     length_mm: float = 200.0           # boule length (narrative geometry only)
     diameter_mm: float = 200.0         # boule diameter (narrative geometry only)
 
@@ -180,6 +197,21 @@ class CzochralskiKnobs:
         from chip.czochralski import void_defect_density
         return void_defect_density(ratio)
 
+    @property
+    def thermal_donor_density(self) -> float:
+        """The C1 active thermal-donor density (cm⁻³) compensating the substrate — **0.0 off (the seam)**.
+
+        ``0.0`` when ``oxygen_conc_cm3`` is ``None`` (no incorporated oxygen) **or**
+        ``thermal_donor_anneal_min`` is ``0`` (no ~450 °C anneal) — donors form at the anneal, not during
+        growth, so a boule with oxygen but no donor anneal is the unchanged substrate. Otherwise the
+        cited-fourth-power / flagged-saturation :func:`chip.czochralski.thermal_donor_density` at this
+        ``([O_i], t)`` — subtracted from the net doping by :attr:`Recipe.effective_channel_N_A`.
+        """
+        if self.oxygen_conc_cm3 is None:
+            return 0.0
+        from chip.czochralski import thermal_donor_density
+        return thermal_donor_density(self.oxygen_conc_cm3, self.thermal_donor_anneal_min)
+
 
 @dataclass(frozen=True)
 class WaferPrepKnobs:
@@ -254,18 +286,36 @@ class EtchDepositionKnobs:
     underlayer. The deposition then fills the gaps between gate lines: ``conformality`` (step coverage)
     ∈ ``[0, 1]`` (1 = conformal CVD; a poor PVD voids high-aspect-ratio gaps → a **functional** kill).
 
+    ``under_etch_frac`` (D1) is the **mirror** of ``over_etch_frac``: an *incomplete* clear that stops
+    before the film is fully etched, leaving **residual film** (``residual = UE·film_thickness``) in the
+    gaps that **bridges** adjacent gate lines into a functional **short** once it exceeds the (flagged)
+    bridge threshold (:func:`chip.etch_deposition.under_etch`) — a second functional kill, parallel to
+    the deposition void (an *open*; this is a *short*). Over- and under-etch are **mutually exclusive**
+    (one etch either runs past, or stops short of, endpoint), so setting **both** ``over_etch_frac`` and
+    ``under_etch_frac`` non-zero raises (a recipe misconfiguration, like CzochralskiKnobs' two-``G``
+    guard).
+
     Defaults are the **idealized seam baseline** — ``anisotropy = 1`` (zero bias → the etched CD equals
-    the printed CD bit-for-bit) and ``conformality = 1`` (never voids) — so the seam *and* the G1–G4
-    banked demos are byte-for-byte unchanged (the etch step is the identity at the default recipe). The
-    G5 demo dials a realistic ``anisotropy < 1`` + over-etch (CD collapse) and a poor PVD coverage (the
-    void kill).
+    the printed CD bit-for-bit), ``conformality = 1`` (never voids), and ``under_etch_frac = 0`` (a full
+    clear → no residual, no bridge) — so the seam *and* the G1–G4 banked demos are byte-for-byte
+    unchanged (the etch step is the identity at the default recipe). The G5 demo dials a realistic
+    ``anisotropy < 1`` + over-etch (CD collapse) and a poor PVD coverage (the void kill); the D1 demo
+    dials an ``under_etch_frac`` (the bridging short).
     """
 
     film_thickness_nm: float = 150.0   # gate film etched through (sets the standing gate height)
     anisotropy: float = 1.0            # 1 = perfectly anisotropic (the seam); <1 → etch bias → CD shrinks
     over_etch_frac: float = 0.0        # over-etch past endpoint (0 = none; deepens etch → more undercut)
+    under_etch_frac: float = 0.0       # D1 incomplete clear (0 = full clear, the seam; >0 → residual → bridge)
     selectivity: float = 20.0          # etch selectivity to the underlayer (over-etch underlayer loss)
     conformality: float = 1.0          # deposition step coverage (1 = conformal CVD seam; <1 voids high-AR gaps)
+
+    def __post_init__(self) -> None:
+        # Over- and under-etch are mutually exclusive (one etch either over- or under-shoots endpoint).
+        if self.over_etch_frac > 0.0 and self.under_etch_frac > 0.0:
+            raise ValueError(
+                "set either over_etch_frac (etch past endpoint → CD undercut) OR under_etch_frac "
+                "(incomplete clear → residual bridge), not both — one etch cannot do both")
 
 
 @dataclass(frozen=True)
@@ -381,14 +431,19 @@ class Recipe:
 
     @property
     def effective_channel_N_A(self) -> float:
-        """The channel doping the device sees: the boule slice **plus** the residual-dopant net shift (cm⁻³).
+        """The channel doping the device sees: the boule slice, the residual-dopant shift, **less donors** (cm⁻³).
 
-        ``channel_N_A + contamination.net_doping_shift`` (residual ``B`` raises it, ``P`` lowers it). At a
-        clean grade the shift is 0, so this equals :attr:`channel_N_A` (and is exactly ``N_seed`` at the
-        seed slice — the seam). Fed to *both* the S/D junction (``N_background``) and the device ``V_t``,
-        so the two stay coherent.
+        ``channel_N_A + contamination.net_doping_shift − thermal_donor_density``: residual ``B`` raises it
+        / ``P`` lowers it (G4a), and **C1 thermal donors** (n-type, from crucible oxygen + the ~450 °C
+        anneal) **compensate** it down (:func:`chip.czochralski.net_doping_after_donors`, exact). At a
+        clean grade *and* no oxygen/anneal both terms are 0, so this equals :attr:`channel_N_A` (exactly
+        ``N_seed`` at the seed slice — the seam). Fed to *both* the S/D junction (``N_background``) and the
+        device ``V_t``, so the two stay coherent. Over-compensation (``N_TD ≥ N_A`` → type inversion)
+        raises (the guarded named edge — keep the oxygen/anneal in the p-type range).
         """
-        return self.channel_N_A + self.contamination.net_doping_shift
+        from chip.czochralski import net_doping_after_donors
+        net_of_residual = self.channel_N_A + self.contamination.net_doping_shift
+        return net_doping_after_donors(net_of_residual, self.czochralski.thermal_donor_density)
 
     @property
     def substrate_resistivity_ohm_cm(self) -> float:

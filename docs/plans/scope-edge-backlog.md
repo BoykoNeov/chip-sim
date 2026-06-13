@@ -30,8 +30,8 @@ The consumer column is the one that decides everything else.
 
 | # | Edge | Origin | Consumer observable | Verdict |
 |---|------|--------|--------------------|---------|
-| C1 | **Oxygen / thermal donors** | new front-of-line | `V_t` / resistivity via net doping (G4a chain) | **PROMOTABLE — build first** |
-| D1 | **Under-etch** | G5 (`etch_deposition.py`) | residual/bridge → functional kill (yield) | **PROMOTABLE** |
+| C1 | **Oxygen / thermal donors** | new front-of-line | `V_t` / resistivity via net doping (G4a chain) | **✅ BUILT (2026-06-14)** |
+| D1 | **Under-etch** | G5 (`etch_deposition.py`) | residual/bridge → functional kill (yield) | **✅ BUILT (2026-06-14)** |
 | A1 | **CG-2 interstitial → dislocation/leakage** | §6a CG-2 | reverse leakage via `lifetime.py` (G4b) | **PROMOTABLE (corner)** |
 | A2 | **OSF ring (radial) + Robin-mode `G(r)` sourcing** | §6a CG-2 | edge-vs-center yield non-uniformity | **COUPLED — one build, §8-bounded** |
 | A3 | **Striations** | §6a CG-1/CG-2 | none as a killer; at most a variance feed | DEFERRED (game-layer at most) |
@@ -163,7 +163,7 @@ The consumer column is the one that decides everything else.
 
 ## Group C — Front-of-line new physics
 
-### C1 — Oxygen / thermal donors  ·  PROMOTABLE — the strongest candidate, build first
+### C1 — Oxygen / thermal donors  ·  ✅ BUILT (2026-06-14)
 
 - **Model class.** CZ silicon dissolves interstitial oxygen `[O_i]` from the quartz crucible;
   subsequent low-temperature anneals (~450 °C) nucleate **thermal donors** — oxygen clusters that act
@@ -184,17 +184,25 @@ The consumer column is the one that decides everything else.
   formation magnitude and the oxygen-incorporation number (the loose/cited leg, like the metal
   device-degradation magnitudes in G4a/G4b).
 - **Engine/ADR.** None — closed-form kinetics, consumer-side, like Scheil / Deal–Grove.
-- **Verdict.** **PROMOTABLE — build first.** It is a clean, citable front-of-line physics module
-  with a *confirmed* device consumer through the existing V_t chain, no engine touch, and it deepens
-  the crystal-growth story on the *electrical* axis (CG-1/2/3 covered doping-profile, defects, and
-  the interface; thermal donors are the missing oxygen/resistivity consequence). Highest value-to-cost
-  in the bag.
+- **Verdict.** **✅ BUILT (2026-06-14).** `chip/czochralski.py` §1e — `thermal_donor_density`
+  (saturating exponential), `thermal_donor_formation_rate` (the **cited Kaiser–Frisch–Reiss fourth-power
+  initial rate `∝[O_i]⁴`**, Phys. Rev. 112, 1546, 1958 — verified before pinning), `thermal_donor_saturation`
+  (flagged cube law `∝[O_i]³`), `net_doping_after_donors` (exact `N_A−N_TD` compensation + a type-inversion
+  guard). Triad shape = the flagged-phenomenology tier (no conservation law): tight = the **seam** (no
+  oxygen *or* no anneal ⇒ `N_TD=0` exact, by both paths) + the exact compensation algebra; the **one cited
+  direction** is the fourth-power rate; the saturating form, the cube exponent, and every magnitude are
+  flagged house numbers (do **not** borrow Scheil's anchors). Wired into `fab_game` via `CzochralskiKnobs`
+  (`oxygen_conc_cm3`/`thermal_donor_anneal_min`, both opt-in → the seam) → `Recipe.effective_channel_N_A`
+  → the existing G4a `V_t` chain; `diagnose` names the donor compensation. Banked artifact
+  `fab_game/demo_thermal_donors.py` (`fab-game-c1.png`). The crystal-growth story's *electrical* axis
+  (CG-1/2/3 covered doping-profile, defects, the interface). **Still deferred:** `[O_i]=f(pull/rotation/melt)`,
+  the higher-T "new donor"/precipitation regimes, type inversion (a guarded named edge).
 
 ---
 
 ## Group D — Mid/back-line process
 
-### D1 — Under-etch  ·  PROMOTABLE
+### D1 — Under-etch  ·  ✅ BUILT (2026-06-14)
 
 - **Model class.** `etch_deposition.py` (G5, [[fab-game-g5]]) built the **over**-etch leg
   (anisotropy → bias → CD shrink) and explicitly named under-etch as the unbuilt mirror: incomplete
@@ -209,9 +217,17 @@ The consumer column is the one that decides everything else.
   residual ⇒ no bridge, by construction) + the residual algebra; flagged = the bridge-threshold
   magnitude. No conservation law (G5 has none).
 - **Engine/ADR.** None.
-- **Verdict.** **PROMOTABLE — the cheap completion.** It closes G5's named "over/under-etch" pair,
-  adds a second etch failure mode (today only over-etch CD-shrink and void exist), and reuses the
-  functional-kill consumer. Build after C1; together they are two quick, high-confidence deepenings.
+- **Verdict.** **✅ BUILT (2026-06-14).** `chip/etch_deposition.py` §3 — `under_etch_residual`
+  (`residual = UE·film`, exact, seam at `UE=0`), `residual_bridges` (a flagged absolute threshold), and
+  the `under_etch` → `UnderEtchResult` bundle (mirroring `deposit_fill`). Triad = the G5 flagged tier:
+  tight = the seam (`UE=0` ⇒ residual 0 bit-for-bit) + the residual algebra (a guard); the bridge
+  threshold magnitude is house, only the "thicker residual → a continuous short" direction is cited.
+  Wired via `EtchDepositionKnobs.under_etch_frac` (opt-in; a `__post_init__` guard makes over/under-etch
+  mutually exclusive), a `Die.bridged` field, the `spec.verdict` functional-fail gate (parallel to
+  `voided`), and a `diagnose` fingerprint. Banked artifact `fab_game/demo_under_etch.py`
+  (`fab-game-d1.png`) — the residual cliff + the **etch process window** (a Goldilocks window bracketed
+  by an under-etch *short* and an over-etch CD-collapse *open*). Closes G5's named "over/under-etch" pair
+  — a second etch failure mode (a *short*; the void is an *open*) reusing the functional-kill consumer.
 
 ### D2 — CMP / dishing / planarity  ·  DEFERRED (no consumer)
 
@@ -251,11 +267,11 @@ The consumer column is the one that decides everything else.
 
 Promote in **consumer strength × cost** order; everything else stays deferred and named.
 
-1. **C1 — Oxygen / thermal donors.** Strongest consumer (V_t/resistivity via the G4a chain), clean
-   citable kinetics, no engine touch. The one to build next.
-2. **D1 — Under-etch.** Cheap G5-tier completion, reuses the functional-kill consumer. Bundle with C1
-   as two quick, high-confidence deepenings.
-3. **A1 — CG-2 interstitial → leakage.** Completes Voronkov's symmetry through the `lifetime.py`
+1. **C1 — Oxygen / thermal donors.** ✅ **BUILT (2026-06-14)** — strongest consumer (V_t/resistivity via
+   the G4a chain), the cited KFR fourth-power kinetics, no engine touch.
+2. **D1 — Under-etch.** ✅ **BUILT (2026-06-14)** — the cheap G5-tier completion, reuses the
+   functional-kill consumer. Bundled with C1 as the two quick, high-confidence deepenings.
+3. **A1 — CG-2 interstitial → leakage** *(next)*. Completes Voronkov's symmetry through the `lifetime.py`
    leakage channel — but a corner (realistic CZ is vacancy-rich), so value is symmetry, not main-line.
 4. **A2 — OSF ring + Robin-`G(r)`.** The richest crystal-growth deepening (heat + pull + defect +
    spatial pattern in one), gated by the §8 "1-D radial, not 2-D wafer PDE" boundary and the per-die

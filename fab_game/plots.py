@@ -839,6 +839,145 @@ def game_figure(result):
     return fig
 
 
+# --------------------------------------------------------------------------- #
+# D1 — under-etch: the residual film + the bridging cliff + the etch process window
+# --------------------------------------------------------------------------- #
+_D1_FILM_COLORS = ("#2ca02c", "#2f6db5", "#d62728")   # film thicknesses (thin → thick)
+
+
+def _residual_panel(ax, result) -> None:
+    """Residual vs under-etch fraction per film, with the (flagged) bridge threshold — UE=0 is the seam."""
+    ue = np.asarray(result.ue_sweep)
+    for h, c in zip(result.films_nm, _D1_FILM_COLORS):
+        ax.plot(ue, result.residual_by_film[h], color=c, lw=1.8, label=f"film {h:.0f} nm")
+    ax.axhline(result.bridge_threshold_nm, color="0.3", ls="--", lw=1.1)
+    ax.text(0.01, result.bridge_threshold_nm + 1.5,
+            f"bridge threshold ≈ {result.bridge_threshold_nm:.0f} nm (short)", fontsize=8, color="0.3")
+    ax.set_xlabel("under-etch fraction UE (incomplete clear)", fontsize=9)
+    ax.set_ylabel("residual film (nm)", fontsize=9)
+    ax.set_title("Residual = UE·film: above the threshold a\nstringer bridges the lines (UE=0 ⇒ 0, the seam)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+
+
+def _bridge_cliff_panel(ax, result) -> None:
+    """Yield vs under-etch fraction (pipeline): a clean functional cliff as the residual crosses threshold."""
+    ue = np.asarray(result.ue_sweep)
+    ax.plot(ue, [100 * y for y in result.yield_vs_ue], color="#1c2530", lw=1.8, marker="o", ms=3, zorder=3)
+    ax.axvline(result.ue_bridge_onset, color="#d62728", ls="--", lw=1.1)
+    ax.text(result.ue_bridge_onset + 0.005, 50,
+            f"residual crosses threshold\nUE ≈ {result.ue_bridge_onset:.2f}", fontsize=8, color="#d62728")
+    ax.set_xlabel("under-etch fraction UE", fontsize=9)
+    ax.set_ylabel("wafer yield (%)", fontsize=9)
+    ax.set_ylim(-5, 105)
+    ax.set_title(f"The bridging cliff (film {result.nominal_film_nm:.0f} nm): a\nFUNCTIONAL short — the CD is untouched",
+                 fontsize=10)
+
+
+def _process_window_panel(ax, result) -> None:
+    """Yield vs the signed etch axis: under-etch (left) shorts, over-etch (right) collapses CD — a window."""
+    x = np.asarray(result.etch_axis)
+    ax.axvspan(result.window_lo, result.window_hi, color="#2ca02c", alpha=0.14,
+               label=f"in-spec window [{result.window_lo:+.2f}, {result.window_hi:+.2f}]")
+    ax.axvline(0.0, color="0.5", ls=":", lw=1.0)
+    ax.text(0.0, 104, "endpoint", fontsize=7.5, color="0.4", ha="center")
+    ax.plot(x, [100 * y for y in result.yield_vs_etch], color="#1c2530", lw=1.8, zorder=3)
+    ax.text(result.etch_axis[0], 8, "under-etch\n→ SHORT", fontsize=8, color="#d62728", ha="left")
+    ax.text(result.etch_axis[-1], 8, "over-etch\n→ OPEN (CD)", fontsize=8, color="#d62728", ha="right")
+    ax.set_xlabel("signed etch (under-etch ← 0 → over-etch)", fontsize=9)
+    ax.set_ylabel("wafer yield (%)", fontsize=9)
+    ax.set_ylim(-5, 112)
+    ax.set_title(f"The etch process window (A={result.process_anisotropy:.2f}):\nbracketed by a short and an open",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="lower center")
+
+
+def under_etch_figure(result):
+    """Assemble the D1 artifact from a :class:`~fab_game.demo_under_etch.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _residual_panel(axes[0], result)
+    _bridge_cliff_panel(axes[1], result)
+    _process_window_panel(axes[2], result)
+    fig.suptitle("D1 — under-etch: an incomplete clear leaves residual film that bridges the gate lines "
+                 "into a functional SHORT (the mirror of G5's over-etch OPEN)\n"
+                 "the residual algebra + the cited 'thicker → bridge' direction are tight; the bridge "
+                 "threshold is a flagged house number — endpoint control is bracketed by a short and an open",
+                 fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    return fig
+
+
+# --------------------------------------------------------------------------- #
+# C1 — crucible oxygen → thermal donors: the kinetics + the V_t walk + the cited power laws
+# --------------------------------------------------------------------------- #
+_C1_FAMILY = ("#2ca02c", "#2f6db5", "#d62728")     # oxygen levels: low / typical / high (clean → scrap)
+
+
+def _td_kinetics_panel(ax, result) -> None:
+    """N_TD vs anneal time at the three oxygen levels (saturating exponentials; more oxygen → faster+higher)."""
+    t = np.asarray(result.anneal_fine)
+    for label, c in zip(result.oxygen_labels, _C1_FAMILY):
+        ax.plot(t, np.asarray(result.n_td_by_oxygen[label]) / 1e16, color=c, lw=1.8, label=f"[O_i] {label}")
+        ax.axhline(result.saturation_by_oxygen[label] / 1e16, color=c, ls=":", lw=1.0, alpha=0.7)
+    ax.set_xlabel("~450 °C donor anneal (min)", fontsize=9)
+    ax.set_ylabel("thermal donors N_TD (1e16 cm⁻³)", fontsize=9)
+    ax.set_title("Donor kinetics: N_TD saturates with anneal\n(more oxygen → faster and higher; t=0 ⇒ 0, the seam)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="lower right")
+
+
+def _td_vt_panel(ax, result) -> None:
+    """V_t vs anneal time (real pipeline) at the three oxygen levels, spec shaded — high oxygen scraps."""
+    t = np.asarray(result.anneal_sweep)
+    lo, hi = result.v_t_lo, result.v_t_hi
+    ax.axhspan(lo, hi, color="#2ca02c", alpha=0.12, label=f"V_t spec [{lo:.2f}, {hi:.2f}]")
+    for label, c in zip(result.oxygen_labels, _C1_FAMILY):
+        vt = result.vt_by_oxygen[label]
+        ax.plot(t, vt, color=c, lw=1.8, marker="o", ms=3, label=f"[O_i] {label}")
+    ax.set_xlabel("~450 °C donor anneal (min)", fontsize=9)
+    ax.set_ylabel("device V_t (V)", fontsize=9)
+    ax.set_title("Donors compensate the substrate → V_t walks down\n(high oxygen exits the floor → a scrap)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper right")
+
+
+def _td_powerlaw_panel(ax, result) -> None:
+    """Log–log vs [O_i]: the cited fourth-power initial rate and the flagged cube-law saturation ceiling."""
+    o = np.asarray(result.oxygen_sweep)
+    rate = np.asarray(result.formation_rate_sweep)
+    sat = np.asarray(result.saturation_sweep)
+    ax.loglog(o, rate / rate[0], color="#d62728", lw=2.0,
+              label=f"initial rate ∝ [O_i]^{result.rate_exponent:.0f}  (cited KFR)")
+    ax.loglog(o, sat / sat[0], color="#2f6db5", lw=2.0, ls="--",
+              label=f"saturation ∝ [O_i]^{result.sat_exponent:.0f}  (flagged)")
+    ax.axvline(result.oxygen_ref, color="0.5", ls=":", lw=1.0)
+    ax.text(result.oxygen_ref, ax.get_ylim()[0] * 1.5, " ref 1e18", fontsize=7.5, color="0.4")
+    ax.set_xlabel("interstitial oxygen [O_i] (cm⁻³)", fontsize=9)
+    ax.set_ylabel("relative to the reference [O_i]", fontsize=9)
+    ax.set_title("The cited power laws: rate ∝ [O_i]⁴ (four-oxygen\ncore), ceiling ∝ [O_i]³ — oxygen control matters",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+
+
+def thermal_donor_figure(result):
+    """Assemble the C1 artifact from a :class:`~fab_game.demo_thermal_donors.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _td_kinetics_panel(axes[0], result)
+    _td_vt_panel(axes[1], result)
+    _td_powerlaw_panel(axes[2], result)
+    fig.suptitle("C1 — crucible oxygen → thermal donors (Kaiser–Frisch–Reiss, Phys. Rev. 112, 1546, 1958): "
+                 "the ~450 °C anneal compensates the p-substrate → V_t drifts down\n"
+                 "the cited fourth-power initial rate ∝ [O_i]⁴ is the only anchor; the saturating form, the "
+                 "cube-law ceiling, and every magnitude are flagged house numbers (opt-in, seam-safe)",
+                 fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    return fig
+
+
 def fab_game_figure(result):
     """Assemble the 2×2 G1 artifact figure from a :class:`~fab_game.demo_fab_game.DemoResult`."""
     import matplotlib.pyplot as plt
