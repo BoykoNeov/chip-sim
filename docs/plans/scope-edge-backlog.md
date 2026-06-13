@@ -33,8 +33,9 @@ The consumer column is the one that decides everything else.
 | C1 | **Oxygen / thermal donors** | new front-of-line | `V_t` / resistivity via net doping (G4a chain) | **✅ BUILT (2026-06-14)** |
 | D1 | **Under-etch** | G5 (`etch_deposition.py`) | residual/bridge → functional kill (yield) | **✅ BUILT (2026-06-14)** |
 | A1 | **CG-2 interstitial → dislocation/leakage** | §6a CG-2 | reverse leakage via `lifetime.py` (G4b) | **PROMOTABLE (corner)** |
-| A2 | **OSF ring (radial) + Robin-mode `G(r)` sourcing** | §6a CG-2 | edge-vs-center yield non-uniformity | **COUPLED — one build, §8-bounded** |
+| A2 | **OSF ring (radial `G(r)`)** + Robin-mode sourcing | §6a CG-2 | edge-vs-center yield non-uniformity | **SPLIT (2026-06-14): ring PROMOTABLE (closed-form); Robin-`G` DEFERRED (premise FALSIFIED)** |
 | A3 | **Striations** | §6a CG-1/CG-2 | none as a killer; at most a variance feed | DEFERRED (game-layer at most) |
+| E1 | **Transient spike/laser anneal `T(x,t)` → `D(T(t))`** | heat-mode consumer search | `x_j`/`R_s`/`V_t` via emergent thermal budget | DEFERRED (trigger recorded — the one real heat-mode consumer) |
 | A4 | **CG-3 facets / interface curvature** | §6a CG-3 | none reads it | DEFERRED (no consumer) |
 | A5 | **Transient Stefan front `X(t)`** | §6a CG-3 | none reads it; quasi-steady balance suffices | DEFERRED (engine-physics, no consumer) |
 | B1 | **Engine 3-D regime** | [[engine-unfrozen]] | none (device is 1-D depth + 2-D x-section) | DEFERRED (record the trigger only) |
@@ -68,32 +69,51 @@ The consumer column is the one that decides everything else.
   slow pull is free on yield), but it is not the main-line lever. Cheap; build after the higher-value
   items unless symmetry is wanted for its own sake.
 
-### A2 — OSF ring (radial pattern) + Robin-mode `G(r)` sourcing  ·  COUPLED — one build
+### A2 — OSF ring (radial pattern) + Robin-mode `G(r)` sourcing  ·  SPLIT on verification (2026-06-14)
 
-- **Model class.** Two of the user's named edges are **the same build**. The oxidation-induced
-  stacking-fault (OSF) ring is the thin annulus where `ξ(r) = ξ_t` — the V/I boundary — which can
-  only appear if `G` (hence `ξ = V/G`) **varies with wafer radius**. Sourcing a radial `G(r)` is
-  exactly what the engine's **already-shipped Robin heat mode** is for (`engines/diffusion`'s `Robin`
-  convective BC + heat mode; `test_robin_heat.py`) — a 1-D radial conduction/convection solve gives
-  `G(r)`, which feeds `ξ(r)` and lights the ring where it crosses `ξ_t`. This is where Robin-mode
-  *finally earns a consumer*; standalone "Robin-`G` sourcing" (CG-2's separate note) still has none.
+> **Verified at build-time (2026-06-14) — the engine premise is FALSIFIED; A2 splits in two.** The
+> backlog asserted these two named edges were *one* build because *"Robin-mode finally earns a
+> consumer."* On verification against the engine code that second clause is **false**, so the build and
+> the heat-mode sourcing separate. The ring is a real (closed-form) consumer; Robin-`G` stays deferred.
+
+- **Model class.** The oxidation-induced stacking-fault (OSF) ring is the thin annulus where
+  `ξ(r) = ξ_t` — the V/I boundary — which can only appear if `G` (hence `ξ = V/G`) **varies with wafer
+  radius**. A radial `G(r)` → `ξ(r) = V/G(r)` → the ring lights where it crosses `ξ_t`. The original
+  claim was that the engine's **already-shipped Robin heat mode** would *source* `G(r)` — see the
+  falsification below.
 - **Consumer.** Edge-vs-center **yield non-uniformity** on the existing per-die map: the ring is a
   radial band of `ξ ≈ ξ_t` (mixed defect) flanked by vacancy (center) and interstitial (edge)
   zones, so killer density varies by die radius → the wafer map shows a ring of degraded dies. Reads
-  through the same G3 Poisson map ([[fab-game-g3]]) keyed on each die's radial position.
-- **§8 boundary — name it loudly.** `fab-game.md` §8: the across-wafer map is *"a per-die parameter
-  field, not a full-wafer PDE."* So this is promotable **only as a 1-D radial `G(r)` profile** sampled
-  per die by radius — **not** a 2-D wafer PDE. Crossing into a true 2-D thermal-field solve would
-  break §8 and needs its own decision.
-- **Triad tier.** Tight = the ring *location* is the definitional `ξ(r) = ξ_t` crossing (pure `ξ_t`,
-  coefficient-robust) + the Robin/heat-mode `G(r)` inherits the engine's validated heat invariants;
-  flagged = the radial `G(r)` magnitude (hot-zone profile) and the ring *width*.
-- **Engine/ADR.** No new engine physics (Robin heat mode exists). No ADR unless a dedicated 2-D
-  thermal solve is added — which §8 says don't.
-- **Verdict.** **COUPLED, promotable as the richest crystal-growth deepening** once edge-vs-center
-  non-uniformity is wanted — but build it as 1-D radial, honoring §8. Higher value than A1 (it ties
-  heat, pull, defect *and* spatial pattern into one mechanism) but more design surface (the per-die
-  radial-position plumbing).
+  through the same G3 Poisson map ([[fab-game-g3]]) keyed on each die's radial position. **Real.**
+- **The ring — PROMOTABLE as a CLOSED FORM ("CG-2 made radial").** `G(r)` is a **flagged house radial
+  profile**, not a solve. Triad: tight = the ring *location* (`ξ(r)=ξ_t`, pure `ξ_t`, coefficient-robust)
+  + the topology signs (vacancy core / interstitial edge); flagged = the `G(r)` magnitude, the ring
+  *width*, and **the ring's existence itself** (a pure house number — lead with this, the CG-1/CG-2
+  honest-magnitude pattern). **No conservation leg** (matches CG-2/3), and — the correction — **no
+  engine heat-invariant leg** (the engine is not used). Promotable when edge-vs-center non-uniformity is
+  the wanted story; the per-die radial-density wiring (`scatter_defects` taking a per-die density, the
+  scalar path = the seam) is the sound part.
+- **Robin-`G` sourcing — DEFERRED, premise FALSIFIED (no consumer a closed form can't serve).** Voronkov
+  reads a **steady** gradient, and a steady 1-D radial conduction profile is **closed-form**. The shipped
+  Robin heat mode actively cannot beat it, verified in `engines/diffusion/diffusion1d.py`: (a) `source`
+  is `S(x,t)`, **independent of the field `u`** — so the standard 1-D **fin** reduction (lateral loss as
+  a distributed `−m²(T−T_amb)`) is inexpressible; lateral cooling enters only at the single rim face → the
+  steady radial profile is a straight **line**; (b) **no advection** (the pull rate never enters); (c)
+  Cartesian transmissibility `D_face/dx` with **no cylindrical `1/r`** weighting. A planned "tight leg" of
+  *engine `T(r)` == analytic slab profile* would be **proof of redundancy** — validating the solver
+  against an answer you can write directly. Both escapes are walls: a true 2-D `(r,z)` solve is fenced by
+  §8; a cylindrical/sink engine term is an amendment = over-build. **The heat mode's native consumer is
+  the Steel program** (`test_robin_heat.py`: *"the lumped-capacitance / Jominy validation belongs to the
+  Steel Phase-2 triad, not here"*); chip-sim shares the engine and has **correctly declined** to
+  manufacture a chip-side consumer. **The rule this verifies:** heat-mode beats a closed form only for a
+  *transient* problem (`k(T)` / arbitrary time-dependent BC / layered media / field coupling) — **never a
+  steady gradient.** The one chip-side candidate meeting that bar is **E1**.
+- **§8 boundary (unchanged).** The ring is promotable **only as a 1-D radial `G(r)` sampled per die by
+  radius** — *not* a 2-D wafer PDE (`fab-game.md` §8). A true 2-D thermal-field solve would break §8.
+- **Engine/ADR.** None — the ring is consumer-side closed form (the engine is retired as decorative).
+- **Verdict.** **SPLIT (2026-06-14):** ring **PROMOTABLE (closed-form, "CG-2 made radial")** when
+  edge-vs-center non-uniformity is wanted; Robin-`G` sourcing **DEFERRED — premise falsified** (a steady
+  gradient is closed-form; the engine cannot earn its place; its home is the Steel program).
 
 ### A3 — Striations  ·  DEFERRED (game-layer at most)
 
@@ -116,8 +136,9 @@ The consumer column is the one that decides everything else.
   planes and overall curvature from the radial thermal field. CG-3 ([[fab-game-cg3]]) built the
   **1-D** quasi-steady Stefan balance and explicitly deferred facets/curvature.
 - **Consumer.** **None reads interface shape.** CG-2's `G` (the only Stefan consumer) takes the
-  scalar interface gradient, already supplied. Curvature would matter for A2's radial `G(r)`, but A2
-  gets `G(r)` from the Robin heat field, not from interface shape — so even A2 does not need this.
+  scalar interface gradient, already supplied. Curvature would matter for A2's radial `G(r)`, but A2's
+  ring gets `G(r)` from a **closed-form house profile** (the Robin-heat-field sourcing was falsified —
+  see A2), not from interface shape — so even A2's ring does not need this.
 - **Engine/ADR.** Would be genuinely 2-D interface geometry — engine-adjacent.
 - **Verdict.** **DEFERRED — the canonical physics-for-its-own-sake risk.** No observable reads it.
   Stays fenced until something downstream needs the interface *shape* (not just its gradient).
@@ -263,6 +284,39 @@ The consumer column is the one that decides everything else.
 
 ---
 
+## Group E — Thermal-transient (the heat-mode consumer search)
+
+This group exists because A2's verification (above) asked a sharper question than "build the OSF ring":
+**does the shipped Robin/heat-mode engine have *any* chip-side consumer a closed form can't serve?** The
+answer fixes the rule — heat-mode beats a closed form **only** for a *transient* problem (`k(T)` /
+arbitrary time-dependent BC / layered media / field coupling), never a steady gradient — and surfaces the
+single candidate that meets it.
+
+### E1 — Transient spike/laser anneal `T(x,t)` → `D(T(t))`  ·  DEFERRED (record the trigger — the one real heat-mode consumer)
+
+- **Model class.** The dopant step runs at a flat plateau today (closed-form erfc/Gaussian, or the
+  engine for `D(N)`). A **spike / laser anneal** is different: the ramp is fast enough that the wafer
+  interior **lags** the surface and a convective/radiative **quench (Robin)** governs cooldown, so
+  `T(x,t)` is **emergent**, not the prescribed setpoint, and the effective thermal budget `∫ D(T(t)) dt`
+  varies through depth. That defeats the closed form (arbitrary `T(t)`, `k(T)`) and couples straight into
+  the **already-wired dopant-diffusion engine** via `D = D(T(t))`. This is the one place the shipped
+  Robin **heat mode genuinely earns its place** in chip-sim — A2's failed promise relocated to a problem
+  that *actually needs* a transient solve.
+- **Consumer.** `x_j` / `R_s` → `V_t` through the existing junction/device chain — **main-line**.
+- **Triad tier.** Tight = the engine's heat invariants (finally used for real) + the slow-ramp limit
+  (`T → setpoint` ⇒ the closed-form plateau, the seam); flagged = the spike-profile / `k(T)` magnitudes
+  and the interior lag.
+- **Engine/ADR.** **No new engine physics** — the *shipped* heat mode + the *shipped* `D(T(t))` diffusion
+  path, coupled consumer-side. Likely no ADR (ADR 0004 pre-authorizes test-gated engine use).
+- **THE verify-at-build gate (the bar that caught A2).** Confirm `T` is genuinely **emergent**, not
+  prescribed. For an ordinary furnace step `T ≈ setpoint` and you just integrate `D(T(t)) dt` — the
+  closed form wins and the engine is decorative again. The consumer is *specifically* spike/laser, where
+  the lag-and-quench **is** the physics. Build only after that premise is verified.
+- **Verdict.** **DEFERRED — record the trigger, don't build (yet).** Unlike B1 (3-D, no consumer at all)
+  this *has* a credible consumer; it is parked pending the emergent-`T` verification, not for lack of one.
+
+---
+
 ## Recommended sequencing
 
 Promote in **consumer strength × cost** order; everything else stays deferred and named.
@@ -273,16 +327,20 @@ Promote in **consumer strength × cost** order; everything else stays deferred a
    functional-kill consumer. Bundled with C1 as the two quick, high-confidence deepenings.
 3. **A1 — CG-2 interstitial → leakage** *(next)*. Completes Voronkov's symmetry through the `lifetime.py`
    leakage channel — but a corner (realistic CZ is vacancy-rich), so value is symmetry, not main-line.
-4. **A2 — OSF ring + Robin-`G(r)`.** The richest crystal-growth deepening (heat + pull + defect +
-   spatial pattern in one), gated by the §8 "1-D radial, not 2-D wafer PDE" boundary and the per-die
-   radial-position plumbing. Build when edge-vs-center non-uniformity is the wanted story.
+4. **A2 — OSF ring (radial `G(r)`), closed-form.** **Split on verification (2026-06-14):** the ring stays
+   promotable as a **closed-form** radial `G(r)` → per-die OSF non-uniformity (edge-vs-center yield), §8-
+   bounded to 1-D radial; **Robin-`G` sourcing is DEFERRED — premise falsified** (a steady gradient is
+   closed-form; the shipped engine cannot beat it). Build the ring when edge-vs-center non-uniformity is
+   the wanted story — the engine does **not** participate.
 
 **Stay deferred (no consumer — this is the point, not a backlog of work):** A3 striations (game-layer
 variance at most), A4 facets/curvature (nothing reads shape), A5 transient Stefan `X(t)` (quasi-steady
 suffices), B1 engine 3-D (no 3-D device — trigger recorded), D2 CMP (no thickness observable), D3
-rebond (game rework rule, not physics). Each is fenced behind a *named consumer that does not yet
-exist*; promoting any of them without that consumer would be the unvalidated-API guess the gate exists
-to catch.
+rebond (game rework rule, not physics), **Robin-`G` heat-mode sourcing (premise FALSIFIED 2026-06-14 — a
+steady gradient is closed-form; the heat mode's home is the Steel program), and E1 transient spike/laser
+anneal (a *credible* heat-mode consumer — trigger recorded, pending the emergent-`T` verification).** Each
+is fenced behind a *named consumer that does not yet exist* (or, for Robin-`G`, one that turned out not to
+exist); promoting any without that consumer would be the unvalidated-API guess the gate exists to catch.
 
 ---
 

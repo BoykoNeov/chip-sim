@@ -1,6 +1,6 @@
 ---
 name: scope-edge-backlog
-description: "scope-edge backlog doc (docs/plans/scope-edge-backlog.md) — the bag of named-but-unbuilt edges across the whole line, triaged by CONSUMER (promote-or-defer each); spine is the deferrals. C1 thermal-donors + D1 under-etch now BUILT (2026-06-14); next promotable = A1 (CG-2 interstitial→leakage)."
+description: "scope-edge backlog doc (docs/plans/scope-edge-backlog.md) — the bag of named-but-unbuilt edges across the whole line, triaged by CONSUMER (promote-or-defer each); spine is the deferrals. C1 thermal-donors + D1 under-etch BUILT (2026-06-14); A2 verified+SPLIT (2026-06-14): OSF ring PROMOTABLE closed-form, Robin-G sourcing FALSIFIED/deferred (engine can't beat a steady-gradient closed form). Next promotable = A1 (CG-2 interstitial→leakage); E1 spike-anneal = the one real heat-mode consumer (trigger)."
 metadata: 
   node_type: memory
   type: project
@@ -25,19 +25,33 @@ doc's primary content is **the deferrals** — which edges have no consumer yet 
 - **PROMOTABLE (corner):** **(A1) CG-2 interstitial→dislocation/leakage** — mirror of the vacancy side,
   feeds `lifetime.py`'s generation-leakage channel (`1/τ += C·ρ_disl`); but realistic CZ is vacancy-rich
   (ξ≈0.29) so it only bites at slow pull → symmetry, not main-line.
-- **COUPLED — one build, §8-bounded:** **(A2) OSF ring + Robin-mode `G(r)`** are the SAME build — the
-  ring is where `ξ(r)=ξ_t`, which needs a radial `G(r)`, which the engine's shipped Robin heat mode
-  sources; consumer = edge-vs-center yield non-uniformity. **Promotable only as 1-D radial `G(r)`** —
-  §8 says across-wafer is a per-die field NOT a full-wafer PDE. This is where Robin-`G` finally gets a
-  consumer (standalone Robin-`G` still has none).
+- **SPLIT on verification (2026-06-14):** **(A2) OSF ring + Robin-mode `G(r)`** were asserted as ONE
+  build ("Robin-`G` finally earns a consumer") — verified-at-build, the second clause is **FALSE**, so
+  they split. **The ring = PROMOTABLE as a CLOSED FORM** ("CG-2 made radial"): radial `G(r)` (flagged
+  house profile) → `ξ(r)=V/G(r)` → ring where `ξ(r)=ξ_t` → per-die killer density keyed on `radius_frac`
+  (consumer = edge-vs-center yield non-uniformity; the per-die `scatter_defects` density is the sound
+  wiring). Tight = ring *location* + topology signs; flagged = `G(r)` magnitude, ring width, **and the
+  ring's existence itself** (pure house number — the CG-1/CG-2 honest-magnitude pattern). §8-bounded to
+  1-D radial. **Robin-`G` sourcing = DEFERRED, premise FALSIFIED:** Voronkov reads a STEADY gradient →
+  closed-form; the shipped engine can't beat it (verified in `diffusion1d.py`: `source` is `S(x,t)`
+  field-INDEPENDENT → no fin sink → steady radial profile is a straight LINE; no advection; Cartesian
+  `D_face/dx`, no cylindrical `1/r`). The "engine T(r)==slab" tight leg would be proof of REDUNDANCY.
+  Escapes both walls (2-D=§8, cylindrical/sink term=over-build). **Heat mode's native consumer is the
+  STEEL program** (`test_robin_heat.py`: Jominy/quench). THE RULE: heat-mode beats a closed form only for
+  a *transient* (k(T)/time-dep BC/layered/coupled) problem, never a steady gradient. [[engine-unfrozen]]
 - **DEFERRED — no consumer (the point):** A3 striations (game-layer variance feed at most, not a chip
-  triad), A4 facets/curvature (nothing reads interface *shape* — A2 gets `G(r)` from the heat field not
-  the shape), A5 transient Stefan `X(t)` (the canonical anti-over-build — quasi-steady balance already
-  built in CG-3 suffices; nothing reads `X(t)`; would need an engine+ADR), B1 engine 3-D (no 3-D device
-  consumer — **trigger recorded**: corner/narrow-width/FinFET; the v1.6→v1.8 wait-for-the-consumer
-  lesson verbatim), D2 CMP (`etch_deposition.py` already refuses it — nothing reads layer thickness;
-  **split from under-etch** though the user grouped them), D3 package rebond (`recipe.py:295` "named,
-  deferred edge" → a **game-layer rework rule** mirroring `rework_litho`, NOT a `chip/` triad).
+  triad), A4 facets/curvature (nothing reads interface *shape* — the ring gets `G(r)` from a closed-form
+  profile, not from interface shape), A5 transient Stefan `X(t)` (the canonical anti-over-build —
+  quasi-steady balance already built in CG-3 suffices; nothing reads `X(t)`; would need an engine+ADR),
+  B1 engine 3-D (no 3-D device consumer — **trigger recorded**: corner/narrow-width/FinFET; the v1.6→v1.8
+  wait-for-the-consumer lesson verbatim), D2 CMP (`etch_deposition.py` already refuses it — nothing reads
+  layer thickness; **split from under-etch** though the user grouped them), D3 package rebond
+  (`recipe.py:295` "named, deferred edge" → a **game-layer rework rule** mirroring `rework_litho`, NOT a
+  `chip/` triad), **Robin-`G` heat-mode sourcing (premise FALSIFIED 2026-06-14 — a steady gradient is
+  closed-form; the engine can't earn its place; home = the Steel program)**, and **E1 transient
+  spike/laser anneal `T(x,t)`→`D(T(t))` (the ONE credible chip-side heat-mode consumer — emergent `T`
+  lag+Robin quench couples to the shipped `D(T(t))` diffusion engine → `x_j`/`R_s`/`V_t`; trigger
+  recorded, the verify-at-build gate is "is `T` emergent or just the setpoint?")**.
 
 **Citation discipline (advisor):** for unbuilt items the doc names the model *class* + *kind* of source
 + a "pin at build" flag — NO confabulated volume:page citations (e.g. thermal donors → "Kaiser–Frisch–
