@@ -384,11 +384,20 @@ def rework_polish(
                          ttv_um=g.ttv_um * (1.0 - extra_ttv_improvement))
     reworked = replace(wafer, geometry=repolished)
     geometry_reason = specs.geometry.check(repolished)
-    new_dies = tuple(_verdict_die(d, specs, geometry_reason) for d in reworked.dies)
+    # Re-score only the failed dies (a flatness improvement cannot newly-fail an already-passing die),
+    # leaving survivors as the same object — so their history is not double-stamped (cf. rework_litho).
+    n_attempted = 0
+    new_dies: list[Die] = []
+    for d in reworked.dies:
+        if d.verdict is not None and d.verdict.passed:
+            new_dies.append(d)
+            continue
+        n_attempted += 1
+        new_dies.append(_verdict_die(d, specs, geometry_reason))
     after = sum(d.verdict.passed for d in new_dies if d.verdict is not None)
-    record = ReworkRecord("polish", n_attempted=len(new_dies), n_recovered=after - before,
+    record = ReworkRecord("polish", n_attempted=n_attempted, n_recovered=after - before,
                           note=f"re-CMP −{extra_removal_um:.0f} µm → TTV {repolished.ttv_um:.3f} µm")
-    return replace(reworked, dies=new_dies, rework_log=reworked.rework_log + (record,))
+    return replace(reworked, dies=tuple(new_dies), rework_log=reworked.rework_log + (record,))
 
 
 # --------------------------------------------------------------------------- #
