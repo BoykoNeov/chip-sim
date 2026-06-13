@@ -699,6 +699,80 @@ def voronkov_figure(result):
 
 
 # --------------------------------------------------------------------------- #
+# CG-3 — the Stefan interface balance: the latent-heat cap on the Voronkov ratio
+# --------------------------------------------------------------------------- #
+_CG3_FAMILY = ("#1c2530", "#2f6db5", "#7aa8d6")    # melt-gradient family (dark → light)
+_CG2_CONTRAST = "#d62728"                          # the CG-2 fixed-G "what if G didn't couple" line
+
+
+def _saturation_panel(ax, result) -> None:
+    """ξ vs pull: the Stefan-coupled ξ(V) caps at ξ_max for every melt gradient, while CG-2's fixed-G
+    ξ=V/G diverges. The headline — latent heat bounds the vacancy supersaturation."""
+    v = np.asarray(result.pull_sweep)
+    ax.axhline(result.xi_max, color="0.4", ls="--", lw=1.2, label=f"ξ_max = k_s/(L·ρ) ≈ {result.xi_max:.2f}")
+    ax.axhline(result.xi_t, color="0.5", ls=":", lw=1.1, label=f"ξ_t = {result.xi_t:.2f} (V/I boundary)")
+    for g_l, c in zip(result.melt_grads, _CG3_FAMILY):
+        ax.plot(v, result.xi_by_melt[g_l], color=c, lw=1.8, label=f"Stefan, G_l={g_l:.1f} K/mm")
+    ax.plot(v, result.xi_cg2_fixed, color=_CG2_CONTRAST, lw=1.8, ls="--",
+            label=f"CG-2 fixed G={result.g_fixed:.1f} (unbounded)")
+    ax.set_xlabel("pull rate V (mm/min)", fontsize=9)
+    ax.set_ylabel("Voronkov ratio ξ = V/G", fontsize=9)
+    ax.set_ylim(0.0, max(0.5, result.xi_max * 1.6))
+    ax.set_title("ξ saturates at ξ_max (latent-heat cap)\nvs CG-2's unbounded fixed-G ξ=V/G", fontsize=10)
+    ax.legend(fontsize=7, loc="upper left")
+
+
+def _coupling_panel(ax, result) -> None:
+    """G_s vs pull: the crystal-side gradient rises linearly with pull (the latent term L·ρ·V/k_s) for
+    each melt gradient — why ξ saturates — vs CG-2's frozen, flat G."""
+    v = np.asarray(result.pull_sweep)
+    for g_l, c in zip(result.melt_grads, _CG3_FAMILY):
+        ax.plot(v, result.gs_by_melt[g_l], color=c, lw=1.8, label=f"G_s(V), G_l={g_l:.1f} K/mm")
+    ax.axhline(result.g_fixed, color=_CG2_CONTRAST, lw=1.6, ls="--",
+               label=f"CG-2 fixed G = {result.g_fixed:.1f} K/mm")
+    ax.set_xlabel("pull rate V (mm/min)", fontsize=9)
+    ax.set_ylabel("crystal-side gradient G_s (K/mm)", fontsize=9)
+    ax.set_title("The coupling: G_s rises linearly with pull\n(latent heat L·ρ·V/k_s) — vs CG-2's frozen G",
+                 fontsize=10)
+    ax.legend(fontsize=7.5, loc="upper left")
+
+
+def _bounded_cost_panel(ax, result) -> None:
+    """Defect yield vs pull: the CG-2 grown-in COP yield FLOORS under the Stefan coupling (a worst-case
+    COP yield) while CG-2's fixed-G collapses it to 0 — the in-model cost of fast pull is capped."""
+    v = np.asarray(result.pull_sweep)
+    ax.axhline(result.yield_floor, color="0.4", ls=":", lw=1.1,
+               label=f"Stefan floor ≈ {result.yield_floor:.2f}")
+    ax.plot(v, result.yield_cg3_ref, color="#2f6db5", lw=2.0,
+            label=f"CG-3 Stefan (G_l={result.g_l_ref:.1f})")
+    ax.plot(v, result.yield_cg2_fixed, color=_CG2_CONTRAST, lw=2.0, ls="--",
+            label=f"CG-2 fixed G={result.g_fixed:.1f}")
+    ax.set_xlabel("pull rate V (mm/min)", fontsize=9)
+    ax.set_ylabel("grown-in COP defect yield", fontsize=9)
+    ax.set_ylim(-0.03, 1.05)
+    ax.set_title("The bounded cost: the COP yield floors (Stefan)\nvs collapses to 0 (CG-2 fixed G)",
+                 fontsize=10)
+    ax.legend(fontsize=7.5, loc="center right")
+
+
+def stefan_figure(result):
+    """Assemble the CG-3 artifact from a :class:`~fab_game.demo_stefan.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _saturation_panel(axes[0], result)
+    _coupling_panel(axes[1], result)
+    _bounded_cost_panel(axes[2], result)
+    fig.suptitle("CG-3 — the Stefan interface balance (latent heat couples G to the pull rate): ξ = V/G_s "
+                 "saturates at ξ_max = k_s/(L·ρ)\n"
+                 "so CG-2's fixed-G runaway is capped — the cost of fast pull is bounded; G_l (hot-zone "
+                 "superheat) is still house, the coupling + cap are the value (no engine touch, no ADR)",
+                 fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    return fig
+
+
+# --------------------------------------------------------------------------- #
 # G7 — the roguelike run down one boule: the Scheil V_t drift + scored strategies
 # --------------------------------------------------------------------------- #
 def _drift_panel(ax, result) -> None:

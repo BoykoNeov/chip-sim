@@ -507,10 +507,40 @@ has a home and a cited model, **not yet detailed**. Ordered by feasibility again
   micro-defects), per the repo's anti-over-build rule (the "build explicit, *not* 2-D" lesson — no
   regime without its named consumer). Fidelity **Low/flagged**; engine: **likely an ADR**, unlike
   CG-1/CG-2.
+  > **CG-3 BUILT (2026-06-13) — closed-form, NO engine amendment, NO ADR (the plan's *own* anti-over-build
+  > clause wins over its tentative "engine amendment" line).** The decisive scope call (advisor-affirmed):
+  > the only named consumer (CG-2's gradient `G`) needs the **quasi-steady Stefan interface balance** (an
+  > algebraic relation), *not* the transient free-boundary front `X(t)`; nothing reads `X(t)`; the v1.2
+  > oxide receding-mesh precedent already does moving boundaries consumer-side; and the engine's only
+  > deferred regime is 3-D, not Stefan. So CG-3 is closed-form in `chip/czochralski.py` §1d:
+  > `stefan_interface_gradient(V, G_l) = (L·ρ·V + k_l·G_l)/k_s` (the Stefan condition for a front at the
+  > pull rate) + `max_voronkov_ratio() = k_s/(L·ρ)`. **THE finding:** `ξ = V/G_s` **saturates** at `ξ_max ≈
+  > 0.32 mm²/(K·min)` (≈2.4× `ξ_t`) as `V→∞` — latent heat steepens `G_s` in lock-step with `V`, so the
+  > vacancy supersaturation is **capped**, correcting CG-2's unbounded fixed-`G` `ξ=V/G`. **Triad (same
+  > honesty tier as CG-2 — NO conservation law):** tight = the V→0 limit (`G_s=k_l·G_l/k_s`, latent
+  > vanishes) + the V→∞ saturation limit (the headline, the CG-1 `Δ=0→k₀` analogue) + cited Si melt-point
+  > constants (`k_s≈22` W/m·K at `T_m` — **not** the RT ~150; `k_l` flagged for its ~50–67 spread). **The
+  > conservation-law claim was the trap (advisor caught it — the CG-2/v1.11 by-construction pattern):**
+  > re-deriving `k_s·G_s−k_l·G_l = L·ρ·V` from a `G_s` computed by that equation is a round-trip guard, NOT
+  > an independent check — dropped. **Honest framing:** `G_l` (hot-zone superheat) is **still a house
+  > number**; CG-3 moves the house-ness up one level + adds the *coupling* + *cap*, it does **not** make `G`
+  > first-principles. **Wired opt-in, seam-safe:** `CzochralskiKnobs.melt_gradient_K_per_mm` →
+  > `interface_gradient_K_per_mm` resolves *melt-set → Stefan `G_s`; elif thermal-set → CG-2 direct; else
+  > None (off)*; **both set → raises** (two competing `G` sources). Default `None` ⇒ CG-2/CG-3 off ⇒ the
+  > G1–G7 + `demo_voronkov` banked demos byte-for-byte unchanged (CG-2's direct-`G` path is byte-identical).
+  > **Demo analytic** (`demo_stefan`, like CG-2): 3 panels — ξ-saturation vs CG-2's runaway, the linear
+  > `G_s(V)` coupling, and the **bounded cost** (the COP defect yield *floors* under Stefan vs *collapses*
+  > to 0 under fixed `G`). **Dropped (advisor):** the Neumann √t transient front — a *different* scenario
+  > nothing computes against (citing-without-solving = decoration). **Deferred:** facets / interface
+  > curvature (1-D), `G_l`'s own `V`-dependence (the saturation assumes `G_l ⊥ V`), the transient solve.
+  > Fast lane 522→**539** (+17: czochralski +7, `test_stefan` 6, `test_demo_stefan` 4). No engine touch.
 
 **The synergy (why these three, in this order).** CG-1 makes pull rate move the *doping*; CG-2 makes
 the *same* pull rate (plus the heat field) move the *defect type* and feed yield; CG-3 is the
-underlying front both ride on — and the only one that pays an engine-physics cost, so it waits.
+underlying front both ride on — built closed-form (the Stefan interface balance), supplying CG-2's `G`
+and capping its runaway, with **no engine-physics cost after all** (the transient free boundary, the
+part that *would* need the engine, has no consumer — so it stays deferred). **All three CG deepenings
+are now BUILT.**
 
 ---
 

@@ -309,3 +309,86 @@ def test_voronkov_invalid_inputs_raise():
         cz.voronkov_ratio(1.0, 0.0)                              # gradient > 0
     with pytest.raises(ValueError):
         cz.void_defect_density(0.5, coefficient=-1.0)            # coefficient ≥ 0
+
+
+# --------------------------------------------------------------------------- #
+# CG-3: the Stefan interface heat balance — where CG-2's gradient G comes from.
+# Triad shape (plan §6a, same honesty tier as CG-2 — NO independent conservation
+# law): the tight legs are the two analytic LIMITS (V→0 pure conduction-matching;
+# V→∞ ξ saturation, the headline + the CG-1 Δ=0→k₀ analogue) + cited Si melt-point
+# constants. The flux-balance round-trip is a by-construction guard, NOT a
+# conservation leg (it re-derives the defining equation). G_l stays a house number.
+# --------------------------------------------------------------------------- #
+def test_stefan_v_zero_limit_is_pure_conduction_matching():
+    # V→0 (no growth): the latent term vanishes → G_s = k_l·G_l/k_s exactly (the interface is just a
+    # conduction matching point). The tight V→0 analytic limit.
+    g_l = 3.0                                                    # K/mm
+    g_s = cz.stefan_interface_gradient(0.0, g_l)
+    expected = cz.SI_LIQUID_THERMAL_COND_W_PER_M_K * g_l / cz.SI_SOLID_THERMAL_COND_W_PER_M_K
+    assert g_s == pytest.approx(expected)                        # K/mm (the unit factors cancel)
+
+
+def test_stefan_ratio_saturates_at_xi_max_the_headline():
+    # THE CG-3 finding (the tight V→∞ limit): ξ = V/G_s saturates at ξ_max = k_s/(L·ρ) — latent heat
+    # caps the vacancy supersaturation. With NO melt gradient (G_l=0) ξ = ξ_max EXACTLY for any V>0
+    # (the latent term alone sets G_s ∝ V), and with G_l>0 ξ → ξ_max from below as V→∞.
+    xi_max = cz.max_voronkov_ratio()
+    for v in (0.5, 1.0, 5.0, 100.0):
+        g_s = cz.stefan_interface_gradient(v, 0.0)               # G_l = 0
+        assert cz.voronkov_ratio(v, g_s) == pytest.approx(xi_max)
+    # G_l > 0 → strictly below ξ_max, approaching it as V grows.
+    xi_slow = cz.voronkov_ratio(1.0, cz.stefan_interface_gradient(1.0, 2.0))
+    xi_fast = cz.voronkov_ratio(50.0, cz.stefan_interface_gradient(50.0, 2.0))
+    assert xi_slow < xi_fast < xi_max
+    assert cz.voronkov_ratio(1.0e6, cz.stefan_interface_gradient(1.0e6, 2.0)) == pytest.approx(xi_max, rel=1e-3)
+
+
+def test_xi_max_is_a_few_times_xi_t_with_cited_constants():
+    # Order-of-magnitude (set by the cited Si constants, k_l-independent): ξ_max ≈ 0.3 mm²/(K·min),
+    # ~2–3× the cited ξ_t (≈0.13). So even an infinitely fast pull lands only modestly vacancy-rich —
+    # NOT the unbounded ξ of CG-2's fixed G. k_l does NOT enter ξ_max (only the V→∞ / G_l→0 limit).
+    xi_max = cz.max_voronkov_ratio()
+    assert 0.2 < xi_max < 0.45
+    assert 2.0 < xi_max / cz.VORONKOV_CRITICAL_RATIO < 3.0
+    assert cz.max_voronkov_ratio(k_solid_W_per_m_K=cz.SI_SOLID_THERMAL_COND_W_PER_M_K) == xi_max  # k_l absent
+
+
+def test_stefan_gradient_rises_linearly_with_pull_the_coupling():
+    # The coupling (machinery/guard): G_s is affine in V with slope L·ρ/k_s (the latent-heat term), so
+    # equal pull increments add equal gradient — and G_s rises with the melt gradient G_l too.
+    g0 = cz.stefan_interface_gradient(0.0, 1.0)
+    g1 = cz.stefan_interface_gradient(1.0, 1.0)
+    g2 = cz.stefan_interface_gradient(2.0, 1.0)
+    assert (g2 - g1) == pytest.approx(g1 - g0)                   # affine in V (constant latent slope)
+    assert g1 > g0                                               # rises with pull rate
+    assert cz.stefan_interface_gradient(1.0, 3.0) > cz.stefan_interface_gradient(1.0, 1.0)  # rises with G_l
+
+
+def test_cited_si_melt_point_constants_pinned():
+    # The benchmark leg: the Si melt-point thermophysical constants, pinned (not from memory). k_s is
+    # the MELT-POINT value (~22 W/m·K), NOT room-temperature (~150) — the load-bearing distinction.
+    assert cz.SI_SOLID_THERMAL_COND_W_PER_M_K == pytest.approx(22.0)
+    assert cz.SI_SOLID_THERMAL_COND_W_PER_M_K < 40.0             # melt-point, not the RT ~150 value
+    assert cz.SI_LATENT_HEAT_FUSION_J_PER_KG == pytest.approx(1.79e6)
+    assert cz.SI_SOLID_DENSITY_KG_PER_M3 == pytest.approx(2330.0)
+
+
+def test_stefan_flux_balance_roundtrip_is_a_guard_not_conservation():
+    # By-construction regression guard (NOT a conservation leg — re-deriving the flux balance from G_s
+    # is the defining equation read backwards): k_s·G_s − k_l·G_l == L·ρ·V in SI. Pinned so a sign/unit
+    # slip is caught, but explicitly NOT claimed as an independent conservation check.
+    v, g_l = 1.5, 2.0
+    g_s = cz.stefan_interface_gradient(v, g_l)
+    lhs = (cz.SI_SOLID_THERMAL_COND_W_PER_M_K * g_s * 1.0e3
+           - cz.SI_LIQUID_THERMAL_COND_W_PER_M_K * g_l * 1.0e3)   # k_s·G_s − k_l·G_l (W/m², G in K/m)
+    rhs = cz.SI_LATENT_HEAT_FUSION_J_PER_KG * cz.SI_SOLID_DENSITY_KG_PER_M3 * (v * 1.0e-3 / 60.0)  # L·ρ·V
+    assert lhs == pytest.approx(rhs)
+
+
+def test_stefan_invalid_inputs_raise():
+    with pytest.raises(ValueError):
+        cz.stefan_interface_gradient(-1.0, 2.0)                  # pull rate ≥ 0
+    with pytest.raises(ValueError):
+        cz.stefan_interface_gradient(1.0, -2.0)                  # melt gradient ≥ 0
+    with pytest.raises(ValueError):
+        cz.stefan_interface_gradient(1.0, 2.0, k_solid_W_per_m_K=0.0)  # k_s > 0

@@ -75,13 +75,25 @@ class CzochralskiKnobs:
     **flagged house knob** (or, deferred, the shipped Robin heat mode); only the criterion + ``ξ_t``
     are cited, the void→density coefficient is house. Setting ``G`` **requires** a ``pull_rate`` (you
     cannot form ``V/G`` without ``V``).
+
+    ``melt_gradient_K_per_mm`` (CG-3) **derives** that interface gradient instead of setting it
+    directly: at the moving freezing front the latent heat couples the crystal-side gradient to the
+    pull rate via the **Stefan balance** ``G_s = (L·ρ·V + k_l·G_l)/k_s``
+    (:func:`chip.czochralski.stefan_interface_gradient`), so you dial the *melt-side* gradient ``G_l``
+    (the hot-zone superheat) and ``V``, and ``G_s`` follows. THE consequence: ``ξ = V/G_s`` **saturates**
+    at ``ξ_max = k_s/(L·ρ) ≈ 0.3`` — latent heat caps the vacancy supersaturation (correcting CG-2's
+    unbounded fixed-``G`` picture). It defaults to **``None``** (CG-3 off → the seam). Provide **either**
+    ``thermal_gradient_K_per_mm`` (CG-2 direct ``G``) **or** ``melt_gradient_K_per_mm`` (CG-3 Stefan-
+    derived), not both. ``G_l`` is still a house number (CG-3 adds the coupling + cap, not first
+    principles).
     """
 
     dopant: str = "B"                  # p-type boron substrate
     N_seed: float = 1.0e17             # cm⁻³ seed-end doping = demo_device CHANNEL_N_A (the seam)
     slice_z: float = 0.0               # axial fraction solidified for THIS wafer (0 = seed end)
     pull_rate_mm_min: float | None = None  # CG-1 pull rate; None = well-mixed k_eff=k₀ (the seam)
-    thermal_gradient_K_per_mm: float | None = None  # CG-2 interface gradient G; None = no grown-in voids (seam)
+    thermal_gradient_K_per_mm: float | None = None  # CG-2 direct interface gradient G; None = off (seam)
+    melt_gradient_K_per_mm: float | None = None     # CG-3 melt-side G_l → Stefan-derived G_s; None = off (seam)
     length_mm: float = 200.0           # boule length (narrative geometry only)
     diameter_mm: float = 200.0         # boule diameter (narrative geometry only)
 
@@ -105,20 +117,44 @@ class CzochralskiKnobs:
         return effective_segregation_coefficient(k0, normalized_growth_velocity(self.pull_rate_mm_min))
 
     @property
-    def voronkov_ratio(self) -> float | None:
-        """The CG-2 Voronkov ratio ``ξ = V/G`` (mm²/(K·min)), or ``None`` when CG-2 is off.
+    def interface_gradient_K_per_mm(self) -> float | None:
+        """The crystal-side interface gradient ``G`` (K/mm) CG-2's Voronkov ratio consumes, or ``None`` (off).
 
-        ``None`` when ``thermal_gradient_K_per_mm`` is ``None`` (CG-2 not engaged → the seam). Raises
-        if a gradient is set without a ``pull_rate_mm_min`` (no ``V`` → no ``V/G``).
+        Resolution: ``melt_gradient_K_per_mm`` set → **CG-3** Stefan-derived ``G_s =
+        stefan_interface_gradient(V, G_l)`` (needs a pull rate — the front velocity ``V``); elif
+        ``thermal_gradient_K_per_mm`` set → that **CG-2** direct house value; else ``None`` (both off →
+        the seam). Setting **both** is a misconfiguration (two competing ``G`` sources) → raises.
         """
-        if self.thermal_gradient_K_per_mm is None:
+        if self.melt_gradient_K_per_mm is not None and self.thermal_gradient_K_per_mm is not None:
+            raise ValueError(
+                "set either thermal_gradient_K_per_mm (CG-2 direct G) OR melt_gradient_K_per_mm "
+                "(CG-3 Stefan-derived G), not both")
+        if self.melt_gradient_K_per_mm is not None:
+            if self.pull_rate_mm_min is None:
+                raise ValueError(
+                    "melt_gradient_K_per_mm (CG-3) requires a pull_rate_mm_min — the Stefan balance "
+                    "needs the front velocity V")
+            from chip.czochralski import stefan_interface_gradient
+            return stefan_interface_gradient(self.pull_rate_mm_min, self.melt_gradient_K_per_mm)
+        return self.thermal_gradient_K_per_mm
+
+    @property
+    def voronkov_ratio(self) -> float | None:
+        """The Voronkov ratio ``ξ = V/G`` (mm²/(K·min)), or ``None`` when no interface gradient is set.
+
+        ``None`` when neither gradient knob is set (CG-2/CG-3 off → the seam). ``G`` is the resolved
+        :attr:`interface_gradient_K_per_mm` (CG-2 direct, or CG-3 Stefan-derived). Raises if a gradient
+        is set without a ``pull_rate_mm_min`` (no ``V`` → no ``V/G``).
+        """
+        g = self.interface_gradient_K_per_mm
+        if g is None:
             return None
         if self.pull_rate_mm_min is None:
             raise ValueError(
-                "thermal_gradient_K_per_mm requires a pull_rate_mm_min — cannot form the Voronkov "
+                "an interface gradient requires a pull_rate_mm_min — cannot form the Voronkov "
                 "ratio V/G without a pull rate V")
         from chip.czochralski import voronkov_ratio
-        return voronkov_ratio(self.pull_rate_mm_min, self.thermal_gradient_K_per_mm)
+        return voronkov_ratio(self.pull_rate_mm_min, g)
 
     @property
     def grown_in_defect_regime(self) -> str | None:

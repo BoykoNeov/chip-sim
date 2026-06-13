@@ -73,11 +73,25 @@ Named scope edge (the honest ceiling)
   ``G``) pushes ``V/G`` up into voids, so the COP killer-defect density rises — the in-model cost
   CG-1 lacked. **Remaining deferred brakes:** the *interstitial*-side dislocation/leakage consequence
   (only the vacancy/void→GOI density is wired), the **OSF-ring radial pattern** (the density here is
-  spatially uniform), constitutional-supercooling **striations**, the dislocation-free Dash neck, and
-  the Stefan moving front (CG-3). ``G`` is a **flagged house knob** here (or, deferred, the shipped
-  Robin heat mode); only the criterion *form* + ``ξ_t`` are cited (plan §6a fidelity ladder: criterion
-  **High**, the void→density coefficient **flagged**). Off by default (no ``G`` set → no grown-in
-  density → the seam).
+  spatially uniform), constitutional-supercooling **striations**, and the dislocation-free Dash neck.
+  ``G`` is a **flagged house knob** here — or, now **BUILT (CG-3, opt-in)**, derived from the Stefan
+  interface heat balance (next bullet); only the criterion *form* + ``ξ_t`` are cited (plan §6a
+  fidelity ladder: criterion **High**, the void→density coefficient **flagged**). Off by default (no
+  ``G`` set → no grown-in density → the seam).
+* **CG-2's interface gradient ``G`` was a free knob — now optionally DERIVED (CG-3, opt-in).** ``G``
+  is not independent of the pull rate: at the moving front the latent heat of solidification must be
+  carried off by the conductive-flux jump (the **Stefan condition**), so the crystal-side gradient
+  ``G_s = (L·ρ·V + k_l·G_l)/k_s`` (:func:`stefan_interface_gradient`, §1d) rises with pull rate. THE
+  finding: ``ξ = V/G_s`` **saturates** at ``ξ_max = k_s/(L·ρ) ≈ 0.3`` (:func:`max_voronkov_ratio`) —
+  latent heat **caps** the vacancy supersaturation (it cannot grow without bound as CG-2's fixed-``G``
+  ξ=V/G does). Triad = the tight V→0 / V→∞ **limits** + cited Si melt-point constants; **no
+  conservation leg** (the flux balance read back from ``G_s`` is by-construction — same honesty tier
+  as CG-2). **Honest:** ``G_l`` (melt-side gradient) is **still a house number** — CG-3 adds the
+  *coupling* ``G_s(V)`` and the *cap*, it does not make ``G`` first-principles. **Deferred:** the
+  transient free-boundary front position ``X(t)`` (the Neumann √t similarity solution — a *different*,
+  transient scenario, no consumer here, so the engine stays untouched, no ADR — per the repo's
+  anti-over-build rule and the v1.2 consumer-side receding-mesh precedent), facets / interface
+  curvature (1-D here), and ``G_l``'s own ``V``-dependence (the saturation assumes ``G_l`` ⊥ ``V``).
 * **Oxygen / thermal donors are a separate, looser story.** Crucible-oxygen incorporation is *not*
   dopant segregation (its ``k`` is contested ~0.25–1.4 and incorporation is dissolution-controlled),
   and the ~450 °C thermal-donor kinetics that make some of it electrically active are a calibrated
@@ -306,6 +320,102 @@ def void_defect_density(
         raise ValueError(f"coefficient must be ≥ 0, got {coefficient}")
     excess = ratio - critical_ratio
     return coefficient * excess if excess > 0.0 else 0.0
+
+
+# --------------------------------------------------------------------------- #
+# 1d. The Stefan interface heat balance — where CG-2's gradient G comes from (CG-3)
+# --------------------------------------------------------------------------- #
+# CG-2 takes the solid-side interface gradient ``G`` as a flagged house knob. It is not free: at the
+# moving solid–liquid front the latent heat liberated by solidification must be carried away by the
+# **jump in conductive heat flux** — the **Stefan condition** (the free-boundary BC of the Stefan
+# problem; Stefan 1891 / Carslaw & Jaeger, *Conduction of Heat in Solids*, §11). For a quasi-steady
+# Czochralski front advancing at the pull rate ``V`` (the front velocity), the 1-D balance is::
+#
+#     L·ρ·V  =  k_s·G_s  −  k_l·G_l          (W/m²)
+#     ⇒  G_s = (L·ρ·V + k_l·G_l) / k_s
+#
+# with ``L`` the latent heat of fusion, ``ρ`` the (solid) density, ``k_s``/``k_l`` the solid/liquid
+# thermal conductivities **at the melting point**, ``G_l`` the melt-side (liquid) axial gradient, and
+# ``G_s`` the crystal-side gradient — i.e. CG-2's ``G``. THE CONSEQUENCE (the CG-3 finding): the
+# Voronkov ratio is then
+#
+#     ξ = V/G_s = V·k_s / (L·ρ·V + k_l·G_l)
+#
+# which **SATURATES** at ``ξ_max = k_s/(L·ρ)`` as ``V→∞`` (or ``G_l→0``) — latent heat steepens ``G_s``
+# in lock-step with ``V``, so there is a **maximum vacancy supersaturation** no matter how fast you
+# pull. This *corrects* CG-2's fixed-``G`` picture (where ξ=V/G grows without bound): the cost of
+# fast pull is **capped**, not a cliff. The melt-side gradient ``G_l`` (the hot-zone superheat) is the
+# physical lever behind CG-2's hand-waved "engineer the hot zone": higher ``G_l`` → smaller ξ.
+#
+# HONEST FRAMING (not over-sold): this does NOT make ``G`` first-principles — ``G_l`` is **still a
+# house number** (the hot-zone design is not modelled). CG-3 moves the house-ness up one level
+# (melt-side instead of solid-side) and adds the **coupling** ``G_s(V)`` + the **cap** ``ξ_max``. That
+# coupling + cap is the value, the V→∞ limit is the tight anchor (the CG-1 ``Δ=0→k₀`` analogue), and
+# the Si constants are the cited benchmark. There is **NO independent conservation leg** — re-deriving
+# the flux balance from ``G_s`` is the same equation read backwards (a by-construction guard, the same
+# honesty tier as CG-2), so it is not claimed as one.
+#
+# Cited Si thermophysical constants AT THE MELTING POINT (~1685 K / 1412 °C). NB ``k_s`` here is the
+# **melt-point** value ~22 W/(m·K) — NOT room-temperature ~150 (silicon's conductivity falls steeply
+# with T); ``k_l`` carries a real literature spread (~50–67) and is the flagged leg. Sources: latent
+# heat / densities — standard (e.g. CRC / Si handbook); ``k_s(T_m)`` — Glassbrenner & Slack
+# (Phys. Rev. 134:A1058, 1964); ``k_l`` — molten-Si measurements (the spread is genuine).
+SI_LATENT_HEAT_FUSION_J_PER_KG: float = 1.79e6   # latent heat of fusion of Si (~50.2 kJ/mol ÷ 28 g/mol)
+SI_SOLID_DENSITY_KG_PER_M3: float = 2330.0       # solid Si density near the melt point
+SI_SOLID_THERMAL_COND_W_PER_M_K: float = 22.0    # k_s at T_m (~1685 K) — NOT the RT ~150 value
+SI_LIQUID_THERMAL_COND_W_PER_M_K: float = 64.0   # k_l, molten Si — FLAGGED (literature ~50–67)
+SI_MELT_POINT_K: float = 1685.0                  # narrative only (1412 °C)
+
+# Unit bridge: a ratio in m²/(s·K) → mm²/(K·min). ×(1e3)² for m²→mm², ×60 for s→min.
+_M2_PER_SK_TO_MM2_PER_KMIN: float = 1.0e6 * 60.0
+
+
+def stefan_interface_gradient(
+    pull_rate_mm_min: float,
+    melt_gradient_K_per_mm: float,
+    *,
+    latent_heat_J_per_kg: float = SI_LATENT_HEAT_FUSION_J_PER_KG,
+    density_kg_per_m3: float = SI_SOLID_DENSITY_KG_PER_M3,
+    k_solid_W_per_m_K: float = SI_SOLID_THERMAL_COND_W_PER_M_K,
+    k_liquid_W_per_m_K: float = SI_LIQUID_THERMAL_COND_W_PER_M_K,
+) -> float:
+    """Crystal-side interface gradient ``G_s`` (K/mm) from the Stefan balance ``L·ρ·V = k_s·G_s − k_l·G_l``.
+
+    ``pull_rate_mm_min`` the front velocity ``V`` (mm/min, ≥ 0); ``melt_gradient_K_per_mm`` the melt-side
+    gradient ``G_l`` (K/mm, ≥ 0 — the flagged hot-zone superheat). Returns ``G_s = (L·ρ·V + k_l·G_l)/k_s``
+    (K/mm), the gradient CG-2's :func:`voronkov_ratio` consumes. At ``V=0`` it is the pure
+    conduction-matching value ``k_l·G_l/k_s`` (latent term vanishes — the tight V→0 limit); it rises
+    linearly with ``V`` (the latent-heat coupling), which is *why* ξ=V/G_s saturates
+    (:func:`max_voronkov_ratio`). The constants are cited Si melt-point values (``k_l`` flagged).
+    """
+    if pull_rate_mm_min < 0.0:
+        raise ValueError(f"pull rate must be ≥ 0, got {pull_rate_mm_min}")
+    if melt_gradient_K_per_mm < 0.0:
+        raise ValueError(f"melt gradient must be ≥ 0, got {melt_gradient_K_per_mm}")
+    if k_solid_W_per_m_K <= 0.0:
+        raise ValueError(f"solid thermal conductivity must be > 0, got {k_solid_W_per_m_K}")
+    v_m_s = pull_rate_mm_min * 1.0e-3 / 60.0          # mm/min → m/s
+    g_l_K_m = melt_gradient_K_per_mm * 1.0e3          # K/mm → K/m
+    latent_flux = latent_heat_J_per_kg * density_kg_per_m3 * v_m_s   # L·ρ·V (W/m²)
+    g_s_K_m = (latent_flux + k_liquid_W_per_m_K * g_l_K_m) / k_solid_W_per_m_K
+    return g_s_K_m * 1.0e-3                            # K/m → K/mm
+
+
+def max_voronkov_ratio(
+    *,
+    latent_heat_J_per_kg: float = SI_LATENT_HEAT_FUSION_J_PER_KG,
+    density_kg_per_m3: float = SI_SOLID_DENSITY_KG_PER_M3,
+    k_solid_W_per_m_K: float = SI_SOLID_THERMAL_COND_W_PER_M_K,
+) -> float:
+    """The latent-heat-capped maximum Voronkov ratio ``ξ_max = k_s/(L·ρ)`` (mm²/(K·min)).
+
+    The ``V→∞`` (equivalently ``G_l→0``) limit of ``ξ = V/G_s`` under the Stefan balance — the
+    **maximum vacancy supersaturation** the front can freeze in, set purely by the cited Si constants.
+    With the melt-point values it is ≈ 0.3 mm²/(K·min), i.e. ~2–3× the cited ``ξ_t`` (≈0.13) — so even
+    an infinitely fast pull lands only modestly into the vacancy regime, not the unbounded ξ of CG-2's
+    fixed ``G``. Order-of-magnitude (set by the constants, ``k_l``-independent), not a precise number.
+    """
+    return (k_solid_W_per_m_K / (latent_heat_J_per_kg * density_kg_per_m3)) * _M2_PER_SK_TO_MM2_PER_KMIN
 
 
 # --------------------------------------------------------------------------- #
