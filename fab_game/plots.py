@@ -610,6 +610,95 @@ def crystal_growth_figure(result):
 
 
 # --------------------------------------------------------------------------- #
+# CG-2 — the Voronkov V/G criterion: the in-model brake on pulling faster
+# --------------------------------------------------------------------------- #
+_VACANCY_C = "#d62728"     # vacancy/void (the COP killer)
+_INTERSTITIAL_C = "#2ca02c"  # interstitial / defect-free
+
+
+def _criterion_panel(ax, result) -> None:
+    """The criterion (G-sweep at fixed pull): the analytic defect yield crosses at G* = V/ξ_t, with the
+    V/G ratio on a twin axis so the ξ_t boundary is visible. Below G* (cool zone) → vacancy/voids."""
+    g = np.asarray(result.g_sweep)
+    ax.plot(g, result.defect_yield_vs_g, color="#2f6db5", lw=2.0, zorder=3,
+            label="defect yield exp(−D_void·A)")
+    ax.axvline(result.g_boundary, color="0.4", ls="--", lw=1.2,
+               label=f"V/I boundary G* = V/ξ_t ≈ {result.g_boundary:.1f} K/mm")
+    ax.axvspan(g.min(), result.g_boundary, color=_VACANCY_C, alpha=0.10)      # cool zone → voids
+    ax.axvspan(result.g_boundary, g.max(), color=_INTERSTITIAL_C, alpha=0.10)  # hot zone → defect-free
+    ax.set_xlabel("interface thermal gradient G (K/mm)", fontsize=9)
+    ax.set_ylabel("grown-in defect yield", fontsize=9)
+    ax.set_ylim(-0.03, 1.05)
+    ax.set_title(f"The criterion (fixed pull V={result.v_fixed:.0f} mm/min)\n"
+                 "cool zone → vacancy/voids; hot zone → defect-free", fontsize=10)
+    # Twin axis: the V/G ratio + the cited ξ_t line (the crossing the yield reads).
+    ax2 = ax.twinx()
+    ax2.plot(g, result.ratio_vs_g, color="0.55", lw=1.3, ls=":")
+    ax2.axhline(result.xi_t, color="0.55", lw=1.0, ls=":")
+    ax2.set_ylabel("ξ = V/G  (mm²/K·min)", fontsize=8.5, color="0.4")
+    ax2.tick_params(axis="y", labelsize=7.5, colors="0.4")
+    ax2.annotate(f"ξ_t = {result.xi_t:.2f}", (g.max(), result.xi_t), fontsize=7.5, color="0.4",
+                 ha="right", va="bottom")
+    ax.legend(fontsize=7.5, loc="center right")
+
+
+def _brake_panel(ax, result) -> None:
+    """The brake (pull-sweep at two hot zones): pulling faster drops the analytic defect yield; the
+    engineered hot zone tolerates a faster pull before the voids switch on."""
+    v = np.asarray(result.pull_sweep)
+    ax.plot(v, result.defect_yield_baseline, color="#2f6db5", lw=2.0,
+            label=f"baseline hot zone (G={result.g_baseline:.1f} K/mm)")
+    ax.plot(v, result.defect_yield_hotzone, color="#2f6db5", lw=2.0, ls="--",
+            label=f"engineered hot zone (G={result.g_hotzone:.1f} K/mm)")
+    ax.set_xlabel("pull rate V (mm/min)", fontsize=9)
+    ax.set_ylabel("grown-in defect yield", fontsize=9)
+    ax.set_ylim(-0.03, 1.05)
+    ax.set_title("The brake CG-1 lacked: faster pull → voids → yield↓\n"
+                 "(a hotter zone tolerates a faster pull)", fontsize=10)
+    ax.legend(fontsize=8, loc="lower left")
+
+
+def _unifier_panel(ax, result) -> None:
+    """CG-1 + CG-2 together (pull-sweep at the hot-zone G): the combined yield is maximized on the
+    defect-free plateau V ≤ V*=ξ_t·G, then falls. CG-1's parametric fraction is FLAT across this range,
+    so the two do not trade off — CG-2's criterion alone sets the pull (the plateau location is the cited
+    ξ_t; only the fall-off depth is the flagged coefficient; the boundary's edge is throughput, unmodeled)."""
+    v = np.asarray(result.pull_unifier)
+    ax.axvline(result.v_boundary_unifier, color="0.4", ls="--", lw=1.2,
+               label=f"V/I boundary V*=ξ_t·G ≈ {result.v_boundary_unifier:.1f} mm/min")
+    ax.plot(v, result.parametric_fraction, color=_INTERSTITIAL_C, lw=1.8, marker="o", ms=4,
+            label="CG-1 parametric in-spec (flat here)")
+    ax.plot(v, result.defect_survival, color=_VACANCY_C, lw=1.8, marker="s", ms=4,
+            label="CG-2 defect survival ↓")
+    ax.plot(v, result.combined_yield, color="#1c2530", lw=2.2, marker="D", ms=4,
+            label="combined (product)")
+    ax.set_xlabel("pull rate V (mm/min)", fontsize=9)
+    ax.set_ylabel("fraction / yield", fontsize=9)
+    ax.set_ylim(-0.03, 1.05)
+    ax.set_title(f"CG-1 + CG-2 (hot zone G={result.g_unifier:.1f} K/mm): CG-2 sets the pull\n"
+                 "max on the defect-free plateau V≤V* (CG-1 flat → no trade-off)", fontsize=10)
+    ax.legend(fontsize=7.5, loc="center left")
+
+
+def voronkov_figure(result):
+    """Assemble the CG-2 artifact from a :class:`~fab_game.demo_voronkov.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _criterion_panel(axes[0], result)
+    _brake_panel(axes[1], result)
+    _unifier_panel(axes[2], result)
+    fig.suptitle("CG-2 — the Voronkov V/G criterion (J. Cryst. Growth 59:625, 1982): the in-model brake "
+                 "on pulling faster\n"
+                 "fast pull / cool hot zone → vacancy-rich → COP killers (gate-oxide integrity); CG-2's "
+                 "criterion (cited ξ_t) sets the optimal pull — CG-1's doping benefit is flat in range, "
+                 "so the two do not trade off",
+                 fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    return fig
+
+
+# --------------------------------------------------------------------------- #
 # G7 — the roguelike run down one boule: the Scheil V_t drift + scored strategies
 # --------------------------------------------------------------------------- #
 def _drift_panel(ax, result) -> None:

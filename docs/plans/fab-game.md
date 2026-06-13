@@ -463,6 +463,38 @@ has a home and a cited model, **not yet detailed**. Ordered by feasibility again
   the criterion is clean/cited; `ξ_t` and the void→GOI→yield mapping are the loose/flagged leg. **No
   new engine physics** (algebraic criterion + the existing heat mode); no ADR unless a dedicated
   thermal solve is added.
+  > **CG-2 BUILT (2026-06-13).** New cited physics in `chip/czochralski.py` (§1c, additive — the
+  > Scheil/CG-1 tests untouched): `voronkov_ratio(V, G) = V/G` (mm²/(K·min)) + `grown_in_defect_regime`
+  > (vacancy/interstitial/osf vs `VORONKOV_CRITICAL_RATIO = 0.13`, cited Voronkov 1982) +
+  > `void_defect_density(ξ)` = the FLAGGED COP/void killer density (`coeff·max(0, ξ−ξ_t)`, **0** at/below
+  > the boundary). **Triad (plan §6a flagged-phenomenology tier — like G5, NO conservation law):** tight =
+  > the cited criterion form + `ξ_t` value (pinned) **and** the definitional-exact regime flip at `ξ=ξ_t`
+  > (the legit limit leg, like CG-1's `Δ=0→k₀`); the **zero-below-threshold + monotone-above are
+  > by-construction regression guards, NOT anchors** (the v1.11 correction); the void→density coefficient
+  > is **house/flagged** (it sets the fall-off *depth*, never the window *location* — that is pure `ξ_t`).
+  > **`G` is a flagged house knob** — the Robin heat-mode sourcing is the named deferred refinement (no
+  > consumer needs the field → the "build explicit, not 2-D" anti-over-build). **Wired (one knob, opt-in,
+  > seam-safe):** `CzochralskiKnobs.thermal_gradient_K_per_mm: float | None = None` (requires a
+  > `pull_rate`) → `Recipe.effective_defect_density = wafer_prep.defect_density + grown_in_defect_density`,
+  > which the pipeline scatters through the **same cited G3 Poisson map** (two Poisson processes superpose).
+  > Default `None` ⇒ grown-in `= 0.0` ⇒ `+ 0.0` exact ⇒ the G1–G7 banked demos byte-for-byte unchanged.
+  > **THE in-model brake CG-1 lacked:** pulling faster (or a cooler hot zone) pushes `ξ` above `ξ_t` →
+  > COP killers → yield down. **Honest magnitude (advisor, checked first):** realistic CZ (V≈1 mm/min,
+  > G≈3.5) sits at `ξ≈0.29 > ξ_t` → **vacancy-rich** (historically COP-containing unless `G` is engineered
+  > up to ≈7.7 K/mm) — matches reality. **Demo analytic, NOT stochastic (the blocker the advisor flagged):**
+  > the G3 scatter fires only with variation **on**, but boule sweeps run `NO_VARIATION` → the demo shows
+  > the deterministic `poisson_yield(grown_in(V,G), A)` (the law the scatter converges to, a G3 invariant).
+  > 3 panels: criterion (G-sweep, coefficient-robust), brake (pull-sweep at two `G`), CG-1+CG-2 (combined =
+  > CG-1 parametric × CG-2 defect → **maximized on the defect-free plateau `V≤V*=ξ_t·G`**, then falls).
+  > **The honest finding (advisor, the G7 over-claim pattern again):** CG-1's parametric fraction is **flat**
+  > across the decision region (it only rises where CG-2 has already crushed yield), so the two do **not**
+  > trade off — **CG-2's criterion alone sets the optimal pull**; the boundary's only edge is *throughput*
+  > (unmodeled), not yield. The plateau *location* is the cited `ξ_t` (coefficient-robust).
+  > **Provenance:** a wafer-level grown-in/`ξ`/regime note (the per-die failure trail still reads a caught
+  > particle — per-particle grown-in-vs-process tagging needs a 2nd Poisson draw → deferred). **Deferred:**
+  > interstitial-side dislocation/leakage cost (only vacancy→GOI wired), the **OSF-ring radial pattern**
+  > (density is uniform here), Robin-`G` sourcing, striations, CG-3 Stefan front. Fast lane 506→**522**
+  > (+16: czochralski +7, `test_voronkov` 5, `test_demo_voronkov` 4). No engine touch, no ADR.
 - **CG-3 — Stefan moving-interface solidification (the honest hard one).** The actual solid–liquid
   front — latent heat, the interface position/shape, facets — as a **free-boundary (Stefan) problem**:
   `L·ρ·dX/dt = k_s·(∂T/∂x)|_s − k_l·(∂T/∂x)|_l`, the front `X(t)` advancing against the heat-flux

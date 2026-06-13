@@ -63,15 +63,25 @@ class CzochralskiKnobs:
     well-mixed Scheil idealization (``k_eff = k₀``, the cited Trumbore value) — so the seam *and* the
     G2/G7 banked boule demos are byte-for-byte unchanged (CG-1 is opt-in; the boule's ``k`` is the
     equilibrium ``k₀`` until a pull rate is set). Honest magnitude: for boron (``k₀=0.80``) realistic
-    Si pull (~0.5–2 mm/min) only *modestly* flattens the drift; the near-flat boule is an illustrative
-    high-pull extrapolation (and its real cost — striations / point-defect voids — is the deferred CG-2
-    brake, not modelled here).
+    Si pull (~0.5–2 mm/min) only *modestly* flattens the drift.
+
+    ``thermal_gradient_K_per_mm`` (CG-2) supplies the interface thermal gradient ``G`` that turns pull
+    rate's one-sided CG-1 benefit into a real trade-off: the **Voronkov ratio** ``ξ = V/G`` against the
+    critical ``ξ_t`` (:func:`chip.czochralski.voronkov_ratio`) decides the grown-in defect regime, and
+    a vacancy-rich (``ξ > ξ_t``) growth seeds COP/void killer defects — :attr:`grown_in_defect_density`
+    (cm⁻²), which **adds to the wafer-prep killer-defect density** (so pulling faster, or running a
+    cooler hot zone, costs yield through the G3 defect map). It defaults to **``None``** — CG-2 off, no
+    grown-in defects → the seam (and the G1–G7 banked demos byte-for-byte unchanged). ``G`` is a
+    **flagged house knob** (or, deferred, the shipped Robin heat mode); only the criterion + ``ξ_t``
+    are cited, the void→density coefficient is house. Setting ``G`` **requires** a ``pull_rate`` (you
+    cannot form ``V/G`` without ``V``).
     """
 
     dopant: str = "B"                  # p-type boron substrate
     N_seed: float = 1.0e17             # cm⁻³ seed-end doping = demo_device CHANNEL_N_A (the seam)
     slice_z: float = 0.0               # axial fraction solidified for THIS wafer (0 = seed end)
     pull_rate_mm_min: float | None = None  # CG-1 pull rate; None = well-mixed k_eff=k₀ (the seam)
+    thermal_gradient_K_per_mm: float | None = None  # CG-2 interface gradient G; None = no grown-in voids (seam)
     length_mm: float = 200.0           # boule length (narrative geometry only)
     diameter_mm: float = 200.0         # boule diameter (narrative geometry only)
 
@@ -93,6 +103,46 @@ class CzochralskiKnobs:
         )
         k0 = segregation_coefficient(self.dopant)
         return effective_segregation_coefficient(k0, normalized_growth_velocity(self.pull_rate_mm_min))
+
+    @property
+    def voronkov_ratio(self) -> float | None:
+        """The CG-2 Voronkov ratio ``ξ = V/G`` (mm²/(K·min)), or ``None`` when CG-2 is off.
+
+        ``None`` when ``thermal_gradient_K_per_mm`` is ``None`` (CG-2 not engaged → the seam). Raises
+        if a gradient is set without a ``pull_rate_mm_min`` (no ``V`` → no ``V/G``).
+        """
+        if self.thermal_gradient_K_per_mm is None:
+            return None
+        if self.pull_rate_mm_min is None:
+            raise ValueError(
+                "thermal_gradient_K_per_mm requires a pull_rate_mm_min — cannot form the Voronkov "
+                "ratio V/G without a pull rate V")
+        from chip.czochralski import voronkov_ratio
+        return voronkov_ratio(self.pull_rate_mm_min, self.thermal_gradient_K_per_mm)
+
+    @property
+    def grown_in_defect_regime(self) -> str | None:
+        """The CG-2 grown-in defect regime (``"vacancy"``/``"interstitial"``/``"osf"``), or ``None`` (off)."""
+        ratio = self.voronkov_ratio
+        if ratio is None:
+            return None
+        from chip.czochralski import grown_in_defect_regime
+        return grown_in_defect_regime(ratio)
+
+    @property
+    def grown_in_defect_density(self) -> float:
+        """The CG-2 grown-in COP/void killer-defect density (cm⁻²) — **0.0 when CG-2 is off (the seam)**.
+
+        ``0.0`` when ``thermal_gradient_K_per_mm`` is ``None`` (CG-2 not engaged) **and** for any
+        interstitial/boundary growth (``ξ ≤ ξ_t``). Otherwise the flagged vacancy-side void density at
+        this ``(V, G)`` — added to the wafer-prep killer density (:attr:`Recipe.effective_defect_density`)
+        so the G3 defect map scatters the extra COPs. Pulling faster / a cooler hot zone raises it.
+        """
+        ratio = self.voronkov_ratio
+        if ratio is None:
+            return 0.0
+        from chip.czochralski import void_defect_density
+        return void_defect_density(ratio)
 
 
 @dataclass(frozen=True)
@@ -271,6 +321,19 @@ class Recipe:
         → :attr:`effective_channel_N_A` (net doping); the metals ride along (the named G4b gap).
         """
         return zone_refine(FEEDSTOCK_GRADES[self.purification.grade], self.purification.zone_passes)
+
+    @property
+    def effective_defect_density(self) -> float:
+        """The total killer-defect density (cm⁻²) the wafer sees: wafer-prep particles **+** grown-in COPs.
+
+        ``wafer_prep.defect_density`` (the line's particle level, G3) plus the CG-2
+        :attr:`CzochralskiKnobs.grown_in_defect_density` (vacancy-rich growth's voids). Two Poisson
+        killer-defect processes superpose into one Poisson process at the summed density — so the
+        grown-in COPs scatter through the **same** cited G3 defect map. At the default (no thermal
+        gradient set) the grown-in term is ``0.0``, so this equals ``wafer_prep.defect_density``
+        **exactly** (``+ 0.0``) — the G3 seam, byte-for-byte.
+        """
+        return self.wafer_prep.defect_density + self.czochralski.grown_in_defect_density
 
     @property
     def channel_N_A(self) -> float:

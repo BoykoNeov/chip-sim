@@ -62,11 +62,22 @@ Named scope edge (the honest ceiling)
   Burton–Prim–Slichter closed form (:func:`effective_segregation_coefficient`, §1b): pull rate
   becomes a live knob that flattens the Scheil drift, with ``k₀`` the tight Trumbore anchor and the
   ``δ``/``D`` ``v``-dependence the calibrated/flagged leg (off by default → the well-mixed ``k₀``
-  limit, the seam). Its **deferred brakes** — constitutional supercooling / **striations**, the
-  **V/G point-defect (void) criterion** (CG-2), the dislocation-free Dash neck and a max-pull limit —
-  are still out (plan §6a fidelity ladder: Scheil/BPS-limit **High**, the ``v``-magnitude Mid, the
-  defect cost not yet modelled). So CG-1 has **no in-model cost to pulling faster** — the cost is CG-2,
-  named not built.
+  limit, the seam).
+* **No grown-in point-defect cost on pulling faster — now BUILT (CG-2, opt-in).** CG-1 alone makes
+  pull rate one-sided (faster → flatter doping → only helps). Its real brake is the **Voronkov V/G
+  criterion** (:func:`voronkov_ratio` / :func:`grown_in_defect_regime` / :func:`void_defect_density`,
+  §1c): the ratio of pull rate ``V`` to the interface thermal gradient ``G``, against the critical
+  ``ξ_t`` (:data:`VORONKOV_CRITICAL_RATIO`), decides the grown-in regime — ``V/G > ξ_t`` is
+  **vacancy-rich** (voids / COPs, which degrade gate-oxide integrity), ``V/G < ξ_t`` is
+  **interstitial-rich** (dislocation loops). Pulling faster (or running a cooler hot zone, lower
+  ``G``) pushes ``V/G`` up into voids, so the COP killer-defect density rises — the in-model cost
+  CG-1 lacked. **Remaining deferred brakes:** the *interstitial*-side dislocation/leakage consequence
+  (only the vacancy/void→GOI density is wired), the **OSF-ring radial pattern** (the density here is
+  spatially uniform), constitutional-supercooling **striations**, the dislocation-free Dash neck, and
+  the Stefan moving front (CG-3). ``G`` is a **flagged house knob** here (or, deferred, the shipped
+  Robin heat mode); only the criterion *form* + ``ξ_t`` are cited (plan §6a fidelity ladder: criterion
+  **High**, the void→density coefficient **flagged**). Off by default (no ``G`` set → no grown-in
+  density → the seam).
 * **Oxygen / thermal donors are a separate, looser story.** Crucible-oxygen incorporation is *not*
   dopant segregation (its ``k`` is contested ~0.25–1.4 and incorporation is dissolution-controlled),
   and the ~450 °C thermal-donor kinetics that make some of it electrically active are a calibrated
@@ -202,6 +213,99 @@ def effective_segregation_coefficient(k0: float, normalized_velocity: float) -> 
     if normalized_velocity < 0.0:
         raise ValueError(f"normalized velocity Δ must be ≥ 0, got {normalized_velocity}")
     return k0 / (k0 + (1.0 - k0) * math.exp(-normalized_velocity))
+
+
+# --------------------------------------------------------------------------- #
+# 1c. Grown-in point defects — the Voronkov V/G criterion (CG-2, the in-model brake)
+# --------------------------------------------------------------------------- #
+# CG-1 (above) makes pull rate one-sided: pulling faster only flattens the doping → only helps. The
+# real cost of fast pull is the **grown-in microdefect** type, set by Voronkov's criterion (V. V.
+# Voronkov, J. Crystal Growth 59:625, 1982): the ratio of the pull (growth) rate ``V`` to the axial
+# thermal gradient ``G`` at the freezing interface, compared with a **critical** ``ξ_t``, fixes which
+# intrinsic point defect is left supersaturated and freezes in::
+#
+#     ξ ≡ V / G      [mm²/(K·min)]            (pull rate ÷ interface gradient)
+#       ξ > ξ_t  →  VACANCY-rich   → voids / COPs  (degrade thin-gate-oxide integrity, GOI)
+#       ξ < ξ_t  →  INTERSTITIAL-rich → dislocation loops / A-defects
+#       ξ = ξ_t  →  the V/I boundary — the OSF (oxidation-induced stacking-fault) ring sits here
+#
+# So **pulling faster (V↑) or running a cooler hot zone (G↓) pushes ξ up into the vacancy/void
+# regime** — the in-model brake CG-1 lacked. Modern "perfect silicon" is grown by holding ξ near
+# ξ_t (a high, engineered G tolerates a faster pull). Realistic CZ (V≈1 mm/min, G≈3.5 K/mm →
+# ξ≈0.29) sits *above* ξ_t — i.e. historically vacancy-rich/COP-containing unless the hot zone is
+# engineered up to G≈V/ξ_t (≈7.7 K/mm here) — which the numbers below reproduce.
+#
+# Units (pinned): ``V`` in mm/min, ``G`` in K/mm → ξ = V/G in **mm²/(K·min)**, matching the cited
+# ξ_t ≈ 0.13 mm²/(K·min) (= the often-quoted ~1.3×10⁻³ cm²/(K·min), ×100 mm²/cm²; Voronkov/Falster).
+#
+# FIDELITY (plan §6a, the flagged-phenomenology tier — like the G5 etch/depo bias, NO independent
+# conservation law): the **criterion form + ξ_t value are cited/tight**, and the regime flip at
+# ξ = ξ_t is definitional-exact. The map from "how far into the vacancy regime" to a **GOI killer-
+# defect density** (:func:`void_defect_density`) is a **FLAGGED house consequence** — its coefficient
+# can manufacture any trade-off, so it is opt-in, never asserted as a magnitude, and only the
+# *direction* (a density that switches on at ξ_t and rises with the excess) is criterion-driven.
+VORONKOV_CRITICAL_RATIO: float = 0.13   # ξ_t, mm²/(K·min) — cited Voronkov (J. Cryst. Growth 59:625, 1982)
+# FLAGGED house coefficient: COP/void killer-defect density (cm⁻²) per unit of vacancy-side excess
+# (ξ − ξ_t). Chosen for teachable VISIBILITY at the game's coarse die map, NOT a cited COP count
+# (real COP number densities and their GOI-killer fraction are a separate, calibrated story): realistic
+# vacancy-rich growth (excess ~0.16) → ~0.05 cm⁻², a *noticeable but survivable* killer density at the
+# illustrative die area (a ~halved defect yield), so the criterion's consequence is visible without the
+# cliff a larger coefficient gives. The coefficient sets only the *steepness* past the V/I boundary —
+# NOT the defect-free window's location (that is pure ξ_t) — so it cannot manufacture the trade-off's
+# optimum, only its depth. Plan/ADR-0005 §5 (the game is mechanics, not magnitudes).
+COP_DENSITY_PER_RATIO_EXCESS_CM2: float = 0.3
+
+
+def voronkov_ratio(pull_rate_mm_min: float, thermal_gradient_K_per_mm: float) -> float:
+    """The Voronkov ratio ``ξ = V/G`` (mm²/(K·min)) — pull rate ÷ interface thermal gradient.
+
+    ``pull_rate_mm_min`` the growth rate ``V`` (mm/min, ≥ 0); ``thermal_gradient_K_per_mm`` the axial
+    gradient ``G`` at the interface (K/mm, > 0 — a flagged house knob, or the shipped Robin heat mode).
+    Compared with :data:`VORONKOV_CRITICAL_RATIO` to classify the grown-in defect regime
+    (:func:`grown_in_defect_regime`). Larger ``ξ`` (faster pull or cooler hot zone) → vacancy/voids.
+    """
+    if pull_rate_mm_min < 0.0:
+        raise ValueError(f"pull rate must be ≥ 0, got {pull_rate_mm_min}")
+    if thermal_gradient_K_per_mm <= 0.0:
+        raise ValueError(f"thermal gradient must be > 0, got {thermal_gradient_K_per_mm}")
+    return pull_rate_mm_min / thermal_gradient_K_per_mm
+
+
+def grown_in_defect_regime(ratio: float, *, critical_ratio: float = VORONKOV_CRITICAL_RATIO) -> str:
+    """Classify the grown-in point-defect regime from the Voronkov ratio ``ξ`` (the cited criterion).
+
+    ``"vacancy"`` for ``ξ > ξ_t`` (voids / COPs — the GOI killer), ``"interstitial"`` for ``ξ < ξ_t``
+    (dislocation loops), and ``"osf"`` **exactly** at the boundary ``ξ = ξ_t`` (the V/I boundary where
+    the OSF ring sits). The flip at ``ξ_t`` is definitional-exact — the tight limit leg of the triad.
+    """
+    if ratio > critical_ratio:
+        return "vacancy"
+    if ratio < critical_ratio:
+        return "interstitial"
+    return "osf"
+
+
+def void_defect_density(
+    ratio: float,
+    *,
+    critical_ratio: float = VORONKOV_CRITICAL_RATIO,
+    coefficient: float = COP_DENSITY_PER_RATIO_EXCESS_CM2,
+) -> float:
+    """Grown-in COP/void **killer-defect density** (cm⁻²) from the Voronkov ratio — FLAGGED consequence.
+
+    The vacancy-side consequence wired to yield: ``0`` at and below ``ξ_t`` (no vacancy supersaturation
+    → no voids — a *by-construction* guard, not an anchor), rising linearly with the excess ``ξ − ξ_t``
+    above it (``coefficient·(ξ − ξ_t)``). These COPs intersect the thin gate oxide → gate-oxide-integrity
+    (GOI) failures → a killer-defect density that plugs into the Poisson defect-yield law
+    (:func:`chip.wafer_prep.poisson_yield`). The *direction* (switches on at ``ξ_t``, monotone above) is
+    criterion-driven; the ``coefficient`` magnitude is **house/flagged** (ADR 0005 §5), never asserted.
+    The interstitial-side (``ξ < ξ_t``) dislocation/leakage cost and the OSF-ring radial pattern are
+    named deferred edges — this density is one-sided (vacancy only) and spatially uniform.
+    """
+    if coefficient < 0.0:
+        raise ValueError(f"coefficient must be ≥ 0, got {coefficient}")
+    excess = ratio - critical_ratio
+    return coefficient * excess if excess > 0.0 else 0.0
 
 
 # --------------------------------------------------------------------------- #

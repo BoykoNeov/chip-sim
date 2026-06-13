@@ -233,3 +233,79 @@ def test_boule_with_keff_flattens_the_axial_profile():
     assert slow.axial_doping(0.0) == fast.axial_doping(0.0) == 1.0e17     # same seed (the seam holds)
     assert fast.axial_doping(0.9) < slow.axial_doping(0.9)               # faster pull → flatter tail
     assert keff > k0
+
+
+# --------------------------------------------------------------------------- #
+# CG-2: the Voronkov V/G grown-in point-defect criterion — the in-model brake on
+# pulling faster. Triad shape (plan §6a, the flagged-phenomenology tier — like
+# the G5 etch/depo bias, NO independent conservation law): the tight legs are the
+# cited criterion form + ξ_t value and the definitional-exact regime flip at ξ_t;
+# the void→density coefficient is the FLAGGED house consequence; the zero-below-
+# threshold + monotone-above are by-construction regression guards (not anchors).
+# --------------------------------------------------------------------------- #
+def test_voronkov_critical_ratio_is_the_cited_value():
+    # ξ_t ≈ 0.13 mm²/(K·min), pinned to the cited Voronkov (J. Cryst. Growth 59:625, 1982) value
+    # (= the often-quoted ~1.3e-3 cm²/(K·min) ×100 mm²/cm²) — the tight cited anchor, NOT from memory.
+    assert cz.VORONKOV_CRITICAL_RATIO == pytest.approx(0.13)
+
+
+def test_voronkov_ratio_units_and_form():
+    # ξ = V/G with V in mm/min, G in K/mm → mm²/(K·min) (the pinned units matching ξ_t).
+    assert cz.voronkov_ratio(1.0, 4.0) == pytest.approx(0.25)
+    assert cz.voronkov_ratio(2.0, 4.0) == pytest.approx(0.50)     # ∝ pull rate
+    assert cz.voronkov_ratio(1.0, 8.0) == pytest.approx(0.125)    # ∝ 1/gradient (cooler hot zone → ξ↑)
+    assert cz.voronkov_ratio(0.0, 4.0) == 0.0                     # zero pull → ξ=0 (deep interstitial)
+
+
+def test_regime_flips_at_the_critical_ratio_the_definitional_limit():
+    # The tight LIMIT leg (like CG-1's Δ=0→k₀): the V/I boundary is exact at ξ_t. Just above → vacancy
+    # (voids/COPs), just below → interstitial (dislocations), exactly at → the OSF ring.
+    xi_t = cz.VORONKOV_CRITICAL_RATIO
+    assert cz.grown_in_defect_regime(xi_t * 1.001) == "vacancy"
+    assert cz.grown_in_defect_regime(xi_t * 0.999) == "interstitial"
+    assert cz.grown_in_defect_regime(xi_t) == "osf"               # exactly on the boundary
+
+
+def test_void_density_zero_at_and_below_threshold_is_a_guard():
+    # By-construction regression guard (NOT a tight anchor): no vacancy supersaturation at/below ξ_t →
+    # no voids. This zero is the seam lever — a sub-ξ_t (interstitial) or boundary growth adds nothing
+    # to the killer-defect density, so the G3 defect map is untouched.
+    xi_t = cz.VORONKOV_CRITICAL_RATIO
+    assert cz.void_defect_density(xi_t) == 0.0
+    assert cz.void_defect_density(xi_t * 0.5) == 0.0              # deep interstitial → 0
+    assert cz.void_defect_density(0.0) == 0.0
+
+
+def test_void_density_rises_monotonically_above_threshold():
+    # Machinery: above ξ_t the COP/void killer density rises monotonically with the excess ξ−ξ_t, and
+    # is continuous at the threshold (→0⁺). The *direction* is criterion-driven; the slope is flagged.
+    xi_t = cz.VORONKOV_CRITICAL_RATIO
+    ratios = [xi_t, xi_t + 0.05, xi_t + 0.16, xi_t + 0.5, xi_t + 1.0]
+    dens = [cz.void_defect_density(r) for r in ratios]
+    assert dens == sorted(dens)                                  # monotone non-decreasing
+    assert dens[0] == 0.0 and dens[1] > 0.0                      # switches on just above ξ_t
+    assert cz.void_defect_density(xi_t + 1e-9) == pytest.approx(0.0, abs=1e-6)   # continuous at ξ_t
+    # Linear in the excess with the (flagged) coefficient.
+    assert cz.void_defect_density(xi_t + 0.4) == pytest.approx(cz.COP_DENSITY_PER_RATIO_EXCESS_CM2 * 0.4)
+
+
+def test_voronkov_realistic_magnitude_typical_cz_is_vacancy_rich():
+    # The HONEST magnitude (the load-bearing flag, like CG-1's): realistic CZ (V≈1 mm/min, G≈3.5 K/mm)
+    # gives ξ≈0.29 > ξ_t → VACANCY-rich (historically COP-containing) — NOT defect-free by default.
+    ratio = cz.voronkov_ratio(1.0, 3.5)
+    assert ratio == pytest.approx(0.2857, abs=1e-3)
+    assert cz.grown_in_defect_regime(ratio) == "vacancy"
+    assert cz.void_defect_density(ratio) > 0.0                   # a real (if modest) COP killer density
+    # The hot-zone lever: raising G to ≈ V/ξ_t pulls ξ back to the boundary (defect-free window).
+    g_star = 1.0 / cz.VORONKOV_CRITICAL_RATIO                    # ≈7.7 K/mm at V=1
+    assert cz.voronkov_ratio(1.0, g_star) == pytest.approx(cz.VORONKOV_CRITICAL_RATIO)
+    assert cz.void_defect_density(cz.voronkov_ratio(1.0, g_star)) == 0.0
+
+
+def test_voronkov_invalid_inputs_raise():
+    with pytest.raises(ValueError):
+        cz.voronkov_ratio(-1.0, 4.0)                             # pull rate ≥ 0
+    with pytest.raises(ValueError):
+        cz.voronkov_ratio(1.0, 0.0)                              # gradient > 0
+    with pytest.raises(ValueError):
+        cz.void_defect_density(0.5, coefficient=-1.0)            # coefficient ≥ 0

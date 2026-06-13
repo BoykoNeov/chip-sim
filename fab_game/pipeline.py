@@ -116,16 +116,32 @@ def run_line(
         incoming_thickness_um=prep.incoming_thickness_um, slice_ttv_um=prep.slice_ttv_um,
         slice_bow_um=prep.slice_bow_um, removal_um=prep.cmp_removal_um,
         ttv_improvement=prep.cmp_ttv_improvement)
+    # The killer-defect density the line scatters is the wafer-prep particle level PLUS any CG-2
+    # grown-in COP/void density (vacancy-rich Czochralski growth) — two Poisson processes superpose,
+    # so the grown-in voids ride the same cited G3 defect map. At the default (no thermal gradient
+    # set) the grown-in term is 0, so this is prep.defect_density exactly (the G3 seam).
+    grown_in = recipe.czochralski.grown_in_defect_density
     defect_map = scatter_defects(
-        wafer.dies, defect_density=prep.defect_density, grid_n=grid_n,
+        wafer.dies, defect_density=recipe.effective_defect_density, grid_n=grid_n,
         wafer_diameter_mm=prep.wafer_diameter_mm, rng=rng, enabled=variation.enabled)
     dies = tuple(wafer_prep_step(d, geometry, defect_map[d.site]) for d in wafer.dies)
+    # Provenance: when CG-2 is engaged, record the grown-in split + the Voronkov regime at the
+    # WAFER level — so the killer density is not silently read as a fab-floor particle level (the
+    # per-die failure trail still names a caught particle; attributing each particle to grown-in vs
+    # process needs a second Poisson draw and is a named deferred edge).
+    prep_summary = {"ttv_um": geometry.ttv_um, "bow_um": geometry.bow_um,
+                    "n_defects": sum(len(v) for v in defect_map.values())}
+    if grown_in > 0.0:
+        prep_summary["grown_in_defect_density"] = grown_in
+        prep_summary["voronkov_ratio"] = recipe.czochralski.voronkov_ratio
+        prep_summary["grown_in_regime"] = recipe.czochralski.grown_in_defect_regime
     wafer = replace(wafer, geometry=geometry).with_step(
         StepRecord("wafer_prep",
                    {"ttv_um": geometry.ttv_um, "bow_um": geometry.bow_um,
-                    "defect_density": prep.defect_density},
-                   {"ttv_um": geometry.ttv_um, "bow_um": geometry.bow_um,
-                    "n_defects": sum(len(v) for v in defect_map.values())}), dies)
+                    "defect_density": prep.defect_density,
+                    "grown_in_defect_density": grown_in,
+                    "effective_defect_density": recipe.effective_defect_density},
+                   prep_summary), dies)
 
     # One perturbation per die, drawn in fixed die order (the determinism contract).
     perts = {d.site: variation.perturbation(d, rng) for d in wafer.dies}
