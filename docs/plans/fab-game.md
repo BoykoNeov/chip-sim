@@ -542,6 +542,12 @@ and capping its runaway, with **no engine-physics cost after all** (the transien
 part that *would* need the engine, has no consumer — so it stays deferred). **All three CG deepenings
 are now BUILT.**
 
+**The remaining named edges** — across the whole line, not just crystal growth — are catalogued with a
+**consumer verdict each** (promote-or-defer) in `docs/plans/scope-edge-backlog.md`: the CG follow-ons
+(interstitial cost, the OSF ring + Robin-`G(r)`, striations, facets, the transient Stefan front), the
+engine's 3-D regime, oxygen/thermal donors, under-etch, CMP, and package rebond. Its spine is the
+*deferrals* — which edges have no consumer yet and stay fenced (the anti-over-build bar).
+
 ---
 
 ## 7. Validation discipline
