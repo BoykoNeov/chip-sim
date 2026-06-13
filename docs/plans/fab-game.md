@@ -344,6 +344,43 @@ thing).
   > rework contrast). Default knobs ⇒ the seam ⇒ G1–G4 demos byte-for-byte unchanged. Fast lane 423→**451**
   > (+28); no engine amendment, no ADR, no chip gallery card.
 - **G6 — Packaging & test & binning.** The back-end assembly yield + parametric/functional test.
+  > **G6 BUILT (2026-06-13).** The **back end** — the line now runs front-to-back, *sand → a binned,
+  > packaged chip* (the last *physics* G-step; G7 is the roguelike shell). New cited physics
+  > `chip/packaging.py` — the **cumulative (multiplicative) assembly-yield funnel** `Y_assembly = Π yᵢ`
+  > (a part must survive every back-end op: dice → attach → wire-bond → encapsulate), the cited
+  > **yield-funnel** decomposition (Sze *VLSI Technology* yield ch. — the same text as G3's defect law;
+  > May & Spanos Ch. 5 cumulative-yield; Tummala assembly-step decomposition), triad-tested
+  > (`test_packaging.py`, 9). **Validation honesty (advisor):** the tight legs are the `yᵢ = 1` ⇒ `Y = 1`
+  > **bit-exact seam** and the **multiplicativity identity** `Y(A∪B) = Y(A)·Y(B)` (the status of G3's
+  > area-additivity) — *but the algebra is structural*; that `Π yᵢ` is the only independent-composition
+  > law is validated by the **realization**, so the load-bearing non-circular leg is the **game-side
+  > per-die Bernoulli → empirical packaged yield → `Π yᵢ`** (a law-of-large-numbers convergence, exactly
+  > G3's placement → `exp(−D₀A)`); the per-step yields are **flagged house numbers**. **The advisor trap
+  > (resolved before writing):** the resolved plan's Gaussian `bin_fractions(μ,σ,edges)` "convergence"
+  > was killed as **near-tautological** *and* dishonest (the game's realized `I_Dsat` is the nonlinear
+  > image of the process variation, not a clean Gaussian, so it would not converge) — **binning is a
+  > grading policy, not physics** (ADR 0005 §1), so it lives in the game layer as a **deterministic
+  > partition** (`SpeedBins`/`SpeedBin` in `fab_game/spec.py`; default = one open bin = the seam), and
+  > `chip/packaging.py` stays **single-headed** (the funnel only). **Game wiring:** `PackagingKnobs`
+  > (four per-step yields, all default `1.0` = seam); a `packaging_step` inserted **after** the
+  > front-end `test` step that (a) draws a per-die **Bernoulli back-end survival** against `Π yᵢ` — gated
+  > on `assembly_yield < 1` **and** the stochastic layer being on, drawn **last** (the G5
+  > conditional-draw-last discipline → a perfect back end / `NO_VARIATION` consumes no RNG → the G1–G5
+  > banked demos are byte-for-byte unchanged), a non-survivor a **functional assembly scrap**
+  > (irreversible — "cracked die = scrap"); and (b) **bins** the survivors by `I_Dsat` (the **speed
+  > proxy** — clock speed ∝ drive current) into value grades, a too-slow part a **bin-out** (a *working
+  > but out-of-grade* reject, distinct from a front-end parametric fail). The **four-way partition**
+  > {front-end fail, assembly scrap, bin-out, binned-good} tiles the die map (front-end fails are *not*
+  > re-packaged — no double-count; good+bad=total closes); `diagnose` names the back-end deaths; `Die`
+  > gains `assembled`/`bin`. The pedagogy: binning turns **process spread → a value distribution** (a
+  > tight process fills the premium bin; a loose one — poor CD control — spreads the grades and bins a
+  > tail **out**), and the headline "**works but never shipped**" point (a back-end assembly scrap with a
+  > *perfect* front end). Banked `demo_packaging`/`fab-game-g6.png` (the assembly funnel narrowing at the
+  > wire-bond | the tight-vs-loose `I_Dsat` bin histogram | the packaged-outcome wafer map). Default
+  > knobs ⇒ the seam ⇒ G1–G5 byte-for-byte unchanged. Fast lane 451→**476** (+25); no engine amendment,
+  > no ADR, no chip gallery card. **Rebond named & DEFERRED** (the plan's "rebond rare; cracked die =
+  > scrap" — the reworkable/irreversible contrast is already banked at G4/G5, so cracked = scrap is the
+  > honest default).
 - **G7 — Roguelike framing + scoring + a Textual TUI; sandbox mode.** The game shell over the
   proven sim. (Tycoon deferred — same harness, different objective.)
 

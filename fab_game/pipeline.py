@@ -31,6 +31,7 @@ from .steps import (
     etch_deposition_step,
     litho_step,
     oxidation_step,
+    packaging_step,
     wafer_prep_step,
 )
 from .variation import NO_VARIATION, Variation
@@ -180,8 +181,16 @@ def run_line(
         StepRecord("device", {"gate": recipe.device.gate, "width_um": recipe.device.width_um},
                    _aggregate(dies, "V_t")), dies)
 
-    # 5. Test — apply the spec windows → the verdicts (and the running yield in provenance).
-    return _test_wafer(wafer, specs)
+    # 5. Test — apply the spec windows → the front-end (wafer-sort) verdicts + the running yield.
+    wafer = _test_wafer(wafer, specs)
+
+    # 6. Packaging & final test (G6, back-end) — dice/attach/bond/encapsulate the front-end-good dies
+    #    (a stochastic per-die back-end survival against the assembly-yield funnel) then bin the
+    #    survivors by I_Dsat (the speed proxy). The assembly kill draws from the RNG **last** (after every
+    #    per-die perturbation) and **only** when the back end is lossy AND the stochastic layer is on, so a
+    #    perfect back end (the default) consumes no randomness and leaves every good die packaged — the
+    #    seam, and the G1–G5 banked demos byte-for-byte unchanged.
+    return _package_wafer(wafer, recipe.packaging, specs.speed_bins, rng, variation.enabled)
 
 
 # --------------------------------------------------------------------------- #
@@ -285,6 +294,42 @@ def _verdict_die(die: Die, specs: SpecSet, geometry_reason: str | None = None) -
 
 
 # --------------------------------------------------------------------------- #
+# Packaging & final test (G6) — the back-end yield funnel + the speed binning
+# --------------------------------------------------------------------------- #
+def _package_wafer(wafer, knobs, bins, rng, variation_enabled: bool) -> WaferState:
+    """Run the back-end assembly + final-test binning over the tested wafer → the packaged wafer.
+
+    A per-die Bernoulli back-end survival is drawn (in fixed die order, **after** every per-die
+    perturbation) against the cumulative assembly yield — but **only** when the back end is lossy
+    (``assembly_yield < 1``) *and* the stochastic layer is on, so a perfect back end / disabled
+    variation consumes no RNG and packages every good die (the seam). The packaging step then assembles
+    + bins each die; the ``packaging`` provenance summary carries the **funnel** (front-end → final
+    yield) and the bin histogram (the demo artifact).
+    """
+    Y = knobs.assembly_yield
+    draw = variation_enabled and Y < 1.0
+    new_dies = []
+    for d in wafer.dies:
+        survived = True
+        if draw and d.verdict is not None and d.verdict.passed:
+            survived = bool(rng.random() < Y)
+        new_dies.append(packaging_step(d, knobs, survived, bins))
+    new_dies = tuple(new_dies)
+
+    n_total = len(new_dies)
+    n_good = sum(d.verdict.passed for d in new_dies if d.verdict is not None)
+    histogram = {label: 0 for label in bins.labels}
+    for d in new_dies:
+        if d.bin is not None:
+            histogram[d.bin] = histogram.get(d.bin, 0) + 1
+    summary = {"assembly_yield": Y, "final_yield": n_good / n_total if n_total else 0.0,
+               "n_good": n_good, "n_total": n_total, "bins": histogram}
+    return wafer.with_step(
+        StepRecord("packaging", {"assembly_yield": Y, "step_yields": knobs.step_yields}, summary),
+        new_dies)
+
+
+# --------------------------------------------------------------------------- #
 # Scoring + the failure trail
 # --------------------------------------------------------------------------- #
 def wafer_yield(wafer: WaferState) -> float:
@@ -339,8 +384,12 @@ def diagnose(die: Die) -> str:
         elif etch.outputs.get("functional_fail"):
             lines.append(f"    ↳ etch/depo: functional fail — {etch.outputs['functional_fail']} "
                          f"(no working gate — back off the over-etch / raise the anisotropy)")
-        elif "etch_bias_nm" in etch.outputs:
-            bias = etch.outputs.get("etch_bias_nm", float("nan"))
+        elif etch.outputs.get("etch_bias_nm", 0.0) > 0.0:
+            # Only name the etch when it actually shrank the CD (a real bias) — a default, perfectly
+            # anisotropic etch is the identity (bias 0) and has no transfer story to tell, so it is not
+            # mentioned in the trail (else a back-end-killed die with a clean etch would print a
+            # self-contradictory "etch bias 0.0 nm shrank the CD" line — G6 surfaced this).
+            bias = etch.outputs["etch_bias_nm"]
             lines.append(f"    ↳ etch/depo: etch bias {bias:.1f} nm shrank the resist CD "
                          f"{etch.outputs.get('resist_cd_nm', float('nan')):.1f} → gate CD "
                          f"{etch.outputs.get('cd_nm', float('nan')):.1f} nm (over-etch / low anisotropy)")
@@ -362,6 +411,14 @@ def diagnose(die: Die) -> str:
             lines.append(f"    ↳ purification: junction leakage from deep-level-metal SRH recombination "
                          f"(minority-carrier lifetime τ {device.outputs.get('tau_us', float('nan')):.2g} µs) "
                          f"→ a leaky diode (purify harder — zone refining scrubs the metals fast, tiny k)")
+    # The back-end fingerprint (G6): a part can die in *packaging* even with a perfect front end — a
+    # stochastic assembly scrap (dice/bond) or a final-test bin-out (works, but too slow to sell).
+    if die.assembled is False:
+        lines.append(f"    ↳ packaging: assembly scrap — a back-end functional kill "
+                     f"(dicing/wire-bond; cracked die = scrap, irreversible)")
+    elif die.bin is not None and any("binned out" in r for r in die.verdict.reasons):
+        lines.append(f"    ↳ final test: binned out — I_Dsat too low for the slowest sellable speed bin "
+                     f"(a working but out-of-grade part — tighten the process spread)")
     return "\n".join(lines)
 
 
@@ -410,14 +467,20 @@ def rework_litho(
     n_attempted = 0
     new_dies: list[Die] = []
     for d in wafer.dies:
-        if d.verdict is not None and d.verdict.passed:
+        # Leave untouched: passing dies, and dies that died in the **back end** (an assembly scrap or a
+        # bin-out — ``assembled is not None`` means the die reached packaging). Litho rework is a
+        # front-end strip-and-re-expose: it cannot un-crack a packaged die or un-bin a shipped part
+        # ("cracked die = scrap", G6), so a back-end death must stay dead and is **not** re-attempted or
+        # counted as recovered. Only a front-end (litho/parametric) fail (``assembled is None``) is
+        # re-exposed. (A particle kill / geometry scrap also has ``assembled is None`` — it re-tests the
+        # same way and litho rework cannot remove a defect.)
+        if d.verdict is not None and (d.verdict.passed or d.assembled is not None):
             new_dies.append(d)
             continue
         n_attempted += 1
         # Re-expose at the corrected focus + the persistent focus bowl (no fresh scatter), re-etch the
         # refreshed resist CD into the gate (so the device reads the re-etched CD — the same mid-line
-        # transfer the run applied), re-run the device, and re-score. A die killed by a particle (or a
-        # geometry-scrapped wafer) re-tests the same way — litho rework cannot remove a defect.
+        # transfer the run applied), re-run the device, and re-score.
         red = litho_step(d, corrected, variation.systematic_perturbation(d))
         red = etch_deposition_step(red, recipe.etch_deposition, recipe.litho.pitch_nm,
                                    variation.systematic_perturbation(d))
@@ -465,10 +528,13 @@ def rework_polish(
     geometry_reason = specs.geometry.check(repolished)
     # Re-score only the failed dies (a flatness improvement cannot newly-fail an already-passing die),
     # leaving survivors as the same object — so their history is not double-stamped (cf. rework_litho).
+    # A **back-end death** (assembly scrap / bin-out — ``assembled is not None``) is also left untouched:
+    # re-polishing fixes wafer flatness, it cannot un-crack a packaged die or un-bin a shipped part
+    # ("cracked die = scrap", G6) — so it stays dead and is not counted as recovered.
     n_attempted = 0
     new_dies: list[Die] = []
     for d in reworked.dies:
-        if d.verdict is not None and d.verdict.passed:
+        if d.verdict is not None and (d.verdict.passed or d.assembled is not None):
             new_dies.append(d)
             continue
         n_attempted += 1

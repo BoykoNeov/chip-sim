@@ -67,6 +67,67 @@ class GeometrySpec:
 
 
 @dataclass(frozen=True)
+class SpeedBin:
+    """One performance (speed) bin: a label + a half-open I_Dsat band ``[lo, hi)`` in **mA** (G6).
+
+    Parts are binned by drive current as a **speed proxy** (clock speed ∝ drive current → ∝ ``I_Dsat``):
+    a faster die (higher ``I_Dsat``) sorts into a higher bin (premium). ``lo_mA``/``hi_mA`` are the
+    inclusive-lower / exclusive-upper edges (``None`` = open on that side). House numbers, flagged.
+    """
+
+    label: str
+    lo_mA: float | None = None
+    hi_mA: float | None = None
+
+    def contains(self, i_dsat_mA: float) -> bool:
+        return ((self.lo_mA is None or i_dsat_mA >= self.lo_mA)
+                and (self.hi_mA is None or i_dsat_mA < self.hi_mA))
+
+
+@dataclass(frozen=True)
+class SpeedBins:
+    """The final-test **binning** policy — sort working parts into speed/value grades (G6, plan §5 step 9).
+
+    Binning is a **grading policy, not physics** (ADR 0005 §1) — sorting parts that already passed the
+    front-end spec into performance grades by **house** ``I_Dsat`` thresholds. It lives in the game
+    layer; the only invariant asserted is the **partition** (every packaged part lands in exactly one
+    bin, or the ``reject`` tail). A part below the slowest sellable bin is a **bin-out** — a working but
+    out-of-grade reject (a functional part that does not ship), distinct from a front-end parametric
+    fail.
+
+    The default is a **single open bin** (``"pass"``) covering everything: every packaged-good die →
+    ``"pass"``, never ``reject`` — so the seam *and* the G1–G5 banked demos are byte-for-byte unchanged
+    (binning grades nothing by default). The G6 demo dials in real fast/typical/slow bins so the
+    across-wafer ``I_Dsat`` spread sorts into value grades (a tight process → the premium bin dominates;
+    a loose one → spread + a bin-out tail).
+    """
+
+    bins: tuple[SpeedBin, ...] = (SpeedBin("pass"),)
+    reject_label: str = "reject"
+
+    def assign(self, i_dsat_mA: float | None) -> str:
+        """The bin label for a die's ``I_Dsat`` (mA) — the first containing bin, else ``reject_label``.
+
+        ``None`` (a die with no device read) bins to ``reject_label`` (it cannot be graded). Bins are
+        tried in order, so list them fastest→slowest (or non-overlapping) for a clean grade.
+        """
+        if i_dsat_mA is None:
+            return self.reject_label
+        for b in self.bins:
+            if b.contains(i_dsat_mA):
+                return b.label
+        return self.reject_label
+
+    def is_reject(self, label: str) -> bool:
+        return label == self.reject_label
+
+    @property
+    def labels(self) -> tuple[str, ...]:
+        """Every grade label plus the reject tail — the bin-histogram keys (a fixed, ordered set)."""
+        return tuple(b.label for b in self.bins) + (self.reject_label,)
+
+
+@dataclass(frozen=True)
 class SpecSet:
     """The full per-die acceptance test: the functional gates + the parametric windows.
 
@@ -90,6 +151,7 @@ class SpecSet:
     leakage: SpecWindow = field(
         default_factory=lambda: SpecWindow("leakage (nA/cm²)", hi=10.0, optional=True))
     geometry: GeometrySpec = field(default_factory=GeometrySpec)
+    speed_bins: SpeedBins = field(default_factory=SpeedBins)   # G6 final-test binning (default: one open bin)
     require_resolved: bool = True
 
     def verdict(self, die: Die, geometry_reason: str | None = None) -> Verdict:

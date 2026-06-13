@@ -27,8 +27,16 @@ from chip.junction import analyze_junction
 from chip.purification import Contamination, sodium_oxide_charge
 from chip.wafer_prep import WaferGeometry
 
-from .recipe import DeviceKnobs, DiffusionKnobs, EtchDepositionKnobs, LithoKnobs, OxidationKnobs
-from .state import DefectEvent, Die
+from .recipe import (
+    DeviceKnobs,
+    DiffusionKnobs,
+    EtchDepositionKnobs,
+    LithoKnobs,
+    OxidationKnobs,
+    PackagingKnobs,
+)
+from .spec import SpeedBins
+from .state import DefectEvent, Die, Verdict
 from .variation import DiePerturbation
 
 
@@ -238,3 +246,52 @@ def device_step(
                  "tau_us": leak.tau_us, "j_leak_nA_cm2": leak.j_leak_nA_cm2},
         V_t=mos.V_t, i_dsat=i_dsat, tau=leak.tau, j_leak=leak.j_leak,
     )
+
+
+def packaging_step(die: Die, knobs: PackagingKnobs, survived: bool, bins: SpeedBins) -> Die:
+    """Back-end packaging & final test on one die (G6) — assemble, then bin by speed (the funnel's end).
+
+    The line's last step, run **after** wafer sort (the ``test`` step's per-die verdict). Only a
+    **front-end-good** die is packaged; a die that already failed (parametric / functional) is **not**
+    re-processed (it carries no assembly outcome — its verdict and bin stay as the front-end left them,
+    so the funnel never double-counts it as an assembly scrap). For a good die:
+
+    * **Assembly** (dice → attach → wire-bond → encapsulate): ``survived`` is the pre-drawn per-die
+      Bernoulli outcome against the cumulative :attr:`PackagingKnobs.assembly_yield` (the funnel,
+      :func:`chip.packaging.assembly_yield`); a part that does **not** survive is a back-end
+      **functional kill** (``assembled=False``, the verdict flips to a fail) — irreversible (a cracked /
+      lifted-bond die is scrap, the plan's "cracked die = scrap").
+    * **Binning** (final test): a surviving part is sorted by its drive current (``I_Dsat`` as the
+      **speed proxy**) into a :class:`SpeedBins` grade. A part below the slowest sellable bin is a
+      **bin-out** — a *working but out-of-grade* reject (the verdict flips to a fail, ``bin="reject"``),
+      distinct from a front-end parametric fail.
+
+    At the default knobs (``assembly_yield = 1`` ⇒ ``survived`` always True; one open bin ⇒ no reject)
+    the step is the **identity**: every front-end-good die packages, bins to the single ``"pass"`` grade,
+    and its verdict is untouched — so the seam and the G1–G5 banked demos are byte-for-byte unchanged.
+    Records the outcome on the append-only history regardless (every die saw every step).
+    """
+    knobs_in = {"assembly_yield": knobs.assembly_yield, "step_yields": knobs.step_yields}
+    # A front-end-failed (or untested) die is not packaged — it carries no assembly outcome.
+    if die.verdict is None or die.verdict.failed:
+        return die.record("packaging", knobs_in=knobs_in,
+                          outputs={"packaged": False, "reason": "front-end fail — not assembled"})
+    # Assembly: a non-surviving part is a back-end functional kill (irreversible scrap).
+    if not survived:
+        v = Verdict(False, ("assembly scrap — back-end functional kill (dice/bond); cracked die = scrap",))
+        return die.record("packaging", knobs_in=knobs_in,
+                          outputs={"packaged": True, "assembled": False, "verdict": "assembly scrap"},
+                          assembled=False, verdict=v)
+    # Final test: bin the surviving part by I_Dsat (the speed proxy); a too-slow part bins out.
+    label = bins.assign(die.i_dsat_mA)
+    if bins.is_reject(label):
+        v = Verdict(False, (f"binned out — I_Dsat {die.i_dsat_mA:.2f} mA below the slowest sellable bin "
+                            f"(a working but out-of-grade part)",))
+        return die.record("packaging", knobs_in=knobs_in,
+                          outputs={"packaged": True, "assembled": True, "bin": label,
+                                   "i_dsat_mA": die.i_dsat_mA},
+                          assembled=True, bin=label, verdict=v)
+    return die.record("packaging", knobs_in=knobs_in,
+                      outputs={"packaged": True, "assembled": True, "bin": label,
+                               "i_dsat_mA": die.i_dsat_mA},
+                      assembled=True, bin=label)

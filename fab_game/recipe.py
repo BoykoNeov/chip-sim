@@ -162,6 +162,45 @@ class DeviceKnobs:
 
 
 @dataclass(frozen=True)
+class PackagingKnobs:
+    """Back-end (assembly) yield knobs → :mod:`chip.packaging` (G6) — the per-step survival yields.
+
+    After wafer sort decides which dies work, the good dies are diced, attached, wire-bonded, and
+    encapsulated; each operation can lose a part, so the **assembly yield** is the product of the
+    per-step survival probabilities (the cited funnel, :func:`chip.packaging.assembly_yield`). The
+    back-end loss is **stochastic** — a per-die Bernoulli draw against :attr:`assembly_yield` (drawn
+    only when the back end is lossy *and* the stochastic layer is on), so it lives with the variation
+    layer (like the killer-particle scatter), not the deterministic core.
+
+    All four default to **1.0** (a perfect back end loses nothing) so the seam *and* the G1–G5 banked
+    demos are byte-for-byte unchanged: ``assembly_yield = 1.0`` ⇒ no draw ⇒ every front-end-good die is
+    packaged. The G6 demo dials in :data:`chip.packaging.ASSEMBLY_STEPS` (a realistic mature back end)
+    or degrades one step (e.g. a bad wire-bond) to narrow the funnel. Cracked/scrapped parts are
+    irreversible (the plan's "cracked die = scrap"); rebond is a named, deferred edge.
+    """
+
+    dice_yield: float = 1.0            # wafer dicing/singulation survival (1.0 = no saw loss; the seam)
+    attach_yield: float = 1.0          # die-attach survival
+    bond_yield: float = 1.0            # wire-bond survival (the lossiest back-end step when degraded)
+    encapsulate_yield: float = 1.0     # mold/encapsulation survival
+
+    @property
+    def step_yields(self) -> tuple[float, ...]:
+        """The four per-step survival yields in funnel order (dice → attach → bond → encapsulate)."""
+        return (self.dice_yield, self.attach_yield, self.bond_yield, self.encapsulate_yield)
+
+    @property
+    def assembly_yield(self) -> float:
+        """The cumulative back-end yield ``Π step_yields`` — the per-die back-end survival probability.
+
+        Exactly ``1.0`` at the default (perfect) knobs (the seam): a part is then packaged with
+        certainty and the stochastic kill never draws.
+        """
+        from chip.packaging import assembly_yield
+        return assembly_yield(*self.step_yields)
+
+
+@dataclass(frozen=True)
 class Recipe:
     """A full line recipe: the Czochralski boule the substrate is grown from + one slice per step.
 
@@ -179,6 +218,7 @@ class Recipe:
     litho: LithoKnobs = field(default_factory=LithoKnobs)
     etch_deposition: EtchDepositionKnobs = field(default_factory=EtchDepositionKnobs)
     device: DeviceKnobs = field(default_factory=DeviceKnobs)
+    packaging: PackagingKnobs = field(default_factory=PackagingKnobs)
 
     @property
     def boule(self) -> Boule:

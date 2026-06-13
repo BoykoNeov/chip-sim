@@ -38,12 +38,13 @@ from .recipe import (
     EtchDepositionKnobs,
     LithoKnobs,
     OxidationKnobs,
+    PackagingKnobs,
     PurificationKnobs,
     Recipe,
     WaferPrepKnobs,
 )
 from .variation import NO_VARIATION, DiePerturbation, Variation
-from .spec import DEFAULT_SPECS, GeometrySpec, SpecSet, SpecWindow
+from .spec import DEFAULT_SPECS, GeometrySpec, SpecSet, SpecWindow, SpeedBin, SpeedBins
 from .defects import scatter_defects
 from .pipeline import (
     BatchResult,
@@ -65,11 +66,12 @@ __all__ = [
     "DefectEvent", "die_area_cm2",
     # recipe
     "Recipe", "PurificationKnobs", "CzochralskiKnobs", "WaferPrepKnobs", "DiffusionKnobs",
-    "OxidationKnobs", "LithoKnobs", "EtchDepositionKnobs", "DeviceKnobs", "DEFAULT_RECIPE",
+    "OxidationKnobs", "LithoKnobs", "EtchDepositionKnobs", "DeviceKnobs", "PackagingKnobs",
+    "DEFAULT_RECIPE",
     # variation
     "Variation", "DiePerturbation", "NO_VARIATION",
     # spec
-    "SpecSet", "SpecWindow", "GeometrySpec", "DEFAULT_SPECS",
+    "SpecSet", "SpecWindow", "GeometrySpec", "SpeedBin", "SpeedBins", "DEFAULT_SPECS",
     # defects
     "scatter_defects",
     # pipeline

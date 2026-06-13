@@ -428,6 +428,114 @@ def etch_figure(result):
     return fig
 
 
+# --------------------------------------------------------------------------- #
+# G6 — packaging & test: the assembly-yield funnel + speed binning + the outcome map
+# --------------------------------------------------------------------------- #
+def _funnel_panel(ax, result) -> None:
+    """The cumulative assembly-yield funnel: a part must survive every back-end step (Π yᵢ narrows)."""
+    x = np.arange(len(result.funnel_labels))
+    vals = [100 * c for c in result.funnel_cumulative]
+    # Colour the bond step (the narrow neck) red, the rest steel blue.
+    colors = ["#2f6db5"] * len(x)
+    for i, lab in enumerate(result.funnel_labels):
+        if "bond" in lab:
+            colors[i] = "#d62728"
+    ax.bar(x, vals, color=colors, width=0.62, zorder=2)
+    for xi, v in zip(x, vals):
+        ax.text(xi, v + 1.0, f"{v:.1f}%", ha="center", fontsize=8, color="0.25")
+    ax.axhline(100 * result.funnel_assembly_yield, color="0.35", ls="--", lw=1.0)
+    ax.text(0.0, 100 * result.funnel_assembly_yield + 1.2,
+            f"cited Π yᵢ = {result.funnel_assembly_yield:.1%}  "
+            f"(realized {result.funnel_empirical:.1%})", fontsize=8, color="0.35")
+    ax.set_xticks(x)
+    ax.set_xticklabels([lab.replace("\n", " ") for lab in result.funnel_labels], fontsize=8, rotation=20)
+    ax.set_ylabel("surviving fraction of front-end-good parts (%)", fontsize=9)
+    ax.set_ylim(0, 108)
+    ax.set_title("Assembly-yield funnel: every back-end step\nmultiplies (the wire-bond is the neck)",
+                 fontsize=10)
+
+
+def _binning_panel(ax, result) -> None:
+    """I_Dsat sorted into speed bins: a tight process fills the premium bin, a loose one spreads + bins out."""
+    edges = sorted(result.bin_edges_mA)            # the sellable-bin lower edges (ascending)
+    lo = min(min(result.loose_idsat), min(result.tight_idsat)) - 0.05
+    hi = max(max(result.loose_idsat), max(result.tight_idsat)) + 0.05
+    bins = np.linspace(lo, hi, 28)
+    ax.hist(result.loose_idsat, bins=bins, color="#d62728", alpha=0.55,
+            label=f"loose process (σ={result.loose_sigma:.0f} nm)", zorder=2)
+    ax.hist(result.tight_idsat, bins=bins, color="#2ca02c", alpha=0.75,
+            label=f"tight process (σ={result.tight_sigma:.0f} nm)", zorder=3)
+    for e in edges:
+        ax.axvline(e, color="0.35", ls="--", lw=1.0, zorder=1)
+    # Shade the reject (bin-out) region — below the slowest sellable edge.
+    ax.axvspan(lo, edges[0], color="0.6", alpha=0.18, zorder=0)
+    ax.text(edges[0] - 0.005, ax.get_ylim()[1] * 0.0 + 1, "reject\n(too slow)", fontsize=7,
+            color="0.4", ha="right", va="bottom")
+    ax.set_xlabel("I_Dsat (mA) — the speed proxy", fontsize=9)
+    ax.set_ylabel("die count", fontsize=9)
+    ax.set_title("Speed binning: process control sets the bin mix\n(loose → spread + a bin-out tail)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+
+
+_OUTCOME_COLORS = {
+    "premium": "#1a7a1a", "typical": "#2ca02c", "value": "#9acd32",
+    "bin-out": "#ff7f0e", "assembly scrap": "#8b0000", "front-end fail": "#7f7f7f",
+}
+
+
+def _die_outcome(d) -> str:
+    """Classify one die's final outcome (the four-way packaging partition + the grade)."""
+    if d.assembled is None:
+        return "front-end fail"
+    if d.assembled is False:
+        return "assembly scrap"
+    if d.bin == "reject":
+        return "bin-out"
+    return d.bin if d.bin in ("premium", "typical", "value") else "value"
+
+
+def _outcome_map_panel(ax, wafer, title: str) -> None:
+    """The packaged wafer: each die coloured by its final outcome (grade / scrap / bin-out / fe-fail)."""
+    import matplotlib.pyplot as plt
+
+    xs, ys = _die_xy(wafer)
+    n = _grid_n(wafer)
+    size = (2.0 / n) * 0.92
+    seen: dict[str, bool] = {}
+    for x, y, d in zip(xs, ys, wafer.dies):
+        outcome = _die_outcome(d)
+        color = _OUTCOME_COLORS.get(outcome, "#7f7f7f")
+        ax.add_patch(plt.Rectangle((x - size / 2, y - size / 2), size, size,
+                                   facecolor=color, edgecolor="white", linewidth=0.5,
+                                   label=outcome if outcome not in seen else None))
+        seen[outcome] = True
+    ax.add_patch(plt.Circle((0, 0), 1.0, fill=False, color="0.4", linewidth=1.2))
+    ax.set_title(title, fontsize=10)
+    ax.set_xlim(-1.15, 1.15)
+    ax.set_ylim(-1.15, 1.15)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.legend(fontsize=7, loc="upper right", framealpha=0.9, ncol=1)
+
+
+def packaging_figure(result):
+    """Assemble the G6 artifact from a :class:`~fab_game.demo_packaging.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.8))
+    _funnel_panel(axes[0], result)
+    _binning_panel(axes[1], result)
+    _outcome_map_panel(axes[2], result.outcome_wafer,
+                       "The packaged wafer (loose process + a degraded bond)")
+    trail = result.dead_trail.splitlines()[0] if result.dead_trail else ""
+    fig.suptitle("G6 — the back end: the assembly-yield funnel (Π yᵢ) + speed binning → a binned, "
+                 "packaged chip (and the three ways to die)\n" + trail, fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    return fig
+
+
 def fab_game_figure(result):
     """Assemble the 2×2 G1 artifact figure from a :class:`~fab_game.demo_fab_game.DemoResult`."""
     import matplotlib.pyplot as plt

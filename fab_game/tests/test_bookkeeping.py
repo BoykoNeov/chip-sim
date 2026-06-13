@@ -27,8 +27,9 @@ def test_provenance_is_append_only():
     # Purification (G4) is a *wafer-level* front-of-line step — its contamination vector is wafer-wide
     # and surfaces per-die only at the device read (Q_ox), so it has no per-die record.
     assert steps == ["purification", "wafer_prep", "diffusion", "oxidation", "litho",
-                     "etch_deposition", "device", "test"]
-    per_die_steps = ["wafer_prep", "diffusion", "oxidation", "litho", "etch_deposition", "device", "test"]
+                     "etch_deposition", "device", "test", "packaging"]
+    per_die_steps = ["wafer_prep", "diffusion", "oxidation", "litho", "etch_deposition", "device",
+                     "test", "packaging"]
     for d in w.dies:
         # Each die saw every per-die step once, in the same order (append-only, never rewritten).
         assert [r.step for r in d.history] == per_die_steps
