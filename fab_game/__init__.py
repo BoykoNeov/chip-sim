@@ -35,6 +35,7 @@ from .recipe import (
     CzochralskiKnobs,
     DeviceKnobs,
     DiffusionKnobs,
+    EtchDepositionKnobs,
     LithoKnobs,
     OxidationKnobs,
     PurificationKnobs,
@@ -50,6 +51,7 @@ from .pipeline import (
     ReworkRecord,
     diagnose,
     initial_wafer,
+    rework_deposition,
     rework_litho,
     rework_polish,
     run_batch,
@@ -63,7 +65,7 @@ __all__ = [
     "DefectEvent", "die_area_cm2",
     # recipe
     "Recipe", "PurificationKnobs", "CzochralskiKnobs", "WaferPrepKnobs", "DiffusionKnobs",
-    "OxidationKnobs", "LithoKnobs", "DeviceKnobs", "DEFAULT_RECIPE",
+    "OxidationKnobs", "LithoKnobs", "EtchDepositionKnobs", "DeviceKnobs", "DEFAULT_RECIPE",
     # variation
     "Variation", "DiePerturbation", "NO_VARIATION",
     # spec
@@ -72,5 +74,5 @@ __all__ = [
     "scatter_defects",
     # pipeline
     "run_line", "run_batch", "initial_wafer", "wafer_yield", "diagnose", "rework_litho",
-    "rework_polish", "LineResult", "BatchResult", "ReworkRecord",
+    "rework_polish", "rework_deposition", "LineResult", "BatchResult", "ReworkRecord",
 ]

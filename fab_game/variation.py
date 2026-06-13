@@ -34,13 +34,17 @@ class DiePerturbation:
 
     ``defocus_nm_delta`` is *added to the litho defocus knob* (systematic tilt + scatter, both
     genuine focus error → the Bossung optics map it to CD); ``t_ox_factor`` multiplies the grown
-    oxide thickness and ``cd_nm_delta`` is added to the printed CD (output-level non-uniformity).
-    The **identity** ``DiePerturbation(0.0, 1.0, 0.0)`` is the no-variation element (the seam).
+    oxide thickness and ``cd_nm_delta`` is added to the printed CD (output-level non-uniformity);
+    ``etch_factor`` (G5) multiplies the etch undercut (etch-rate non-uniformity → an etch-bias jitter
+    routed *through* :func:`chip.etch_deposition.etch_feature`'s ``bias_factor`` hook — so it only
+    moves the CD where the etch is non-ideal, ``anisotropy < 1``). The **identity**
+    ``DiePerturbation(0.0, 1.0, 0.0, 1.0)`` is the no-variation element (the seam).
     """
 
     defocus_nm_delta: float = 0.0
     t_ox_factor: float = 1.0
     cd_nm_delta: float = 0.0
+    etch_factor: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -59,6 +63,7 @@ class Variation:
     focus_sigma_nm: float = 20.0       # focus jitter
     cd_sigma_nm: float = 1.5           # line-width roughness on the printed CD
     t_ox_sigma_frac: float = 0.008     # oxide-thickness jitter
+    etch_bias_sigma_frac: float = 0.0  # etch-rate non-uniformity (G5; 0 ⇒ no draw — keeps banked demos byte-identical)
 
     def _trends(self, die: Die) -> tuple[float, float]:
         """The deterministic center-to-edge trends at this die: (defocus tilt nm, t_ox frac shift)."""
@@ -68,17 +73,31 @@ class Variation:
     def perturbation(self, die: Die, rng: np.random.Generator) -> DiePerturbation:
         """Draw this die's full perturbation from ``rng`` — systematic trend **+** scatter.
 
-        Consumes 3 normals in a fixed order (focus, t_ox, CD). With ``enabled=False`` returns the
-        identity perturbation **without touching ``rng``** — so the seam is exact *and* a
-        disabled-variation run does not perturb the random stream.
+        Consumes 3 normals in a fixed order (focus, t_ox, CD), then a **4th only when**
+        ``etch_bias_sigma_frac > 0`` (the etch non-uniformity, drawn *last* so an enabled run with the
+        default ``etch_bias_sigma_frac = 0`` draws byte-identically to before G5 — the G1–G4 banked
+        demos are unchanged). With ``enabled=False`` returns the identity perturbation **without
+        touching ``rng``** — so the seam is exact *and* a disabled-variation run does not perturb the
+        random stream.
         """
         if not self.enabled:
             return DiePerturbation()
         focus_tilt, t_ox_trend = self._trends(die)
+        # The three existing draws, in their fixed order (focus, t_ox, CD)…
+        defocus_nm_delta = focus_tilt + float(rng.normal(0.0, self.focus_sigma_nm))
+        t_ox_factor = 1.0 + t_ox_trend + float(rng.normal(0.0, self.t_ox_sigma_frac))
+        cd_nm_delta = float(rng.normal(0.0, self.cd_sigma_nm))
+        # …then a 4th, conditional draw LAST: only consume the RNG for the etch jitter when it is
+        # switched on, so an enabled run with the default etch σ = 0 draws byte-identically to before
+        # G5 (the G1–G4 banked demos are unchanged).
+        etch_factor = 1.0
+        if self.etch_bias_sigma_frac > 0.0:
+            etch_factor = 1.0 + float(rng.normal(0.0, self.etch_bias_sigma_frac))
         return DiePerturbation(
-            defocus_nm_delta=focus_tilt + float(rng.normal(0.0, self.focus_sigma_nm)),
-            t_ox_factor=1.0 + t_ox_trend + float(rng.normal(0.0, self.t_ox_sigma_frac)),
-            cd_nm_delta=float(rng.normal(0.0, self.cd_sigma_nm)),
+            defocus_nm_delta=defocus_nm_delta,
+            t_ox_factor=t_ox_factor,
+            cd_nm_delta=cd_nm_delta,
+            etch_factor=etch_factor,
         )
 
     def systematic_perturbation(self, die: Die) -> DiePerturbation:

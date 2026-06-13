@@ -18,6 +18,7 @@ The seam: at the nominal recipe with the identity perturbation, every call reduc
 from __future__ import annotations
 
 from chip import diffusion_dopant as dd
+from chip import etch_deposition as ed
 from chip import oxidation as ox
 from chip import litho
 from chip import device as dev
@@ -26,7 +27,7 @@ from chip.junction import analyze_junction
 from chip.purification import Contamination, sodium_oxide_charge
 from chip.wafer_prep import WaferGeometry
 
-from .recipe import DeviceKnobs, DiffusionKnobs, LithoKnobs, OxidationKnobs
+from .recipe import DeviceKnobs, DiffusionKnobs, EtchDepositionKnobs, LithoKnobs, OxidationKnobs
 from .state import DefectEvent, Die
 from .variation import DiePerturbation
 
@@ -126,6 +127,71 @@ def litho_step(die: Die, knobs: LithoKnobs, pert: DiePerturbation) -> Die:
         outputs={"cd_nm": cd_nm, "nils": feat.nils, "contrast": feat.contrast,
                  "resolved": bool(feat.resolved)},
         cd_nm=cd_nm, nils=feat.nils, resolved=bool(feat.resolved),
+    )
+
+
+def etch_deposition_step(
+    die: Die, knobs: EtchDepositionKnobs, pitch_nm: float, pert: DiePerturbation,
+) -> Die:
+    """Etch & deposition on one die (G5) — transfer the resist CD → the etched gate CD, gate the gap-fill.
+
+    The mid-line step between litho and the device. The **etch** transfers the printed (resist) CD into
+    the gate film through the real anisotropy → etch-bias geometry of
+    :func:`chip.etch_deposition.etch_feature` (a less-anisotropic or over-etched recipe undercuts the
+    mask → the CD shrinks → a shorter channel → the device's ``I_Dsat ∝ W/L`` rises — the "over-etch →
+    CD out of spec" failure of plan §5); the etched CD **overwrites** ``cd_nm`` (the cross-module length
+    the device reads — so the propagation needs *no* device-step change), with the resist CD kept in the
+    record. The **deposition** then fills the gaps between the gate lines: a poor step coverage voids a
+    high-aspect-ratio gap (:func:`chip.etch_deposition.deposit_fill`, the aspect ratio derived from the
+    inherited gate height + ``pitch − CD``) → ``voided`` → a **functional** kill (like a killer particle,
+    distinct from a parametric shift).
+
+    The per-die etch-rate non-uniformity rides ``pert.etch_factor`` through the ``bias_factor`` hook (so
+    it only moves the CD where the etch is non-ideal, ``anisotropy < 1``). Two graceful degradations
+    (degrade, don't crash — like litho's ``resolved=False``): if the litho image did not resolve / no CD
+    was produced upstream, the etch **passes through** untouched (``voided`` stays ``None``) so the
+    device step still refuses; and if a runaway over-etch would consume the whole gate line, the die is
+    marked a **functional** kill (``voided=True``) rather than raising. At the default knobs
+    (``anisotropy = 1`` ⇒ zero bias, ``conformality = 1`` ⇒ no void) the CD passes through
+    **bit-for-bit** and no die voids (the seam).
+    """
+    if die.cd_nm is None or die.resolved is False:
+        reason = ("litho image not resolved" if die.resolved is False else "missing upstream CD")
+        return die.record(
+            "etch_deposition",
+            knobs_in={"anisotropy": knobs.anisotropy, "over_etch_frac": knobs.over_etch_frac},
+            outputs={"skipped": reason},
+        )
+    try:
+        etch = ed.etch_feature(
+            die.cd_nm,
+            film_thickness_nm=knobs.film_thickness_nm, anisotropy=knobs.anisotropy,
+            over_etch_frac=knobs.over_etch_frac, selectivity=knobs.selectivity,
+            bias_factor=pert.etch_factor,
+        )
+        depo = ed.deposit_fill(
+            etch.gate_height_nm, pitch_nm, etch.cd_out_nm, step_coverage=knobs.conformality,
+        )
+    except ValueError as exc:
+        # A degenerate gate geometry — a runaway over-etch consumed the whole line, or the etched lines
+        # touch (no gap to fill). No working gate → a functional kill (not a crash), like litho's refusal.
+        return die.record(
+            "etch_deposition",
+            knobs_in={"anisotropy": knobs.anisotropy, "over_etch_frac": knobs.over_etch_frac,
+                      "etch_factor": pert.etch_factor},
+            outputs={"functional_fail": str(exc)},
+            voided=True,
+        )
+    return die.record(
+        "etch_deposition",
+        knobs_in={"anisotropy": knobs.anisotropy, "over_etch_frac": knobs.over_etch_frac,
+                  "film_thickness_nm": knobs.film_thickness_nm, "conformality": knobs.conformality,
+                  "etch_factor": pert.etch_factor},
+        outputs={"resist_cd_nm": die.cd_nm, "cd_nm": etch.cd_out_nm, "etch_bias_nm": etch.etch_bias_nm,
+                 "gate_height_nm": etch.gate_height_nm, "underlayer_loss_nm": etch.underlayer_loss_nm,
+                 "aspect_ratio": depo.aspect_ratio, "critical_aspect_ratio": depo.critical_aspect_ratio,
+                 "voided": depo.voided},
+        cd_nm=etch.cd_out_nm, gate_height_nm=etch.gate_height_nm, voided=depo.voided,
     )
 
 

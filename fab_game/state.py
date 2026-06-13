@@ -106,12 +106,14 @@ class Die:
     resolved: bool | None = None
     x_j_um: float | None = None
     R_s: float | None = None
+    gate_height_nm: float | None = None         # standing gate height after the etch (G5; the gap-fill AR reads it)
     V_t: float | None = None
     i_dsat: float | None = None
     tau: float | None = None                    # minority-carrier SRH lifetime (s) — deep-level metals (G4b)
     j_leak: float | None = None                 # junction reverse-leakage density (A/cm²) — the metal killer (G4b)
     defects: tuple[DefectEvent, ...] = ()       # killer particles caught at wafer prep (G3)
     killed_by_defect: bool | None = None        # set by wafer prep; True ⇒ a functional fail
+    voided: bool | None = None                  # set by etch/depo (G5); True ⇒ a depo void → functional fail
     verdict: Verdict | None = None
     history: tuple[DieStepRecord, ...] = ()
 

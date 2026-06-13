@@ -110,38 +110,78 @@ device step (a new die field + an *optional* leakage spec window), so the proven
 unchanged and the metals never touch `V_t`/`I_Dsat`. **Gettering / precipitation / oxide breakdown**
 stay named **Tier-3** edges.
 
+## G5 — etch & deposition (the mid-line, between litho and the device)
+
+The missing mid-line operations, the plan's **flagged-phenomenology** tier (§7) —
+[`chip/etch_deposition.py`](../chip/etch_deposition.py) (triad-tested), two sections wired into the
+pipeline **after litho, before the device** as one `etch_deposition_step`:
+
+- **Etch — anisotropy → etch bias → the gate CD (the parametric failure).** A real etch is directional
+  but not perfectly so: with anisotropy `A < 1` it undercuts the mask, and the **over-etch** needed to
+  clear residue deepens the etch → widens the undercut → the transferred gate CD shrinks below the
+  printed CD (`bias = 2·(1−A)·h·(1+OE)`). The etched CD **overwrites `cd_nm`**, so the device reads the
+  *gate* CD — a shorter channel → `I_Dsat ∝ W/L` over its ceiling, CD out the bottom of its window. A
+  perfectly anisotropic etch (`A = 1`) is the seam (zero bias).
+- **Deposition — step coverage → a keyhole void (the functional failure).** The gap between gate lines
+  (`pitch − CD`, aspect ratio `gate-height / gap`, *derived from the inherited gate geometry*) must be
+  filled; a poor line-of-sight **PVD** (`SC ≈ 0.3`) pinches off a void where a conformal **CVD**
+  (`≈ 0.9`) fills (`void ⇔ AR > SC/(1−SC)`) — a **functional** kill (the die's `V_t`/`I_Dsat` read fine),
+  parallel to a killer particle. `SC = 1` (conformal) never voids — the seam.
+
+> a poor **PVD** coverage voids the same gate gap a conformal **CVD** fills → scrapped on the **void**,
+> the trail naming the non-conformal fill. **Rework is the reworkable/irreversible contrast** (the plan's
+> "depo strippable; over-etch irreversible"): `rework_deposition` re-deposits a void conformally → it
+> recovers, but a die whose CD was collapsed by over-etch stays dead (you cannot un-etch the gate).
+
+The one genuinely **tight** leg is the bit-for-bit **seam** (`A=1` ⇒ bias 0 for any film/over-etch;
+`SC=1` ⇒ never voids); the bias / underlayer / aspect-ratio algebra is **machinery (regression guards),
+not a conservation anchor** (no only-possible-law content here, unlike wafer-prep area-additivity);
+the magnitudes (anisotropy, step coverage, the pinch-off AR) are **flagged house numbers** — only the
+cited *forms* (Wolf & Tauber; Plummer–Deal–Griffin; Campbell) and band orderings are asserted
+([`chip/tests/test_etch_deposition.py`](../chip/tests/test_etch_deposition.py)). The optional etch-rate
+non-uniformity is a **conditional 4th RNG draw** (fires only when its σ>0 → the G1–G4 demos are
+byte-identical). **CMP planarization is named and deferred** (no device consumer in the compact model —
+its real consumers, dishing→opens and planarity→focus budget, are unwired; TTV→focus is already a
+`wafer_prep` edge).
+
 ## Module map
 
 - **`state.py`** — the immutable `WaferState` / `Die` die-map + append-only `DieStepRecord`
   provenance (the "why did this die?" trail). G2 added the substrate fields `slice_z` /
   `resistivity_ohm_cm`; G3 added per-die **`defects`** / `killed_by_defect`, the wafer-level
   **`geometry`**, the `DefectEvent` type, and the **single** `die_area_cm2` / cell-geometry helpers;
-  G4 added the wafer-level **`contamination`** vector and the per-die **`tau`** / **`j_leak`** (G4b).
+  G4 added the wafer-level **`contamination`** vector and the per-die **`tau`** / **`j_leak`** (G4b);
+  G5 added per-die **`gate_height_nm`** + **`voided`** (the etch/depo functional-kill flag).
 - **`recipe.py`** — the per-step knob dataclasses; `DEFAULT_RECIPE` **is** `chip.demo_device`'s
   coherent n-MOSFET recipe (the seam anchor). G2 added **`CzochralskiKnobs`**; G3 added
   **`WaferPrepKnobs`** (geometry + the killer-defect density); G4 added **`PurificationKnobs`**
   (feedstock grade + zone passes, defaulting to a clean feed) + the derived `contamination` /
-  `effective_channel_N_A` recipe properties.
+  `effective_channel_N_A` recipe properties; G5 added **`EtchDepositionKnobs`** (anisotropy / over-etch
+  / step coverage, defaulting to perfectly anisotropic + conformal = the seam).
 - **`variation.py`** — the seeded stochastic spread: a center-to-edge trend routed *through the
   physics* + die-to-die output scatter. `NO_VARIATION` collapses to one physics call (the seam).
-  Magnitudes are **flagged house defaults**, not cited.
+  Magnitudes are **flagged house defaults**, not cited. G5 added the **conditional** etch-rate channel
+  (`etch_bias_sigma_frac`, default 0 → no 4th draw → the banked demos stay byte-identical).
 - **`defects.py`** (G3) — the seeded **per-die Poisson** killer-particle placement (off without
   touching the RNG when the stochastic layer is disabled or the line is clean — the seam).
 - **`spec.py`** — spec windows → the per-die verdict (NILS / CD / I_Dsat / V_t); G3 added the
   killer-defect **functional** gate and the wafer-level **`GeometrySpec`** (TTV/bow) scrap gate; G4b
   added the *optional* **leakage** window (`SpecWindow.optional` — a die not scored on leakage isn't
-  failed "missing").
+  failed "missing"); G5 added the **deposition-void** functional gate.
 - **`steps.py`** — the deterministic step wrappers; G3 added `wafer_prep_step` (geometry + defects);
   G4 wired the **device step's contamination reads** (Na→`Q_ox`→`V_t`; G4b Fe/Cu→`chip.lifetime`→the
-  leakage field), all *inside* `device_step` (no new pipeline step).
+  leakage field), all *inside* `device_step`; G5 added **`etch_deposition_step`** (the etch overwrites
+  `cd_nm`, the depo sets `voided`; degrades gracefully on an unresolved image / a runaway over-etch).
 - **`pipeline.py`** — `run_line` (the driver, one seeded RNG in fixed die order; the wafer-level
-  purification + wafer-prep run first), `wafer_yield`, `diagnose` (the failure trail, + killer-defect /
-  `Q_ox` / deep-level-metal leakage branches), `rework_litho`, G3's **`rework_polish`**, and G2's
-  **`run_batch`**.
+  purification + wafer-prep run first, the **etch/depo step between litho and the device**),
+  `wafer_yield`, `diagnose` (the failure trail, + killer-defect / `Q_ox` / deep-level-metal leakage /
+  **etch-bias & void** branches), `rework_litho`, G3's **`rework_polish`**, G5's **`rework_deposition`**
+  (re-deposit a void; the etch is irreversible), and G2's **`run_batch`**.
 - **`demo_fab_game.py`** + **`demo_boule.py`** + **`demo_wafer_prep.py`** + **`demo_purification.py`**
-  + **`demo_lifetime.py`** + **`plots.py`** — the banked artifacts (`fab-game-g1.png` defocus;
-  `fab-game-g2.png` boule → V_t; `fab-game-g3.png` particle map + yield law + TTV scrap;
-  `fab-game-g4.png` Na → V_t scrap + rework; `fab-game-g4b.png` metals → leaky diode + rework).
+  + **`demo_lifetime.py`** + **`demo_etch.py`** + **`plots.py`** — the banked artifacts
+  (`fab-game-g1.png` defocus; `fab-game-g2.png` boule → V_t; `fab-game-g3.png` particle map + yield law +
+  TTV scrap; `fab-game-g4.png` Na → V_t scrap + rework; `fab-game-g4b.png` metals → leaky diode + rework;
+  `fab-game-g5.png` over-etch CD walk + the void map + the rework contrast).
 - **`fab_game.ipynb`** — the thin notebook skin (not in the correctness path).
 
 ## Test discipline (ADR 0005 §5) — mechanics invariants, not cited magnitudes
@@ -168,6 +208,11 @@ stay named **Tier-3** edges.
   scrapped on **leakage** (not `V_t`) and named; more passes recover; clean is the baseline seam.
 - **`test_demo_purification.py`** / **`test_demo_lifetime.py`** (G4a/G4b) — the banked artifacts'
   theses (the Na→`V_t` kill + rework; the isolated metal → leaky-diode kill + rework).
+- **`test_etch.py`** (G5) — the etch/depo wiring: the etched CD overwrites the device's currency
+  (over-etch → CD ↓ → `I_Dsat` ↑), a poor coverage voids functionally, the unresolved/runaway cases
+  degrade gracefully, and the etch-rate channel is deterministic *and* draws no RNG when off.
+- **`test_demo_etch.py`** (G5) — the banked artifact's thesis (the over-etch CD walk out of window, the
+  PVD-voids/CVD-fills contrast, the reworkable-void / irreversible-etch rework).
 
 ## Run it
 
@@ -177,6 +222,7 @@ python -m fab_game.demo_boule             # the G2 boule → V_t spread, banks d
 python -m fab_game.demo_wafer_prep        # the G3 particle map + yield law + TTV scrap, banks fab-game-g3.png
 python -m fab_game.demo_purification      # the G4a Na → V_t scrap + rework, banks fab-game-g4.png
 python -m fab_game.demo_lifetime          # the G4b metals → leaky diode + rework, banks fab-game-g4b.png
+python -m fab_game.demo_etch              # the G5 over-etch CD walk + void map + rework, banks fab-game-g5.png
 pytest fab_game/ -q                       # the mechanics suite (rides the fast lane)
 jupyter lab fab_game/fab_game.ipynb       # the interactive skin (needs the [viz,notebook] extras)
 ```

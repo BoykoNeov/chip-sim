@@ -314,6 +314,35 @@ thing).
   > G1–G4a demos byte-for-byte unchanged. Fast lane 401→**423** (+22); no engine amendment, no ADR, no chip
   > gallery card. **Tier-3 (gettering/precipitation, oxide breakdown) stays the named edge.**
 - **G5 — Etch / deposition / CMP.** The missing mid-line operations (phenomenological, honest).
+  > **G5 BUILT (2026-06-13).** The mid-line step between litho and the device, the plan's **flagged-
+  > phenomenology** tier (§7). New cited physics `chip/etch_deposition.py` — two sections: **(1)
+  > pattern-transfer etch** — anisotropy ``A`` → etch bias ``2·(1−A)·h·(1+OE)`` shrinks the resist CD
+  > into the gate CD (over-etch deepens the etch → widens the undercut → CD ↓), with the over-etch
+  > underlayer loss ``OE·h/S``; **(2) deposition step coverage** — a keyhole void when the gap aspect
+  > ratio ``h/(pitch−CD)`` exceeds ``AR_crit = SC/(1−SC)`` (a poor PVD voids the gap a conformal CVD
+  > fills). Triad (`test_etch_deposition.py`, 14): **the one genuinely tight leg is the bit-for-bit
+  > seam** (``A=1`` ⇒ bias 0 for any film/over-etch; ``SC=1`` ⇒ never voids), the bias/underlayer/AR
+  > algebra is **machinery (regression guards), not a conservation anchor** (advisor: there is no
+  > only-possible-law content here, unlike wafer-prep area-additivity / SRH detailed balance), and the
+  > magnitudes (anisotropy, step coverage, the pinch-off AR) are **flagged house numbers** — only the
+  > cited *forms* (Wolf & Tauber; Plummer–Deal–Griffin; Campbell) and the band orderings are asserted.
+  > **CMP planarization is named and DEFERRED** (advisor: no device consumer in the compact model — its
+  > real consumers, dishing→metal-opens and planarity→next-litho focus budget, are unwired, and TTV→focus
+  > is *already* a named `wafer_prep` edge; don't let "(+ CMP)" pull filler in). Wired into `fab_game`:
+  > `EtchDepositionKnobs` (default = perfectly anisotropic + conformal = the seam) + an
+  > `etch_deposition_step` inserted **after litho, before device** that **overwrites `cd_nm`** (the
+  > device reads the etched gate CD — the propagation needs no device change) and gates the gap-fill on
+  > conformality vs the gate aspect ratio (a **void → a functional kill**, parallel to a killer particle).
+  > The aspect ratio is **derived from the inherited gate geometry** (height + ``pitch−CD``), a genuine
+  > propagation. The optional etch-rate non-uniformity is a **conditional 4th RNG draw** (only fires when
+  > its σ>0, drawn last → the G1–G4 banked demos are byte-identical — the advisor's trap). Two graceful
+  > degradations (degrade, don't crash): an unresolved litho image passes through to the device's refusal,
+  > and a runaway over-etch that would consume the whole line is a functional kill. New `rework_deposition`
+  > banks the plan's **reworkable/irreversible contrast** — a depo void is strippable (re-deposit
+  > conformally → recovers), the etched CD is irreversible (a perfect re-fill can't undo it). Banked
+  > `demo_etch`/`fab-game-g5.png` (the over-etch CD walk out of window | the PVD-voids/CVD-fills map | the
+  > rework contrast). Default knobs ⇒ the seam ⇒ G1–G4 demos byte-for-byte unchanged. Fast lane 423→**451**
+  > (+28); no engine amendment, no ADR, no chip gallery card.
 - **G6 — Packaging & test & binning.** The back-end assembly yield + parametric/functional test.
 - **G7 — Roguelike framing + scoring + a Textual TUI; sandbox mode.** The game shell over the
   proven sim. (Tycoon deferred — same harness, different objective.)

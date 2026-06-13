@@ -351,6 +351,83 @@ def lifetime_figure(result):
     return fig
 
 
+# --------------------------------------------------------------------------- #
+# G5 — etch & deposition: CD transfer (etch bias) + the void map + the rework
+# --------------------------------------------------------------------------- #
+def _etch_bias_panel(ax, result) -> None:
+    """Gate CD vs over-etch, per anisotropy — a real etch undercuts; the seam (A=1) is flat."""
+    oe = np.asarray(result.over_etch)
+    colors = {result.etch_curves[0]: "#2ca02c", result.etch_curves[1]: "#2f6db5",
+              result.etch_curves[2]: "#d62728"}
+    for A in result.etch_curves:
+        label = "A = 1.0 (ideal — seam)" if A == 1.0 else f"A = {A:.2f}"
+        ax.plot(oe, result.cd_by_aniso[A], lw=1.7, color=colors.get(A, "0.4"), marker="o", ms=3,
+                label=label)
+    ax.axhspan(result.cd_lo, result.cd_hi, color="#2ca02c", alpha=0.10, zorder=0)
+    ax.axhline(result.cd_lo, color="#2ca02c", ls="--", lw=1.0, alpha=0.7)
+    ax.set_xlabel("over-etch fraction (past endpoint)", fontsize=9)
+    ax.set_ylabel("gate CD (nm)", fontsize=9)
+    ax.set_title("Etch bias: over-etch undercuts → CD shrinks\n(out the bottom of its window → I_Dsat ↑)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="lower left")
+
+
+def _void_panel(ax, result) -> None:
+    """Max void-free aspect ratio vs step coverage, with the gate gap + the CVD/PVD points."""
+    sc = np.asarray(result.step_coverages)
+    ax.plot(sc, result.ar_crit_curve, color="0.35", lw=1.7, zorder=2,
+            label="max void-free AR = SC/(1−SC)")
+    ax.axhline(result.gate_gap_ar, color="#7f3fbf", ls="--", lw=1.2,
+               label=f"gate-gap AR ≈ {result.gate_gap_ar:.2f}")
+    # The two process points (AR_crit values come from compute() — plots never recompute physics): PVD
+    # sits below the gap line (voids), CVD above (fills, clamped into view).
+    top = result.gate_gap_ar * 6
+    ax.scatter([result.pvd_sc], [result.pvd_ar_crit], s=70, zorder=4,
+               color="#d62728", label=f"PVD ({result.pvd_sc:.1f}) → void")
+    ax.scatter([result.cvd_sc], [min(result.cvd_ar_crit, top)], s=70, zorder=4,
+               color="#2ca02c", label=f"CVD ({result.cvd_sc:.1f}) → fills")
+    ax.set_ylim(0, top)
+    ax.set_xlabel("deposition step coverage (sidewall / top)", fontsize=9)
+    ax.set_ylabel("aspect ratio", fontsize=9)
+    ax.set_title("Step coverage: a non-conformal fill voids the\ngap a conformal one fills (functional kill)",
+                 fontsize=10)
+    ax.legend(fontsize=7.5, loc="upper left")
+
+
+def _etch_rework_panel(ax, result) -> None:
+    """Yield before/after re-deposit: the void recovers, the over-etched CD does not (irreversible)."""
+    x = np.arange(2)
+    width = 0.36
+    before = [result.void_yield_before * 100, result.overetch_yield_before * 100]
+    after = [result.void_yield_after * 100, result.overetch_yield_after * 100]
+    ax.bar(x - width / 2, before, width, color="#d62728", label="before rework", zorder=2)
+    ax.bar(x + width / 2, after, width, color="#2ca02c", label="after re-deposit (CVD)", zorder=2)
+    ax.set_xticks(x)
+    ax.set_xticklabels(["PVD void\n(strippable)", "over-etch\n(irreversible)"], fontsize=9)
+    ax.set_ylabel("wafer yield (%)", fontsize=9)
+    ax.set_ylim(0, 108)
+    ax.set_title("Rework: a depo void re-deposits clean;\nan over-etched CD cannot be undone", fontsize=10)
+    ax.legend(fontsize=8, loc="upper center")
+    for xi, (b, a) in enumerate(zip(before, after)):
+        ax.text(xi - width / 2, b + 2, f"{b:.0f}", ha="center", fontsize=8, color="0.3")
+        ax.text(xi + width / 2, a + 2, f"{a:.0f}", ha="center", fontsize=8, color="0.3")
+
+
+def etch_figure(result):
+    """Assemble the G5 artifact from a :class:`~fab_game.demo_etch.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _etch_bias_panel(axes[0], result)
+    _void_panel(axes[1], result)
+    _etch_rework_panel(axes[2], result)
+    trail = result.void_trail.splitlines()[0] if result.void_trail else ""
+    fig.suptitle("G5 — mid-line etch & deposition: over-etch shrinks the gate CD; a non-conformal fill "
+                 "voids the gap; rework recovers the void, not the etch\n" + trail, fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    return fig
+
+
 def fab_game_figure(result):
     """Assemble the 2×2 G1 artifact figure from a :class:`~fab_game.demo_fab_game.DemoResult`."""
     import matplotlib.pyplot as plt

@@ -127,6 +127,32 @@ class LithoKnobs:
 
 
 @dataclass(frozen=True)
+class EtchDepositionKnobs:
+    """Etch & deposition knobs → :mod:`chip.etch_deposition` (G5) — the mid-line gate-pattern transfer.
+
+    The etch transfers the resist CD into the gate film: ``anisotropy`` ∈ ``[0, 1]`` (1 = perfectly
+    anisotropic; <1 undercuts the mask → an etch bias that **shrinks** the CD), ``over_etch_frac`` the
+    extra etch past endpoint (deepens the etch → widens the undercut → more CD loss, and consumes the
+    underlayer by ``OE·film/selectivity``), ``film_thickness_nm`` the gate film etched through (sets
+    the standing gate height the deposition's gap aspect ratio reads), ``selectivity`` to the
+    underlayer. The deposition then fills the gaps between gate lines: ``conformality`` (step coverage)
+    ∈ ``[0, 1]`` (1 = conformal CVD; a poor PVD voids high-aspect-ratio gaps → a **functional** kill).
+
+    Defaults are the **idealized seam baseline** — ``anisotropy = 1`` (zero bias → the etched CD equals
+    the printed CD bit-for-bit) and ``conformality = 1`` (never voids) — so the seam *and* the G1–G4
+    banked demos are byte-for-byte unchanged (the etch step is the identity at the default recipe). The
+    G5 demo dials a realistic ``anisotropy < 1`` + over-etch (CD collapse) and a poor PVD coverage (the
+    void kill).
+    """
+
+    film_thickness_nm: float = 150.0   # gate film etched through (sets the standing gate height)
+    anisotropy: float = 1.0            # 1 = perfectly anisotropic (the seam); <1 → etch bias → CD shrinks
+    over_etch_frac: float = 0.0        # over-etch past endpoint (0 = none; deepens etch → more undercut)
+    selectivity: float = 20.0          # etch selectivity to the underlayer (over-etch underlayer loss)
+    conformality: float = 1.0          # deposition step coverage (1 = conformal CVD seam; <1 voids high-AR gaps)
+
+
+@dataclass(frozen=True)
 class DeviceKnobs:
     """Device-read knobs → :func:`chip.device.threshold_voltage` / :func:`chip.device.saturation_current`."""
 
@@ -151,6 +177,7 @@ class Recipe:
     diffusion: DiffusionKnobs = field(default_factory=DiffusionKnobs)
     oxidation: OxidationKnobs = field(default_factory=OxidationKnobs)
     litho: LithoKnobs = field(default_factory=LithoKnobs)
+    etch_deposition: EtchDepositionKnobs = field(default_factory=EtchDepositionKnobs)
     device: DeviceKnobs = field(default_factory=DeviceKnobs)
 
     @property

@@ -25,7 +25,14 @@ from .defects import scatter_defects
 from .recipe import DEFAULT_RECIPE, Recipe
 from .spec import DEFAULT_SPECS, SpecSet
 from .state import Die, StepRecord, Verdict, WaferState, build_die_map
-from .steps import device_step, diffusion_junction, litho_step, oxidation_step, wafer_prep_step
+from .steps import (
+    device_step,
+    diffusion_junction,
+    etch_deposition_step,
+    litho_step,
+    oxidation_step,
+    wafer_prep_step,
+)
 from .variation import NO_VARIATION, Variation
 
 
@@ -146,6 +153,21 @@ def run_line(
     wafer = wafer.with_step(
         StepRecord("litho", {"defocus_nm": recipe.litho.defocus_nm,
                              "pitch_nm": recipe.litho.pitch_nm, "NA": recipe.litho.NA},
+                   _aggregate(dies, "cd_nm")), dies)
+
+    # 3b. Etch & deposition (G5) — per die: transfer the resist CD → the etched gate CD (anisotropy →
+    #     etch bias overwrites cd_nm, which the device reads next), and gate the gap-fill on conformality
+    #     vs the gate aspect ratio (a void → a functional fail). At default knobs (perfectly anisotropic,
+    #     conformal) the CD passes through bit-for-bit and no die voids (the seam).
+    dies = tuple(
+        etch_deposition_step(d, recipe.etch_deposition, recipe.litho.pitch_nm, perts[d.site])
+        for d in wafer.dies
+    )
+    wafer = wafer.with_step(
+        StepRecord("etch_deposition",
+                   {"anisotropy": recipe.etch_deposition.anisotropy,
+                    "over_etch_frac": recipe.etch_deposition.over_etch_frac,
+                    "conformality": recipe.etch_deposition.conformality},
                    _aggregate(dies, "cd_nm")), dies)
 
     # 4. Device — per die, reading the inherited t_ox + cd + the wafer contamination (the propagation:
@@ -293,8 +315,10 @@ def diagnose(die: Die) -> str:
         locs = ", ".join(f"({d.x:+.2f}, {d.y:+.2f})" for d in die.defects)
         lines.append(f"    ↳ wafer prep: caught {len(die.defects)} killer particle(s) at {locs} "
                      f"(wafer-radius units) — a functional kill, no working die")
-    # Walk the trail for the litho focus (the dramatic-win root cause) and the device read.
+    # Walk the trail for the litho focus (the dramatic-win root cause), the etch/depo transfer, and
+    # the device read.
     litho = next((r for r in die.history if r.step == "litho"), None)
+    etch = next((r for r in die.history if r.step == "etch_deposition"), None)
     device = next((r for r in die.history if r.step == "device"), None)
     if litho is not None:
         eff = litho.knobs_in.get("defocus_nm")
@@ -302,6 +326,24 @@ def diagnose(die: Die) -> str:
                      f"CD {litho.outputs.get('cd_nm', float('nan')):.1f} nm, "
                      f"NILS {litho.outputs.get('nils', float('nan')):.2f}, "
                      f"resolved={litho.outputs.get('resolved')}")
+    # The etch/deposition fingerprint (G5): an etch bias that shrank the resist CD into the gate CD
+    # (over-etch / a non-anisotropic etch → I_Dsat over its ceiling), or a deposition void (a poor step
+    # coverage that failed to fill the gate gap → a functional kill).
+    if etch is not None:
+        if etch.outputs.get("voided") is True:
+            ar = etch.outputs.get("aspect_ratio", float("nan"))
+            ar_c = etch.outputs.get("critical_aspect_ratio", float("nan"))
+            lines.append(f"    ↳ etch/depo: deposition VOID — gap aspect ratio {ar:.2f} > the "
+                         f"step-coverage limit {ar_c:.2f} (non-conformal fill → keyhole; a functional "
+                         f"kill — deposit more conformally / open the pitch)")
+        elif etch.outputs.get("functional_fail"):
+            lines.append(f"    ↳ etch/depo: functional fail — {etch.outputs['functional_fail']} "
+                         f"(no working gate — back off the over-etch / raise the anisotropy)")
+        elif "etch_bias_nm" in etch.outputs:
+            bias = etch.outputs.get("etch_bias_nm", float("nan"))
+            lines.append(f"    ↳ etch/depo: etch bias {bias:.1f} nm shrank the resist CD "
+                         f"{etch.outputs.get('resist_cd_nm', float('nan')):.1f} → gate CD "
+                         f"{etch.outputs.get('cd_nm', float('nan')):.1f} nm (over-etch / low anisotropy)")
     if device is not None and "refused" in device.outputs:
         lines.append(f"    ↳ device: refused ({device.outputs['refused']}) — no working transistor")
     elif device is not None:
@@ -372,10 +414,13 @@ def rework_litho(
             new_dies.append(d)
             continue
         n_attempted += 1
-        # Re-expose at the corrected focus + the persistent focus bowl (no fresh scatter),
-        # re-run the device on the refreshed CD, and re-score. A die killed by a particle (or a
+        # Re-expose at the corrected focus + the persistent focus bowl (no fresh scatter), re-etch the
+        # refreshed resist CD into the gate (so the device reads the re-etched CD — the same mid-line
+        # transfer the run applied), re-run the device, and re-score. A die killed by a particle (or a
         # geometry-scrapped wafer) re-tests the same way — litho rework cannot remove a defect.
         red = litho_step(d, corrected, variation.systematic_perturbation(d))
+        red = etch_deposition_step(red, recipe.etch_deposition, recipe.litho.pitch_nm,
+                                   variation.systematic_perturbation(d))
         red = device_step(red, recipe.device, wafer.channel_N_A, contamination=wafer.contamination)
         red = _verdict_die(red, specs, geometry_reason)
         new_dies.append(red)
@@ -432,6 +477,52 @@ def rework_polish(
     record = ReworkRecord("polish", n_attempted=n_attempted, n_recovered=after - before,
                           note=f"re-CMP −{extra_removal_um:.0f} µm → TTV {repolished.ttv_um:.3f} µm")
     return replace(reworked, dies=tuple(new_dies), rework_log=reworked.rework_log + (record,))
+
+
+def rework_deposition(
+    wafer: WaferState,
+    recipe: Recipe = DEFAULT_RECIPE,
+    *,
+    specs: SpecSet = DEFAULT_SPECS,
+    conformality: float = 0.9,
+) -> WaferState:
+    """Strip & **re-deposit** the voided dies at a more conformal step coverage, then re-test.
+
+    The plan's depo-reworkable path ("depo sometimes strippable; over-etch irreversible"): a keyhole
+    void is stripped and re-filled by a more conformal deposition (``conformality``, a CVD by default)
+    — recovering the die *iff* its parametrics are otherwise in spec. The **etch is irreversible**: the
+    gate CD is already cut, so a die failed on an over-etched (collapsed) CD stays dead even after a
+    perfect re-fill — the teachable irreversible-vs-reworkable contrast. Only **voided** dies are
+    re-deposited (read back the gate height + etched CD each carries and re-fill at the new coverage);
+    passing dies and parametrically-failed (non-voided) dies are returned untouched. Provenance/die
+    total never shrink and the accounting closes (``n_recovered = good_after − good_before``).
+    """
+    from chip import etch_deposition as ed
+
+    before = sum(d.verdict.passed for d in wafer.dies if d.verdict is not None)
+    geometry_reason = specs.geometry.check(wafer.geometry)
+    pitch_nm = recipe.litho.pitch_nm
+    n_attempted = 0
+    new_dies: list[Die] = []
+    for d in wafer.dies:
+        # Re-deposit only the voided dies; a void needs a gate height + etched CD to re-fill.
+        if d.voided is not True or d.gate_height_nm is None or d.cd_nm is None:
+            new_dies.append(d)
+            continue
+        n_attempted += 1
+        depo = ed.deposit_fill(d.gate_height_nm, pitch_nm, d.cd_nm, step_coverage=conformality)
+        red = d.record(
+            "etch_deposition_rework",
+            knobs_in={"conformality": conformality},
+            outputs={"aspect_ratio": depo.aspect_ratio,
+                     "critical_aspect_ratio": depo.critical_aspect_ratio, "voided": depo.voided},
+            voided=depo.voided,
+        )
+        new_dies.append(_verdict_die(red, specs, geometry_reason))
+    after = sum(d.verdict.passed for d in new_dies if d.verdict is not None)
+    record = ReworkRecord("deposition", n_attempted=n_attempted, n_recovered=after - before,
+                          note=f"re-deposit at step coverage {conformality:.2f}")
+    return replace(wafer, dies=tuple(new_dies), rework_log=wafer.rework_log + (record,))
 
 
 # --------------------------------------------------------------------------- #
