@@ -383,6 +383,36 @@ thing).
   > honest default).
 - **G7 — Roguelike framing + scoring + a Textual TUI; sandbox mode.** The game shell over the
   proven sim. (Tycoon deferred — same harness, different objective.)
+  > **G7 BUILT (2026-06-13) — framing + scoring; TUI deferred.** The roguelike shell over the
+  > now-complete line, **purely additive game policy** (no physics / `run_line` / `WaferState` touched →
+  > the 476 stay green trivially, no ADR). Two new game-layer modules: `fab_game/scoring.py` (the
+  > economics — bin **prices** + wafer/scrap/rework **costs** → a `ScoreCard`, `revenue = Σ price·count`
+  > over shipped dies, `profit = revenue − cost`) and `fab_game/game.py` (the **session** — an immutable
+  > `GameSession` + `GameConfig`, `process_wafer`/`scrap_wafer`/`play`, `RunRecord` history). **The frame
+  > is physics-grounded, not invented:** *one boule = one run, each wafer a turn,* and the **G2 Scheil
+  > `V_t` drift is the difficulty curve** — boron segregates down the boule (`N_A` ↑ → `V_t` walks
+  > 0.55→0.75, out the 0.68 ceiling by z≈0.8), so the tail forces a decision. The **lever** is
+  > physics-grounded too: **thin the gate oxide** (lower `t_ox` → lower `V_t` *and* higher `I_Dsat`) pulls
+  > the tail back into spec and into the premium speed bin. The banked `demo_game`/`fab-game-g7.png` plays
+  > three strategies down the same boule — **naive** (process all → tail bleeds), **scrap-the-tail** (cut
+  > the loss), **adapt** (thin the oxide every wafer) — scored: a worse strategy banks less (naive < scrap
+  > < adapt). **The attribution honesty (a done-check finding, advisor):** adapt posts the top score, but
+  > **~90 % of its edge over naive is *upgrading in-spec, never-in-danger wafers to premium*** (thinner
+  > oxide → faster part → premium bin — the real scaling lever) and **only ~10 % is the doomed-tail
+  > rescue** — a premium *windfall*, not "adapt-or-die." So the clean, cost-independent lesson is
+  > **scrap-vs-naive** (cut the loss on the doomed tail); the windfall is **double-braked**: *(in-model)*
+  > over-thinning the **extreme tail** drives `I_Dsat` into its **spec ceiling** (the linear trim's last
+  > slice sits at the ceiling → within-wafer variation tips half its dies over → it fumbles — a Goldilocks
+  > window), **plus** *(unmodeled)* no gate-oxide reliability/leakage penalty (a real fab can't thin
+  > freely), a named scope edge. **The TUI is deliberately deferred** (the user scoped this to
+  > "framing/scoring"; "roguelike framing" is a *session model*, not a UI — everything here is headless
+  > and testable; a Textual front-end would be a thin driver of this session, added when wanted).
+  > Mechanics-tested (ADR 0005 §5): determinism (a fixed `(seed, decisions)` reproduces the run),
+  > bookkeeping closes (`budget = start + Σ profits`, append-only history), monotonicity (a better bin mix
+  > never scores less), sandbox-vs-roguelike (the bankrupt gate is one mode flag), and the drift arc
+  > (naive's tail fails where adapt holds; adapt > scrap > naive). Fast lane 476→**492** (+16:
+  > `test_scoring.py` 5, `test_game.py` 8, `test_demo_game.py` 3); no engine amendment, no ADR, no chip
+  > gallery card. **Tycoon deferred** (same harness, a different objective + scoring).
 
 ### 6a. Crystal-growth deepenings (G2 follow-ons — deferred; detailed when their time comes)
 

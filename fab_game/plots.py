@@ -536,6 +536,73 @@ def packaging_figure(result):
     return fig
 
 
+# --------------------------------------------------------------------------- #
+# G7 — the roguelike run down one boule: the Scheil V_t drift + scored strategies
+# --------------------------------------------------------------------------- #
+def _drift_panel(ax, result) -> None:
+    """V_t vs slice_z: the naive recipe walks out of spec; the adaptive oxide trim holds it in."""
+    z = np.asarray(result.z_curve)
+    ax.axhspan(result.vt_lo, result.vt_hi, color="#2ca02c", alpha=0.12,
+               label=f"V_t spec [{result.vt_lo:.2f}, {result.vt_hi:.2f}]")
+    ax.plot(z, result.vt_naive, color="#d62728", lw=1.8, label="naive (fixed recipe)")
+    ax.plot(z, result.vt_adaptive, color="#2f6db5", lw=1.8, label="adapt (thin the oxide)")
+    ax.set_xlabel("axial position z (down the boule)", fontsize=9)
+    ax.set_ylabel("device V_t (V)", fontsize=9)
+    ax.set_title("The difficulty curve: Scheil drift walks V_t up\n(naive exits the ceiling; adapt holds)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+
+
+def _score_panel(ax, result) -> None:
+    """Budget vs wafer (turn) for the three strategies — the roguelike payoff: the lines diverge."""
+    for traj, color, name in ((result.naive_budget, "#d62728", "naive"),
+                              (result.scrap_budget, "#ff7f0e", "scrap the tail"),
+                              (result.adaptive_budget, "#2f6db5", "adapt (thin oxide)")):
+        x = range(1, len(traj) + 1)
+        ax.plot(x, traj, color=color, lw=1.8, marker="o", ms=4, label=name)
+    ax.axhline(result.naive.config.starting_budget, color="0.5", ls=":", lw=1.0,
+               label=f"start ${result.naive.config.starting_budget:.0f}")
+    ax.set_xlabel("wafer (turn down the boule)", fontsize=9)
+    ax.set_ylabel("budget ($, house)", fontsize=9)
+    ax.set_title("Scored playthrough: a worse strategy banks less\n(adapt's win = premium upgrade, not tail rescue)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+
+
+def _profit_panel(ax, result) -> None:
+    """Per-wafer profit down the boule: naive collapses at the tail where adaptive climbs (premium)."""
+    x = np.arange(len(result.wafer_z))
+    width = 0.4
+    ax.bar(x - width / 2, result.naive_profit, width, color="#d62728", label="naive", zorder=2)
+    ax.bar(x + width / 2, result.adaptive_profit, width, color="#2f6db5", label="adapt", zorder=2)
+    ax.axhline(0.0, color="0.3", lw=1.0)
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{z:.2f}" for z in result.wafer_z], fontsize=8)
+    ax.set_xlabel("wafer slice z", fontsize=9)
+    ax.set_ylabel("per-wafer profit ($, house)", fontsize=9)
+    ax.set_title("Where the money is made/lost down the boule\n(naive bleeds the tail; adapt banks premium)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="lower left")
+
+
+def game_figure(result):
+    """Assemble the G7 artifact from a :class:`~fab_game.demo_game.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _drift_panel(axes[0], result)
+    _score_panel(axes[1], result)
+    _profit_panel(axes[2], result)
+    fig.suptitle("G7 — a roguelike run down one boule: the Scheil V_t drift is the difficulty curve; "
+                 "three strategies, scored\n"
+                 f"naive ${result.naive.score:+.0f} < scrap ${result.scrap.score:+.0f} < "
+                 f"adapt ${result.adaptive.score:+.0f}  ·  adapt's win is a premium UPGRADE of in-spec "
+                 "wafers (double-braked: I_Dsat ceiling + unmodeled oxide reliability), not a tail rescue",
+                 fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    return fig
+
+
 def fab_game_figure(result):
     """Assemble the 2×2 G1 artifact figure from a :class:`~fab_game.demo_fab_game.DemoResult`."""
     import matplotlib.pyplot as plt

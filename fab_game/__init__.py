@@ -59,6 +59,18 @@ from .pipeline import (
     run_line,
     wafer_yield,
 )
+from .scoring import BIN_PRICES, REWORK_COSTS, SCRAP_COST, WAFER_COST, ScoreCard, score_wafer
+from .game import (
+    MARKET_BINS,
+    GameConfig,
+    GameSession,
+    ReworkSpec,
+    RunRecord,
+    new_session,
+    play,
+    process_wafer,
+    scrap_wafer,
+)
 
 __all__ = [
     # state
@@ -77,4 +89,9 @@ __all__ = [
     # pipeline
     "run_line", "run_batch", "initial_wafer", "wafer_yield", "diagnose", "rework_litho",
     "rework_polish", "rework_deposition", "LineResult", "BatchResult", "ReworkRecord",
+    # scoring (G7)
+    "score_wafer", "ScoreCard", "BIN_PRICES", "WAFER_COST", "SCRAP_COST", "REWORK_COSTS",
+    # game / roguelike session (G7)
+    "GameConfig", "GameSession", "RunRecord", "ReworkSpec", "MARKET_BINS",
+    "new_session", "process_wafer", "scrap_wafer", "play",
 ]
