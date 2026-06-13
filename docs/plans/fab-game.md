@@ -431,6 +431,25 @@ has a home and a cited model, **not yet detailed**. Ordered by feasibility again
   the axial doping (and the V_t walk the G2 demo already exploits). Fidelity **Mid**: `k₀` stays the
   tight Trumbore anchor, the `v`-dependence (via `δ`) is the calibrated leg. **No engine touch, no
   ADR** — closed form, consumer-side, like Scheil itself.
+  > **CG-1 BUILT (2026-06-13).** New cited physics in `chip/czochralski.py` (§1b, additive — the Scheil
+  > tests untouched): `effective_segregation_coefficient(k₀, Δ) = k₀/[k₀+(1−k₀)·e^(−Δ)]` (Burton–Prim–
+  > Slichter, J. Chem. Phys. 21:1987 1953) + `normalized_growth_velocity(pull_rate_mm_min)` → `Δ = v·δ/D`
+  > (flagged `δ`/`D` module constants — the calibrated leg). **Triad (plan §7 honesty — the two *limits*
+  > are the tight legs, no independent conservation law, like the etch/packaging tiers):** tight = `Δ=0
+  > ⇒ k_eff=k₀` **bit-exact** (the well-mixed Scheil seam) + `Δ→∞ ⇒ k_eff→1` (complete solute trapping)
+  > + `k₀=1 ⇒ k_eff=1` for any `Δ`; machinery = monotone, bounded `[k₀,1]`, and the structural identity
+  > `1/k_eff − 1 = (1/k₀−1)·e^(−Δ)`; benchmark = the cited BPS *form* + the flagged `δ`/`D` magnitude.
+  > **Wired (one knob):** `CzochralskiKnobs.pull_rate_mm_min: float | None = None` → `Recipe.boule`
+  > passes `k=k_eff` when set, else `k=None` → the equilibrium Trumbore `k₀` (so CG-1 is **opt-in** and
+  > the G2/G7 boule demos are **byte-for-byte unchanged** — fast lane 492→**504**, +12 all new). Banked
+  > `demo_crystal_growth`/`fab-game-cg1.png`: `k_eff(v)` + the boule `N_A(z)`/`V_t(z)` flattening at a
+  > few pull rates. **THE load-bearing honesty (advisor magnitude check, done first):** boron's
+  > `k₀=0.80` *barely segregates already*, so at **realistic Si pull (≤2 mm/min)** `k_eff` only reaches
+  > ≈0.84 — a **modest** flattening (V_t walk +0.20→+0.155); the near-flat boule needs pull **beyond
+  > realistic Si** (~10–20 mm/min, drawn but **labelled illustrative**). **NOT a score-war (advisor):**
+  > CG-1 is one-sided *in-model* (faster pull only flattens doping → only helps), so the demo shows the
+  > **physics consequence only**, and the real cost of fast pull — **CG-2** microvoids, **striations**,
+  > dislocation/max-pull — is named **loudly as the deferred brake**, not modelled. No ADR.
 - **CG-2 — Voronkov `V/G` point-defect / void criterion (the unifier).** The high-value one: it
   ties **pull rate**, the **thermal gradient** (the "heat diffusion" bullet), and **crystallographic
   defect formation** into one mechanism. The ratio of pull rate `V` to the axial thermal gradient `G`

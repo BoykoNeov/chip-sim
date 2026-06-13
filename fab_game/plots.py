@@ -537,6 +537,79 @@ def packaging_figure(result):
 
 
 # --------------------------------------------------------------------------- #
+# CG-1 — pull rate → effective segregation k_eff(v) → a flatter Scheil boule
+# --------------------------------------------------------------------------- #
+_CG1_COLORS = ("#1c2530", "#2f6db5", "#d62728")     # equilibrium / realistic / fast(illustrative)
+
+
+def _keff_panel(ax, result) -> None:
+    """k_eff vs pull rate (the BPS curve): k₀ at zero pull → 1 as pull → ∞; realistic-Si band shaded."""
+    v = np.asarray(result.pull_sweep)
+    ax.plot(v, result.keff_sweep, color="#2f6db5", lw=2.0, zorder=3, label="k_eff(v)  (Burton–Prim–Slichter)")
+    ax.axhline(result.k0, color="0.5", ls=":", lw=1.1, label=f"k₀ = {result.k0:.2f} (well-mixed Scheil)")
+    ax.axhline(1.0, color="0.5", ls="--", lw=1.0, label="k_eff → 1 (complete trapping)")
+    ax.axvspan(0.0, result.realistic_pull_max, color="#2ca02c", alpha=0.12,
+               label=f"realistic Si pull (≤ {result.realistic_pull_max:.0f} mm/min)")
+    for pull, keff, c in zip(result.demo_pulls, result.demo_keffs, _CG1_COLORS):
+        if pull is not None:
+            ax.scatter([pull], [keff], color=c, s=40, zorder=4)
+    ax.set_xlabel("pull rate (mm/min)", fontsize=9)
+    ax.set_ylabel("effective segregation k_eff", fontsize=9)
+    ax.set_title("Pull rate lifts k_eff toward 1\n(boron barely moves at realistic pull — modest)",
+                 fontsize=10)
+    ax.legend(fontsize=7.5, loc="lower right")
+
+
+def _profile_panel(ax, result) -> None:
+    """N_A(z) down the boule at the representative pull rates — flatter as pull rises (seed pinned)."""
+    z = np.asarray(result.na_z)
+    for (label, na), c, pull in zip(result.n_a_by_pull.items(), _CG1_COLORS, result.demo_pulls):
+        illustrative = pull is not None and pull > result.realistic_pull_max
+        ax.plot(z, np.asarray(na) / 1e17, color=c, lw=1.8,
+                ls="--" if illustrative else "-",                    # dashed = beyond realistic Si pull
+                label=f"{label} (illustrative)" if illustrative else label)
+    ax.set_xlabel("axial position z (down the boule)", fontsize=9)
+    ax.set_ylabel("substrate N_A (1e17 cm⁻³)", fontsize=9)
+    ax.set_title("Faster pull flattens the axial doping\n(the seed end is pinned; the tail pulls down)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+
+
+def _vt_walk_panel(ax, result) -> None:
+    """V_t(z) down the boule (the real pipeline) at each pull rate, with the spec window shaded."""
+    z = np.asarray(result.z_positions)
+    ax.axhspan(result.v_t_lo, result.v_t_hi, color="#2ca02c", alpha=0.12,
+               label=f"V_t spec [{result.v_t_lo:.2f}, {result.v_t_hi:.2f}]")
+    for (label, vt), c, pull in zip(result.v_t_by_pull.items(), _CG1_COLORS, result.demo_pulls):
+        illustrative = pull is not None and pull > result.realistic_pull_max
+        ax.plot(z, vt, color=c, lw=1.8, marker="o", ms=3,
+                ls="--" if illustrative else "-",                    # dashed = beyond realistic Si pull
+                label=f"{label} (illustrative)" if illustrative else label)
+    ax.set_xlabel("axial position z (down the boule)", fontsize=9)
+    ax.set_ylabel("device V_t (V)", fontsize=9)
+    ax.set_title("Consequence: a faster pull keeps the tail in spec\n(benefit only — the cost is CG-2, unmodelled)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+
+
+def crystal_growth_figure(result):
+    """Assemble the CG-1 artifact from a :class:`~fab_game.demo_crystal_growth.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _keff_panel(axes[0], result)
+    _profile_panel(axes[1], result)
+    _vt_walk_panel(axes[2], result)
+    fig.suptitle("CG-1 — pull rate → effective segregation k_eff(v) (Burton–Prim–Slichter): pulling "
+                 "faster flattens the Scheil boule\n"
+                 "boron barely segregates (k₀=0.80) → modest at realistic Si pull; the cost of fast pull "
+                 "(microvoids/striations = CG-2) is the deferred, unmodelled brake",
+                 fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    return fig
+
+
+# --------------------------------------------------------------------------- #
 # G7 — the roguelike run down one boule: the Scheil V_t drift + scored strategies
 # --------------------------------------------------------------------------- #
 def _drift_panel(ax, result) -> None:

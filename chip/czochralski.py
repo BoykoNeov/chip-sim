@@ -58,9 +58,15 @@ Named scope edge (the honest ceiling)
 -------------------------------------
 * **Equilibrium, well-mixed melt, constant ``k``.** Scheil assumes complete melt mixing and an
   interface at equilibrium. Real growth has a diffusion boundary layer, so the *effective*
-  ``k_eff(v)`` rises toward 1 with pull rate/stirring (Burton–Prim–Slichter) — a named calibrated
-  edge, not built here. Constitutional supercooling / striations / the dislocation-free Dash neck
-  are likewise out (plan fidelity ladder: Scheil **High**, the rest Mid/Low).
+  ``k_eff(v)`` rises toward 1 with pull rate/stirring — now **BUILT (CG-1, opt-in)** as the
+  Burton–Prim–Slichter closed form (:func:`effective_segregation_coefficient`, §1b): pull rate
+  becomes a live knob that flattens the Scheil drift, with ``k₀`` the tight Trumbore anchor and the
+  ``δ``/``D`` ``v``-dependence the calibrated/flagged leg (off by default → the well-mixed ``k₀``
+  limit, the seam). Its **deferred brakes** — constitutional supercooling / **striations**, the
+  **V/G point-defect (void) criterion** (CG-2), the dislocation-free Dash neck and a max-pull limit —
+  are still out (plan §6a fidelity ladder: Scheil/BPS-limit **High**, the ``v``-magnitude Mid, the
+  defect cost not yet modelled). So CG-1 has **no in-model cost to pulling faster** — the cost is CG-2,
+  named not built.
 * **Oxygen / thermal donors are a separate, looser story.** Crucible-oxygen incorporation is *not*
   dopant segregation (its ``k`` is contested ~0.25–1.4 and incorporation is dissolution-controlled),
   and the ~450 °C thermal-donor kinetics that make some of it electrically active are a calibrated
@@ -85,6 +91,7 @@ The ``k`` values are pinned to the cited source, **not** carried from memory.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -123,6 +130,78 @@ def segregation_coefficient(dopant: str) -> float:
     if dopant not in SEGREGATION_K:
         raise KeyError(f"no segregation coefficient for {dopant!r} (have {sorted(SEGREGATION_K)})")
     return SEGREGATION_K[dopant]
+
+
+# --------------------------------------------------------------------------- #
+# 1b. Pull rate → effective segregation k_eff(v) — Burton–Prim–Slichter (CG-1)
+# --------------------------------------------------------------------------- #
+# Scheil's equilibrium ``k₀`` assumes a *well-mixed* melt. Real growth leaves a thin diffusion
+# **boundary layer** ``δ`` at the freezing interface, across which rejected solute (``k₀<1``) piles
+# up — so the interface sees a richer liquid and the **effective** segregation coefficient rises
+# toward 1. Burton–Prim–Slichter (J. Chem. Phys. 21:1987, 1953) give it in closed form::
+#
+#     k_eff = k₀ / [ k₀ + (1 − k₀)·e^(−Δ) ],     Δ = v·δ / D      (dimensionless)
+#
+# with ``v`` the growth (pull) rate, ``δ`` the boundary-layer thickness (set by crucible/crystal
+# rotation — faster stirring → thinner ``δ``), and ``D`` the solute diffusivity in the melt. ``Δ`` is
+# the **normalized growth velocity**: the limits are exact and physical —
+#   * ``Δ → 0`` (slow pull / vigorous stirring): ``k_eff → k₀`` **exactly** — the well-mixed Scheil
+#     limit (the seam: the fab-line boule reproduces G2 bit-for-bit when CG-1 is off);
+#   * ``Δ → ∞`` (fast pull / no stirring): ``k_eff → 1`` — **complete solute trapping**, no
+#     segregation, a uniform axial profile.
+# So **pulling faster flattens the Scheil drift** (``k_eff`` toward 1 → ``C_s(z)`` flatter). Fidelity
+# is **Mid** (plan §7): ``k₀`` stays the **tight** Trumbore anchor; the ``v``-dependence — i.e. the
+# ``δ`` and ``D`` magnitudes below — is the **calibrated/flagged** leg.
+#
+# HONEST MAGNITUDE (load-bearing — boron barely segregates already). For the boron substrate
+# (``k₀=0.80``) at *realistic* Si pull (≈0.5–2 mm/min → ``Δ≈0.07–0.28``) ``k_eff`` rises only to
+# ≈0.81–0.84 — a **modest** flattening. A near-flat boule (``k_eff≳0.99``) needs ``Δ≳3``, i.e. pull
+# rates well **beyond realistic Si growth** (~20 mm/min here). The dramatic-flattening regime is
+# therefore an *illustrative* extrapolation, flagged as such — not a claim about real Si CZ.
+#
+# These δ/D are FLAGGED representative house values (the calibrated leg), NOT tight-cited: the melt
+# diffusivity of a light solute in molten Si is ~1e-4..1e-3 cm²/s, and the rotation-set boundary
+# layer is ~0.01..0.05 cm. Only the BPS *form* and its limits are asserted; the Δ-mapping magnitude
+# is house (like the game's other flagged process bands).
+BPS_MELT_DIFFUSIVITY_CM2_S: float = 2.4e-4   # solute diffusivity in molten Si (flagged, ~1e-4..1e-3)
+BPS_BOUNDARY_LAYER_CM: float = 0.02          # diffusion boundary layer ~200 µm (flagged; rotation-set)
+
+
+def normalized_growth_velocity(
+    pull_rate_mm_min: float,
+    *,
+    boundary_layer_cm: float = BPS_BOUNDARY_LAYER_CM,
+    melt_diffusivity_cm2_s: float = BPS_MELT_DIFFUSIVITY_CM2_S,
+) -> float:
+    """The dimensionless BPS normalized growth velocity ``Δ = v·δ/D`` from physical inputs.
+
+    Converts ``pull_rate_mm_min`` (mm/min → cm/s) and combines with the **flagged** boundary layer
+    ``δ`` (cm, rotation-set) and melt diffusivity ``D`` (cm²/s). ``Δ ≥ 0``; ``Δ = 0`` at zero pull
+    (the well-mixed limit). Only the *form* is physics; the ``δ``/``D`` magnitudes are house numbers.
+    """
+    if pull_rate_mm_min < 0.0:
+        raise ValueError(f"pull rate must be ≥ 0, got {pull_rate_mm_min}")
+    if boundary_layer_cm <= 0.0 or melt_diffusivity_cm2_s <= 0.0:
+        raise ValueError("boundary layer and melt diffusivity must be > 0")
+    v_cm_s = pull_rate_mm_min * 0.1 / 60.0       # mm/min → cm/s
+    return v_cm_s * boundary_layer_cm / melt_diffusivity_cm2_s
+
+
+def effective_segregation_coefficient(k0: float, normalized_velocity: float) -> float:
+    """Burton–Prim–Slichter effective coefficient ``k_eff = k₀/[k₀+(1−k₀)·e^(−Δ)]`` (CG-1).
+
+    ``k0`` the equilibrium (Trumbore) coefficient ∈ ``(0, 1]``; ``normalized_velocity`` the
+    dimensionless ``Δ = v·δ/D ≥ 0`` (:func:`normalized_growth_velocity`). Returns ``k0`` **exactly**
+    at ``Δ=0`` (the well-mixed Scheil seam), rises monotonically toward **1** as ``Δ→∞`` (complete
+    solute trapping), and is ``1`` for any ``Δ`` when ``k0=1`` (nothing to segregate). Bounded in
+    ``[k0, 1]``. The structural identity ``1/k_eff − 1 = (1/k₀ − 1)·e^(−Δ)`` (the segregation deficit
+    decays exponentially in ``Δ``) holds exactly — a regression guard, not a conservation law.
+    """
+    if not 0.0 < k0 <= 1.0:
+        raise ValueError(f"k0 must be in (0, 1], got {k0}")
+    if normalized_velocity < 0.0:
+        raise ValueError(f"normalized velocity Δ must be ≥ 0, got {normalized_velocity}")
+    return k0 / (k0 + (1.0 - k0) * math.exp(-normalized_velocity))
 
 
 # --------------------------------------------------------------------------- #

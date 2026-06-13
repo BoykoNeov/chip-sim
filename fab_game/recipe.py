@@ -53,16 +53,46 @@ class CzochralskiKnobs:
     ``dopant`` the p-type substrate species; ``N_seed`` (cm⁻³) the seed-end (``z=0``) doping — equal
     to ``demo_device``'s ``CHANNEL_N_A`` at the default, so the seed slice reproduces the demo
     bit-for-bit (the seam). ``slice_z`` ∈ ``[0, 1)`` is the axial fraction-solidified for **this**
-    wafer (0 = seed end); :func:`fab_game.pipeline.run_batch` sweeps it down the boule. ``k`` is the
-    cited Trumbore segregation coefficient (looked up from ``dopant``); ``length_mm``/``diameter_mm``
-    are narrative geometry. (Pull rate/rotation are the named ``k_eff`` scope edge — not knobs here.)
+    wafer (0 = seed end); :func:`fab_game.pipeline.run_batch` sweeps it down the boule.
+    ``length_mm``/``diameter_mm`` are narrative geometry.
+
+    ``pull_rate_mm_min`` (CG-1) turns the **pull rate** into a live knob: a thin diffusion boundary
+    layer at the freezing interface makes the *effective* segregation coefficient rise toward 1 with
+    pull rate (Burton–Prim–Slichter, :func:`chip.czochralski.effective_segregation_coefficient`), so
+    **pulling faster flattens the Scheil drift** down the boule. It defaults to **``None``** — the
+    well-mixed Scheil idealization (``k_eff = k₀``, the cited Trumbore value) — so the seam *and* the
+    G2/G7 banked boule demos are byte-for-byte unchanged (CG-1 is opt-in; the boule's ``k`` is the
+    equilibrium ``k₀`` until a pull rate is set). Honest magnitude: for boron (``k₀=0.80``) realistic
+    Si pull (~0.5–2 mm/min) only *modestly* flattens the drift; the near-flat boule is an illustrative
+    high-pull extrapolation (and its real cost — striations / point-defect voids — is the deferred CG-2
+    brake, not modelled here).
     """
 
     dopant: str = "B"                  # p-type boron substrate
     N_seed: float = 1.0e17             # cm⁻³ seed-end doping = demo_device CHANNEL_N_A (the seam)
     slice_z: float = 0.0               # axial fraction solidified for THIS wafer (0 = seed end)
+    pull_rate_mm_min: float | None = None  # CG-1 pull rate; None = well-mixed k_eff=k₀ (the seam)
     length_mm: float = 200.0           # boule length (narrative geometry only)
     diameter_mm: float = 200.0         # boule diameter (narrative geometry only)
+
+    @property
+    def k_eff(self) -> float | None:
+        """The effective segregation coefficient for the boule, or ``None`` (use the equilibrium ``k₀``).
+
+        ``None`` when ``pull_rate_mm_min`` is ``None`` (the well-mixed idealization → :class:`Boule`
+        falls back to the cited Trumbore ``k₀`` — the seam). Otherwise the Burton–Prim–Slichter
+        ``k_eff(Δ)`` at this pull rate (``Δ`` from the flagged boundary-layer/diffusivity), which the
+        boule uses in place of ``k₀`` to flatten the axial profile.
+        """
+        if self.pull_rate_mm_min is None:
+            return None
+        from chip.czochralski import (
+            effective_segregation_coefficient,
+            normalized_growth_velocity,
+            segregation_coefficient,
+        )
+        k0 = segregation_coefficient(self.dopant)
+        return effective_segregation_coefficient(k0, normalized_growth_velocity(self.pull_rate_mm_min))
 
 
 @dataclass(frozen=True)
@@ -222,9 +252,14 @@ class Recipe:
 
     @property
     def boule(self) -> Boule:
-        """The :class:`chip.czochralski.Boule` grown from the Czochralski knobs (cited Scheil profile)."""
+        """The :class:`chip.czochralski.Boule` grown from the Czochralski knobs (cited Scheil profile).
+
+        Uses the CG-1 Burton–Prim–Slichter ``k_eff`` when a ``pull_rate_mm_min`` is set (pulling faster
+        flattens the axial drift); ``k=None`` otherwise → the boule defaults to the equilibrium Trumbore
+        ``k₀`` (the well-mixed Scheil seam — the G2/G7 demos are byte-for-byte unchanged when CG-1 is off).
+        """
         cz = self.czochralski
-        return Boule(dopant=cz.dopant, N_seed=cz.N_seed,
+        return Boule(dopant=cz.dopant, N_seed=cz.N_seed, k=cz.k_eff,
                      length_mm=cz.length_mm, diameter_mm=cz.diameter_mm)
 
     @property

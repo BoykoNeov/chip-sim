@@ -151,3 +151,85 @@ def test_scheil_rejects_out_of_range_fraction():
         cz.scheil_profile(1.0, 1.0e15, 0.8)                      # z must be < 1
     with pytest.raises(ValueError):
         cz.scheil_profile(-0.01, 1.0e15, 0.8)
+
+
+# --------------------------------------------------------------------------- #
+# CG-1: Burton–Prim–Slichter effective segregation k_eff(Δ) — pull rate vs the
+# boundary layer. Triad shape (plan §6a): the two LIMITS are the tight legs (no
+# independent conservation law — like the etch/packaging tiers); the cited BPS
+# form + flagged δ/D are the benchmark; monotone-bounded-[k₀,1] is machinery.
+# --------------------------------------------------------------------------- #
+def test_keff_at_zero_velocity_is_exactly_k0_the_wellmixed_seam():
+    # Δ=0 (slow pull / vigorous stirring) → k_eff = k₀/[k₀+(1−k₀)·1] = k₀ EXACTLY — the well-mixed
+    # Scheil limit the fab-line boule rides when CG-1 is off (the seam). Bit-exact for any k₀.
+    for k0 in (0.80, 0.35, 0.023, 1.0):
+        assert cz.effective_segregation_coefficient(k0, 0.0) == k0
+
+
+def test_keff_tends_to_one_complete_solute_trapping():
+    # Δ→∞ (fast pull / no stirring) → e^(−Δ)→0 → k_eff→1: complete solute trapping, no segregation.
+    k0 = cz.SEGREGATION_K["B"]
+    assert cz.effective_segregation_coefficient(k0, 50.0) == pytest.approx(1.0, abs=1e-9)
+    # A strong segregator also tends to 1 (just needs a larger Δ to get there).
+    assert cz.effective_segregation_coefficient(cz.SEGREGATION_K["Sb"], 200.0) == pytest.approx(1.0, abs=1e-9)
+
+
+def test_keff_is_one_for_any_velocity_when_k0_is_one():
+    # k₀=1 → nothing to segregate → k_eff=1 for every Δ (the no-segregation degenerate case).
+    for delta in (0.0, 0.3, 2.0, 10.0):
+        assert cz.effective_segregation_coefficient(1.0, delta) == 1.0
+
+
+def test_keff_rises_monotonically_and_stays_bounded():
+    # Machinery: k_eff increases monotonically with Δ and stays in [k₀, 1] (between equilibrium and
+    # complete trapping) — pulling faster only ever reduces segregation, never reverses it.
+    k0 = cz.SEGREGATION_K["B"]
+    deltas = [0.0, 0.1, 0.3, 1.0, 3.0, 10.0]
+    keffs = [cz.effective_segregation_coefficient(k0, d) for d in deltas]
+    assert keffs == sorted(keffs)                                # monotone increasing
+    assert all(k0 <= ke <= 1.0 for ke in keffs)                  # bounded in [k₀, 1]
+    assert keffs[1] > k0                                         # any Δ>0 strictly lifts k_eff (k₀<1)
+
+
+def test_keff_segregation_deficit_decays_exponentially():
+    # The structural identity 1/k_eff − 1 = (1/k₀ − 1)·e^(−Δ) (a regression guard, NOT a conservation
+    # law): the fractional segregation "deficit" decays exponentially in the normalized velocity.
+    k0 = 0.35
+    for delta in (0.2, 1.0, 2.5):
+        ke = cz.effective_segregation_coefficient(k0, delta)
+        assert (1.0 / ke - 1.0) == pytest.approx((1.0 / k0 - 1.0) * math.exp(-delta))
+
+
+def test_normalized_velocity_form_and_realistic_magnitude():
+    # Δ = v·δ/D with the flagged δ/D. The HONEST magnitude (the load-bearing flag): boron at realistic
+    # Si pull (≈1 mm/min) gives a SMALL Δ and so only a MODEST k_eff lift — not a flat boule.
+    delta = cz.normalized_growth_velocity(1.0)                   # 1 mm/min, default δ/D
+    assert 0.0 < delta < 0.5                                     # realistic Si pull → small Δ
+    keff = cz.effective_segregation_coefficient(cz.SEGREGATION_K["B"], delta)
+    assert 0.80 < keff < 0.85                                    # boron barely moves at realistic pull
+    # Δ scales linearly with pull rate, and zero pull is the well-mixed Δ=0 seam.
+    assert cz.normalized_growth_velocity(2.0) == pytest.approx(2.0 * delta)
+    assert cz.normalized_growth_velocity(0.0) == 0.0
+
+
+def test_keff_invalid_inputs_raise():
+    with pytest.raises(ValueError):
+        cz.effective_segregation_coefficient(0.0, 1.0)           # k0 must be in (0, 1]
+    with pytest.raises(ValueError):
+        cz.effective_segregation_coefficient(1.2, 1.0)
+    with pytest.raises(ValueError):
+        cz.effective_segregation_coefficient(0.8, -0.1)          # Δ ≥ 0
+    with pytest.raises(ValueError):
+        cz.normalized_growth_velocity(-1.0)
+
+
+def test_boule_with_keff_flattens_the_axial_profile():
+    # The consumer payoff at the physics layer: a boule built with k_eff (faster pull) has a FLATTER
+    # axial doping profile than the equilibrium-k₀ boule — less rise from seed to tail.
+    k0 = cz.SEGREGATION_K["B"]
+    keff = cz.effective_segregation_coefficient(k0, cz.normalized_growth_velocity(10.0))
+    slow = cz.Boule(dopant="B", N_seed=1.0e17, k=k0)
+    fast = cz.Boule(dopant="B", N_seed=1.0e17, k=keff)
+    assert slow.axial_doping(0.0) == fast.axial_doping(0.0) == 1.0e17     # same seed (the seam holds)
+    assert fast.axial_doping(0.9) < slow.axial_doping(0.9)               # faster pull → flatter tail
+    assert keff > k0
