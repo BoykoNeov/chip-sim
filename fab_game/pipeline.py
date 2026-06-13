@@ -19,11 +19,13 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from chip.czochralski import Boule
+from chip.wafer_prep import prep_geometry
 
+from .defects import scatter_defects
 from .recipe import DEFAULT_RECIPE, Recipe
 from .spec import DEFAULT_SPECS, SpecSet
 from .state import Die, StepRecord, Verdict, WaferState, build_die_map
-from .steps import device_step, diffusion_junction, litho_step, oxidation_step
+from .steps import device_step, diffusion_junction, litho_step, oxidation_step, wafer_prep_step
 from .variation import NO_VARIATION, Variation
 
 
@@ -71,12 +73,36 @@ def run_line(
     All randomness flows from ``numpy.random.default_rng(seed)`` consumed in **fixed die order**,
     so ``(seed, recipe, variation)`` reproduces the wafer exactly. With ``variation=NO_VARIATION``
     every die gets the nominal physics and the centre die reproduces :mod:`chip.demo_device`
-    bit-for-bit (the seam). Steps run diffusion → oxidation → litho → device → test; the device
-    step *reads the inherited* ``t_ox``/``cd`` (the propagation), and the test step applies the
-    spec windows.
+    bit-for-bit (the seam). Steps run wafer-prep → diffusion → oxidation → litho → device → test;
+    wafer prep scatters killer particles on the die map and sets the wafer geometry (G3), the device
+    step *reads the inherited* ``t_ox``/``cd`` (the propagation), and the test step applies the spec
+    windows (a killer-defect or out-of-spec geometry is a functional fail).
+
+    RNG order (the determinism contract): the defect scatter is drawn first (wafer prep is step 1),
+    then the per-die perturbations. Both short-circuit without touching the RNG when off (variation
+    disabled / zero defect density), so a clean, no-variation run consumes no randomness (the seam).
     """
     rng = np.random.default_rng(seed)
     wafer = initial_wafer(recipe, grid_n=grid_n, edge_exclusion=edge_exclusion, wafer_id=wafer_id)
+
+    # 0. Wafer prep (front-of-line): the prepped geometry (deterministic) + the killer-particle
+    #    scatter (stochastic, fixed die order). Drawn before the per-die perturbations.
+    prep = recipe.wafer_prep
+    geometry = prep_geometry(
+        incoming_thickness_um=prep.incoming_thickness_um, slice_ttv_um=prep.slice_ttv_um,
+        slice_bow_um=prep.slice_bow_um, removal_um=prep.cmp_removal_um,
+        ttv_improvement=prep.cmp_ttv_improvement)
+    defect_map = scatter_defects(
+        wafer.dies, defect_density=prep.defect_density, grid_n=grid_n,
+        wafer_diameter_mm=prep.wafer_diameter_mm, rng=rng, enabled=variation.enabled)
+    dies = tuple(wafer_prep_step(d, geometry, defect_map[d.site]) for d in wafer.dies)
+    wafer = replace(wafer, geometry=geometry).with_step(
+        StepRecord("wafer_prep",
+                   {"ttv_um": geometry.ttv_um, "bow_um": geometry.bow_um,
+                    "defect_density": prep.defect_density},
+                   {"ttv_um": geometry.ttv_um, "bow_um": geometry.bow_um,
+                    "n_defects": sum(len(v) for v in defect_map.values())}), dies)
+
     # One perturbation per die, drawn in fixed die order (the determinism contract).
     perts = {d.site: variation.perturbation(d, rng) for d in wafer.dies}
 
@@ -194,15 +220,22 @@ def run_batch(
 
 
 def _test_wafer(wafer: WaferState, specs: SpecSet) -> WaferState:
-    """Score every die against ``specs`` → verdicts; record the wafer yield in provenance."""
-    dies = tuple(_verdict_die(d, specs) for d in wafer.dies)
+    """Score every die against ``specs`` → verdicts; record the wafer yield in provenance.
+
+    The wafer-level geometry scrap (TTV/bow out of spec) is computed **once** and applied to every
+    die (a flatness reject fails the whole wafer); the per-die functional (defect / unresolved) +
+    parametric checks then run for each die.
+    """
+    geometry_reason = specs.geometry.check(wafer.geometry)
+    dies = tuple(_verdict_die(d, specs, geometry_reason) for d in wafer.dies)
     n_good = sum(d.verdict.passed for d in dies)
-    summary = {"yield": n_good / len(dies), "n_good": n_good, "n_total": len(dies)}
+    summary = {"yield": n_good / len(dies), "n_good": n_good, "n_total": len(dies),
+               "geometry_scrap": geometry_reason}
     return wafer.with_step(StepRecord("test", {"specs": repr(specs)}, summary), dies)
 
 
-def _verdict_die(die: Die, specs: SpecSet) -> Die:
-    verdict = specs.verdict(die)
+def _verdict_die(die: Die, specs: SpecSet, geometry_reason: str | None = None) -> Die:
+    verdict = specs.verdict(die, geometry_reason)
     return die.record("test", {"specs": "applied"},
                       {"passed": verdict.passed, "reasons": verdict.reasons},
                       verdict=verdict)
@@ -233,6 +266,12 @@ def diagnose(die: Die) -> str:
         return f"die {die.site}: PASS"
 
     lines = [f"die {die.site} (r={die.radius_frac:.2f}): FAIL — " + "; ".join(die.verdict.reasons)]
+    # A killer particle defect (G3) is a functional kill at the front of the line — name it and the
+    # location(s), the "why did this die?" for a defect death (independent of the defocus chain).
+    if die.killed_by_defect:
+        locs = ", ".join(f"({d.x:+.2f}, {d.y:+.2f})" for d in die.defects)
+        lines.append(f"    ↳ wafer prep: caught {len(die.defects)} killer particle(s) at {locs} "
+                     f"(wafer-radius units) — a functional kill, no working die")
     # Walk the trail for the litho focus (the dramatic-win root cause) and the device read.
     litho = next((r for r in die.history if r.step == "litho"), None)
     device = next((r for r in die.history if r.step == "device"), None)
@@ -291,6 +330,7 @@ def rework_litho(
     """
     before = sum(d.verdict.passed for d in wafer.dies if d.verdict is not None)
     corrected = replace(recipe.litho, defocus_nm=recipe.litho.defocus_nm + focus_correction_nm)
+    geometry_reason = specs.geometry.check(wafer.geometry)   # a scrapped wafer stays scrapped on re-test
     n_attempted = 0
     new_dies: list[Die] = []
     for d in wafer.dies:
@@ -299,16 +339,56 @@ def rework_litho(
             continue
         n_attempted += 1
         # Re-expose at the corrected focus + the persistent focus bowl (no fresh scatter),
-        # re-run the device on the refreshed CD, and re-score.
+        # re-run the device on the refreshed CD, and re-score. A die killed by a particle (or a
+        # geometry-scrapped wafer) re-tests the same way — litho rework cannot remove a defect.
         red = litho_step(d, corrected, variation.systematic_perturbation(d))
         red = device_step(red, recipe.device, wafer.channel_N_A)
-        red = _verdict_die(red, specs)
+        red = _verdict_die(red, specs, geometry_reason)
         new_dies.append(red)
 
     after = sum(d.verdict.passed for d in new_dies if d.verdict is not None)
     record = ReworkRecord("litho", n_attempted=n_attempted, n_recovered=after - before,
                           note=f"re-expose at focus correction {focus_correction_nm:+.0f} nm")
     return replace(wafer, dies=tuple(new_dies), rework_log=wafer.rework_log + (record,))
+
+
+def rework_polish(
+    wafer: WaferState,
+    *,
+    specs: SpecSet = DEFAULT_SPECS,
+    extra_removal_um: float = 40.0,
+    extra_ttv_improvement: float = 0.5,
+) -> WaferState:
+    """Re-polish a flatness-scrapped wafer: a second CMP lowers TTV — **at the cost of thickness**.
+
+    The plan's wafer-prep reworkable path (re-polish/re-clean, costly, eats thickness). A re-CMP
+    removes ``extra_removal_um`` more silicon (thickness shrinks) and improves the residual TTV by
+    ``extra_ttv_improvement`` ∈ ``[0, 1]`` — so a wafer scrapped for TTV can come back **in** spec.
+    Bow is unchanged (CMP does not fix bow), so a bow scrap is *not* recoverable this way, and a
+    re-polish that would eat the whole wafer **raises** (the physical limit — you can re-polish only
+    so far). Re-polish fixes *flatness*; it does **not** remove a killer particle defect (those dies
+    stay dead). Provenance/die-total are unchanged; the accounting closes (``n_recovered =
+    good_after − good_before``) — the bookkeeping invariant on a wafer-level rework.
+    """
+    if wafer.geometry is None:
+        raise ValueError("wafer has no geometry to re-polish (run wafer prep first)")
+    before = sum(d.verdict.passed for d in wafer.dies if d.verdict is not None)
+    g = wafer.geometry
+    thickness_out = g.thickness_um - extra_removal_um
+    if thickness_out <= 0.0:
+        raise ValueError(f"re-polish removal {extra_removal_um} µm ≥ wafer thickness "
+                         f"{g.thickness_um} µm — nothing left of the wafer")
+    if not 0.0 <= extra_ttv_improvement <= 1.0:
+        raise ValueError(f"extra_ttv_improvement must be in [0, 1], got {extra_ttv_improvement}")
+    repolished = replace(g, thickness_um=thickness_out,
+                         ttv_um=g.ttv_um * (1.0 - extra_ttv_improvement))
+    reworked = replace(wafer, geometry=repolished)
+    geometry_reason = specs.geometry.check(repolished)
+    new_dies = tuple(_verdict_die(d, specs, geometry_reason) for d in reworked.dies)
+    after = sum(d.verdict.passed for d in new_dies if d.verdict is not None)
+    record = ReworkRecord("polish", n_attempted=len(new_dies), n_recovered=after - before,
+                          note=f"re-CMP −{extra_removal_um:.0f} µm → TTV {repolished.ttv_um:.3f} µm")
+    return replace(reworked, dies=new_dies, rework_log=reworked.rework_log + (record,))
 
 
 # --------------------------------------------------------------------------- #

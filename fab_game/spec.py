@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from chip.wafer_prep import WaferGeometry
+
 from .state import Die, Verdict
 
 
@@ -38,31 +40,57 @@ class SpecWindow:
 
 
 @dataclass(frozen=True)
-class SpecSet:
-    """The full per-die acceptance test: a functional gate (resolved) + the parametric windows.
+class GeometrySpec:
+    """Wafer-level flatness windows — TTV/bow out of band scraps the **whole wafer** (G3, plan §5).
 
-    The defocus chain rides **NILS** (the printability floor) and **CD/I_Dsat** (the channel-length
-    chain); ``V_t`` rides the ``t_ox``/``N_A`` channel. The NILS floor is the *physically primary*
-    defocus signature: a defocused image loses edge sharpness (NILS collapses) long before its CD
-    midpoint shifts — so a too-defocused feature is unprintable even while its nominal CD looks
-    fine, and only an *extreme* defocus finally collapses the CD (which then **raises** ``I_Dsat``
-    via the shorter channel, hence an I_Dsat *ceiling*, not a floor, on the defocus side).
+    Geometry is a *wafer* property (not per-die), so a violation is a functional reject of every die
+    on the wafer (the front-of-line incoming-inspection gate). House numbers, flagged. ``check``
+    returns the reason for the first window violated, else ``None`` (geometry in spec → no scrap).
+    """
+
+    ttv_um: SpecWindow = field(default_factory=lambda: SpecWindow("TTV (µm)", hi=1.0))
+    bow_um: SpecWindow = field(default_factory=lambda: SpecWindow("bow (µm)", hi=40.0))
+
+    def check(self, geometry: WaferGeometry | None) -> str | None:
+        """The wafer's geometry scrap reason (``None`` if in spec, or if no geometry was produced)."""
+        if geometry is None:
+            return None
+        return self.ttv_um.check(geometry.ttv_um) or self.bow_um.check(geometry.bow_um)
+
+
+@dataclass(frozen=True)
+class SpecSet:
+    """The full per-die acceptance test: the functional gates + the parametric windows.
+
+    Two functional gates short-circuit before the parametrics, in order: (1) a **killer particle
+    defect** caught at wafer prep — the transistor exists but is dead (distinct from an unresolved
+    litho image, where the device never formed); (2) a litho image that **never resolved**. A
+    wafer-level **geometry** scrap (TTV/bow out, passed in as ``geometry_reason``) is the outermost
+    gate — it fails every die. Otherwise the parametric chain: the defocus chain rides **NILS** (the
+    printability floor) and **CD/I_Dsat** (the channel-length chain); ``V_t`` rides the
+    ``t_ox``/``N_A`` channel (the device's own scope edge keeps ``V_t`` off the channel-length chain).
     """
 
     cd_nm: SpecWindow
     i_dsat_mA: SpecWindow
     v_t: SpecWindow
     nils: SpecWindow
+    geometry: GeometrySpec = field(default_factory=GeometrySpec)
     require_resolved: bool = True
 
-    def verdict(self, die: Die) -> Verdict:
-        """Score one die: functional gate first (short-circuits), then every parametric window.
+    def verdict(self, die: Die, geometry_reason: str | None = None) -> Verdict:
+        """Score one die: wafer-geometry scrap → defect/resolve functional gates → parametric windows.
 
-        A functional fail (the litho image did not resolve at all) short-circuits — a print that
-        never formed has no meaningful CD/V_t to bin. Otherwise every window (NILS printability, CD,
-        I_Dsat, V_t) is checked and *all* failing reasons are collected (so the trail shows
-        everything out of spec, not just the first).
+        ``geometry_reason`` (computed once per wafer) scraps every die when set. A killer-defect or
+        an unresolved image then short-circuits — neither has a meaningful parametric bin. Otherwise
+        every window (NILS printability, CD, I_Dsat, V_t) is checked and *all* failing reasons are
+        collected (so the trail shows everything out of spec, not just the first).
         """
+        if geometry_reason is not None:
+            return Verdict(False, (f"{geometry_reason} — wafer scrapped (functional fail)",))
+        if die.killed_by_defect is True:
+            n = len(die.defects)
+            return Verdict(False, (f"killer particle defect ×{n} (functional fail)",))
         if self.require_resolved and die.resolved is False:
             return Verdict(False, ("litho image not resolved (functional fail)",))
         reasons = [

@@ -22,6 +22,8 @@ from typing import Callable
 
 import numpy as np
 
+from chip.wafer_prep import WaferGeometry
+
 # --------------------------------------------------------------------------- #
 # Per-step provenance — the "why did this die?" trail
 # --------------------------------------------------------------------------- #
@@ -51,6 +53,22 @@ class StepRecord:
     step: str
     knobs: dict
     summary: dict
+
+
+@dataclass(frozen=True)
+class DefectEvent:
+    """One killer particle defect placed on the across-wafer map (G3 — the die map made physical).
+
+    ``x``/``y`` are the defect's location in **wafer-radius units** (``∈ [-1, 1]``, the same frame
+    the die-map plot draws in); ``killer`` marks it fatal to the die it lands on (G3 places only
+    killers — ``D₀`` is the *killer*-defect density — and keeps the flag for future cosmetic
+    particles). A die that catches one or more is dead **functionally** (its parametric device may
+    still read fine — distinct from a litho image that never resolved, where the device *refuses*).
+    """
+
+    x: float
+    y: float
+    killer: bool = True
 
 
 @dataclass(frozen=True)
@@ -89,6 +107,8 @@ class Die:
     R_s: float | None = None
     V_t: float | None = None
     i_dsat: float | None = None
+    defects: tuple[DefectEvent, ...] = ()       # killer particles caught at wafer prep (G3)
+    killed_by_defect: bool | None = None        # set by wafer prep; True ⇒ a functional fail
     verdict: Verdict | None = None
     history: tuple[DieStepRecord, ...] = ()
 
@@ -130,6 +150,7 @@ class WaferState:
     dies: tuple[Die, ...]
     slice_z: float | None = None                             # axial fraction solidified (G2 boule slice)
     resistivity_ohm_cm: float | None = None                  # substrate resistivity at this slice (Ω·cm)
+    geometry: WaferGeometry | None = None                    # prepped thickness/TTV/bow (G3, wafer-level)
     provenance: tuple[StepRecord, ...] = ()
     rework_log: tuple = ()                                    # tuple[ReworkRecord, ...] (avoids an import cycle)
 
@@ -175,3 +196,43 @@ def build_die_map(grid_n: int = 5, edge_exclusion: float = 0.95) -> tuple[Die, .
     if not dies:
         raise ValueError("die map is empty — loosen edge_exclusion or raise grid_n")
     return tuple(dies)
+
+
+# --------------------------------------------------------------------------- #
+# The die map made *physical* (G3) — one definition of cell geometry + die area
+# --------------------------------------------------------------------------- #
+# These are THE single source of a die's footprint and area: the defect placement
+# (fab_game.defects) draws against ``die_area_cm2`` and positions inside ``die_cell_bounds``, and the
+# closed-form yield (the demo / the convergence test) feeds ``die_area_cm2`` to ``poisson_yield`` —
+# so the stochastic kill rate and the analytic ``exp(−D₀·A)`` use a *byte-identical* area (the G3
+# analogue of G2's "parameterize by N_seed so the seam is exact"). Both live in wafer-radius units:
+# a die occupies a square cell of edge ``cell_fraction = 2/grid_n`` (the build_die_map lattice spacing),
+# centred at ``die_cell_center``; its physical edge is ``cell_fraction · wafer_radius``.
+def cell_fraction(grid_n: int) -> float:
+    """A die cell's edge length in wafer-radius units — the ``2/grid_n`` lattice spacing of the map."""
+    return 2.0 / grid_n
+
+
+def die_cell_center(site: tuple[int, int], grid_n: int) -> tuple[float, float]:
+    """The (x, y) centre of die ``site``'s cell in wafer-radius units ``[-1, 1]`` (the map frame)."""
+    cf = cell_fraction(grid_n)
+    return ((site[0] + 0.5) * cf - 1.0, (site[1] + 0.5) * cf - 1.0)
+
+
+def die_cell_bounds(site: tuple[int, int], grid_n: int) -> tuple[float, float, float, float]:
+    """Die ``site``'s cell as ``(x_lo, x_hi, y_lo, y_hi)`` in wafer-radius units — the placement box."""
+    cx, cy = die_cell_center(site, grid_n)
+    h = cell_fraction(grid_n) / 2.0
+    return (cx - h, cx + h, cy - h, cy + h)
+
+
+def die_area_cm2(grid_n: int, wafer_diameter_mm: float) -> float:
+    """A die's critical area (cm²) — ``(cell_fraction · wafer_radius)²`` — the ONE area definition.
+
+    The coarse map makes this an **illustrative** area (a 5×5 grid over a 200 mm wafer gives ~16 cm²
+    dies — far larger than a real die), but it is *consistent*: the same value drives both the Poisson
+    placement and the ``exp(−D₀·A)`` closed form, so the empirical kill rate converges to the law.
+    """
+    radius_cm = wafer_diameter_mm / 2.0 / 10.0           # mm → cm
+    edge_cm = cell_fraction(grid_n) * radius_cm
+    return edge_cm * edge_cm

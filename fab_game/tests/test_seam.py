@@ -72,3 +72,23 @@ def test_seam_no_variation_does_not_touch_rng():
     assert pert == DiePerturbation()
     # The stream is untouched — the first draw equals a fresh generator's first draw.
     assert rng.normal() == np.random.default_rng(123).normal()
+
+
+def test_seam_defect_scatter_does_not_touch_rng_when_off():
+    """The wafer-prep defect scatter places nothing AND leaves the RNG untouched when off (the seam).
+
+    Both the disabled stochastic layer (``enabled=False``) and a clean line (``defect_density=0``)
+    must short-circuit without consuming a draw — else the prep step would shift every downstream
+    per-die perturbation and break the seam / G1/G2 banked demos.
+    """
+    import numpy as np
+
+    from fab_game.defects import scatter_defects
+
+    dies = run_line(DEFAULT_RECIPE, seed=0, variation=NO_VARIATION, grid_n=3).dies
+    for enabled, density in ((False, 0.5), (True, 0.0)):
+        rng = np.random.default_rng(123)
+        out = scatter_defects(dies, defect_density=density, grid_n=3, wafer_diameter_mm=200.0,
+                              rng=rng, enabled=enabled)
+        assert all(v == () for v in out.values())             # nothing placed
+        assert rng.normal() == np.random.default_rng(123).normal()   # stream untouched

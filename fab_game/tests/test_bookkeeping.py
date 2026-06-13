@@ -24,7 +24,7 @@ def test_provenance_is_append_only():
     """The wafer provenance and every die history grow by exactly the run's steps, in order."""
     w = run_line(DEFAULT_RECIPE, seed=0, variation=Variation(), grid_n=3)
     steps = [r.step for r in w.provenance]
-    assert steps == ["diffusion", "oxidation", "litho", "device", "test"]
+    assert steps == ["wafer_prep", "diffusion", "oxidation", "litho", "device", "test"]
     for d in w.dies:
         # Each die saw every step once, in the same order (append-only, never rewritten).
         assert [r.step for r in d.history] == steps

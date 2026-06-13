@@ -252,6 +252,19 @@ thing).
 - **G3 — Wafer prep + particles + the die map made physical.** Defect events placed at
   locations on the across-wafer map; killer-defect functional yield; geometry (TTV/bow)
   bookkeeping.
+  > **G3 BUILT (2026-06-13).** New cited physics `chip/wafer_prep.py` — the **defect-limited yield
+  > law** `Y = exp(−D₀·A)` (Murphy/Poisson; Stapper negative-binomial `(1+D₀A/α)^(−α)` as the
+  > `α→∞` limit + named clustered-placement scope edge) + exact geometry (slice→lap/CMP →
+  > thickness/TTV/bow), triad-tested (`test_wafer_prep.py`, 14: `Y(0)=1` exact + `α→∞`→Poisson;
+  > area-additivity `Y(A₁+A₂)=Y(A₁)·Y(A₂)` conservation; cited `D₀` band). Wired into `fab_game`:
+  > `fab_game/defects.py` scatters killers as a **per-die Poisson** process (= the global wafer
+  > scatter restricted to each die's cell, by the Poisson restriction property) against the
+  > **single** `state.die_area_cm2` the closed form also uses; a killer defect is a **functional**
+  > fail (distinct from a litho refusal); wafer-level **geometry scrap** gate (`GeometrySpec`) +
+  > `rework_polish` (re-CMP eats thickness). Banked `demo_wafer_prep`/`fab-game-g3.png` — the
+  > particle map + the empirical yield **converging to the cited Poisson law** + the TTV scrap/re-polish.
+  > Default `defect_density=0.0` (clean line) so the seam + the G1/G2 demos are byte-for-byte
+  > unchanged. Fast lane 338→**369** (+31); no engine amendment, no ADR, no chip gallery card.
 - **G4 — Silicon purification + the contamination consequence model (§5a).** **Segregation
   purification** as real physics (Pfann zone-refining `C/C₀ = 1−(1−k)e^(−kx/L)` + cited `k`; the
   *grade knob* for the Siemens route). Then the contamination buckets wired to their

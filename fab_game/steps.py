@@ -22,10 +22,32 @@ from chip import oxidation as ox
 from chip import litho
 from chip import device as dev
 from chip.junction import analyze_junction
+from chip.wafer_prep import WaferGeometry
 
 from .recipe import DeviceKnobs, DiffusionKnobs, LithoKnobs, OxidationKnobs
-from .state import Die
+from .state import DefectEvent, Die
 from .variation import DiePerturbation
+
+
+def wafer_prep_step(die: Die, geometry: WaferGeometry, defects: tuple[DefectEvent, ...]) -> Die:
+    """Wafer prep on one die (G3) — record the wafer geometry + the killer particles it caught.
+
+    The first step of the line (front-of-line). ``geometry`` is the wafer-level prepped flatness
+    (the same object for every die — it gates the *wafer*, scored at test); ``defects`` are the
+    killer particles the stochastic scatter placed on **this** die. A die that caught any is marked
+    ``killed_by_defect`` → a functional fail (its parametric device may still read fine). Adds only
+    orthogonal fields (geometry/defects), so at no variation it places no defects and the device seam
+    is untouched. ``killed_by_defect`` is always set (``False`` when clean) — an un-run step leaves it
+    ``None``, a clean prep leaves it ``False`` (the gap-vs-zero distinction the state keeps).
+    """
+    killed = len(defects) > 0
+    return die.record(
+        "wafer_prep",
+        knobs_in={"ttv_um": geometry.ttv_um, "bow_um": geometry.bow_um,
+                  "thickness_um": geometry.thickness_um},
+        outputs={"n_defects": len(defects), "killed_by_defect": killed},
+        defects=defects, killed_by_defect=killed,
+    )
 
 
 def diffusion_junction(knobs: DiffusionKnobs, channel_N_A: float) -> tuple[dict, dict]:

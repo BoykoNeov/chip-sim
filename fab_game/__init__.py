@@ -21,12 +21,14 @@ is proven first.
 from __future__ import annotations
 
 from .state import (
+    DefectEvent,
     Die,
     DieStepRecord,
     StepRecord,
     Verdict,
     WaferState,
     build_die_map,
+    die_area_cm2,
 )
 from .recipe import (
     DEFAULT_RECIPE,
@@ -36,9 +38,11 @@ from .recipe import (
     LithoKnobs,
     OxidationKnobs,
     Recipe,
+    WaferPrepKnobs,
 )
 from .variation import NO_VARIATION, DiePerturbation, Variation
-from .spec import DEFAULT_SPECS, SpecSet, SpecWindow
+from .spec import DEFAULT_SPECS, GeometrySpec, SpecSet, SpecWindow
+from .defects import scatter_defects
 from .pipeline import (
     BatchResult,
     LineResult,
@@ -46,6 +50,7 @@ from .pipeline import (
     diagnose,
     initial_wafer,
     rework_litho,
+    rework_polish,
     run_batch,
     run_line,
     wafer_yield,
@@ -54,14 +59,17 @@ from .pipeline import (
 __all__ = [
     # state
     "Die", "DieStepRecord", "StepRecord", "Verdict", "WaferState", "build_die_map",
+    "DefectEvent", "die_area_cm2",
     # recipe
-    "Recipe", "CzochralskiKnobs", "DiffusionKnobs", "OxidationKnobs", "LithoKnobs", "DeviceKnobs",
-    "DEFAULT_RECIPE",
+    "Recipe", "CzochralskiKnobs", "WaferPrepKnobs", "DiffusionKnobs", "OxidationKnobs",
+    "LithoKnobs", "DeviceKnobs", "DEFAULT_RECIPE",
     # variation
     "Variation", "DiePerturbation", "NO_VARIATION",
     # spec
-    "SpecSet", "SpecWindow", "DEFAULT_SPECS",
+    "SpecSet", "SpecWindow", "GeometrySpec", "DEFAULT_SPECS",
+    # defects
+    "scatter_defects",
     # pipeline
     "run_line", "run_batch", "initial_wafer", "wafer_yield", "diagnose", "rework_litho",
-    "LineResult", "BatchResult", "ReworkRecord",
+    "rework_polish", "LineResult", "BatchResult", "ReworkRecord",
 ]

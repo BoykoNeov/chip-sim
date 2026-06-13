@@ -135,6 +135,86 @@ def boule_figure(result):
     return fig
 
 
+# --------------------------------------------------------------------------- #
+# G3 — the die map made physical (particles + the cited yield law + geometry)
+# --------------------------------------------------------------------------- #
+def _particle_map(ax, wafer: WaferState, title: str) -> None:
+    """Draw the wafer: pass dies green, fail dies red, with killer particles as black dots on top."""
+    import matplotlib.pyplot as plt
+
+    xs, ys = _die_xy(wafer)
+    passed = np.array([d.verdict is not None and d.verdict.passed for d in wafer.dies])
+    n = _grid_n(wafer)
+    size = (2.0 / n) * 0.92
+    for x, y, ok in zip(xs, ys, passed):
+        ax.add_patch(plt.Rectangle((x - size / 2, y - size / 2), size, size,
+                                   facecolor="#2ca02c" if ok else "#d62728",
+                                   edgecolor="white", linewidth=0.6, zorder=1))
+    # The killer particles at their locations (wafer-radius units — DefectEvent.x/y).
+    px = [e.x for d in wafer.dies for e in d.defects]
+    py = [e.y for d in wafer.dies for e in d.defects]
+    ax.scatter(px, py, s=18, c="black", marker="x", linewidths=1.1, zorder=4, label="killer particle")
+    ax.add_patch(plt.Circle((0, 0), 1.0, fill=False, color="0.4", linewidth=1.2))
+    n_good = int(passed.sum())
+    ax.set_title(f"{title}\nyield {n_good}/{len(wafer.dies)} = {n_good / len(wafer.dies):.0%}, "
+                 f"{len(px)} particles", fontsize=10)
+    ax.set_xlim(-1.15, 1.15)
+    ax.set_ylim(-1.15, 1.15)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.legend(fontsize=8, loc="lower right")
+
+
+def _defect_yield_curve(ax, result) -> None:
+    """Empirical defect yield vs D₀ hugging the cited Poisson law exp(−D₀·A) — placement → physics."""
+    D = np.array(result.sweep_densities)
+    ax.plot(D, [100 * y for y in result.poisson_yields], color="#2f6db5", lw=2.0,
+            label="cited law  Y = exp(−D₀·A)", zorder=2)
+    ax.scatter(D, [100 * y for y in result.empirical_yields], c="#d62728", s=28, zorder=3,
+               label="placement (Monte-Carlo mean)")
+    ax.set_xlabel("killer-defect density D₀ (cm⁻²)", fontsize=9)
+    ax.set_ylabel("defect-limited yield (%)", fontsize=9)
+    ax.set_ylim(0, 105)
+    ax.set_title(f"Random placement → the cited Poisson law\n(die area A = {result.die_area_cm2:.1f} cm²)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper right")
+
+
+def _geometry_panel(ax, result) -> None:
+    """The TTV scrap → re-polish recovery: TTV before/after vs the flatness spec, and the thickness cost."""
+    from .spec import DEFAULT_SPECS
+
+    g0, g1 = result.scrap_wafer.geometry, result.repolished_wafer.geometry
+    ttv_hi = DEFAULT_SPECS.geometry.ttv_um.hi
+    labels = ["as-prepped\n(weak CMP)", "after re-polish"]
+    ttvs = [g0.ttv_um, g1.ttv_um]
+    colors = ["#d62728" if t > ttv_hi else "#2ca02c" for t in ttvs]
+    ax.bar(labels, ttvs, color=colors, width=0.55, zorder=2)
+    ax.axhline(ttv_hi, color="0.3", ls="--", lw=1.0)
+    ax.text(-0.45, ttv_hi + 0.03, f"flatness spec = {ttv_hi:.1f} µm", fontsize=8, color="0.3")
+    ax.set_ylabel("wafer TTV (µm)", fontsize=9)
+    ax.set_title(f"Geometry gate: scrap → re-polish\n(thickness {g0.thickness_um:.0f} → {g1.thickness_um:.0f} µm, "
+                 f"−{g0.thickness_um - g1.thickness_um:.0f} µm)", fontsize=10)
+    for i, t in enumerate(ttvs):
+        ax.text(i, t + 0.03, f"{t:.2f}", ha="center", fontsize=8)
+
+
+def wafer_prep_figure(result):
+    """Assemble the G3 artifact from a :class:`~fab_game.demo_wafer_prep.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.8))
+    _particle_map(axes[0], result.dirty_wafer,
+                  f"Particle map (D₀ = {result.map_density:.3f} cm⁻²)")
+    _defect_yield_curve(axes[1], result)
+    _geometry_panel(axes[2], result)
+    fig.suptitle("G3 — the die map made physical: killer particles → functional yield "
+                 "(the cited Poisson law) + the TTV scrap/re-polish", fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    return fig
+
+
 def fab_game_figure(result):
     """Assemble the 2×2 G1 artifact figure from a :class:`~fab_game.demo_fab_game.DemoResult`."""
     import matplotlib.pyplot as plt

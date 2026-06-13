@@ -44,6 +44,34 @@ class CzochralskiKnobs:
 
 
 @dataclass(frozen=True)
+class WaferPrepKnobs:
+    """Wafer-prep knobs → :mod:`chip.wafer_prep` (G3) — the geometry + the killer-defect density.
+
+    Geometry (exact bookkeeping): ``incoming_thickness_um`` from the saw, ``slice_ttv_um`` /
+    ``slice_bow_um`` the as-sliced flatness, ``cmp_removal_um`` the lap+CMP material removal (eats
+    thickness), ``cmp_ttv_improvement`` ∈ ``[0, 1]`` the planarizing fraction (improves TTV; bow is
+    *not* fixed by CMP). ``defect_density`` (cm⁻²) is the line's **killer**-particle level — the
+    :data:`chip.wafer_prep.DEFECT_DENSITY_BANDS` knob.
+
+    ``defect_density`` defaults to **0.0** (a defect-free line) so the seam *and* the G1/G2 banked
+    demos are unchanged — a zero density places no particles and consumes no RNG, and defect placement
+    is anyway gated by the stochastic layer (``NO_VARIATION`` → no particles regardless). The G3 demo
+    dials in a :data:`~chip.wafer_prep.DEFECT_DENSITY_BANDS` level to introduce the killer-defect
+    story. The geometry defaults sit comfortably **in** the geometry spec (the seam wafer is never
+    scrapped). ``wafer_diameter_mm`` sets the die-map physical scale (the single
+    :func:`fab_game.state.die_area_cm2`).
+    """
+
+    incoming_thickness_um: float = 800.0   # as-sliced wafer thickness (µm)
+    slice_ttv_um: float = 2.0              # as-sliced total thickness variation (µm)
+    slice_bow_um: float = 25.0             # as-sliced bow (µm) — CMP does not fix this
+    cmp_removal_um: float = 60.0           # lap + CMP material removed (µm)
+    cmp_ttv_improvement: float = 0.85      # TTV planarized by 85 % (fraction ∈ [0, 1])
+    defect_density: float = 0.0            # cm⁻² killer-defect density (0 ⇒ clean line; G3 demo dials it up)
+    wafer_diameter_mm: float = 200.0       # die-map physical scale (→ die area)
+
+
+@dataclass(frozen=True)
 class DiffusionKnobs:
     """Source/drain two-step diffusion knobs → :func:`chip.diffusion_dopant.two_step`."""
 
@@ -96,6 +124,7 @@ class Recipe:
     """
 
     czochralski: CzochralskiKnobs = field(default_factory=CzochralskiKnobs)
+    wafer_prep: WaferPrepKnobs = field(default_factory=WaferPrepKnobs)
     diffusion: DiffusionKnobs = field(default_factory=DiffusionKnobs)
     oxidation: OxidationKnobs = field(default_factory=OxidationKnobs)
     litho: LithoKnobs = field(default_factory=LithoKnobs)
