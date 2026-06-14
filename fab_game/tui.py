@@ -63,10 +63,11 @@ class FabLineApp(App):
     #summary { height: auto; padding: 1 0; border-top: solid $panel; }
     """
 
-    BINDINGS = [
-        ("r", "run_line", "Run the line"),
-        ("q", "quit", "Quit"),
-    ]
+    # No keyboard run binding: a single-letter binding is shadowed the moment a knob Input has focus
+    # (the common case right after editing), where the keystroke goes to the field instead — a
+    # misleading footer affordance. The real run paths are the *Run* button and Enter in any field
+    # (``on_input_submitted``). Quit stays (it is not contextual).
+    BINDINGS = [("q", "quit", "Quit")]
 
     def __init__(self) -> None:
         super().__init__()
@@ -100,9 +101,6 @@ class FabLineApp(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self._run_and_render()                                  # Enter in any field re-runs the line
-
-    def action_run_line(self) -> None:
-        self._run_and_render()
 
     def _knobs(self) -> dict:
         """Read the input fields into ``run_dashboard`` kwargs, falling back to the default on bad input.
