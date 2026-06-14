@@ -33,7 +33,7 @@ The consumer column is the one that decides everything else.
 | C1 | **Oxygen / thermal donors** | new front-of-line | `V_t` / resistivity via net doping (G4a chain) | **✅ BUILT (2026-06-14)** |
 | D1 | **Under-etch** | G5 (`etch_deposition.py`) | residual/bridge → functional kill (yield) | **✅ BUILT (2026-06-14)** |
 | A1 | **CG-2 interstitial → dislocation/leakage** | §6a CG-2 | reverse leakage via `lifetime.py` (G4b) | **PROMOTABLE (corner)** |
-| A2 | **OSF ring (radial `G(r)`)** + Robin-mode sourcing | §6a CG-2 | edge-vs-center yield non-uniformity | **SPLIT (2026-06-14): ring PROMOTABLE (closed-form); Robin-`G` DEFERRED (premise FALSIFIED)** |
+| A2 | **OSF ring (radial `G(r)`)** + Robin-mode sourcing | §6a CG-2 | edge-vs-center yield non-uniformity | **SPLIT (2026-06-14): ring ✅ BUILT (closed-form); Robin-`G` DEFERRED (premise FALSIFIED)** |
 | A3 | **Striations** | §6a CG-1/CG-2 | none as a killer; at most a variance feed | DEFERRED (game-layer at most) |
 | E1 | **Transient spike/laser anneal `T(x,t)` → `D(T(t))`** | heat-mode consumer search | `x_j`/`R_s`/`V_t` via emergent thermal budget | DEFERRED (trigger recorded — the one real heat-mode consumer) |
 | A4 | **CG-3 facets / interface curvature** | §6a CG-3 | none reads it | DEFERRED (no consumer) |
@@ -85,14 +85,27 @@ The consumer column is the one that decides everything else.
   radial band of `ξ ≈ ξ_t` (mixed defect) flanked by vacancy (center) and interstitial (edge)
   zones, so killer density varies by die radius → the wafer map shows a ring of degraded dies. Reads
   through the same G3 Poisson map ([[fab-game-g3]]) keyed on each die's radial position. **Real.**
-- **The ring — PROMOTABLE as a CLOSED FORM ("CG-2 made radial").** `G(r)` is a **flagged house radial
-  profile**, not a solve. Triad: tight = the ring *location* (`ξ(r)=ξ_t`, pure `ξ_t`, coefficient-robust)
-  + the topology signs (vacancy core / interstitial edge); flagged = the `G(r)` magnitude, the ring
-  *width*, and **the ring's existence itself** (a pure house number — lead with this, the CG-1/CG-2
-  honest-magnitude pattern). **No conservation leg** (matches CG-2/3), and — the correction — **no
-  engine heat-invariant leg** (the engine is not used). Promotable when edge-vs-center non-uniformity is
-  the wanted story; the per-die radial-density wiring (`scatter_defects` taking a per-die density, the
-  scalar path = the seam) is the sound part.
+- **The ring — ✅ BUILT (2026-06-14) as a CLOSED FORM ("CG-2 made radial").** `G(r)` is a **flagged house
+  radial profile**, not a solve. Triad: tight = the ring *location* (`ξ(r)=ξ_t`, pure `ξ_t`,
+  coefficient-robust) + the topology signs (vacancy core / interstitial edge); flagged = the `G(r)`
+  magnitude, the ring *width*, and **the ring's existence itself** (a pure house number — lead with this,
+  the CG-1/CG-2 honest-magnitude pattern). **No conservation leg** (matches CG-2/3), and — the correction
+  — **no engine heat-invariant leg** (the engine is not used). The per-die radial-density wiring
+  (`scatter_defects` taking a per-die density, the scalar path = the seam) is the sound part.
+  **As built:** `chip/czochralski.py` §1f — `radial_thermal_gradient` (`G(r)=G_center·(1+boost·r²)`,
+  the flagged profile), `osf_ring_radius` (the tight V/I location, coefficient-free), `radial_defect_regime`
+  (the topology helper). Wired via `CzochralskiKnobs.radial_gradient_boost` (reinterprets
+  `thermal_gradient_K_per_mm` as `G_center`; requires the direct-`G` + a pull; guarded against CG-3) →
+  `grown_in_defect_density_at(radius_frac)` → a per-die `density_fn` in `scatter_defects` → the G3 Poisson
+  map keyed on `radius_frac`. **THE finding (advisor, led with):** the reused (monotone) `void_defect_density`
+  peaks at the high-ξ **centre** and is **zero at the ring**, so the map is a **COP-degraded vacancy core
+  + a clean interstitial rim — NOT a ring of dead dies** (the core mortality is *modest*, the same capped
+  CG-2 coefficient; the rim is *provably* clean); the ring is the *boundary* where the kills **stop**.
+  Default `boost=None` ⇒ uniform ⇒ **CG-2 byte-for-byte** (the existing `test_defects`/`test_seam`/
+  `test_voronkov` pass unchanged). Banked artifact `fab_game/demo_osf_ring.py` (`fab-game-a2.png`); fast
+  lane +20 (czochralski +8, `test_osf_ring` 8, `test_demo_osf_ring` 4). **Still deferred:** the literal
+  *degraded ring* (the OSF band's own stacking-fault **leakage** → the interstitial/`lifetime.py` channel
+  = the separately-deferred **A1** edge — building it here would reach into A1's consumer = over-build).
 - **Robin-`G` sourcing — DEFERRED, premise FALSIFIED (no consumer a closed form can't serve).** Voronkov
   reads a **steady** gradient, and a steady 1-D radial conduction profile is **closed-form**. The shipped
   Robin heat mode actively cannot beat it, verified in `engines/diffusion/diffusion1d.py`: (a) `source`
@@ -111,8 +124,8 @@ The consumer column is the one that decides everything else.
 - **§8 boundary (unchanged).** The ring is promotable **only as a 1-D radial `G(r)` sampled per die by
   radius** — *not* a 2-D wafer PDE (`fab-game.md` §8). A true 2-D thermal-field solve would break §8.
 - **Engine/ADR.** None — the ring is consumer-side closed form (the engine is retired as decorative).
-- **Verdict.** **SPLIT (2026-06-14):** ring **PROMOTABLE (closed-form, "CG-2 made radial")** when
-  edge-vs-center non-uniformity is wanted; Robin-`G` sourcing **DEFERRED — premise falsified** (a steady
+- **Verdict.** **SPLIT (2026-06-14):** ring **✅ BUILT (closed-form, "CG-2 made radial")** → per-die OSF
+  non-uniformity (edge-vs-center yield); Robin-`G` sourcing **DEFERRED — premise falsified** (a steady
   gradient is closed-form; the engine cannot earn its place; its home is the Steel program).
 
 ### A3 — Striations  ·  DEFERRED (game-layer at most)
@@ -327,11 +340,12 @@ Promote in **consumer strength × cost** order; everything else stays deferred a
    functional-kill consumer. Bundled with C1 as the two quick, high-confidence deepenings.
 3. **A1 — CG-2 interstitial → leakage** *(next)*. Completes Voronkov's symmetry through the `lifetime.py`
    leakage channel — but a corner (realistic CZ is vacancy-rich), so value is symmetry, not main-line.
-4. **A2 — OSF ring (radial `G(r)`), closed-form.** **Split on verification (2026-06-14):** the ring stays
-   promotable as a **closed-form** radial `G(r)` → per-die OSF non-uniformity (edge-vs-center yield), §8-
-   bounded to 1-D radial; **Robin-`G` sourcing is DEFERRED — premise falsified** (a steady gradient is
-   closed-form; the shipped engine cannot beat it). Build the ring when edge-vs-center non-uniformity is
-   the wanted story — the engine does **not** participate.
+4. **A2 — OSF ring (radial `G(r)`), closed-form.** ✅ **BUILT (2026-06-14).** The ring shipped as a
+   **closed-form** radial `G(r)` → per-die OSF non-uniformity (edge-vs-center yield), §8-bounded to 1-D
+   radial, the engine does **not** participate; **Robin-`G` sourcing stays DEFERRED — premise falsified**
+   (a steady gradient is closed-form; the shipped engine cannot beat it). **Next promotable = A1**
+   (CG-2 interstitial → dislocation/leakage, the `lifetime.py` channel — a corner, realistic CZ is
+   vacancy-rich; also the home of A2's deferred *degraded-ring* leakage).
 
 **Stay deferred (no consumer — this is the point, not a backlog of work):** A3 striations (game-layer
 variance at most), A4 facets/curvature (nothing reads shape), A5 transient Stefan `X(t)` (quasi-steady

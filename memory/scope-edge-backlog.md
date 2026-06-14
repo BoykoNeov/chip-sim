@@ -1,6 +1,6 @@
 ---
 name: scope-edge-backlog
-description: "scope-edge backlog doc (docs/plans/scope-edge-backlog.md) — the bag of named-but-unbuilt edges across the whole line, triaged by CONSUMER (promote-or-defer each); spine is the deferrals. C1 thermal-donors + D1 under-etch BUILT (2026-06-14); A2 verified+SPLIT (2026-06-14): OSF ring PROMOTABLE closed-form, Robin-G sourcing FALSIFIED/deferred (engine can't beat a steady-gradient closed form). Next promotable = A1 (CG-2 interstitial→leakage); E1 spike-anneal = the one real heat-mode consumer (trigger)."
+description: "scope-edge backlog doc (docs/plans/scope-edge-backlog.md) — the bag of named-but-unbuilt edges across the whole line, triaged by CONSUMER (promote-or-defer each); spine is the deferrals. C1 thermal-donors + D1 under-etch + A2 OSF ring (→ [[fab-game-a2]]) all BUILT (2026-06-14). A2 SPLIT: ring BUILT (closed-form, CG-2 made radial), Robin-G sourcing FALSIFIED/deferred (engine can't beat a steady-gradient closed form). Next promotable = A1 (CG-2 interstitial→leakage); E1 spike-anneal = the one real heat-mode consumer (trigger)."
 metadata: 
   node_type: memory
   type: project
@@ -27,11 +27,12 @@ doc's primary content is **the deferrals** — which edges have no consumer yet 
   (ξ≈0.29) so it only bites at slow pull → symmetry, not main-line.
 - **SPLIT on verification (2026-06-14):** **(A2) OSF ring + Robin-mode `G(r)`** were asserted as ONE
   build ("Robin-`G` finally earns a consumer") — verified-at-build, the second clause is **FALSE**, so
-  they split. **The ring = PROMOTABLE as a CLOSED FORM** ("CG-2 made radial"): radial `G(r)` (flagged
-  house profile) → `ξ(r)=V/G(r)` → ring where `ξ(r)=ξ_t` → per-die killer density keyed on `radius_frac`
-  (consumer = edge-vs-center yield non-uniformity; the per-die `scatter_defects` density is the sound
-  wiring). Tight = ring *location* + topology signs; flagged = `G(r)` magnitude, ring width, **and the
-  ring's existence itself** (pure house number — the CG-1/CG-2 honest-magnitude pattern). §8-bounded to
+  they split. **The ring = ✅ BUILT → [[fab-game-a2]]** ("CG-2 made radial", closed-form): radial `G(r)`
+  (flagged house profile) → `ξ(r)=V/G(r)` → ring where `ξ(r)=ξ_t` → per-die killer density keyed on
+  `radius_frac` (consumer = edge-vs-center yield non-uniformity; `scatter_defects` gained a `density_fn`).
+  Tight = ring *location* (coefficient-robust) + topology signs; flagged = `G(r)` magnitude, ring width,
+  **and the ring's existence itself** (pure house number — the CG-1/CG-2 honest-magnitude pattern). THE
+  finding: monotone `void_density` → COP-degraded vacancy core (modest) + clean rim, NOT a ring of kills. §8-bounded to
   1-D radial. **Robin-`G` sourcing = DEFERRED, premise FALSIFIED:** Voronkov reads a STEADY gradient →
   closed-form; the shipped engine can't beat it (verified in `diffusion1d.py`: `source` is `S(x,t)`
   field-INDEPENDENT → no fin sink → steady radial profile is a straight LINE; no advection; Cartesian
