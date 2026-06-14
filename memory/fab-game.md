@@ -24,13 +24,25 @@ deferred Textual TUI**. Variation **ON** (else the map is a binary all-pass/all-
 story — the advisor's catch). Reuses `LineResult` (no new dataclass); **dropped a profit readout** —
 default `speed_bins` grade everything `"pass"` so `score_wafer` prices revenue 0 → a profit line
 would be a binning-policy artifact, not a signal. The real safety net is `tests/test_dashboard.py`
-(10 tests), NOT the notebook run (`interact` swallows callback exceptions). **Remaining front-end =
-the Textual TUI + tycoon — both still deferred** (the named-consumer physics backlog stays exhausted).
-**Textual TUI shape DRAFTED, not built (2026-06-14): `docs/plans/fab-game-tui.md`** — v1 = a thin
-terminal driver of the §9 `run_dashboard`/`dashboard_summary` core (new `[tui]` extra carrying
-`textual`; one new headless helper `plots.wafer_map_text`; `importorskip`-gated `run_test()` pilot
-via an `asyncio.run` wrapper, NOT `pytest-asyncio`; xdist-safety to be verified, slow-mark escape
-hatch if it flakes like the notebook); v2 = the G7 `GameSession` roguelike loop. No new physics/ADR.
+(10 tests), NOT the notebook run (`interact` swallows callback exceptions).
+
+**>> Textual TUI v1 BUILT 2026-06-14 (`docs/plans/fab-game-tui.md`):** `fab_game/tui.py`
+(`FabLineApp`) = a thin terminal driver of the §9 `run_dashboard`/`dashboard_summary` core + the
+ONE new headless helper `plots.wafer_map_text(wafer, *, color=False)` (ASCII die map, `O` pass/`X`
+fail, `color=True` wraps in Rich `[green]`/`[red]` markup). `tui.py` is the **only** `textual`
+importer and — like `plots.py` — is **NOT** re-exported from `fab_game/__init__` (so `import
+fab_game` + the fast lane stay headless); new `[tui]` extra `textual>=8` (verified on 8.2.7). Tested
+in `tests/test_tui.py`: 4 pure-renderer legs + 2 `importorskip` App-pilot legs (`run_test()` via an
+`asyncio.run` wrapper, NOT `pytest-asyncio`). **Advisor catches that bit:** summary `Static` needs
+`markup=False` (arbitrary computed trail text can contain `[...]` → Rich `MarkupError`), map `Static`
+`markup=True`; one sync `_run_and_render()` (shared by mount/button/Enter) stashes `last_summary`/
+`last_map` for state assertions + the fidelity check (`last_summary == dashboard_summary(...)`).
+**Verified:** fast lane 637 green; clean 5×5 under `-n auto` → **no notebook-style flake** (`run_test`
+is in-process asyncio, no zmq → the slow/`xdist_group` escape hatch was NOT needed); textual-absent →
+4 pass/2 skip. As-built deviation: the button-click pilot test needs `run_test(size=(120,50))` (the
+default 80×24 screen clips the Run button below the fold). **Remaining front-end = the G7
+`GameSession` roguelike loop (TUI v2) + the tycoon — both still deferred** (named-consumer physics
+backlog stays exhausted). No new physics/ADR.
 
 **The seven synced choices:** (1) **full grand tour** — every distinct step,
 purification→Czochralski→wafer-prep→oxidation→litho→diffusion→etch/depo→device→dice/bond/test,

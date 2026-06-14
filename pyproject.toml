@@ -37,6 +37,12 @@ viz = ["matplotlib>=3.7"]
 # The committed suite stays notebook-free regardless (the smoke-test is slow-marked and
 # importorskip/kernelspec-gated, and self-skips under CI — see the test docstring).
 notebook = ["jupyterlab>=4", "ipywidgets>=8", "nbclient", "nbformat", "ipykernel"]
+# The terminal front-end (fab_game/tui.py) is opt-in (ADR 0002 — an interactive surface per
+# pedagogy, behind the headless `run_dashboard` boundary, like [viz]/[notebook]). Only
+# fab_game/tui.py imports textual; the compute core and the always-on suite stay headless (the
+# App test importorskip-skips it, and tui.py is NOT in fab_game/__init__). Verified on the
+# textual 8.x line. Install with `pip install -e .[tui]`; run with `python -m fab_game.tui`.
+tui = ["textual>=8"]
 
 # Single-command test runner config. `pythonpath = ["."]` puts the repo root on
 # sys.path so tests import the engine as `engines.diffusion...` (and the project as

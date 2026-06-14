@@ -1,7 +1,16 @@
 # Plan — fab-game Textual TUI (the deferred terminal front-end)
 
-Status: **Planned, not built** (drafted 2026-06-14). A *deferred-build* shape doc — decisions,
-risks, and the seam/acceptance criteria, **not** a full spec. Build when wanted.
+Status: **v1 BUILT (2026-06-14)** (drafted same day). The plan below is the as-built shape; the
+roguelike loop (§7) stays the deferred v2. **What landed:** `fab_game/tui.py` (`FabLineApp` — the
+only module importing `textual`, *not* re-exported from `fab_game/__init__`, mirroring `plots.py`),
+the new headless `fab_game.plots.wafer_map_text(wafer, *, color=False)` renderer, the `[tui]` extra
+(`textual>=8`, verified on 8.2.7), and `fab_game/tests/test_tui.py` (4 pure-renderer legs + 2
+`importorskip` App-pilot legs). **Verified:** fast lane 637 green; the App test runs clean 5×5 under
+`-n auto` (no notebook-style flake → the `slow`/`xdist_group` escape hatch was **not** needed —
+`run_test()` is in-process asyncio, no zmq/subprocess); with `textual` uninstalled the suite stays
+green (4 pass / 2 skip) and `import fab_game` stays textual-free (the headless-safe criterion). The
+one as-built deviation from §4's sketch: the App-pilot button test passes `run_test(size=(120, 50))`
+so the *Run* button is on-screen for `pilot.click` (the default 80×24 pilot screen clipped it).
 
 This is the terminal front-end promised three times already and never built: the main plan's
 §9 ("A Textual TUI next … still a thin skin"), §10's UX ladder, and the G7 note ("a Textual

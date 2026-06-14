@@ -87,6 +87,45 @@ def dashboard_figure(result):
 
 
 # --------------------------------------------------------------------------- #
+# The terminal wafer map — the headless renderer the deferred Textual TUI drives
+# --------------------------------------------------------------------------- #
+WAFER_PASS_GLYPH = "O"      # a die that printed in spec
+WAFER_FAIL_GLYPH = "X"      # a die that failed its verdict (or was never tested)
+WAFER_EMPTY_GLYPH = " "     # a grid cell outside the wafer's edge-exclusion circle (no die)
+
+
+def wafer_map_text(wafer: WaferState, *, color: bool = False) -> str:
+    """An ASCII die map of ``wafer`` — pass dies ``O``, fail dies ``X``, on the wafer circle.
+
+    The terminal twin of :func:`dashboard_figure`'s wafer-map panel: it reuses the **same** per-die
+    placement (the ``grid_n × grid_n`` lattice clipped to the circle — :func:`_grid_n` and the
+    :class:`~fab_game.state.Die` ``site`` index), emitting one glyph per cell instead of a matplotlib
+    patch. A cell with no die (outside the edge-exclusion ring) renders as :data:`WAFER_EMPTY_GLYPH`,
+    so the wafer's round footprint emerges; rows are laid top-to-bottom with *y* increasing upward
+    (matplotlib's orientation — cosmetic on a symmetric map, but it keeps the text and the figure
+    consistent). A die counts as a pass only with a passing :class:`~fab_game.state.Verdict` (mirrors
+    :func:`_wafer_map`); an untested or failed die is the fail glyph.
+
+    This is a **pure function with no matplotlib / Textual import** — the load-bearing, independently
+    testable core the deferred Textual front-end drives. (The §9 discipline: the validated
+    string-building lives *outside* the interactive surface, which — like ``ipywidgets.interact`` —
+    can swallow a callback exception and still look green.) With ``color=True`` the pass/fail glyphs
+    are wrapped in Rich console markup (``[green]``/``[red]``) for the TUI's markup-rendering panel;
+    the default is plain ASCII (what the test pins).
+    """
+    n = _grid_n(wafer)
+    grid = [[WAFER_EMPTY_GLYPH] * n for _ in range(n)]
+    for d in wafer.dies:
+        passed = d.verdict is not None and d.verdict.passed
+        glyph = WAFER_PASS_GLYPH if passed else WAFER_FAIL_GLYPH
+        if color:
+            glyph = f"[green]{glyph}[/]" if passed else f"[red]{glyph}[/]"
+        i, j = d.site                                          # site[0] → column (x), site[1] → row (y)
+        grid[j][i] = glyph
+    return "\n".join(" ".join(row) for row in reversed(grid))  # reversed: higher y on top
+
+
+# --------------------------------------------------------------------------- #
 # G2 — the boule → batch artifact (the Scheil spread down the boule)
 # --------------------------------------------------------------------------- #
 def _scheil_panel(ax, result) -> None:
