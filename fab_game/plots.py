@@ -773,6 +773,104 @@ def stefan_figure(result):
 
 
 # --------------------------------------------------------------------------- #
+# A2 — the OSF ring: CG-2 made radial (a radial G(r) → the across-wafer non-uniformity)
+# --------------------------------------------------------------------------- #
+def _osf_criterion_panel(ax, result) -> None:
+    """ξ(r) vs radius: the radial gradient makes ξ=V/G(r) fall from centre to edge, crossing the cited
+    ξ_t at the OSF ring r_OSF — the three zones (vacancy core | OSF ring | interstitial rim)."""
+    r = np.asarray(result.r_grid)
+    ax.plot(r, result.xi_of_r, color="#2f6db5", lw=2.0, zorder=3, label="ξ(r) = V / G(r)")
+    ax.axhline(result.xi_t, color="0.4", ls=":", lw=1.2, label=f"ξ_t = {result.xi_t:.2f} (V/I boundary)")
+    ax.axvline(result.ring_radius, color="0.4", ls="--", lw=1.2,
+               label=f"OSF ring r_OSF = {result.ring_radius:.2f}")
+    ax.axvspan(0.0, result.ring_radius, color=_VACANCY_C, alpha=0.10)        # vacancy core
+    ax.axvspan(result.ring_radius, 1.0, color=_INTERSTITIAL_C, alpha=0.10)   # interstitial rim
+    ax.set_xlabel("die radius r (centre → edge)", fontsize=9)
+    ax.set_ylabel("Voronkov ratio ξ = V/G", fontsize=9)
+    ax.set_xlim(0.0, 1.0)
+    ax.set_title("The radial criterion: ξ(r) falls outward\nvacancy core | OSF ring | interstitial rim",
+                 fontsize=10)
+    ax.legend(fontsize=7.5, loc="upper right")
+
+
+def _osf_consequence_panel(ax, result) -> None:
+    """The kills STOP at the ring: the per-die survival exp(−D(r)·A) climbs from the degraded vacancy core
+    to a clean interstitial rim, the void density D(r) (twin axis) peaking at the centre and zero past r_OSF."""
+    r = np.asarray(result.r_grid)
+    ax.plot(r, result.survival_of_r, color="#2f6db5", lw=2.0, zorder=3,
+            label="per-die survival exp(−D(r)·A)")
+    ax.axvline(result.ring_radius, color="0.4", ls="--", lw=1.2,
+               label=f"OSF ring r_OSF = {result.ring_radius:.2f}")
+    ax.set_xlabel("die radius r (centre → edge)", fontsize=9)
+    ax.set_ylabel("grown-in defect survival", fontsize=9)
+    ax.set_ylim(-0.03, 1.05)
+    ax.set_xlim(0.0, 1.0)
+    ax.set_title("The kills STOP at the ring\nCOP-degraded core → clean interstitial rim", fontsize=10)
+    ax2 = ax.twinx()
+    ax2.plot(r, result.density_of_r, color=_VACANCY_C, lw=1.4, ls=":")
+    ax2.set_ylabel("void density D(r) (cm⁻²)", fontsize=8.5, color=_VACANCY_C)
+    ax2.tick_params(axis="y", labelsize=7.5, colors=_VACANCY_C)
+    ax.legend(fontsize=7.5, loc="center left")
+
+
+def _osf_wafer_map_panel(ax, result) -> None:
+    """The G3 consumer: the seeded wafer map, each die shaded by its grown-in void density, killer-COP
+    deaths marked (×) — they fall **only** in the vacancy core; the rim is clean. The OSF ring is dashed."""
+    import matplotlib.pyplot as plt
+
+    wafer = result.wafer
+    xs, ys = _die_xy(wafer)
+    geom_r = np.hypot(xs, ys)
+    rad_frac = np.array([d.radius_frac for d in wafer.dies])
+    dens = np.interp(rad_frac, result.r_grid, result.density_of_r)          # per-die void density
+    killed = np.array([bool(d.killed_by_defect) for d in wafer.dies])
+    n = _grid_n(wafer)
+    size = (2.0 / n) * 0.92
+    dmax = max(float(dens.max()), 1e-12)
+    cmap = plt.get_cmap("Reds")
+    for x, y, dn, kl in zip(xs, ys, dens, killed):
+        face = cmap(0.18 + 0.82 * dn / dmax) if dn > 0.0 else "#eef3ee"      # red core → pale clean rim
+        ax.add_patch(plt.Rectangle((x - size / 2, y - size / 2), size, size, facecolor=face,
+                                   edgecolor="black" if kl else "white", linewidth=1.6 if kl else 0.6))
+        if kl:                                                              # a killer-COP death (×)
+            h = size / 2.6
+            ax.plot([x - h, x + h], [y - h, y + h], color="black", lw=1.3)
+            ax.plot([x - h, x + h], [y + h, y - h], color="black", lw=1.3)
+    ax.add_patch(plt.Circle((0, 0), 1.0, fill=False, color="0.4", linewidth=1.2))
+    # The OSF ring drawn at the geometric radius (radius_frac is normalized by edge-exclusion).
+    pos = rad_frac > 0.05
+    edge_excl = float(np.median(geom_r[pos] / rad_frac[pos])) if np.any(pos) else 0.95
+    ax.add_patch(plt.Circle((0, 0), result.ring_radius * edge_excl, fill=False,
+                            color="#1c2530", linewidth=1.6, ls="--"))
+    ax.set_xlim(-1.15, 1.15)
+    ax.set_ylim(-1.15, 1.15)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title(f"Wafer map (seed {result.map_seed}): COPs kill the core, the rim survives\n"
+                 f"core {result.core_killed}/{result.core_dies} killed · rim {result.rim_killed}/"
+                 f"{result.rim_dies} killed  (× = COP death, dashed = OSF ring)", fontsize=9.5)
+
+
+def osf_ring_figure(result):
+    """Assemble the A2 artifact from a :class:`~fab_game.demo_osf_ring.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _osf_criterion_panel(axes[0], result)
+    _osf_consequence_panel(axes[1], result)
+    _osf_wafer_map_panel(axes[2], result)
+    fig.suptitle("A2 — the OSF ring: CG-2 made radial (a radial G(r) → ξ(r) → the V/I boundary made "
+                 "visible on the wafer)\n"
+                 "the ring is the BOUNDARY where the vacancy-core COP kills STOP — a COP-degraded core "
+                 "(modest) + a provably-clean rim (edge-vs-centre non-uniformity), NOT a ring of kills; "
+                 "the ring's existence is a flagged house profile",
+                 fontsize=10.0)
+    fig.tight_layout(rect=(0, 0, 1, 0.9))
+    return fig
+
+
+# --------------------------------------------------------------------------- #
 # G7 — the roguelike run down one boule: the Scheil V_t drift + scored strategies
 # --------------------------------------------------------------------------- #
 def _drift_panel(ax, result) -> None:

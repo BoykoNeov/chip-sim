@@ -31,6 +31,8 @@ magnitudes); the *law* the placement obeys is the cited Murphy/Poisson form.
 """
 from __future__ import annotations
 
+from typing import Callable
+
 import numpy as np
 
 from .state import DefectEvent, Die, die_area_cm2, die_cell_bounds
@@ -44,24 +46,35 @@ def scatter_defects(
     wafer_diameter_mm: float,
     rng: np.random.Generator,
     enabled: bool = True,
+    density_fn: Callable[[Die], float] | None = None,
 ) -> dict[tuple[int, int], tuple[DefectEvent, ...]]:
     """Draw the killer-defect realization per die → ``{site: (DefectEvent, …)}`` (fixed die order).
 
     Each die catches ``n ~ Poisson(D₀·A_die)`` killer particles (``A_die`` the single
     :func:`fab_game.state.die_area_cm2`), placed uniformly inside its cell
-    (:func:`fab_game.state.die_cell_bounds`). With ``enabled=False`` **or** a non-positive
-    ``defect_density`` returns an empty map for every die and **does not consume the RNG** (the seam,
-    and a clean line stays byte-identical). Consuming the RNG in the given ``dies`` order is the
-    determinism contract.
+    (:func:`fab_game.state.die_cell_bounds`). With ``enabled=False`` returns an empty map for every die
+    and **does not consume the RNG** (the seam, and a clean line stays byte-identical).
+
+    ``density_fn`` (the A2/OSF-ring radial path) makes the killer density **per die** — ``density_fn(d)``
+    in place of the scalar ``defect_density`` (so a radial ``D₀(r)`` keyed on ``d.radius_frac`` scatters
+    a vacancy core / clean rim). When ``density_fn is None`` the **uniform scalar path** is taken,
+    *byte-identical* to before: a non-positive ``defect_density`` returns empty without touching the RNG.
+    A per-die ``λ ≤ 0`` draws nothing (no RNG) — so the radial map is self-consistent and a clean die
+    stays clean. Consuming the RNG in the given ``dies`` order is the determinism contract (unchanged).
     """
-    if not enabled or defect_density <= 0.0:
+    if not enabled:
         return {d.site: () for d in dies}
 
     area = die_area_cm2(grid_n, wafer_diameter_mm)
-    lam = defect_density * area
+    if density_fn is None:
+        if defect_density <= 0.0:
+            return {d.site: () for d in dies}     # the uniform seam — no RNG, byte-identical
+        density_fn = lambda _d: defect_density    # noqa: E731 — uniform density for every die
+
     out: dict[tuple[int, int], tuple[DefectEvent, ...]] = {}
     for d in dies:
-        n = int(rng.poisson(lam))
+        lam = density_fn(d) * area
+        n = int(rng.poisson(lam)) if lam > 0.0 else 0
         x_lo, x_hi, y_lo, y_hi = die_cell_bounds(d.site, grid_n)
         events = tuple(
             DefectEvent(x=float(rng.uniform(x_lo, x_hi)),

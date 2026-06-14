@@ -34,9 +34,10 @@ the same way CG-1 plotted the deterministic ``V_t`` walk. Three panels:
 
 **Honesty (the repo's bar).** ``G`` is a **flagged house knob** (or, deferred, the shipped Robin heat
 mode); the void→density **coefficient** is house; only the Voronkov criterion *form* + ``ξ_t`` are
-cited. The interstitial-side dislocation/leakage cost and the **OSF-ring radial pattern** (the density
-here is spatially uniform) are named deferred edges — and the per-particle "grown-in vs fab-floor"
-attribution (the failure trail still reads a caught particle) is a deferred second-draw refinement.
+cited. The interstitial-side dislocation/leakage cost is a named deferred edge; the **OSF-ring radial
+pattern** (the density is spatially uniform *here*) is now **BUILT** as A2 (:mod:`fab_game.demo_osf_ring`
+— CG-2 made radial). The per-particle "grown-in vs fab-floor" attribution (the failure trail still reads
+a caught particle) is a deferred second-draw refinement.
 
 Run headless (saves the figure, prints the story):
 

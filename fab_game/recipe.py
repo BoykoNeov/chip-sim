@@ -87,6 +87,21 @@ class CzochralskiKnobs:
     derived), not both. ``G_l`` is still a house number (CG-3 adds the coupling + cap, not first
     principles).
 
+    ``radial_gradient_boost`` (A2, the **OSF ring** — CG-2 made *radial*) turns the single interface
+    gradient into a **radial profile** ``G(r) = G_center·(1 + boost·r²)``
+    (:func:`chip.czochralski.radial_thermal_gradient`), reinterpreting ``thermal_gradient_K_per_mm`` as
+    the **centre** gradient ``G_center`` (so it requires the direct CG-2 ``G`` + a pull rate, and is
+    **incompatible** with CG-3's ``melt_gradient_K_per_mm`` — the two-``G`` guard). With ``G`` rising
+    toward the edge, ``ξ(r) = V/G(r)`` **falls** outward, so the centre can be **vacancy**-rich (COP
+    voids) and the edge **interstitial**-rich, with the **OSF ring** at ``ξ(r) = ξ_t``
+    (:attr:`osf_ring_radius`). The killer (vacancy) density is then **per die** keyed on ``radius_frac``
+    (:meth:`grown_in_defect_density_at`): the pipeline scatters a **COP-degraded vacancy core + a clean
+    rim** — the edge-vs-centre yield **non-uniformity**. THE honest finding: the void density is monotone
+    in ξ, so it peaks at the centre (a *modest* core kill rate — the same capped coefficient as CG-2) and
+    is **zero at the ring** — the ring is the *boundary* where the kills **stop**, not a band of kills. It defaults to **``None``** (uniform ``G`` ⇒ **CG-2 byte-for-byte**,
+    the seam). The ``G(r)`` profile, the ``boost``, and the ring's on-wafer existence are flagged house
+    numbers; only the ring *location* + the topology signs are tight.
+
     ``oxygen_conc_cm3`` (C1) + ``thermal_donor_anneal_min`` (C1) add the **electrical** crystal-growth
     deepening: a CZ boule dissolves interstitial oxygen ``[O_i]`` from the quartz crucible, and a
     ~450 °C **donor anneal** nucleates **thermal donors** (n-type) that **compensate** the p-substrate —
@@ -109,6 +124,7 @@ class CzochralskiKnobs:
     pull_rate_mm_min: float | None = None  # CG-1 pull rate; None = well-mixed k_eff=k₀ (the seam)
     thermal_gradient_K_per_mm: float | None = None  # CG-2 direct interface gradient G; None = off (seam)
     melt_gradient_K_per_mm: float | None = None     # CG-3 melt-side G_l → Stefan-derived G_s; None = off (seam)
+    radial_gradient_boost: float | None = None      # A2 OSF ring: G(r)=G_center·(1+boost·r²); None = uniform (CG-2 seam)
     oxygen_conc_cm3: float | None = None   # C1 incorporated [O_i] (cm⁻³); None = oxygen-free (the seam)
     thermal_donor_anneal_min: float = 0.0  # C1 ~450 °C donor-anneal time (min); 0 = no anneal (the seam)
     length_mm: float = 200.0           # boule length (narrative geometry only)
@@ -190,12 +206,95 @@ class CzochralskiKnobs:
         interstitial/boundary growth (``ξ ≤ ξ_t``). Otherwise the flagged vacancy-side void density at
         this ``(V, G)`` — added to the wafer-prep killer density (:attr:`Recipe.effective_defect_density`)
         so the G3 defect map scatters the extra COPs. Pulling faster / a cooler hot zone raises it.
+
+        With the A2 **radial** profile on (``radial_gradient_boost`` set), this scalar is the **centre**
+        value (it reads ``G = thermal_gradient_K_per_mm = G_center``, the lowest ``G`` → highest ξ → the
+        *worst* density). The radial pipeline branch does **not** use it (nor the scalar
+        :attr:`Recipe.effective_defect_density`); it scatters the per-die
+        :meth:`grown_in_defect_density_at` instead. The scalar stays defined as the centre/worst case.
         """
         ratio = self.voronkov_ratio
         if ratio is None:
             return 0.0
         from chip.czochralski import void_defect_density
         return void_defect_density(ratio)
+
+    # --- A2: the OSF ring — CG-2 made radial (G(r) keyed on each die's radius_frac) --- #
+    @property
+    def is_osf_radial(self) -> bool:
+        """True when the OSF-ring radial gradient is engaged (``radial_gradient_boost`` is set)."""
+        return self.radial_gradient_boost is not None
+
+    def _center_gradient_K_per_mm(self) -> float:
+        """The centre gradient ``G_center`` the radial profile builds on — the direct CG-2 ``G``.
+
+        Raises if misconfigured: the radial profile reinterprets ``thermal_gradient_K_per_mm`` as
+        ``G_center`` (so it must be set) and is **incompatible** with CG-3's ``melt_gradient_K_per_mm``
+        (a Stefan-derived ``G`` is a single number, not a radial profile — the two-``G`` guard).
+        """
+        if self.melt_gradient_K_per_mm is not None:
+            raise ValueError(
+                "radial_gradient_boost (the A2 OSF ring) is incompatible with melt_gradient_K_per_mm "
+                "(CG-3 Stefan-derived G) — the radial profile reinterprets the direct "
+                "thermal_gradient_K_per_mm as the centre gradient G_center, not both")
+        if self.thermal_gradient_K_per_mm is None:
+            raise ValueError(
+                "radial_gradient_boost (the A2 OSF ring) requires thermal_gradient_K_per_mm — it is the "
+                "centre interface gradient G_center the radial profile G(r)=G_center·(1+boost·r²) builds on")
+        if self.pull_rate_mm_min is None:
+            raise ValueError(
+                "the A2 OSF radial gradient requires a pull_rate_mm_min — no V → no ξ(r)=V/G(r)")
+        return self.thermal_gradient_K_per_mm
+
+    def grown_in_defect_density_at(self, radius_frac: float) -> float:
+        """Per-die grown-in COP/void killer density (cm⁻²) at this die's ``radius_frac`` — the OSF field.
+
+        When ``radial_gradient_boost`` is ``None`` → the **uniform** :attr:`grown_in_defect_density`
+        (radius-independent — the CG-2 seam). When set → the vacancy-side
+        :func:`chip.czochralski.void_defect_density` at the radial ``G(r)``: the **vacancy core** (small
+        ``r``, low ``G``, high ξ) catches COPs, and the **interstitial rim** (large ``r``) is clean
+        (``0.0`` at and beyond the ring). The pipeline adds the (uniform) wafer-prep particle level and
+        scatters the sum per die through the same G3 Poisson map.
+        """
+        if self.radial_gradient_boost is None:
+            return self.grown_in_defect_density          # uniform — CG-2 (radius-independent; the seam)
+        from chip.czochralski import (
+            radial_thermal_gradient,
+            void_defect_density,
+            voronkov_ratio,
+        )
+        g_r = radial_thermal_gradient(
+            radius_frac, self._center_gradient_K_per_mm(), boost=self.radial_gradient_boost)
+        return void_defect_density(voronkov_ratio(self.pull_rate_mm_min, g_r))
+
+    @property
+    def osf_ring_radius(self) -> float | None:
+        """The normalized radius of the OSF (V/I) ring, or ``None`` (radial off **or** no on-wafer boundary).
+
+        ``None`` when ``radial_gradient_boost`` is unset (the seam) or when the boundary is off-wafer
+        (all-vacancy / all-interstitial). The two off-wafer cases are told apart by
+        :attr:`osf_zone_regimes`, not by the ``None`` (advisor: don't conflate no-kills with all-kills).
+        """
+        if self.radial_gradient_boost is None:
+            return None
+        from chip.czochralski import osf_ring_radius
+        return osf_ring_radius(
+            self.pull_rate_mm_min, self._center_gradient_K_per_mm(), boost=self.radial_gradient_boost)
+
+    @property
+    def osf_zone_regimes(self) -> tuple[str, str] | None:
+        """``(centre_regime, edge_regime)`` for the radial wafer, or ``None`` (radial off).
+
+        The topology-sign leg: a ring on-wafer ⇒ ``("vacancy", "interstitial")``. Also disambiguates the
+        off-wafer cases — ``("vacancy", "vacancy")`` is all-vacancy, ``("interstitial", "interstitial")``
+        all-interstitial — which the bare :attr:`osf_ring_radius` ``None`` cannot.
+        """
+        if self.radial_gradient_boost is None:
+            return None
+        from chip.czochralski import radial_defect_regime
+        g_center, v, boost = self._center_gradient_K_per_mm(), self.pull_rate_mm_min, self.radial_gradient_boost
+        return (radial_defect_regime(0.0, v, g_center, boost),
+                radial_defect_regime(1.0, v, g_center, boost))
 
     @property
     def thermal_donor_density(self) -> float:

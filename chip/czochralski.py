@@ -71,9 +71,10 @@ Named scope edge (the honest ceiling)
   **vacancy-rich** (voids / COPs, which degrade gate-oxide integrity), ``V/G < ξ_t`` is
   **interstitial-rich** (dislocation loops). Pulling faster (or running a cooler hot zone, lower
   ``G``) pushes ``V/G`` up into voids, so the COP killer-defect density rises — the in-model cost
-  CG-1 lacked. **Remaining deferred brakes:** the *interstitial*-side dislocation/leakage consequence
-  (only the vacancy/void→GOI density is wired), the **OSF-ring radial pattern** (the density here is
-  spatially uniform), constitutional-supercooling **striations**, and the dislocation-free Dash neck.
+  CG-1 lacked. The **OSF-ring radial pattern** is now **BUILT (A2, opt-in)** — see the §1f bullet
+  below. **Remaining deferred brakes:** the *interstitial*-side dislocation/leakage consequence
+  (only the vacancy/void→GOI density is wired), constitutional-supercooling **striations**, and the
+  dislocation-free Dash neck.
   ``G`` is a **flagged house knob** here — or, now **BUILT (CG-3, opt-in)**, derived from the Stefan
   interface heat balance (next bullet); only the criterion *form* + ``ξ_t`` are cited (plan §6a
   fidelity ladder: criterion **High**, the void→density coefficient **flagged**). Off by default (no
@@ -104,6 +105,21 @@ Named scope edge (the honest ceiling)
   net-doping chain. Off by default (no ``[O_i]`` or no donor anneal → ``N_TD = 0`` exact → the seam).
   **Still deferred:** ``[O_i] = f(pull/rotation/melt)`` (a flagged input *level*, not a growth model),
   the higher-T "new donor" / oxygen-precipitation regimes, and type inversion (a guarded named edge).
+* **The OSF ring — CG-2 made radial — now BUILT (A2, opt-in), the across-wafer deepening.** CG-2's
+  ``ξ = V/G`` is one number for the whole crystal (uniform defect regime). Letting ``G`` vary with
+  wafer **radius** (the periphery cools faster, so ``G`` rises outward — :func:`radial_thermal_gradient`,
+  §1f) makes ``ξ(r) = V/G(r)`` fall from centre to edge, so a single pull can leave the centre
+  **vacancy**-rich and the edge **interstitial**-rich, with the **OSF (oxidation-induced
+  stacking-fault) ring** at the annulus where ``ξ(r) = ξ_t`` (:func:`osf_ring_radius` — the V/I
+  boundary made visible on the wafer). THE finding: the reused (monotone) :func:`void_defect_density`
+  peaks at the high-ξ **centre** and falls to zero **at** the ring, so the consequence is a dead
+  vacancy **core + a clean interstitial rim — NOT a ring of dead dies**; the ring is the *boundary*
+  where the kills **stop**. Tight = the ring **location** (``ξ(r_OSF)=ξ_t``, coefficient-robust) + the
+  topology signs (vacancy centre / interstitial edge); flagged = the ``G(r)`` profile, the radial
+  boost, the ring width, and **its on-wafer existence itself**. **No engine** (the Robin-``G`` sourcing
+  was falsified/deferred — closed-form house profile). Off by default (``boost = 0`` ⇒ uniform ⇒ CG-2
+  byte-for-byte). **Still deferred:** the literal *degraded ring* (the OSF band's own stacking-fault
+  **leakage** → the interstitial/:mod:`chip.lifetime` channel = the separately-deferred A1 edge).
 * **Full dopant activation at 300 K** (inherited from the Masetti/junction resistivity model): the
   electrically-active concentration is taken equal to the chemical one — fine at the substrate
   ``~1e15–1e17`` here; the active-vs-chemical edge is the repo's standing ceiling.
@@ -320,8 +336,10 @@ def void_defect_density(
     (GOI) failures → a killer-defect density that plugs into the Poisson defect-yield law
     (:func:`chip.wafer_prep.poisson_yield`). The *direction* (switches on at ``ξ_t``, monotone above) is
     criterion-driven; the ``coefficient`` magnitude is **house/flagged** (ADR 0005 §5), never asserted.
-    The interstitial-side (``ξ < ξ_t``) dislocation/leakage cost and the OSF-ring radial pattern are
-    named deferred edges — this density is one-sided (vacancy only) and spatially uniform.
+    This density is one-sided (vacancy only); the interstitial-side (``ξ < ξ_t``) dislocation/leakage
+    cost stays a named deferred edge. It is uniform **per call** — but A2 (§1f) reuses it *per wafer
+    radius* (at the radial ``G(r)``) to build the OSF-ring pattern, so "uniform" is only the single-``ξ``
+    reading, not a ceiling.
     """
     if coefficient < 0.0:
         raise ValueError(f"coefficient must be ≥ 0, got {coefficient}")
@@ -590,6 +608,121 @@ def net_doping_after_donors(N_A: float, thermal_donor_cm3: float) -> float:
             "(the substrate would go n-type); the compact p-substrate device does not model this "
             "(lower the oxygen / shorten the donor anneal)")
     return N_A - thermal_donor_cm3
+
+
+# --------------------------------------------------------------------------- #
+# 1f. The OSF ring — CG-2 made radial: a radial G(r) → ξ(r) → the V/I boundary (A2)
+# --------------------------------------------------------------------------- #
+# CG-2 (§1c) takes ONE interface gradient ``G`` for the whole crystal, so its Voronkov ratio
+# ``ξ = V/G`` is **spatially uniform** — the wafer is entirely vacancy-rich or entirely interstitial-
+# rich. Real CZ wafers instead show a **radial** defect pattern, because ``G`` is not constant across
+# the freezing interface: the crystal **periphery** loses heat to the (cooler) surroundings faster
+# than the insulated centre, so the axial gradient ``G`` **rises toward the wafer edge**. Then
+#
+#     G(r) = G_center·(1 + boost·r²)        (K/mm; r = normalized radius ∈ [0, 1], 0 = centre)
+#     ξ(r) = V / G(r)                       falls monotonically from centre to edge
+#
+# so a single pull rate can leave the **centre vacancy-rich** (low ``G`` → high ξ) and the **edge
+# interstitial-rich** (high ``G`` → low ξ), with the thin annulus where ``ξ(r) = ξ_t`` being the
+# **OSF (oxidation-induced stacking-fault) ring** — the V/I boundary (§1c) made *visible on the wafer*.
+# This is the classic CZ picture: as the pull rate ``V`` rises the ring moves outward (the vacancy core
+# grows), as ``V`` falls it shrinks inward and vanishes (the wafer goes all-interstitial).
+#
+# THE HONEST FINDING (lead with it — the CG-1/CG-2 honest-magnitude pattern). The yield consequence
+# reuses CG-2's vacancy-side :func:`void_defect_density`, which is **monotone in ξ**: the killer-COP
+# density therefore **peaks at the high-ξ centre and falls to zero AT the ring**, then stays zero
+# across the interstitial rim. So the across-wafer map this produces is a **COP-degraded vacancy core
+# + a clean interstitial rim — NOT a ring of dead dies.** The OSF ring is the *boundary* where the
+# kills **stop**, not a band of kills. (Honest magnitude — the void coefficient is the same capped
+# house number as CG-2, so the core mortality is *modest*, not a wipeout: the kill rate climbs toward
+# the centre and the rim is **provably** clean — zero density past the ring — but the core is
+# *degraded*, not literally dead.) (A literal *degraded ring* — the stacking faults' own
+# junction-leakage — is a different consequence that would feed the **interstitial/leakage** channel
+# of :mod:`chip.lifetime`; that is the separately-deferred A1 edge, so the OSF band-as-killer stays a
+# **named deferred refinement** here, not built — the repo's no-regime-without-its-consumer bar.)
+#
+# FIDELITY (plan §6a flagged-phenomenology tier — like CG-2, NO conservation law, and — the A2
+# correction — **NO engine heat leg**: the gradient is a closed-form house *profile*, the shipped
+# Robin heat-mode sourcing of ``G(r)`` was verified-and-falsified, deferred). The **tight** legs are
+# the ring **location** (``ξ(r_OSF) = ξ_t`` — pure ``ξ_t`` + the profile shape; :func:`osf_ring_radius`
+# does not even see the void coefficient, so the location is **coefficient-robust**) and the
+# **topology signs** (vacancy centre / interstitial edge when a ring is on-wafer). The **flagged house**
+# parts are the ``G(r)`` profile magnitude, the radial ``boost``, the ring *width*, and — say it plainly
+# — **the ring's on-wafer existence itself**: you choose the profile so the boundary lands in ``[0, 1]``,
+# so a ring on a given recipe is *illustrative*, not a prediction. The density-decreasing-with-radius
+# is a **by-construction guard, not an anchor** (the v1.11 / CG-2 reminder). Off by default (``boost = 0``
+# ⇒ uniform ``G ≡ G_center`` ⇒ CG-2 byte-for-byte — the seam).
+OSF_RADIAL_GRADIENT_BOOST: float = 1.0   # FLAGGED house radial steepening: G(edge) = G_center·(1+boost)
+
+
+def radial_thermal_gradient(radius_frac, G_center: float, *, boost: float = OSF_RADIAL_GRADIENT_BOOST):
+    """Radial interface gradient ``G(r) = G_center·(1 + boost·r²)`` (K/mm) — the FLAGGED house profile.
+
+    ``radius_frac`` the normalized wafer radius ∈ ``[0, 1]`` (0 = centre, 1 = edge; scalar or array);
+    ``G_center`` (K/mm, > 0) the centre gradient; ``boost`` (≥ 0) the flagged centre→edge steepening.
+    ``G`` **rises** toward the edge (the periphery cools faster), so ``ξ = V/G`` falls outward → a
+    vacancy centre / interstitial edge. ``boost = 0`` returns ``G_center`` for every ``r`` — the uniform
+    CG-2 seam (:func:`voronkov_ratio` then recovers the single-``G`` ratio). Only the *direction* (``G``
+    rises outward) is physics; the ``r²`` shape and the ``boost`` magnitude are house numbers (ADR 0005 §5).
+    """
+    if G_center <= 0.0:
+        raise ValueError(f"centre gradient G_center must be > 0, got {G_center}")
+    if boost < 0.0:
+        raise ValueError(f"radial boost must be ≥ 0, got {boost}")
+    r = np.asarray(radius_frac, dtype=float)
+    if np.any(r < 0.0):
+        raise ValueError("radius_frac must be ≥ 0")
+    out = G_center * (1.0 + boost * r * r)
+    return float(out) if out.ndim == 0 else out
+
+
+def osf_ring_radius(
+    pull_rate_mm_min: float,
+    G_center: float,
+    *,
+    boost: float = OSF_RADIAL_GRADIENT_BOOST,
+    critical_ratio: float = VORONKOV_CRITICAL_RATIO,
+) -> float | None:
+    """The normalized radius ``r_OSF`` where ``ξ(r) = V/G(r) = ξ_t`` — the OSF (V/I) ring, or ``None``.
+
+    THE TIGHT LEG (coefficient-robust): solving ``G(r_OSF) = V/ξ_t`` for ``G(r) = G_center·(1+boost·r²)``
+    gives ``r_OSF = √((V/(ξ_t·G_center) − 1)/boost)`` — set purely by the cited ``ξ_t`` and the profile
+    shape, **independent of the void-density coefficient** (this function does not take it). Returns
+    ``None`` when the boundary is **off-wafer** (``r_OSF² ∉ (0, 1]``): all-interstitial (``G_center ≥
+    V/ξ_t`` — even the centre is interstitial) or all-vacancy (even the edge has ``ξ > ξ_t``). The two
+    off-wafer cases are **not** distinguished by the ``None`` — read the regime field
+    (:func:`radial_defect_regime` at centre/edge, surfaced in provenance) to tell a clean wafer from a
+    fully-dead one. ``boost = 0`` (uniform G) has no interior boundary → ``None``.
+    """
+    if boost <= 0.0:
+        return None                               # uniform G (CG-2) — no radial V/I boundary
+    if pull_rate_mm_min < 0.0:
+        raise ValueError(f"pull rate must be ≥ 0, got {pull_rate_mm_min}")
+    if G_center <= 0.0:
+        raise ValueError(f"centre gradient G_center must be > 0, got {G_center}")
+    r_sq = (pull_rate_mm_min / (critical_ratio * G_center) - 1.0) / boost
+    if 0.0 < r_sq <= 1.0:
+        return math.sqrt(r_sq)
+    return None                                   # boundary off-wafer (all-vacancy or all-interstitial)
+
+
+def radial_defect_regime(
+    radius_frac: float,
+    pull_rate_mm_min: float,
+    G_center: float,
+    boost: float = OSF_RADIAL_GRADIENT_BOOST,
+    *,
+    critical_ratio: float = VORONKOV_CRITICAL_RATIO,
+) -> str:
+    """The grown-in defect regime at one wafer radius — :func:`grown_in_defect_regime` of ``ξ(r)``.
+
+    ``"vacancy"`` / ``"osf"`` / ``"interstitial"`` from ``ξ(r) = V/G(r)`` at this ``radius_frac`` (the
+    radial profile :func:`radial_thermal_gradient`). The topology-sign leg: with a ring on-wafer, the
+    centre (``r=0``, low ``G``) reads ``"vacancy"`` and the edge (``r=1``, high ``G``) reads
+    ``"interstitial"`` — the tight, coefficient-robust direction the OSF picture asserts.
+    """
+    g_r = radial_thermal_gradient(radius_frac, G_center, boost=boost)
+    return grown_in_defect_regime(voronkov_ratio(pull_rate_mm_min, g_r), critical_ratio=critical_ratio)
 
 
 # --------------------------------------------------------------------------- #

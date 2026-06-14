@@ -312,6 +312,119 @@ def test_voronkov_invalid_inputs_raise():
 
 
 # --------------------------------------------------------------------------- #
+# A2 (OSF ring): CG-2 made radial — a radial G(r) → ξ(r) → the V/I boundary.
+# Triad shape (plan §6a flagged-phenomenology tier, NO conservation law, and — the
+# A2 correction — NO engine heat leg, the gradient is a closed-form house profile):
+# the TIGHT legs are the ring LOCATION (ξ(r_OSF)=ξ_t, coefficient-robust — the solver
+# never sees the void coefficient) and the topology SIGNS (vacancy centre / interstitial
+# edge). The G(r) profile, the boost, the ring width, and the ring's on-wafer existence
+# are FLAGGED house numbers. boost=0 recovers CG-2 byte-for-byte (the seam). The
+# density-falls-with-radius is a by-construction guard, NOT an anchor.
+# --------------------------------------------------------------------------- #
+# A (V, G_center, boost) with the V/I boundary ON-wafer: ξ(0)=V/G_center=0.20 > ξ_t > ξ(1)=0.10
+# (need G_center ∈ (V/2ξ_t, V/ξ_t) = (7.7, 15.4) at V=2, boost=1).
+_V_RING, _GC_RING, _BOOST_RING = 2.0, 10.0, 1.0
+
+
+def test_radial_gradient_boost_zero_is_the_cg2_seam():
+    # boost=0 → G(r) ≡ G_center for every r (uniform) — bit-for-bit the single-G CG-2 picture, and
+    # osf_ring_radius has no interior boundary (None). The seam: the radial knob off recovers CG-2.
+    for r in (0.0, 0.3, 0.71, 1.0):
+        assert cz.radial_thermal_gradient(r, _GC_RING, boost=0.0) == _GC_RING   # exact uniform
+    assert cz.osf_ring_radius(_V_RING, _GC_RING, boost=0.0) is None
+
+
+def test_radial_gradient_rises_toward_the_edge():
+    # The one physics DIRECTION (flagged shape, but the sign is the OSF topology): G rises outward, so
+    # ξ=V/G falls outward → centre higher-ξ than edge. G(0)=G_center exactly.
+    assert cz.radial_thermal_gradient(0.0, _GC_RING, boost=_BOOST_RING) == _GC_RING
+    g_edge = cz.radial_thermal_gradient(1.0, _GC_RING, boost=_BOOST_RING)
+    assert g_edge == pytest.approx(_GC_RING * (1.0 + _BOOST_RING))              # G(1)=G_center·(1+boost)
+    assert g_edge > _GC_RING                                                    # rises toward the edge
+    # array form (the demo's radial sweep) — monotone increasing in r.
+    g = cz.radial_thermal_gradient(np.array([0.0, 0.5, 1.0]), _GC_RING, boost=_BOOST_RING)
+    assert np.all(np.diff(g) > 0.0)
+
+
+def test_osf_ring_location_sits_exactly_at_xi_t_the_tight_leg():
+    # THE tight leg: the ring is where ξ(r_OSF)=ξ_t — a definitional crossing, to machine precision.
+    r_osf = cz.osf_ring_radius(_V_RING, _GC_RING, boost=_BOOST_RING)
+    assert r_osf is not None and 0.0 < r_osf < 1.0
+    g_at = cz.radial_thermal_gradient(r_osf, _GC_RING, boost=_BOOST_RING)
+    assert cz.voronkov_ratio(_V_RING, g_at) == pytest.approx(cz.VORONKOV_CRITICAL_RATIO)
+    # The closed form: r_OSF = √((V/(ξ_t·G_center) − 1)/boost).
+    import math
+    expected = math.sqrt((_V_RING / (cz.VORONKOV_CRITICAL_RATIO * _GC_RING) - 1.0) / _BOOST_RING)
+    assert r_osf == pytest.approx(expected)
+
+
+def test_osf_ring_location_is_coefficient_robust():
+    # The ring LOCATION does not depend on the flagged void coefficient (osf_ring_radius never takes
+    # one) — the coefficient sets only the kill DEPTH, never the boundary. So the void density's
+    # zero-crossing sits at r_OSF for ANY coefficient (inside kills, at/outside is clean).
+    r_osf = cz.osf_ring_radius(_V_RING, _GC_RING, boost=_BOOST_RING)
+    def density_at(r, coef):
+        g = cz.radial_thermal_gradient(r, _GC_RING, boost=_BOOST_RING)
+        return cz.void_defect_density(cz.voronkov_ratio(_V_RING, g), coefficient=coef)
+    for coef in (0.05, 0.3, 5.0):
+        assert density_at(r_osf * 0.99, coef) > 0.0                # just inside the ring → vacancy kills
+        assert density_at(r_osf, coef) == pytest.approx(0.0, abs=1e-12)   # AT the ring → exactly zero
+        assert density_at(min(r_osf * 1.01, 1.0), coef) == 0.0     # outside → clean interstitial rim
+
+
+def test_osf_topology_signs_vacancy_core_interstitial_edge():
+    # The topology-sign leg: with the ring on-wafer the centre is vacancy-rich, the edge interstitial.
+    assert cz.radial_defect_regime(0.0, _V_RING, _GC_RING, _BOOST_RING) == "vacancy"
+    assert cz.radial_defect_regime(1.0, _V_RING, _GC_RING, _BOOST_RING) == "interstitial"
+    # The killer (vacancy void) density is a by-construction guard: it FALLS to zero with radius
+    # (NOT an anchor — the magnitude is the flagged coefficient; only the monotone direction is asserted).
+    def vd(r):
+        g = cz.radial_thermal_gradient(r, _GC_RING, boost=_BOOST_RING)
+        return cz.void_defect_density(cz.voronkov_ratio(_V_RING, g))
+    dens = [vd(r) for r in np.linspace(0.0, 1.0, 11)]
+    assert dens[0] > 0.0                                           # COP-degraded vacancy core (centre)
+    assert dens[-1] == 0.0                                         # clean interstitial rim
+    assert all(a >= b for a, b in zip(dens, dens[1:]))            # monotone non-increasing (the guard)
+
+
+def test_osf_ring_off_wafer_both_cases_return_none():
+    # None means NO on-wafer boundary — but the two off-wafer cases are distinct, so the caller reads
+    # the regime (not the None) to tell them apart (advisor: don't conflate no-kills with all-kills).
+    # (a) all-interstitial: even the centre is interstitial (G_center ≥ V/ξ_t → ξ(0) ≤ ξ_t).
+    g_big = _V_RING / cz.VORONKOV_CRITICAL_RATIO + 1.0
+    assert cz.osf_ring_radius(_V_RING, g_big, boost=_BOOST_RING) is None
+    assert cz.radial_defect_regime(0.0, _V_RING, g_big, _BOOST_RING) in ("interstitial", "osf")
+    assert cz.radial_defect_regime(1.0, _V_RING, g_big, _BOOST_RING) == "interstitial"
+    # (b) all-vacancy: even the EDGE has ξ > ξ_t (G(1)=G_center·(1+boost) < V/ξ_t).
+    g_tiny = 1.0                                                   # G(1)=2 ≪ V/ξ_t=15.4
+    assert cz.osf_ring_radius(_V_RING, g_tiny, boost=_BOOST_RING) is None
+    assert cz.radial_defect_regime(0.0, _V_RING, g_tiny, _BOOST_RING) == "vacancy"
+    assert cz.radial_defect_regime(1.0, _V_RING, g_tiny, _BOOST_RING) == "vacancy"
+
+
+def test_osf_pull_rate_moves_the_ring_outward():
+    # The classic CZ behaviour (a cross-check on the direction, not a magnitude): a FASTER pull (higher
+    # ξ everywhere) pushes the vacancy core outward → the ring moves toward the edge (larger r_OSF),
+    # and eventually off-wafer (all-vacancy → None). Coefficient-free, pure ξ_t + profile.
+    r_slow = cz.osf_ring_radius(1.8, _GC_RING, boost=_BOOST_RING)
+    r_fast = cz.osf_ring_radius(2.2, _GC_RING, boost=_BOOST_RING)
+    assert r_slow is not None and r_fast is not None
+    assert r_fast > r_slow                                         # faster pull → ring moves outward
+    assert cz.osf_ring_radius(5.0, _GC_RING, boost=_BOOST_RING) is None   # too fast → all-vacancy, off-wafer
+
+
+def test_osf_invalid_inputs_raise():
+    with pytest.raises(ValueError):
+        cz.radial_thermal_gradient(0.5, 0.0)                      # G_center > 0
+    with pytest.raises(ValueError):
+        cz.radial_thermal_gradient(0.5, 10.0, boost=-1.0)         # boost ≥ 0
+    with pytest.raises(ValueError):
+        cz.radial_thermal_gradient(-0.1, 10.0)                    # radius_frac ≥ 0
+    with pytest.raises(ValueError):
+        cz.osf_ring_radius(_V_RING, 0.0, boost=_BOOST_RING)       # G_center > 0
+
+
+# --------------------------------------------------------------------------- #
 # CG-3: the Stefan interface heat balance — where CG-2's gradient G comes from.
 # Triad shape (plan §6a, same honesty tier as CG-2 — NO independent conservation
 # law): the tight legs are the two analytic LIMITS (V→0 pure conduction-matching;

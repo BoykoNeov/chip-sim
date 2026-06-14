@@ -120,10 +120,22 @@ def run_line(
     # grown-in COP/void density (vacancy-rich Czochralski growth) — two Poisson processes superpose,
     # so the grown-in voids ride the same cited G3 defect map. At the default (no thermal gradient
     # set) the grown-in term is 0, so this is prep.defect_density exactly (the G3 seam).
-    grown_in = recipe.czochralski.grown_in_defect_density
-    defect_map = scatter_defects(
-        wafer.dies, defect_density=recipe.effective_defect_density, grid_n=grid_n,
-        wafer_diameter_mm=prep.wafer_diameter_mm, rng=rng, enabled=variation.enabled)
+    cz = recipe.czochralski
+    grown_in = cz.grown_in_defect_density       # uniform CG-2 density (the CENTRE/worst value when radial)
+    if cz.is_osf_radial:
+        # A2 OSF ring: the grown-in density is RADIAL — per die D₀(r) = wafer-prep particles +
+        # grown_in_defect_density_at(radius_frac). The vacancy core (small r) catches COPs; the
+        # interstitial rim (large r) is clean (0 at/beyond the ring) → an edge-vs-centre yield
+        # non-uniformity. The uniform scalar effective_defect_density is NOT used on this branch.
+        base = prep.defect_density
+        defect_map = scatter_defects(
+            wafer.dies, defect_density=base, grid_n=grid_n,
+            wafer_diameter_mm=prep.wafer_diameter_mm, rng=rng, enabled=variation.enabled,
+            density_fn=lambda d: base + cz.grown_in_defect_density_at(d.radius_frac))
+    else:
+        defect_map = scatter_defects(
+            wafer.dies, defect_density=recipe.effective_defect_density, grid_n=grid_n,
+            wafer_diameter_mm=prep.wafer_diameter_mm, rng=rng, enabled=variation.enabled)
     dies = tuple(wafer_prep_step(d, geometry, defect_map[d.site]) for d in wafer.dies)
     # Provenance: when CG-2 is engaged, record the grown-in split + the Voronkov regime at the
     # WAFER level — so the killer density is not silently read as a fab-floor particle level (the
@@ -131,10 +143,17 @@ def run_line(
     # process needs a second Poisson draw and is a named deferred edge).
     prep_summary = {"ttv_um": geometry.ttv_um, "bow_um": geometry.bow_um,
                     "n_defects": sum(len(v) for v in defect_map.values())}
-    if grown_in > 0.0:
+    if cz.is_osf_radial:
+        # The OSF ring is radial — record the ring location + the centre/edge topology + the centre/edge
+        # density (the boundary where the vacancy-core kills stop), so the map's non-uniformity is legible.
+        prep_summary["osf_ring_radius"] = cz.osf_ring_radius
+        prep_summary["osf_zone_regimes"] = cz.osf_zone_regimes
+        prep_summary["grown_in_density_center"] = cz.grown_in_defect_density_at(0.0)
+        prep_summary["grown_in_density_edge"] = cz.grown_in_defect_density_at(1.0)
+    elif grown_in > 0.0:
         prep_summary["grown_in_defect_density"] = grown_in
-        prep_summary["voronkov_ratio"] = recipe.czochralski.voronkov_ratio
-        prep_summary["grown_in_regime"] = recipe.czochralski.grown_in_defect_regime
+        prep_summary["voronkov_ratio"] = cz.voronkov_ratio
+        prep_summary["grown_in_regime"] = cz.grown_in_defect_regime
     wafer = replace(wafer, geometry=geometry).with_step(
         StepRecord("wafer_prep",
                    {"ttv_um": geometry.ttv_um, "bow_um": geometry.bow_um,
