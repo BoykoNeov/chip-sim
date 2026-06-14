@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>chip-sim &mdash; the fab-line game gallery</title>
+  <style>
+      :root {
+        --bg: #f6f7f9; --card: #ffffff; --ink: #1c2530; --muted: #5b6772;
+        --line: #e2e6ea; --accent: #2f6db5; --code: #0b3a66; --shot-bg: #fafbfc;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink);
+             font: 16px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      header { padding: 2.6rem 1.5rem 1.4rem; border-bottom: 1px solid var(--line);
+               background: linear-gradient(180deg, #fff, var(--bg)); }
+      .wrap { max-width: 1180px; margin: 0 auto; }
+      h1 { margin: 0 0 .25rem; font-size: 1.9rem; letter-spacing: -.01em; }
+      .tagline { margin: 0 0 1rem; color: var(--muted); font-size: 1.05rem; }
+      .lead { margin: 0 0 1rem; max-width: 70ch; }
+      .quick { margin: 0; padding: .7rem .9rem; background: #0d1b2a; color: #e6edf3;
+               border-radius: 8px; overflow-x: auto; font: .85rem/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; }
+      .quick .c { color: #7fb0e0; }
+      .repo { display: inline-block; margin-top: .8rem; font-weight: 600; }
+      main { max-width: 1180px; margin: 0 auto; padding: 1.6rem 1.5rem 3rem; }
+      section { margin-top: 2.2rem; }
+      h2 { font-size: 1.3rem; margin: 0 0 .2rem; }
+      .sub { margin: 0 0 1.1rem; color: var(--muted); }
+      .grid { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              overflow: hidden; display: flex; flex-direction: column;
+              transition: box-shadow .15s ease, transform .15s ease; }
+      .card:hover { box-shadow: 0 8px 24px rgba(20,40,70,.12); transform: translateY(-2px); }
+      .shot { display: block; background: var(--shot-bg); border-bottom: 1px solid var(--line); }
+      .shot img { display: block; width: 100%; height: auto; }
+      .body { padding: .9rem 1rem 1rem; display: flex; flex-direction: column; gap: .55rem; flex: 1; }
+      .tag { align-self: flex-start; font-weight: 700; font-size: .76rem; letter-spacing: .03em;
+             text-transform: uppercase; color: var(--accent); background: #eaf2fb;
+             border-radius: 999px; padding: .12rem .6rem; }
+      .blurb { margin: 0; flex: 1; }
+      .links { display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+               margin-top: .2rem; padding-top: .6rem; border-top: 1px dashed var(--line); }
+      .links code { color: var(--code); background: #eef3f8; border-radius: 6px;
+                    padding: .2rem .45rem; font: .8rem ui-monospace, "Cascadia Code", Consolas, monospace;
+                    overflow-x: auto; }
+      .src { white-space: nowrap; font-size: .85rem; }
+      .deeper { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+      .deeper .item { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+                      padding: .9rem 1rem; }
+      .deeper .item h3 { margin: 0 0 .25rem; font-size: 1rem; }
+      .deeper .item p { margin: 0; color: var(--muted); font-size: .9rem; }
+      footer { border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem;
+               padding: 1.4rem 1.5rem 2.4rem; }
+      footer code { background: #eef3f8; border-radius: 5px; padding: .1rem .35rem;
+                    font: .82rem ui-monospace, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>chip-sim &mdash; the fab-line game</h1>
+      <p class="tagline"><em>Recipe in, yield out &mdash; and you can see why a die died.</em> The gamified
+        full-production-line layer, built on the validated physics.</p>
+      <p class="lead">A wafer's whole journey, <strong>sand &rarr; a binned chip</strong>: a Czochralski
+        boule sliced into wafers, the across-wafer die map, the front end, the mid-line, and the back end
+        &mdash; each stage a cited <code>chip/</code> module the game layer turns into a <strong>yield</strong>.
+        This is the clickable front door to all of it: the <strong>visualizations</strong> (click any figure
+        for full size), the <strong>demos</strong> that produce them (run command + source), and the
+        <strong>deepenings</strong>. The figures below are pre-committed, so the gallery browses without
+        running anything. (The physics side has its <a href="index.html">own gallery</a>.)</p>
+      <pre class="quick"><span class="c"># clone, install the figure stack, run the dramatic first win</span>
+pip install -e ".[viz]"
+python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks docs/figures/fab-game-g1.png</span></pre>
+      <a class="repo" href="https://github.com/BoykoNeov/chip-sim">View the repository on GitHub&nbsp;&#8599;</a>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>The line</h2>
+      <p class="sub">Sand to a binned chip, in process order &mdash; start here. G1 is all reuse (zero new
+        physics); G2 onward each adds a cited, triad-tested module the game consumes.</p>
+      <div class="grid">
+        <article class="card">
+          <a class="shot" href="figures/fab-game-g1.png" title="open the full figure">
+            <img src="figures/fab-game-g1.png" alt="G1 — demo_fab_game figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">G1</span>
+            <p class="blurb">One bad knob → a dead die, with the failure trail: defocus → NILS collapse → off-spec → the wafer yield drops, and the trail names defocus as the cause.</p>
+            <div class="links">
+              <code>python -m fab_game.demo_fab_game</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_fab_game.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-g2.png" title="open the full figure">
+            <img src="figures/fab-game-g2.png" alt="G2 — demo_boule figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">G2</span>
+            <p class="blurb">Czochralski + the Scheil axial boule → a V_t spread down the boule (k≈0.8, the tail scraps) — the difficulty curve of a run.</p>
+            <div class="links">
+              <code>python -m fab_game.demo_boule</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_boule.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-g3.png" title="open the full figure">
+            <img src="figures/fab-game-g3.png" alt="G3 — demo_wafer_prep figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">G3</span>
+            <p class="blurb">The die map made physical: killer particles → the defect-limited yield law Y=exp(−D₀A) + the TTV/bow geometry scrap gate.</p>
+            <div class="links">
+              <code>python -m fab_game.demo_wafer_prep</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_wafer_prep.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-g4.png" title="open the full figure">
+            <img src="figures/fab-game-g4.png" alt="G4 — demo_purification figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">G4</span>
+            <p class="blurb">Silicon purification (Pfann single-pass zone refining) → Na contamination → Q_ox → a V_t hit, recovered by rework.</p>
+            <div class="links">
+              <code>python -m fab_game.demo_purification</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_purification.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-g4b.png" title="open the full figure">
+            <img src="figures/fab-game-g4b.png" alt="G4b — demo_lifetime figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">G4b</span>
+            <p class="blurb">Deep-level metals (Fe/Cu) → SRH lifetime killed → generation leakage → a leaky diode (the optional leakage spec window).</p>
+            <div class="links">
+              <code>python -m fab_game.demo_lifetime</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_lifetime.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-g5.png" title="open the full figure">
+            <img src="figures/fab-game-g5.png" alt="G5 — demo_etch figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">G5</span>
+            <p class="blurb">The mid-line etch &amp; deposition: etch bias shrinks CD; a gap above the aspect-ratio limit voids the deposition (a functional kill).</p>
+            <div class="links">
+              <code>python -m fab_game.demo_etch</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_etch.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-g6.png" title="open the full figure">
+            <img src="figures/fab-game-g6.png" alt="G6 — demo_packaging figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">G6</span>
+            <p class="blurb">The back end: the cumulative assembly-yield funnel Y=Πyᵢ + speed binning into value grades (the bin-out tail).</p>
+            <div class="links">
+              <code>python -m fab_game.demo_packaging</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_packaging.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-g7.png" title="open the full figure">
+            <img src="figures/fab-game-g7.png" alt="G7 — demo_game figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">G7</span>
+            <p class="blurb">A roguelike run down one boule: thin the gate oxide against the rising Scheil V_t drift — a Goldilocks lever (over-thinning hits the I_Dsat ceiling).</p>
+            <div class="links">
+              <code>python -m fab_game.demo_game</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_game.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>The deepenings &mdash; crystal growth &amp; scope edges</h2>
+      <p class="sub">Optional depth: the crystal-growth triad (CG-1&ndash;CG-3) and the scope-edge
+        promotions (C1/D1/A2/A1/E1), each promoting a named edge into a real device/yield consumer.</p>
+      <div class="grid">
+        <article class="card">
+          <a class="shot" href="figures/fab-game-cg1.png" title="open the full figure">
+            <img src="figures/fab-game-cg1.png" alt="CG-1 — demo_crystal_growth figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">CG-1</span>
+            <p class="blurb">Pull rate → the Burton–Prim–Slichter effective segregation k_eff(v) → flattens the Scheil doping drift (one-sided: faster only helps).</p>
+            <div class="links">
+              <code>python -m fab_game.demo_crystal_growth</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_crystal_growth.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-cg2.png" title="open the full figure">
+            <img src="figures/fab-game-cg2.png" alt="CG-2 — demo_voronkov figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">CG-2</span>
+            <p class="blurb">The Voronkov V/G criterion → grown-in voids/COPs above ξ_t feed the same G3 defect map — the in-model brake on pulling faster.</p>
+            <div class="links">
+              <code>python -m fab_game.demo_voronkov</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_voronkov.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-cg3.png" title="open the full figure">
+            <img src="figures/fab-game-cg3.png" alt="CG-3 — demo_stefan figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">CG-3</span>
+            <p class="blurb">The Stefan interface heat balance supplies CG-2&#x27;s gradient G → ξ=V/G_s saturates at ξ_max, capping the vacancy cost.</p>
+            <div class="links">
+              <code>python -m fab_game.demo_stefan</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_stefan.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-c1.png" title="open the full figure">
+            <img src="figures/fab-game-c1.png" alt="C1 — demo_thermal_donors figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">C1</span>
+            <p class="blurb">Crucible oxygen → thermal donors (initial rate ∝[Oᵢ]⁴) compensate the p-substrate (N_A−N_TD) → V_t down — the crystal-growth electrical deepening.</p>
+            <div class="links">
+              <code>python -m fab_game.demo_thermal_donors</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_thermal_donors.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-d1.png" title="open the full figure">
+            <img src="figures/fab-game-d1.png" alt="D1 — demo_under_etch figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">D1</span>
+            <p class="blurb">Under-etch → a residual film bridges the gate lines into a functional short — the mirror of the deposition void&#x27;s open (the etch process window).</p>
+            <div class="links">
+              <code>python -m fab_game.demo_under_etch</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_under_etch.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-a2.png" title="open the full figure">
+            <img src="figures/fab-game-a2.png" alt="A2 — demo_osf_ring figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">A2</span>
+            <p class="blurb">The OSF ring: CG-2 made radial → a dead vacancy core + a clean rim. The ring is where the kills stop, not a ring of kills.</p>
+            <div class="links">
+              <code>python -m fab_game.demo_osf_ring</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_osf_ring.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-a1.png" title="open the full figure">
+            <img src="figures/fab-game-a1.png" alt="A1 — demo_dislocation figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">A1</span>
+            <p class="blurb">The interstitial side of Voronkov: slow pull (ξ&lt;ξ_t) → dislocations → junction leakage — the two-sided window (optimum at ξ_t).</p>
+            <div class="links">
+              <code>python -m fab_game.demo_dislocation</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_dislocation.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/fab-game-e1.png" title="open the full figure">
+            <img src="figures/fab-game-e1.png" alt="E1 — demo_thermal_budget figure" loading="lazy">
+          </a>
+          <div class="body">
+            <span class="tag">E1</span>
+            <p class="blurb">A spike/RTA anneal&#x27;s thermal budget ∫D(T(t))dt → a faster ramp → a smaller budget → a shallower x_j (why RTA, the OED effective_Dt twin).</p>
+            <div class="links">
+              <code>python -m fab_game.demo_thermal_budget</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/demo_thermal_budget.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Go deeper</h2>
+      <p class="sub">The guided notebook, the written record, and back to the physics.</p>
+      <div class="deeper">
+        <div class="item">
+          <h3>The game notebook</h3>
+          <p>fab_game/fab_game.ipynb &mdash; the front-of-line tour (G1 mechanism &rarr; G2 boule &rarr; G3
+            die map) ending on the guided <strong>command-the-whole-line</strong> slice. GitHub renders it
+            <em>read-only</em> (no live kernel); for the interactive knobs, install the extras
+            (<code>pip install -e ".[viz,notebook]"</code>) and launch it locally:</p>
+          <div class="links">
+            <code>jupyter lab fab_game/fab_game.ipynb</code>
+            <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/fab_game.ipynb">view on GitHub&nbsp;&#8599;</a>
+          </div>
+        </div>
+        <a class="item" href="index.html">
+          <h3>The physics gallery &#8599;</h3>
+          <p>The other front door: the four-phase process spine + the litho deepenings that this game
+            layer is built on &mdash; recipe in, device out.</p>
+        </a>
+        <a class="item" href="https://github.com/BoykoNeov/chip-sim/blob/main/fab_game/README.md">
+          <h3>The fab_game README &#8599;</h3>
+          <p>The two-layer design, the module map, and the per-stage narrative (G1 &rarr; the boule &rarr;
+            the physical die map &rarr; the mid-line).</p>
+        </a>
+        <a class="item" href="https://github.com/BoykoNeov/chip-sim/blob/main/docs/decisions/0005-fab-game-layering.md">
+          <h3>ADR 0005 &mdash; the layering &#8599;</h3>
+          <p>Why the game is a separate layer with a one-way dependency, and what lives in the game layer
+            vs. the validated physics core.</p>
+        </a>
+        <a class="item" href="https://github.com/BoykoNeov/chip-sim/blob/main/docs/plans/fab-game.md">
+          <h3>The build plan &#8599;</h3>
+          <p>fab-game.md &mdash; the G-by-G build order, the design pillars, and the open questions each
+            slice resolved.</p>
+        </a>
+        <a class="item" href="https://github.com/BoykoNeov/chip-sim/blob/main/docs/plans/scope-edge-backlog.md">
+          <h3>The scope-edge backlog &#8599;</h3>
+          <p>The named-but-deferred edges triaged by consumer &mdash; the anti-over-build bar (now
+            exhausted: every remaining edge lacks a device/yield consumer).</p>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">Generated from the demo modules by <code>python -m fab_game.gallery</code> &mdash;
+      figure paths are introspected, never hand-typed, so this gallery stays in lock-step with the demos.
+      The physics it is built on lives in <code>chip/</code> + <code>engines/</code> (cited, triad-tested);
+      this layer owns only the balance, the spec windows, and the fun (ADR 0005).</div>
+  </footer>
+</body>
+</html>

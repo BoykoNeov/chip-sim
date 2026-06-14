@@ -121,22 +121,24 @@ def assert_manifest_complete() -> None:
         )
 
 
-def figure_relpath(demo: Demo) -> str:
+def figure_relpath(demo: Demo, pkg: str = "chip") -> str:
     """The demo's banked figure, **relative to docs/** — introspected from the module's DOCS_FIGURE.
 
     Importing a demo module is viz-free (matplotlib is imported lazily inside its ``save_figure``),
-    so this is safe in the fast lane without the ``viz`` extra installed.
+    so this is safe in the fast lane without the ``viz`` extra installed. ``pkg`` lets the sibling
+    ``fab_game`` gallery reuse this for its own ``fab_game.demo_*`` modules (fab_game → chip is the
+    allowed import direction, ADR 0005 §2); ``pkg="chip"`` keeps this module's own output identical.
     """
-    mod = importlib.import_module(f"chip.{demo.module}")
+    mod = importlib.import_module(f"{pkg}.{demo.module}")
     return Path(mod.DOCS_FIGURE).relative_to(DOCS_DIR).as_posix()  # e.g. "figures/chip-oed-segregation.png"
 
 
-def _card(demo: Demo, local: bool = False) -> str:
-    fig = figure_relpath(demo)
+def _card(demo: Demo, local: bool = False, pkg: str = "chip") -> str:
+    fig = figure_relpath(demo, pkg)
     label = html.escape(demo.label)
     blurb = html.escape(demo.blurb)
-    run = html.escape(f"python -m chip.{demo.module}")
-    src = f"{_LAB}/chip/{demo.module}.py" if local else f"{_BLOB}/chip/{demo.module}.py"
+    run = html.escape(f"python -m {pkg}.{demo.module}")
+    src = f"{_LAB}/{pkg}/{demo.module}.py" if local else f"{_BLOB}/{pkg}/{demo.module}.py"
     tgt = ' target="_blank" rel="noopener"' if local else ""   # launch in a new tab, keep the gallery open
     return f"""        <article class="card">
           <a class="shot" href="{fig}" title="open the full figure">
@@ -153,8 +155,8 @@ def _card(demo: Demo, local: bool = False) -> str:
         </article>"""
 
 
-def _grid(demos: list[Demo], local: bool = False) -> str:
-    return "\n".join(_card(d, local) for d in demos)
+def _grid(demos: list[Demo], local: bool = False, pkg: str = "chip") -> str:
+    return "\n".join(_card(d, local, pkg) for d in demos)
 
 
 # Deterministic by construction: the output depends only on the manifest + introspected figure
@@ -246,6 +248,7 @@ def render_html(local: bool = False) -> str:
         decisions = f"{_LAB}/docs/decisions"
         build_plan = f"{_LAB}/docs/plans/microchip-fabrication.md"
         engine = f"{_LAB}/engines/diffusion"
+        fabgame = "fab-game.local.html"   # the sibling gallery's local edition (next to this file)
     else:
         title = "chip-sim — visualization &amp; demo gallery"
         repo_link = f'<a class="repo" href="{_REPO_URL}">View the repository on GitHub&nbsp;&#8599;</a>'
@@ -267,6 +270,7 @@ def render_html(local: bool = False) -> str:
         decisions = f"{_TREE}/docs/decisions"
         build_plan = f"{_BLOB}/docs/plans/microchip-fabrication.md"
         engine = f"{_TREE}/engines/diffusion"
+        fabgame = "fab-game.html"   # the sibling gallery (the gamified full-line layer), in the same /docs dir
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -318,6 +322,12 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
       <h2>Go deeper</h2>
       <p class="sub">The interactive tour and the written record.</p>
       <div class="deeper">
+        <a class="item" href="{fabgame}"{item_attr}>
+          <h3>The fab-line game &#8599;</h3>
+          <p>A separate gallery: the gamified full-line layer built on this physics &mdash; sand &rarr; a
+            binned chip across G1&ndash;G7, plus the crystal-growth and scope-edge deepenings. Recipe in
+            &rarr; <strong>yield</strong> out, and you can see <em>why</em> a die died.</p>
+        </a>
         {notebook_card}
         <a class="item" href="{readme}"{item_attr}>
           <h3>README &amp; quickstart &#8599;</h3>
