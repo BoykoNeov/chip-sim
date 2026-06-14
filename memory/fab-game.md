@@ -16,6 +16,17 @@ synced with the user across two AskUserQuestion rounds, then **`docs/plans/fab-g
 through the validated back end, "one bad knob → dead die + failure trail", 5 mechanics invariants
 green, fast lane 314). The defocus chain's primary signature = **NILS** not CD (plan §1 corrected).
 
+**>> §9 guided ipywidgets slice BUILT 2026-06-14** (`fab_game/dashboard.py` + `plots.dashboard_figure`
++ the `fab_game.ipynb` "command the whole line" section): a thin, **tested** skin over `run_line`
+(`run_dashboard`/`dashboard_summary`, 4 dramatic+legible knobs — defocus→edge ring · D₀→scattered
+kills · slice_z→Scheil drift · t_ox→the G7 rescue lever) = the **headless, tested core of the
+deferred Textual TUI**. Variation **ON** (else the map is a binary all-pass/all-fail flip, not a
+story — the advisor's catch). Reuses `LineResult` (no new dataclass); **dropped a profit readout** —
+default `speed_bins` grade everything `"pass"` so `score_wafer` prices revenue 0 → a profit line
+would be a binning-policy artifact, not a signal. The real safety net is `tests/test_dashboard.py`
+(10 tests), NOT the notebook run (`interact` swallows callback exceptions). **Remaining front-end =
+the Textual TUI + tycoon — both still deferred** (the named-consumer physics backlog stays exhausted).
+
 **The seven synced choices:** (1) **full grand tour** — every distinct step,
 purification→Czochralski→wafer-prep→oxidation→litho→diffusion→etch/depo→device→dice/bond/test,
 repeats collapsed; (2) **both failure models** — deterministic physics mean + stochastic

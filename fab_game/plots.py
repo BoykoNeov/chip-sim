@@ -66,6 +66,27 @@ def _nils_vs_radius(ax, wafer: WaferState) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# The guided slider-driven slice (the §9 UX step) — the live wafer map
+# --------------------------------------------------------------------------- #
+def dashboard_figure(result):
+    """The guided-slice wafer map — the live render the notebook slider drives (one panel).
+
+    A thin reuse of the G1 die map (:func:`_wafer_map`) over a
+    :class:`~fab_game.pipeline.LineResult`: pass dies green, fail red, on the wafer circle, titled
+    with the recipe + yield. The map is the **spatial** story (the focus bowl's edge ring, the
+    scattered particle kills); the rich readout + the failure trail are the text companion
+    :func:`fab_game.dashboard.dashboard_summary`. "Builds without error" is all the viz layer asserts
+    (ADR 0002/0005 — a figure is never in the correctness path).
+    """
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(5.0, 5.0))
+    _wafer_map(ax, result.wafer, result.label)
+    fig.tight_layout()
+    return fig
+
+
+# --------------------------------------------------------------------------- #
 # G2 — the boule → batch artifact (the Scheil spread down the boule)
 # --------------------------------------------------------------------------- #
 def _scheil_panel(ax, result) -> None:
