@@ -34,6 +34,7 @@ docs/figures/        # banked figures (chip-*.png)
 pip install -e ".[viz]"                 # compute + figures
 python -m chip.demo_oxidation           # any demo prints its validation table + banks a figure
 jupyter lab chip/chip.ipynb             # the teaching notebook (needs .[viz,notebook])
+python -m fab_game.tui                  # …or play the fab-line game (TUI; needs .[tui]) — see below
 ```
 
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
