@@ -27,12 +27,13 @@ Run it with ``pip install -e .[tui]`` then ``python -m fab_game.tui``.
 from __future__ import annotations
 
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static
 
 from .dashboard import dashboard_summary, run_dashboard
 from .game import GameConfig, GameSession, new_session, process_wafer, scrap_wafer
+from .guide import MODE_INTRO, dashboard_guide, roguelike_guide
 from .plots import wafer_map_text
 from .recipe import Recipe
 from .session_view import (
@@ -63,6 +64,16 @@ class FabLineApp(App):
     summary/failure-trail panel on the right. Opening the App runs the default knobs — the
     ``DEFAULT_RECIPE`` seam → a clean 100 % wafer — so the player departs from the validated baseline.
     Deterministic in ``(seed, knobs)`` (inherited from ``run_dashboard``).
+
+    **The launch-time mode** (``educational`` / ``prompt_mode``). Hardcore (``educational=False``, the
+    default) is the bare cockpit — exactly today's TUI. Educational (``educational=True``) adds a
+    **guide panel** on the right (the headless :func:`fab_game.guide.dashboard_guide` text, rendered
+    verbatim) explaining every selector + readout and *what to try*; it is **presentation only** —
+    no knob, recipe, or physics changes, so the seam (the clean default wafer) is byte-identical and
+    the guide is hidden (``display: none`` → reserves no space) in hardcore. ``prompt_mode=True`` (the
+    ``python -m fab_game.tui`` launch) opens a :class:`ModeSelectScreen` so the player picks the mode
+    first; the pilot tests construct ``FabLineApp(educational=…)`` directly (no prompt), so they are
+    unaffected.
     """
 
     TITLE = "fab-line — command the whole line"
@@ -79,6 +90,11 @@ class FabLineApp(App):
     #wafer { height: auto; padding: 1 0; }
     #map-legend { color: $text-muted; }
     #summary { height: auto; padding: 1 0; border-top: solid $panel; }
+    /* The educational guide panel — hidden in hardcore (display:none reserves no space, so the
+       hardcore layout is byte-identical); shown by _refresh_guide when educational. */
+    #guide-box { display: none; height: 1fr; padding: 1 0; border-top: solid $panel; }
+    #guide-box.shown { display: block; }
+    #guide { color: $text-muted; }
     """
 
     # No keyboard run binding: a single-letter binding is shadowed the moment a knob Input has focus
@@ -87,12 +103,18 @@ class FabLineApp(App):
     # (``on_input_submitted``). Quit stays (it is not contextual).
     BINDINGS = [("q", "quit", "Quit")]
 
-    def __init__(self) -> None:
+    def __init__(self, *, educational: bool = False, prompt_mode: bool = False) -> None:
         super().__init__()
+        # The mode: hardcore (False) is today's bare cockpit; educational (True) shows the guide panel.
+        # prompt_mode opens the ModeSelectScreen at launch so the player picks — set only by main(), so
+        # the pilot tests that build FabLineApp(educational=…) directly never see the chooser.
+        self.educational: bool = educational
+        self._prompt_mode: bool = prompt_mode
         # The last rendered strings — stashed for the test to assert on (decoupled from widget
         # internals) and to make the "the TUI never recomputes" fidelity check trivial.
         self.last_summary: str = ""
         self.last_map: str = ""
+        self.last_guide: str = dashboard_guide()       # the verbatim guide text (static; shown when educational)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -107,18 +129,37 @@ class FabLineApp(App):
                 yield Static(id="wafer", markup=True)          # controlled glyphs + [green]/[red] tags
                 yield Label("O pass   X fail", id="map-legend")
                 yield Static(id="summary", markup=False)        # arbitrary computed text — no markup
+                with VerticalScroll(id="guide-box"):            # educational only (hidden in hardcore)
+                    yield Static(self.last_guide, id="guide", markup=False)
         yield Footer()
 
     def on_mount(self) -> None:
-        """Open on the seam: run the default (clean) knobs so the first frame is the validated baseline."""
+        """Open on the seam: run the default (clean) knobs so the first frame is the validated baseline.
+
+        Then reflect the current mode (show/hide the guide) and — on the real launch path
+        (``prompt_mode``) — push the :class:`ModeSelectScreen` so the player picks educational vs hardcore.
+        """
         self._run_and_render()
+        self._refresh_guide()
+        if self._prompt_mode:
+            self.push_screen(ModeSelectScreen())
+
+    def apply_mode(self, educational: bool) -> None:
+        """Set the mode (the :class:`ModeSelectScreen` callback) and show/hide the guide panel accordingly."""
+        self.educational = educational
+        self._refresh_guide()
+
+    def _refresh_guide(self) -> None:
+        """Toggle the guide panel to match :attr:`educational` (render-only; never touches the line)."""
+        self.query_one("#guide-box").set_class(self.educational, "shown")
 
     # --- the wiring: input → run → panels (one synchronous path, shared by mount/button/enter) --- #
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "run":
             self._run_and_render()
         elif event.button.id == "play-game":
-            self.push_screen(RoguelikeScreen())          # the v2 roguelike loop (one boule, scored)
+            # the v2 roguelike loop (one boule, scored) — inherits the chosen mode
+            self.push_screen(RoguelikeScreen(educational=self.educational))
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self._run_and_render()                                  # Enter in any field re-runs the line
@@ -163,6 +204,43 @@ class FabLineApp(App):
         self.query_one("#summary", Static).update(self.last_summary)
 
 
+class ModeSelectScreen(Screen):
+    """The launch chooser: *Educational* (guided + explained) vs *Hardcore* (the bare cockpit).
+
+    A thin front gate opened by :meth:`FabLineApp.on_mount` when the App is launched with
+    ``prompt_mode=True`` (the ``python -m fab_game.tui`` path). It shows the headless
+    :data:`fab_game.guide.MODE_INTRO` describing the two modes, and two Buttons; a press calls
+    :meth:`FabLineApp.apply_mode` (which shows/hides the guide panel) and pops back to the dashboard
+    underneath — which already rendered its clean seam on mount, so the choice only toggles the
+    *presentation*. Like the other screens, the affordances are **Buttons, not single-letter
+    bindings** (consistent with the documented footgun); ``q`` quits.
+    """
+
+    BINDINGS = [("q", "quit", "Quit")]
+
+    CSS = """
+    #mode-box { padding: 1 2; align: center middle; }
+    #mode-intro { padding: 1 2; }
+    #mode-buttons { height: auto; align: center middle; }
+    #mode-buttons Button { margin: 1 2; min-width: 24; }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with Vertical(id="mode-box"):
+            yield Static(MODE_INTRO, id="mode-intro", markup=False)
+            with Horizontal(id="mode-buttons"):
+                yield Button("Educational", id="mode-edu", variant="primary")
+                yield Button("Hardcore", id="mode-hard")
+        yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Pick the mode (Educational/Hardcore), apply it to the dashboard, and reveal it (pop this gate)."""
+        if event.button.id in ("mode-edu", "mode-hard"):
+            self.app.apply_mode(event.button.id == "mode-edu")
+            self.app.pop_screen()
+
+
 class RoguelikeScreen(Screen):
     """The G7 roguelike loop (TUI v2): play one boule — process or scrap each slice, scored, on a budget.
 
@@ -195,18 +273,25 @@ class RoguelikeScreen(Screen):
     #inspect { height: auto; padding: 1 0; color: $text-muted; }
     #trail-legend { margin-top: 1; color: $text-muted; }
     #trail { height: 1fr; padding: 1 0; border-top: solid $panel; }
+    /* The educational guide — hidden in hardcore (display:none reserves no space); shown when educational. */
+    #game-guide-box { display: none; height: 1fr; padding: 1 0; border-top: solid $panel; }
+    #game-guide-box.shown { display: block; }
+    #game-guide { color: $text-muted; }
     """
 
-    def __init__(self, config: GameConfig | None = None, *, seed: int = 0) -> None:
+    def __init__(self, config: GameConfig | None = None, *, seed: int = 0,
+                 educational: bool = False) -> None:
         super().__init__()
         self._config = config if config is not None else GameConfig()
         self._seed = seed
+        self._educational = educational                # presentation only — shows the roguelike guide panel
         self.session: GameSession = new_session(self._config, seed=seed)
         # The last-rendered strings — stashed for the test (decoupled from widget internals) and to make
         # the "the screen never recomputes" fidelity check trivial (mirrors FabLineApp.last_summary).
         self.last_header: str = ""
         self.last_inspect: str = ""
         self.last_trail: str = ""
+        self.last_guide: str = roguelike_guide()       # the verbatim guide text (static; shown when educational)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -224,11 +309,14 @@ class RoguelikeScreen(Screen):
                 yield Static(id="inspect", markup=False)
                 yield Label("— turn history —", id="trail-legend")
                 yield Static(id="trail", markup=False)
+                with VerticalScroll(id="game-guide-box"):       # educational only (hidden in hardcore)
+                    yield Static(self.last_guide, id="game-guide", markup=False)
         yield Footer()
 
     def on_mount(self) -> None:
         """Open on a fresh run: the seam recipe at the seed slice → the inspect panel shows the baseline."""
         self._repaint()
+        self.query_one("#game-guide-box").set_class(self._educational, "shown")
 
     # --- the wiring: button → session action → panels (the screen computes nothing) --- #
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -296,8 +384,8 @@ class RoguelikeScreen(Screen):
 
 
 def main() -> None:
-    """Launch the TUI (the ``python -m fab_game.tui`` entry point)."""
-    FabLineApp().run()
+    """Launch the TUI (the ``python -m fab_game.tui`` entry point) — prompt for the mode first."""
+    FabLineApp(prompt_mode=True).run()
 
 
 if __name__ == "__main__":

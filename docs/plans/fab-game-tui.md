@@ -1,7 +1,8 @@
 # Plan — fab-game Textual TUI (the deferred terminal front-end)
 
-Status: **v1 BUILT (2026-06-14); v2 roguelike loop BUILT (2026-06-14)** (drafted same day). The plan
-below is the as-built shape. **v2 (§7) landed:** `fab_game/session_view.py` (the headless renderers —
+Status: **v1 BUILT (2026-06-14); v2 roguelike loop BUILT (2026-06-14); Educational/Hardcore launch mode
+BUILT (2026-06-14)** (all drafted same day). The plan below is the as-built shape; the launch-mode
+follow-on is recorded in §9. **v2 (§7) landed:** `fab_game/session_view.py` (the headless renderers —
 `turn_recipe`/`oxide_recipe`/`projected_vt`/`inspect_line`/`session_header`/`turn_line`/`history_trail`/
 `session_summary`, re-exported from `__init__`, tested by `tests/test_session_view.py`) + a
 `RoguelikeScreen` in `tui.py` driving `game.py`'s `GameSession` (oxide-knob *adapt* lever + Process/Scrap
@@ -181,6 +182,42 @@ are bindings. The action handlers no-op + the buttons disable once `session.done
 the run is over — a thin driver must never let that throw into the swallow-prone loop).
 
 The tycoon economy stays deferred (ADR 0005).
+
+## 9. Educational vs Hardcore launch mode (**BUILT 2026-06-14**)
+
+A launch-time choice layered on the built TUI: `python -m fab_game.tui` now opens a `ModeSelectScreen`
+(two Buttons + the `MODE_INTRO` blurb) before the dashboard. **Hardcore** is the bare cockpit — the TUI
+exactly as v1/v2 shipped. **Educational** adds a verbatim **guide panel** to both the dashboard and the
+roguelike screen: a plain-language glossary of every selector + readout (defocus, defect density, boule
+slice z, gate-oxide drive, seed, V_t, I_Dsat, NILS, CD, leakage, the bins, the Scheil drift, the failure
+trail, process/adapt/scrap) plus *what-to-do* strategy — exploratory on the dashboard ("crank defocus →
+watch the ring die"), the decision on the roguelike screen ("the tail forces adapt-vs-scrap; mind the
+I_Dsat ceiling").
+
+**As-built shape — the same doctrine as the rest of this plan.** The load-bearing prose lives in a new
+import-pure module **`fab_game/guide.py`** (`dashboard_guide` / `roguelike_guide` / `glossary_text` /
+`MODE_INTRO`, re-exported from `__init__`, tested by `tests/test_guide.py` *without* textual); the TUI
+renders those strings **verbatim** (the App composes no prose). Educational mode is **presentation only**
+— no knob, recipe, or physics changes — so:
+
+- **The seam is byte-identical.** `FabLineApp(educational=False)` (the default; what the existing pilots
+  construct) is unchanged, and the guide panel is `display: none` in hardcore → it reserves no space, so
+  the hardcore layout and the `pilot.click("#run")`/`#play-game` legs are untouched. The clean default
+  wafer (the §5 seam) is the same in both modes.
+- **Two flags, forced by "don't break the pilots."** `FabLineApp(educational: bool, prompt_mode: bool)`:
+  the pilots build `FabLineApp(educational=…)` directly (no chooser); only `main()` passes
+  `prompt_mode=True` to open the `ModeSelectScreen`. The mode-screen picks the mode (`apply_mode`) and
+  pops back to the dashboard underneath — which already rendered its clean seam on mount.
+- **Tests** (mechanics, ADR 0005 §5): `test_guide.py` pins the *completeness* (every named concept +
+  every dashboard selector has a glossary entry) and that each guide mentions them + carries its
+  what-to-do block; the import-purity leg runs in a **fresh subprocess** (not this process's
+  `sys.modules`, which a co-scheduled `test_tui` pilot pollutes with textual under `-n auto`). New
+  `test_tui.py` legs prove the chooser wires (Educational shows the guide, Hardcore hides it, the line
+  stays the seam) and that *Play roguelike* inherits the mode. Verified green serially and under
+  `-n auto` (no notebook-style flake).
+
+No new physics, no engine touch, no new ADR — additive game-layer UI under ADR 0002/0005, exactly like
+§9 of the main plan and the v1/v2 TUI.
 
 ## 8. What this is NOT
 

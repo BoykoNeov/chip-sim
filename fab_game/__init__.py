@@ -82,6 +82,16 @@ from .session_view import (
     turn_line,
     turn_recipe,
 )
+from .guide import (
+    GLOSSARY,
+    GLOSSARY_BY_KEY,
+    MODE_INTRO,
+    Term,
+    dashboard_guide,
+    glossary_text,
+    roguelike_guide,
+    term_block,
+)
 
 __all__ = [
     # state
@@ -110,4 +120,7 @@ __all__ = [
     # session_view (the headless renderers the TUI v2 roguelike screen drives)
     "turn_recipe", "oxide_recipe", "projected_vt", "inspect_line", "session_header",
     "turn_line", "history_trail", "session_summary",
+    # guide (the educational-mode prose the TUI renders verbatim)
+    "Term", "GLOSSARY", "GLOSSARY_BY_KEY", "MODE_INTRO", "term_block", "dashboard_guide",
+    "roguelike_guide", "glossary_text",
 ]

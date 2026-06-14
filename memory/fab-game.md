@@ -60,8 +60,23 @@ model *raises* when over — a thin driver must never throw into the swallow-pro
 The pilot's load-bearing leg is **fidelity not movement**: a driven Process/adapt/Scrap sequence yields
 a session == headless `play(new_session(cfg, seed), [same decisions])` verbatim. **Verified:** fast lane
 651 green under `-n auto` (no flake across 3 repeats), `import fab_game` stays textual-free.
-**Remaining front-end = the tycoon ONLY** (roguelike loop now built; named-consumer physics backlog
-stays exhausted).
+
+**>> Educational/Hardcore launch mode BUILT 2026-06-14 (`docs/plans/fab-game-tui.md` §9):** `python -m
+fab_game.tui` now opens a `ModeSelectScreen` first. **Hardcore** = the bare cockpit (today's TUI, byte-
+identical). **Educational** layers a verbatim **guide panel** on the dashboard + roguelike screens:
+a glossary of every selector + readout (defocus, defect density, boule slice z, gate-oxide drive, seed,
+V_t, I_Dsat, NILS, CD, leakage, bins, Scheil drift, the trail, process/adapt/scrap) PLUS *what-to-do*
+strategy (exploratory on the dashboard, the adapt-vs-scrap decision + the I_Dsat-ceiling caveat on the
+roguelike). **Same doctrine:** prose lives in a NEW import-pure **`fab_game/guide.py`** (`dashboard_guide`/
+`roguelike_guide`/`glossary_text`/`MODE_INTRO`, re-exported, tested by `tests/test_guide.py` WITHOUT
+textual), the TUI renders it verbatim. **Presentation only** → no knob/recipe/physics touched, the seam
+is byte-identical, guide is `display:none` in hardcore (reserves no space → existing pilots untouched).
+**Two flags forced by "don't break the pilots":** `FabLineApp(educational, prompt_mode)` — pilots build
+`educational=…` directly (no chooser), only `main()` sets `prompt_mode=True`. The import-purity test
+runs in a **fresh subprocess** (this process's `sys.modules` is polluted by a co-scheduled `test_tui`
+pilot under `-n auto`). Verified green serially + `-n auto` (3 repeats, no flake). No new ADR.
+**Remaining front-end = the tycoon ONLY** (roguelike loop + educational mode now built; named-consumer
+physics backlog stays exhausted).
 
 **The seven synced choices:** (1) **full grand tour** — every distinct step,
 purification→Czochralski→wafer-prep→oxidation→litho→diffusion→etch/depo→device→dice/bond/test,

@@ -212,6 +212,14 @@ renders pre-tested strings/figures verbatim, so the *renderers* carry the tests,
   oxide-minutes Input = the adapt lever + Process / Scrap / New-run Buttons, disabled once `session.done`). The
   load-bearing string renderers live in **`session_view.py`** (import-pure, tested *without* textual). The pilot's
   load-bearing leg is **fidelity, not movement**: a driven Process/adapt/Scrap sequence == headless `play(...)`.
+  - **Launch-time mode — Educational vs Hardcore.** `python -m fab_game.tui` opens a `ModeSelectScreen`:
+    **Hardcore** is the bare cockpit (today's TUI, unchanged); **Educational** layers on a verbatim **guide
+    panel** that explains every selector + readout (defocus · boule slice z · gate-oxide drive · seed · V_t ·
+    I_Dsat · NILS · CD · leakage · Scheil drift …) and *what to do* — exploratory strategy on the dashboard, the
+    process/adapt/scrap decision on the roguelike screen. The prose is **presentation only** (no knob/recipe/
+    physics touched → the seam is byte-identical, the guide is `display:none` in hardcore) and lives in the
+    new import-pure **`guide.py`** (`dashboard_guide` / `roguelike_guide` / `glossary_text` / `MODE_INTRO`),
+    tested headless in `tests/test_guide.py` — the TUI renders it verbatim.
 
 **The tycoon mode is the one remaining front-end** (same harness, different objective) — deferred.
 
@@ -331,9 +339,13 @@ exhausted — every remaining edge lacks a consumer.**
   renderers (`turn_recipe` / `projected_vt` / `inspect_line` / `session_header` / `turn_line` /
   `history_trail` / `session_summary`). Import-pure and tested directly — the swallow-prone UIs render
   them verbatim.
-- **`tui.py`** — the Textual front-end (`FabLineApp` + `RoguelikeScreen`), the **only** `textual`
-  importer and **not** re-exported from `__init__` (the fast lane stays headless; `[tui]` extra). A
-  thin driver of the cores above.
+- **`guide.py`** — the educational-mode prose (import-pure, re-exported, tested without textual): the
+  `Term`/`GLOSSARY` glossary of every selector + readout and the `dashboard_guide` / `roguelike_guide` /
+  `glossary_text` / `MODE_INTRO` renderers the TUI shows verbatim in Educational mode (presentation only).
+- **`tui.py`** — the Textual front-end (`ModeSelectScreen` + `FabLineApp` + `RoguelikeScreen`), the
+  **only** `textual` importer and **not** re-exported from `__init__` (the fast lane stays headless;
+  `[tui]` extra). A thin driver of the cores above; `python -m fab_game.tui` prompts Educational vs
+  Hardcore at launch.
 - **`plots.py`** — the figure builders (not in the correctness path), incl. `dashboard_figure` (§9)
   and the headless `wafer_map_text` ASCII die map (the TUI's map).
 - **`gallery.py`** — the game-layer gallery (`docs/fab-game.html` + `fab-game.local.html`), surfacing

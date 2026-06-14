@@ -23,6 +23,7 @@ import pytest
 
 from fab_game.dashboard import dashboard_summary, run_dashboard
 from fab_game.game import GameConfig, new_session, play
+from fab_game.guide import dashboard_guide, roguelike_guide
 from fab_game.plots import WAFER_FAIL_GLYPH, WAFER_PASS_GLYPH, _grid_n, wafer_map_text
 from fab_game.session_view import (
     history_trail,
@@ -199,5 +200,92 @@ def test_roguelike_screen_drives_the_session_exactly_like_the_headless_model():
             assert screen.last_header == session_header(expected)
             assert screen.last_inspect == session_summary(expected)
             assert screen.last_trail == history_trail(expected)
+
+    asyncio.run(scenario())
+
+
+# --------------------------------------------------------------------------- #
+# 4. Educational vs hardcore — the launch mode (presentation only; the seam is untouched)
+# --------------------------------------------------------------------------- #
+def test_hardcore_app_hides_the_guide_and_educational_shows_it_verbatim():
+    """``FabLineApp(educational=False)`` is the bare cockpit — the guide panel is hidden (no ``shown``
+    class → ``display:none`` reserves no space, the hardcore layout byte-identical). ``educational=True``
+    shows it, and the panel text is the headless ``dashboard_guide()`` **verbatim** (fidelity — the App
+    composes no prose). In *both* modes the line itself is the clean seam (educational is render-only)."""
+    pytest.importorskip("textual")
+    import asyncio
+
+    from fab_game.tui import FabLineApp
+
+    async def hardcore():
+        app = FabLineApp()                                  # educational=False, the default (today's TUI)
+        async with app.run_test(size=(120, 50)) as pilot:
+            await pilot.pause()
+            assert app.educational is False
+            assert not app.query_one("#guide-box").has_class("shown")   # hidden → no reserved space
+            assert app.last_summary == dashboard_summary(run_dashboard())  # the seam, unperturbed by mode
+
+    async def educational():
+        app = FabLineApp(educational=True)
+        async with app.run_test(size=(120, 50)) as pilot:
+            await pilot.pause()
+            assert app.query_one("#guide-box").has_class("shown")        # the guide is visible
+            # The panel is built from the stash verbatim (``yield Static(self.last_guide)``), so the stash
+            # equalling the headless prose IS the fidelity pin (the App composes no prose of its own).
+            assert app.last_guide == dashboard_guide()
+            assert app.last_summary == dashboard_summary(run_dashboard())  # the line is STILL the seam
+
+    asyncio.run(hardcore())
+    asyncio.run(educational())
+
+
+def test_mode_select_screen_picks_educational_or_hardcore():
+    """Launched with ``prompt_mode=True`` (the ``python -m fab_game.tui`` path) the App opens on the
+    :class:`ModeSelectScreen`; pressing *Educational* sets the mode, pops back to the dashboard, and
+    shows the guide; *Hardcore* leaves it hidden. The chooser only toggles presentation."""
+    pytest.importorskip("textual")
+    import asyncio
+
+    from textual.widgets import Button
+
+    from fab_game.tui import FabLineApp, ModeSelectScreen
+
+    async def pick(button_id: str, *, expect_shown: bool, expect_edu: bool):
+        app = FabLineApp(prompt_mode=True)
+        async with app.run_test(size=(120, 50)) as pilot:
+            await pilot.pause()
+            assert isinstance(app.screen, ModeSelectScreen)             # the chooser is the front gate
+            assert app.screen.query_one("#mode-edu", Button) and app.screen.query_one("#mode-hard", Button)
+            await pilot.click(button_id)                                # pick a mode → apply + pop
+            await pilot.pause()
+            assert not isinstance(app.screen, ModeSelectScreen)         # revealed the dashboard underneath
+            assert app.educational is expect_edu
+            assert app.query_one("#guide-box").has_class("shown") is expect_shown
+
+    asyncio.run(pick("#mode-edu", expect_shown=True, expect_edu=True))
+    asyncio.run(pick("#mode-hard", expect_shown=False, expect_edu=False))
+
+
+def test_play_roguelike_inherits_the_educational_mode_and_shows_its_guide():
+    """The dashboard's *Play roguelike* button carries the chosen mode into ``RoguelikeScreen``: in
+    educational mode the screen shows its own guide (``roguelike_guide()`` verbatim); the session it
+    drives is still the headless ``new_session`` seam (the mode is render-only)."""
+    pytest.importorskip("textual")
+    import asyncio
+
+    from fab_game.tui import FabLineApp, RoguelikeScreen
+
+    async def scenario():
+        app = FabLineApp(educational=True)
+        async with app.run_test(size=(120, 50)) as pilot:
+            await pilot.pause()
+            await pilot.click("#play-game")
+            await pilot.pause()
+            screen = app.screen
+            assert isinstance(screen, RoguelikeScreen) and screen._educational is True
+            assert screen.query_one("#game-guide-box").has_class("shown")
+            assert screen.last_guide == roguelike_guide()                 # the verbatim headless prose
+            # The driven session is still the headless fresh run — the guide changed nothing.
+            assert screen.session.budget == new_session(GameConfig(), seed=0).budget
 
     asyncio.run(scenario())
