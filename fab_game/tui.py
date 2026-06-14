@@ -31,7 +31,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static
 
-from .dashboard import dashboard_summary, run_dashboard
+from .dashboard import dashboard_summary, knob_errors, oxide_minutes_error, run_dashboard
 from .game import GameConfig, GameSession, new_session, process_wafer, scrap_wafer
 from .guide import MODE_INTRO, dashboard_guide, roguelike_guide
 from .plots import wafer_map_text
@@ -177,7 +177,7 @@ class FabLineApp(App):
         def num(key: str, cast) -> float | int:
             try:
                 return cast(raw[key])
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, ArithmeticError):     # ArithmeticError: int(float("1e999")) overflows
                 return cast(defaults[key])
 
         return dict(
@@ -195,9 +195,27 @@ class FabLineApp(App):
         pause the panels are populated, which keeps the pilot test deterministic. The App **never**
         recomputes the readout — it renders the headless ``dashboard_summary`` / ``wafer_map_text``
         of the run verbatim.
+
+        An out-of-domain-but-parseable knob (``slice_z`` outside ``[0, 1)``, a non-positive oxide bake)
+        would otherwise make ``run_dashboard`` **raise** a ``ValueError`` straight into this Textual
+        handler and kill the App, so a bad value is pre-screened (:func:`fab_game.dashboard.knob_errors`)
+        into a readable note — and the run itself is wrapped as a belt-and-suspenders net (any domain raise
+        we did not pre-screen still becomes a panel message, never an uncaught exception in the event loop).
         """
         knobs = self._knobs()
-        result = run_dashboard(**knobs)
+        errors = knob_errors(slice_z=knobs["slice_z"], oxide_minutes=knobs["oxide_minutes"],
+                             defect_density=knobs["defect_density"])
+        if errors:
+            self.last_summary = ("Out-of-range knob — adjust it and run again:\n"
+                                 + "\n".join(f" • {e}" for e in errors))
+            self.query_one("#summary", Static).update(self.last_summary)
+            return                                              # leave the wafer map on the last good run
+        try:
+            result = run_dashboard(**knobs)
+        except (ValueError, ArithmeticError) as exc:            # the net: a domain raise we did not pre-screen
+            self.last_summary = f"Could not run the line — {exc}"
+            self.query_one("#summary", Static).update(self.last_summary)
+            return
         self.last_map = wafer_map_text(result.wafer, color=True)
         self.last_summary = dashboard_summary(result)
         self.query_one("#wafer", Static).update(self.last_map)
@@ -335,32 +353,44 @@ class RoguelikeScreen(Screen):
         """Enter in the oxide field **previews** the new knob (non-destructive); *Process* commits the turn."""
         self._repaint()
 
-    def _oxide_recipe(self) -> Recipe:
-        """The current oxide knob as a recipe (the adapt lever) — the base recipe's drive set to the field.
+    def _oxide_minutes(self) -> float:
+        """The oxide-drive field as minutes (the adapt lever), falling back to the base recipe on bad input.
 
-        Guarded like the dashboard's ``_knobs``: a malformed / transiently-empty field falls back to the
-        base recipe's oxide minutes rather than crashing the turn.
+        Guarded like the dashboard's ``_knobs``: a malformed / transiently-empty / overflowing field
+        (e.g. ``"1e999"`` → ``OverflowError``) falls back to the base recipe's oxide minutes rather than
+        crashing the turn. (Whether the parsed value is *in domain* — > 0 min — is a separate check,
+        :func:`fab_game.dashboard.oxide_minutes_error`, used by :meth:`_repaint` / :meth:`_apply_action`.)
         """
         base = self._config.base_recipe
         raw = self.query_one("#in-oxide", Input).value
         try:
-            minutes = float(raw)
-        except (TypeError, ValueError):
-            minutes = base.oxidation.minutes
-        return oxide_recipe(minutes, base=base)
+            return float(raw)
+        except (TypeError, ValueError, ArithmeticError):
+            return base.oxidation.minutes
+
+    def _oxide_recipe(self) -> Recipe:
+        """The current oxide knob as a recipe (the adapt lever) — the base recipe's drive set to the field."""
+        return oxide_recipe(self._oxide_minutes(), base=self._config.base_recipe)
 
     def _apply_action(self, action) -> None:
-        """Apply a session action (process / scrap), guarding the run-over case, then repaint.
+        """Apply a session action (process / scrap), guarding the run-over case + a bad knob, then repaint.
 
         ``process_wafer`` / ``scrap_wafer`` **raise** once the run is over; a thin driver must never call
         them when done. The buttons are also disabled in :meth:`_repaint` once ``done`` (the honest
         affordance) — this guard is the belt to those suspenders, so a stray event can never throw into
         the event loop (which Textual could swallow — the failure the headless-core doctrine guards
-        against).
+        against). The second net catches a domain raise from the line itself: *Process* runs ``run_line``
+        at the oxide knob, so a non-positive bake (which :meth:`_repaint` already pre-screens in the
+        preview) becomes a readable note here too rather than an uncaught exception.
         """
         if self.session.done:
             return
-        self.session = action(self.session)
+        try:
+            self.session = action(self.session)
+        except (ValueError, ArithmeticError) as exc:            # a bad-knob domain raise — never into the loop
+            self.last_inspect = f"Can't process this turn — {exc}"
+            self.query_one("#inspect", Static).update(self.last_inspect)
+            return
         self._repaint()
 
     def _repaint(self) -> None:
@@ -374,7 +404,13 @@ class RoguelikeScreen(Screen):
         s = self.session
         self.last_header = session_header(s)
         self.last_trail = history_trail(s)
-        self.last_inspect = session_summary(s) if s.done else inspect_line(s, self._oxide_recipe())
+        if s.done:
+            self.last_inspect = session_summary(s)
+        else:
+            # the preview runs the line (inspect_line → projected_vt → run_line), so a non-positive oxide
+            # bake would raise into the event loop — pre-screen it with the same readable note as Process.
+            err = oxide_minutes_error(self._oxide_minutes())
+            self.last_inspect = err if err is not None else inspect_line(s, self._oxide_recipe())
         self.query_one("#game-header", Static).update(self.last_header)
         self.query_one("#inspect", Static).update(self.last_inspect)
         self.query_one("#trail", Static).update(self.last_trail)

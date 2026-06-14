@@ -78,6 +78,18 @@ pilot under `-n auto`). Verified green serially + `-n auto` (3 repeats, no flake
 **Remaining front-end = the tycoon ONLY** (roguelike loop + educational mode now built; named-consumer
 physics backlog stays exhausted).
 
+**>> Input-domain crash guard BUILT 2026-06-14 (`docs/plans/fab-game-tui.md` §10):** a knob that *parses*
+but is out of the physics domain (`slice_z` ∉ [0,1), oxide bake ≤ 0) used to **raise into the Textual
+handler and kill the App** — the old parse guards caught only non-numeric strings. Fix = headless validator
+`dashboard.knob_errors`/`oxide_minutes_error` (friendly notes, tested + cross-checked it can't diverge from
+what `run_dashboard` actually raises) + **belt-and-suspenders** in the TUI: pre-screen → note in the panel,
+then a `try/except` **net** around the run. **Advisor catch:** scope the catch by *class* not the observed
+one — `int(float("1e999"))`→`OverflowError`, so guards+nets widened to `(ValueError, ArithmeticError)`. Two
+roguelike crash sites (preview `inspect_line→projected_vt→run_line` AND Process). **The pilot is the real
+regression** (raises on un-fixed code; the headless test wouldn't). Seam untouched (defaults validate clean).
+No physics/engine/ADR. The "more of a game" asks (more screens, challenge) stay a **design conversation**, not
+yet built.
+
 **The seven synced choices:** (1) **full grand tour** — every distinct step,
 purification→Czochralski→wafer-prep→oxidation→litho→diffusion→etch/depo→device→dice/bond/test,
 repeats collapsed; (2) **both failure models** — deterministic physics mean + stochastic

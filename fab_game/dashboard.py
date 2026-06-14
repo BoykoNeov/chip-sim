@@ -86,6 +86,45 @@ def run_dashboard(
     return LineResult.of(label, wafer)
 
 
+def oxide_minutes_error(minutes: float) -> str | None:
+    """A readable message if the gate-oxide drive is outside its domain (must be > 0 min), else ``None``.
+
+    The shared *adapt-lever* check. The oxidation model **raises** for a non-positive bake (``t_ox`` must
+    be positive), so both the dashboard and the roguelike screen call this before running the line and
+    show the message instead of letting the raw ``ValueError`` reach Textual's (exception-swallowing) event
+    loop. ``not (minutes > 0)`` also rejects ``NaN`` (every comparison with ``NaN`` is ``False``).
+    """
+    if not (minutes > 0.0):
+        return (f"Gate-oxide drive must be greater than 0 min — no oxide grows in zero or negative "
+                f"time. Got {minutes:g}.")
+    return None
+
+
+def knob_errors(*, slice_z: float = 0.0, oxide_minutes: float = 20.0,
+                defect_density: float = 0.0) -> tuple[str, ...]:
+    """Readable messages for any dashboard knob outside its physical domain (an empty tuple = all valid).
+
+    The bounded knobs the underlying physics enforces by **raising** (or silently running as nonsense):
+    the boule is only so long, so ``slice_z`` ∈ [0, 1); the gate-oxide bake must be positive; the
+    killer-particle ``defect_density`` can't be negative. The thin TUI calls this **before**
+    :func:`run_dashboard`, so an out-of-range field shows a readable note instead of propagating a raw
+    ``ValueError`` into Textual's (exception-swallowing) event loop and killing the app. Pure/headless
+    (ADR 0002/0005) — tested without textual. ``defocus_nm`` has no bounded domain (a signed offset; large
+    values merely drive the yield to zero rather than raising), so it is not checked here.
+    """
+    errors: list[str] = []
+    if not (0.0 <= slice_z < 1.0):                  # the half-open boule fraction (also rejects NaN)
+        errors.append(f"Boule slice z must be in [0, 1) — the fraction of the boule solidified "
+                      f"(0 = seed end, approaching 1 = tail). Got {slice_z:g}.")
+    ox = oxide_minutes_error(oxide_minutes)
+    if ox is not None:
+        errors.append(ox)
+    if defect_density < 0.0:                        # particles per cm² can't be negative (NaN passes — harmless)
+        errors.append(f"Defect density can't be negative — it is killer particles per cm squared. "
+                      f"Got {defect_density:g}.")
+    return tuple(errors)
+
+
 def dashboard_summary(result: LineResult) -> str:
     """The headline readout + the worst dead die's failure trail (the §9 "watch the trail" payoff).
 

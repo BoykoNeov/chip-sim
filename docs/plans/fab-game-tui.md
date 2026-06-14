@@ -219,6 +219,33 @@ renders those strings **verbatim** (the App composes no prose). Educational mode
 No new physics, no engine touch, no new ADR — additive game-layer UI under ADR 0002/0005, exactly like
 §9 of the main plan and the v1/v2 TUI.
 
+## 10. Input-domain guard — a bad knob shows a note, never crashes (**BUILT 2026-06-14**)
+
+The bug: a knob value that **parses** but is outside the physics' domain (`slice_z` outside `[0, 1)`, a
+non-positive gate-oxide bake) made `run_dashboard` / `run_line` **raise** a `ValueError` straight into a
+Textual handler and kill the App. The existing parse guards only caught *non-numeric* strings — an
+out-of-range *number* sailed through to the raising physics. Both screens were affected, and the
+roguelike has **two** crash sites for the oxide knob: the live preview (`inspect_line → projected_vt →
+run_line`) and *Process*.
+
+As-built, same doctrine (load-bearing logic outside the swallow-prone surface; ADR 0002/0005):
+
+- **A headless validator** — `fab_game.dashboard.knob_errors(slice_z, oxide_minutes, defect_density)` →
+  readable messages for any out-of-domain knob (empty tuple = valid), plus the shared
+  `oxide_minutes_error` the roguelike reuses. Import-pure, tested in `test_dashboard.py` (including a
+  cross-check that every slice/oxide value it flags is one `run_dashboard` actually raises on — the guard
+  can't diverge from the real domain).
+- **Belt + suspenders in the TUI.** The dashboard *pre-screens* with `knob_errors` and shows the note in
+  the summary panel (leaving the last good wafer map up); the run is then wrapped in a `try/except`
+  **net**. The roguelike pre-screens the oxide knob in the preview and nets *Process*. **The catch is
+  scoped by exception class, not the one observed:** `(ValueError, ArithmeticError)` — `int(float("1e999"))`
+  raises `OverflowError`, so the parse guards (`_knobs`/`_oxide_minutes`) and the nets all widened past
+  `ValueError`. Goal: nothing uncaught reaches the event loop.
+- **The pilots are the real regression** (`test_tui.py` §5): set `slice_z="1.5"` → *Run* → the App is still
+  alive and the panel shows the note; `oxide="0"` → Enter (preview) then *Process* — both refuse without
+  crashing. These raise on the un-fixed code; the headless `knob_errors` test would not. The seam is
+  untouched (defaults validate clean). No new physics / engine / ADR.
+
 ## 8. What this is NOT
 
 - **Not new physics / not a new device output** — pure front-end over `run_dashboard`.

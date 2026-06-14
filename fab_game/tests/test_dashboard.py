@@ -16,7 +16,13 @@ from __future__ import annotations
 import pytest
 
 from fab_game import DEFAULT_RECIPE
-from fab_game.dashboard import dashboard_recipe, dashboard_summary, run_dashboard
+from fab_game.dashboard import (
+    dashboard_recipe,
+    dashboard_summary,
+    knob_errors,
+    oxide_minutes_error,
+    run_dashboard,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -107,6 +113,46 @@ def test_oxide_lever_rescues_the_drifted_tail():
     drifted = run_dashboard(slice_z=0.85, oxide_minutes=20.0).yield_
     rescued = run_dashboard(slice_z=0.85, oxide_minutes=18.0).yield_
     assert rescued > drifted
+
+
+# --------------------------------------------------------------------------- #
+# Knob-domain validation — the friendly notes the TUI shows instead of crashing
+# --------------------------------------------------------------------------- #
+def test_knob_errors_are_empty_at_the_defaults():
+    """The default knobs are all in-domain → no messages: the seam validates clean, so the TUI opens and
+    runs exactly as before (the pre-screen is invisible on the validated baseline)."""
+    assert knob_errors() == ()
+    assert knob_errors(slice_z=0.5, oxide_minutes=18.0, defect_density=0.06) == ()
+
+
+def test_knob_errors_flag_each_out_of_domain_knob():
+    """Each bounded knob outside its domain yields exactly one readable, knob-naming message: a boule slice
+    outside the half-open ``[0, 1)``, a non-positive oxide bake, a negative defect density."""
+    assert len(knob_errors(slice_z=1.5)) == 1 and "slice z" in knob_errors(slice_z=1.5)[0]
+    assert knob_errors(slice_z=1.0)                            # z = 1 is out (half-open at the tail)
+    assert knob_errors(slice_z=-0.1)
+    assert any("oxide" in m for m in knob_errors(oxide_minutes=0.0))
+    assert any("oxide" in m for m in knob_errors(oxide_minutes=-5.0))
+    assert any("Defect" in m for m in knob_errors(defect_density=-1.0))
+
+
+def test_knob_errors_match_what_the_physics_actually_raises():
+    """The validator is a thin guard, not a second source of truth: every slice/oxide value it flags is one
+    ``run_dashboard`` would itself **raise** on — so pre-screening cannot diverge from the real domain.
+    (Negative ``defect_density`` is the exception: it runs as silent nonsense rather than raising, which is
+    exactly why the validator flags it.)"""
+    for kw in (dict(slice_z=1.5), dict(slice_z=-0.1), dict(oxide_minutes=0.0), dict(oxide_minutes=-5.0)):
+        assert knob_errors(**kw)                              # the validator flags it...
+        with pytest.raises(ValueError):
+            run_dashboard(**kw)                               # ...and the physics agrees it is out of domain
+
+
+def test_oxide_minutes_error_is_the_shared_adapt_lever_check():
+    """``oxide_minutes_error`` is ``None`` for a positive bake and a message otherwise — the single check the
+    dashboard knobs and the roguelike screen share for the gate-oxide drive (its one player knob)."""
+    assert oxide_minutes_error(20.0) is None
+    assert oxide_minutes_error(0.0) is not None
+    assert oxide_minutes_error(-1.0) is not None
 
 
 # --------------------------------------------------------------------------- #

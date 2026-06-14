@@ -296,3 +296,74 @@ def test_play_roguelike_inherits_the_educational_mode_and_shows_its_guide():
             assert screen.session.budget == new_session(GameConfig(), seed=0).budget
 
     asyncio.run(scenario())
+
+
+# --------------------------------------------------------------------------- #
+# 5. Out-of-domain knobs show a readable note instead of crashing the App (regression)
+# --------------------------------------------------------------------------- #
+def test_out_of_range_dashboard_knob_shows_a_note_instead_of_crashing():
+    """The bug: an out-of-domain-but-parseable value (``slice_z`` outside ``[0, 1)``) used to raise a raw
+    ``ValueError`` straight into the Textual handler and kill the App. Now *Run* pre-screens it → the
+    summary panel shows the readable note, the App stays alive, and the wafer map is untouched (the last
+    clean seam). This pilot is the real regression — it raises on the un-fixed code; the headless
+    ``knob_errors`` test never would."""
+    pytest.importorskip("textual")
+    import asyncio
+
+    from textual.widgets import Input
+
+    from fab_game.tui import FabLineApp
+
+    async def scenario():
+        app = FabLineApp()
+        async with app.run_test(size=(120, 50)) as pilot:
+            await pilot.pause()
+            seam_map = app.last_map                              # the clean mount run
+            app.query_one("#in-slice_z", Input).value = "1.5"   # a boule slice past the tail (out of [0, 1))
+            await pilot.click("#run")                            # would previously crash the App
+            await pilot.pause()
+            assert app.is_running                                # still alive — no uncaught exception
+            assert "slice z" in app.last_summary and "[0, 1)" in app.last_summary
+            assert app.last_map == seam_map                      # the run was skipped; the map is unchanged
+
+    asyncio.run(scenario())
+
+
+def test_zero_oxide_in_the_roguelike_does_not_crash_preview_or_process():
+    """The roguelike's only player knob is the gate-oxide drive, and BOTH the live preview
+    (``inspect_line → projected_vt → run_line``) and *Process* run the line — two separate crash sites for
+    a non-positive bake. Entering ``"0"`` and pressing Enter (the preview) then clicking *Process* must
+    each show a readable note, not raise into the event loop, and process must refuse the doomed turn (no
+    record appended)."""
+    pytest.importorskip("textual")
+    import asyncio
+
+    from textual.widgets import Input
+
+    from fab_game.tui import FabLineApp, RoguelikeScreen
+
+    async def scenario():
+        app = FabLineApp()
+        async with app.run_test(size=(120, 50)) as pilot:
+            await pilot.pause()
+            screen = RoguelikeScreen(seed=0)
+            await app.push_screen(screen)
+            await pilot.pause()
+
+            oxide = screen.query_one("#in-oxide", Input)
+            oxide.value = "0"                                    # a zero-time bake — out of domain
+            oxide.focus()
+            await pilot.pause()
+            await pilot.press("enter")                           # preview path: must not crash
+            await pilot.pause()
+            assert app.is_running
+            assert "oxide" in screen.last_inspect                # the readable note, not a stack trace
+
+            n_turns = len(screen.session.history)
+            await pilot.click("#process")                        # process path: must not crash either
+            await pilot.pause()
+            assert app.is_running
+            assert len(screen.session.history) == n_turns        # the doomed turn was refused (no record)
+            assert "process" in screen.last_inspect.lower()      # the net's "Can't process this turn — …" note
+
+    asyncio.run(scenario())
