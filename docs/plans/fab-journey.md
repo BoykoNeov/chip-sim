@@ -5,10 +5,13 @@ dashboard (`fab_game/dashboard.py`, four live sliders) never gave: build **one w
 stage**, making a real decision at each fab stage and watching it land downstream — from no-effect,
 through a graded yield ring, to an outright scrap.
 
-This is a **phased** build. It is also, deliberately, almost entirely a *sequencing/exposure* problem over
+This is a **phased** build. It is also, deliberately, *mostly* a *sequencing/exposure* problem over
 already-validated physics: the `Recipe` (`fab_game/recipe.py`) is already grouped by fab stage, and
-`run_line` already chains them. The journey adds **zero new physics** — it composes `run_line` +
-`score_wafer` and surfaces a decision + a consequence at each stage (ADR 0005).
+`run_line` already chains them. Phases 1–3 add **zero new physics** — they compose `run_line` +
+`score_wafer` and surface a decision + a consequence at each stage (ADR 0005). **Phase 4 is the documented
+exception:** the diffusion outputs (`x_j`/`R_s`) fed *nothing scored* (the device reads `N_A`/`t_ox`/CD,
+never `R_s`), so the dose was inert — making it a real decision required one genuine device term (an
+additive S/D series resistance on `chip.device.saturation_current`, default-0 seam). See Phase 4 below.
 
 ## The decision (what the user asked for)
 
@@ -44,7 +47,7 @@ built when it has a consumer (the repo's anti-over-build rule, `scope-edge-backl
 | **1** | **Purification** | **BUILT** | refine a dirty feed; the edge-loaded Na ring is the graded consequence |
 | **2** | **Crystal growth (Czochralski)** | **BUILT** | set the boule pull rate at a radial hot zone — the two-sided Voronkov window (slow → dislocation leakage rim, fast → void core, clean OSF ring between), graded both ways; the axial Scheil drift flattens with a faster pull (CG-1) |
 | **3** | **Wafer prep — slice/cut** | **BUILT** | where down the boule to cut this wafer — it reads the axial Scheil drift (cut too deep → a graded V_t **centre core** → dead), and how deep you can cut is set by the **phase-2 pull** (the first stage coupled to a prior decision). Polish/flatness/killer-defect deferred (TTV→defocus is a named scope edge) |
-| 4 | Diffusion | stub | dose/temperature/time → junction depth + sheet resistance |
+| **4** | **S/D diffusion** | **BUILT** | the **predep dose** → diffused-layer sheet resistance `R_s` → (a new S/D **series-resistance** device term) source degeneration that **starves** `I_Dsat` → a graded `I_Dsat` **centre core**. The drive-in is *not* the lever (it conserves dose). The **one stage that adds real physics** (the dose was inert — `R_s` fed nothing scored); lands on the existing `I_Dsat` spec |
 | 5 | Oxidation | stub | ambient/T/time → gate oxide; the thin-oxide V_t lever |
 | 6 | Lithography | stub | focus/dose → the CD/NILS edge ring (the G1 dramatic knob) |
 | 7 | Etch & deposition | stub | over/under-etch, conformality → bridges/voids (functional shorts/opens) |
@@ -143,25 +146,67 @@ seed, which would be the `gradual-failure-preferred` "inflate an unrelated varia
 `V_t` centre-core wafer map join the purification + growth rows); `test_journey.py` pins the graded core, the
 coupling, the channel naming, and the no-cut **seam** (an explicit `cut(0)` reproduces the no-cut forecast).
 
+## Phase 4 — the S/D diffusion stage (BUILT 2026-06-14)
+
+On the cut wafer the decision is the **predep dose** (`JourneyState.diffuse(predep_C, predep_min)`) — how
+much dopant to lay down before the drive-in redistributes it. It is the **one stage that adds real
+physics**, because the diffusion was a genuine *dead end* for the journey:
+
+- **The gap (verified empirically before building).** The diffusion step records `x_j`/`R_s` on every die,
+  but **nothing scored consumes them** — `device_step` reads `N_A`/`t_ox`/CD, the spec windows are
+  `CD/I_Dsat/V_t/NILS/leakage`, none on `R_s`. So changing the diffusion knobs moved `x_j`/`R_s` but
+  changed **no** yield: the dose was inert. (Confirmed by grep + a dynamic-range probe.)
+- **The consumer (the new term).** `R_s` → a parasitic S/D **series resistance** `R_series = R_s·n_□` →
+  **source degeneration** that degrades the drive current: the device self-consistently solves
+  `I_D = β·(V_GS − V_t − I_D·R_S)²` (`chip.device.saturation_current` gained an additive `R_series_ohm`,
+  **default 0.0 → bit-for-bit the ideal closed form**, the seam; its own triad leg = the seam + the
+  self-consistency residual + the small-signal `g_m = g_m0/(1+g_m0 R_S)`). So an **under-diffused**
+  (cool/short) predep → high `R_s` → starved `I_Dsat` → fails the **existing** `I_Dsat` floor (no new
+  spec). The journey engages the consumer with a flagged house geometry `n_□ ≈ 0.15` (a wide `W = 10 µm`
+  device: `L_access/W ≈ 1.5 µm/10 µm`), so nominal `R_series ≈ 12 Ω` sits comfortably inside the window and
+  an under-diffused predep walks it out.
+- **The drive-in is *not* the lever** — it conserves dose (sealed Neumann both ends), so it swings `x_j`
+  but barely moves `R_s` (the same trap a slow pull was for the Scheil drift; verified — drive-in 950→1100 °C
+  *lowers* `R_s` while `x_j` grows 10×). The **predep** is the dose lever.
+- **Graded, one-sided.** The radial `t_ox` non-uniformity already in the line grades the consequence: the
+  edge's thinner gate oxide gives more drive (higher `C_ox`), so the **thicker-oxide centre** dies cross
+  the `I_Dsat` floor first → a graded `I_Dsat` **centre core** (same radial sense as the slice `V_t` core,
+  a *different channel*: drive-current-low vs threshold-high). **One-sided** like purification/slice — more
+  dose only lowers `R_s`; the over-diffusion harm (short-channel rolloff) is the device model's *omitted*
+  scope edge, so a high-dose failure is **not faked** (the gradual-failure "inflate an unrelated variable"
+  fudge avoided). The cost side (thermal budget / "use the least dose in spec") is the same deferred
+  economics shared by purification and slice.
+
+`forecast` names the channel by direction (`I_Dsat` *low* + consumer engaged → series resistance, distinct
+from a defocus/over-etch *high*-`I_Dsat` over-current); `diffuse` logs the resulting `R_s`/`x_j`;
+`diffusion_trajectory` is the *watch-the-dose-set-the-junction* view (predep time → `R_s`/`x_j`/`I_Dsat`).
+`demo_journey.py` is now a **four-stage** playthrough (a 4×3 figure: the diffusion dose-read, the arc, and
+the `I_Dsat` centre-core map join the prior three rows); `test_journey.py`/`test_demo_journey.py` pin the
+graded core, the channel naming, the one-sidedness, and the no-diffuse **seam** (consumer off ⇒
+`sd_contact_squares = 0` ⇒ ideal-contact `I_Dsat`). `chip/tests/test_device.py` carries the device term's
+triad.
+
 ## Deferred (explicit)
 
-- **The economics — the cost side of the decision (the #1 open item, now shared by TWO stages).** Today
-  `finish` charges only the wafer cost, so two stages are *one-sided absent a price*: **purification**
-  (refining is free + every grade is the same price → "refine until clean") and **the slice/cut** (cutting
+- **The economics — the cost side of the decision (the #1 open item, now shared by THREE stages).** Today
+  `finish` charges only the wafer cost, so three stages are *one-sided absent a price*: **purification**
+  (refining is free + every grade is the same price → "refine until clean"), **the slice/cut** (cutting
   at the seed is always safest → "camp at the seed"; the value of cutting deeper = **more wafers per boule**
-  = throughput). A **grade/per-pass refining price** *and* a **per-wafer-vs-throughput** cost are the same
-  missing half: the ring/Scheil-drift penalizes under-doing it, cost penalizes over-doing it (the
-  two-sided Goldilocks shape the G7 oxide lever already has). The consequence spectrum (the forecast bands)
-  is built for both; the cost side is its other half — the natural next increment. (Crystal growth is the
-  exception — its two-sidedness needed no economics; the radial hot zone supplied it.)
+  = throughput), and **the S/D diffusion** (more dose only lowers `R_s` → "predep forever"; the cost of
+  more dose = thermal budget / cycle time). A **per-pass / per-wafer-vs-throughput / per-budget** cost is
+  the same missing half across all three: the ring/Scheil-drift/`R_s` penalizes under-doing it, cost
+  penalizes over-doing it (the two-sided Goldilocks shape the G7 oxide lever already has). The consequence
+  spectrum (the forecast bands) is built for all; the cost side is its other half — the natural next
+  increment. (Crystal growth is the exception — its two-sidedness needed no economics; the radial hot zone
+  supplied it.)
 - **The polish/flatness + killer-defect half of wafer-prep** — phase 3 ships the *cut*; TTV/bow/CMP +
   the defect map run at defaults (flatness is a binary scrap, and TTV→focus-budget is a named scope edge =
   new physics). Built when graded.
-- **The remaining stages' interactive logic (4–8 + wafer-prep's polish half)** — they run at recipe
+- **The remaining stages' interactive logic (5–8 + wafer-prep's polish half)** — they run at recipe
   defaults today (the journey carries them); built when each has a consumer.
 - **All difficulty mechanics** — per the user's "start easy, difficulty later."
 - **The live interactive UI** — a notebook `interact` cell and/or a Textual journey screen driving the
-  headless core. The scripted playthrough + figure is phases 1–3's visible artifact; the live UI is the
+  headless core. The scripted playthrough + figure is phases 1–4's visible artifact; the live UI is the
   next increment.
 
 ## References

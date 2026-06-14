@@ -1,6 +1,6 @@
 ---
 name: fab-journey
-description: the staged sand→chip journey front-end — phases 1-3 (purification + crystal growth + slice/cut) BUILT; the cost-side decision + difficulty + live UI deferred
+description: the staged sand→chip journey front-end — phases 1-4 (purification + crystal growth + slice/cut + S/D diffusion) BUILT; the cost-side decision + difficulty + live UI deferred
 metadata: 
   node_type: memory
   type: project
@@ -11,9 +11,10 @@ The staged sand→chip **journey** — a new player-facing front-end (sibling to
 `game.py` and the `dashboard`): build ONE wafer's recipe **stage by stage**, a decision per
 fab stage with the downstream consequence shown. Plan `docs/plans/fab-journey.md` (the full
 vision + phased order + the four-beat pattern: **decide → advance/observe → forecast →
-commit**). Zero new physics — composes `run_line` + `score_wafer` (ADR 0005). The scaffold is
-deliberately THIN (an accumulating `Recipe` + the current stage's decision), NOT a 9-stage
-state machine — a stage gets built when it has a consumer (anti-over-build).
+commit**). Phases 1-3 add zero new physics (compose `run_line` + `score_wafer`, ADR 0005);
+**phase 4 is the documented exception** — it adds one genuine device term (see below). The
+scaffold is deliberately THIN (an accumulating `Recipe` + the current stage's decision), NOT a
+9-stage state machine — a stage gets built when it has a consumer (anti-over-build).
 
 **Phase 1 (purification stage) BUILT 2026-06-14** — `fab_game/journey.py` (headless,
 GameSession discipline: frozen/immutable, action→new state, append-only log, deterministic):
@@ -31,13 +32,14 @@ GameSession discipline: frozen/immutable, action→new state, append-only log, d
 - Surfaces: `demo_journey.py` (watch-a-playthrough) + the **J1** gallery card +
   `docs/figures/fab-game-journey.png`; tests `test_journey.py` (16) + `test_demo_journey.py` (4).
 
-**THE #1 open item (advisor — deferred but NAMED, not silently shipped) — now shared by TWO stages:**
-the purification *and* the slice/cut decisions are both ONE-SIDED absent economics. Purification: refining
+**THE #1 open item (advisor — deferred but NAMED, not silently shipped) — now shared by THREE stages:**
+purification, slice/cut *and* S/D diffusion are all ONE-SIDED absent economics. Purification: refining
 is **free** + grades are one price → "refine until clean". Slice/cut: cutting at the seed is always safest
-→ "camp at the seed"; the value of cutting deeper = **more wafers per boule** = throughput. The **cost
-side** — a grade/per-pass refining price + a per-wafer-vs-throughput cost — is the same missing half for
-both: the ring/Scheil-drift penalizes under-doing it, cost penalizes over-doing it (the two-sided
-Goldilocks shape the G7 oxide lever has). The consequence spectrum (forecast bands) is built for both;
+→ "camp at the seed"; value of cutting deeper = **more wafers per boule** = throughput. Diffusion: more
+predep dose only lowers `R_s` → "predep forever"; cost of more dose = **thermal budget / cycle time**. The
+**cost side** — per-pass / per-wafer-vs-throughput / per-budget — is the same missing half for all three:
+the ring/Scheil-drift/`R_s` penalizes under-doing it, cost penalizes over-doing it (the two-sided
+Goldilocks shape the G7 oxide lever has). The consequence spectrum (forecast bands) is built for all;
 **the natural next increment.** (Crystal growth is the exception — the radial hot zone gave it
 two-sidedness with NO economics.)
 
@@ -82,9 +84,36 @@ THREE-stage playthrough (**3×3** figure: slice-arc + the coupling + the `V_t` c
 **299 fab_game tests green** (+9: graded ring, coupling, channel, commit-fold, range guard, seam).
 **Deferred:** the across-wafer/polish handoff + the killer-defect map (wafer-prep's other half).
 
-**Deferred:** the remaining stages' interactive logic (stages 4–8 + wafer-prep's polish half run at recipe
+**Phase 4 (S/D diffusion) BUILT 2026-06-14** — `JourneyState.diffuse(predep_C, predep_min)` (new `predep_C`
+overlay field; engaging it turns on the consumer). **THE one stage that adds REAL physics** (advisor-gated):
+the diffusion was a journey DEAD END — the step records `x_j`/`R_s` per die but **nothing scored consumes
+them** (device reads `N_A`/`t_ox`/CD; specs are CD/I_Dsat/V_t/NILS/leakage, none on `R_s`) → the dose was
+**inert** (verified by grep + a dynamic-range probe BEFORE building). **The consumer (new device term):**
+`R_s` → S/D parasitic **series resistance** `R_series = R_s·n_□` → **source degeneration** solving
+`I_D = β·(V_GS−V_t−I_D·R_S)²` — `chip.device.saturation_current` gained additive `R_series_ohm` (**default
+0.0 → bit-for-bit ideal closed form = the seam**; own triad: seam + self-consistency residual + small-signal
+`g_m=g_m0/(1+g_m0 R_S)`, `chip/tests/test_device.py`). Under-diffused (cool/short) predep → high `R_s` →
+starved `I_Dsat` → fails the **EXISTING** I_Dsat floor (no new spec). **THE empirical gate (advisor, decided
+the design):** the **predep is the lever, NOT the drive-in** — drive-in conserves dose (sealed Neumann) so
+it swings `x_j` 10× but *lowers* `R_s` (the same trap a slow pull was for Scheil). House geometry `n_□≈0.15`
+(`DIFFUSION_SD_CONTACT_SQUARES`; a WIDE W=10µm device → L_access/W≈1.5µm/10µm — NOT the ~1-5 of a square
+device the advisor first assumed; nominal R_series≈12Ω in-window, under-diffused walks it out). **Graded,
+one-sided:** existing radial `t_ox` non-uniformity grades it — edge oxide thinner → higher C_ox → more drive
+→ survives; thicker-oxide **CENTRE** crosses the floor first → an `I_Dsat` **centre-WEIGHTED core** (advisor:
+NOT phase-3-clean — fail mean r≈0.63 vs pass 0.81, CD scatter blurs it, span 0–0.98; same radial sense as
+the slice `V_t` core but a DIFFERENT channel: drive-low vs threshold-high, AND noisier). **One-sided like
+purify/slice** — more dose only helps; over-diffusion's short-channel harm is the device model's OMITTED
+scope edge → NOT faked (gradual-failure "inflate an unrelated variable" fudge avoided). `_dominant_channel`
+keys on direction (`I_Dsat` *low* + consumer on → series-R, vs defocus/over-etch *high*). `diffusion_trajectory`
+= watch-the-dose view (predep TIME at `DEMO_PREDEP_C=900` → R_s/x_j/I_Dsat; time gives a wider graded band
+than T at full 10-min). demo_journey now **FOUR-stage (4×3 figure**, the diffusion dose-read + arc + I_Dsat
+centre-core map join the rows); journey/demo tests pin graded core, channel, one-sidedness, no-diffuse seam.
+Honesty: the plan's "journey adds zero new physics" is **formally false at phase 4** — recorded in the plan +
+module docstrings, not carried stale.
+
+**Deferred:** the remaining stages' interactive logic (stages 5–8 + wafer-prep's polish half run at recipe
 defaults today — see the plan's stage table), all difficulty mechanics ("start easy, difficulty later"),
-the live UI (notebook `interact` / Textual journey screen — the scripted playthrough is phases 1–3's artifact).
+the live UI (notebook `interact` / Textual journey screen — the scripted playthrough is phases 1–4's artifact).
 Default grade `solar` is an *intermediate* (already partly-refined) feed, chosen for the clean
 ring at 0.25 steps; the raw-"sand" MGS narrative is noted in the demo. [[fab-game]]
 [[gradual-failure-preferred]] [[scope-edge-backlog]]

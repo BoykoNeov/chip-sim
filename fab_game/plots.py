@@ -450,18 +450,60 @@ def _journey_coupling_panel(ax, result) -> None:
     ax.legend(fontsize=8, loc="center right")
 
 
+def _journey_diffusion_panel(ax, result) -> None:
+    """Watch the dose set the junction: predep dose (time) → R_s up, I_Dsat down (the series-R consumer)."""
+    t = [pt for pt, _, _, _ in result.diffusion_traj]
+    rs = [r for _, r, _, _ in result.diffusion_traj]
+    idsat = [i for _, _, _, i in result.diffusion_traj]
+    ax.plot(t, rs, color="#7f3fbf", lw=1.8, marker="o", ms=4, label="sheet resistance R_s (Ω/sq)")
+    ax.set_xlabel(f"predep time at {result.diffusion_predep_C:g}°C (dose) — less →", fontsize=9)
+    ax.set_ylabel("S/D sheet resistance R_s (Ω/sq)", fontsize=9, color="#7f3fbf")
+    ax.tick_params(axis="y", labelcolor="#7f3fbf")
+    ax.invert_xaxis()                                            # less dose to the right (the failing direction)
+    ax2 = ax.twinx()
+    ax2.plot(t, idsat, color="#2f6db5", lw=1.6, marker="s", ms=3, label="I_Dsat (mA)")
+    ax2.set_ylabel("drive current I_Dsat (mA)", fontsize=9, color="#2f6db5")
+    ax2.tick_params(axis="y", labelcolor="#2f6db5")
+    ax.set_title("Watch the dose set the junction: less predep dose\n→ higher R_s → series R starves I_Dsat",
+                 fontsize=10)
+
+
+def _journey_diffusion_arc_panel(ax, result) -> None:
+    """Forecast yield vs predep dose (time), banded — clean → a graded I_Dsat centre-weighted core → dead."""
+    t = list(result.diffusion_times)
+    y = [100.0 * v for v in result.diffusion_yields]
+    ax.axhspan(0, 5, color="#d62728", alpha=0.10)
+    ax.axhspan(5, 90, color="#ff7f0e", alpha=0.10)
+    ax.axhspan(90, 100, color="#2ca02c", alpha=0.10)
+    ax.plot(t, y, color="0.2", lw=1.7, marker="o", ms=5, zorder=3)
+    ax.invert_xaxis()                                            # less dose → right (toward failure)
+    ax.axvline(result.diffusion_commit_time, color="#2ca02c", ls="--", lw=1.1,
+               label=f"shortest clean predep {result.diffusion_commit_time:g} min")
+    ax.axvline(result.diffusion_ring_time, color="#ff7f0e", ls=":", lw=1.2,
+               label=f"the I_Dsat core ({result.diffusion_ring_forecast.yield_:.0%}) at "
+                     f"{result.diffusion_ring_time:g} min")
+    ax.set_xlabel(f"predep time at {result.diffusion_predep_C:g}°C (dose) — less →", fontsize=9)
+    ax.set_ylabel("forecast yield (%)", fontsize=9)
+    ax.set_ylim(-3, 103)
+    ax.set_title("Under-diffuse → I_Dsat starved: clean → a graded\nI_Dsat centre-weighted core → dead (one-sided)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="lower left")
+
+
 def journey_figure(result):
-    """Assemble the journey artifact from a :class:`~fab_game.demo_journey.JourneyDemoResult` (3×3 panels).
+    """Assemble the journey artifact from a :class:`~fab_game.demo_journey.JourneyDemoResult` (4×3 panels).
 
     Row 1 — **purification**: the refining scrub, the dead→ring→clean consequence arc, and the wafer map at
     the graded Na ring. Row 2 — **crystal growth**: the axial boule drift (CG-1 flattening), the two-sided
     Voronkov pull window (leakage rim ↔ void core), and the wafer map at the optimum (the clean OSF ring).
     Row 3 — **slice/cut**: where-to-cut (clean → V_t centre core → dead down the boule), the phase-2 coupling
     (a flat boule cuts deep; a slow pull is dead before the cut), and the wafer map at the V_t centre core.
+    Row 4 — **S/D diffusion**: the dose → R_s → I_Dsat read, the clean → I_Dsat-core → dead arc, and the
+    wafer map at the I_Dsat centre-weighted core.
     """
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(3, 3, figsize=(15, 13.6))
+    fig, axes = plt.subplots(4, 3, figsize=(15, 18))
     _journey_trajectory_panel(axes[0][0], result)
     _journey_arc_panel(axes[0][1], result)
     _wafer_map(axes[0][2], result.ring_forecast.result.wafer,
@@ -474,9 +516,14 @@ def journey_figure(result):
     _journey_coupling_panel(axes[2][1], result)
     _wafer_map(axes[2][2], result.slice_ring_forecast.result.wafer,
                f"stage 3: the V_t centre core — cut z={result.slice_ring_z:g}")
-    fig.suptitle("The journey — stage 1: purify a feed (the Na edge ring)  →  stage 2: grow the boule "
-                 "(the Voronkov window)  →  stage 3: cut a wafer (the Scheil V_t centre core)", fontsize=12)
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    _journey_diffusion_panel(axes[3][0], result)
+    _journey_diffusion_arc_panel(axes[3][1], result)
+    _wafer_map(axes[3][2], result.diffusion_ring_forecast.result.wafer,
+               f"stage 4: the I_Dsat centre-weighted core — predep {result.diffusion_ring_time:g} min")
+    fig.suptitle("The journey — stage 1: purify (the Na edge ring)  →  stage 2: grow (the Voronkov window)  "
+                 "→  stage 3: cut (the Scheil V_t core)  →  stage 4: diffuse (the series-R I_Dsat core)",
+                 fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
     return fig
 
 

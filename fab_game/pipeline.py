@@ -236,7 +236,8 @@ def run_line(
         device_step(d, recipe.device, recipe.effective_channel_N_A,
                     contamination=_die_contamination(recipe.contamination, variation.na_factor(d.radius_frac)),
                     thermal_donor_density=recipe.czochralski.thermal_donor_density,
-                    dislocation_density=recipe.czochralski.interstitial_dislocation_density_at(d.radius_frac))
+                    dislocation_density=recipe.czochralski.interstitial_dislocation_density_at(d.radius_frac),
+                    sd_contact_squares=recipe.diffusion.sd_contact_squares)
         for d in wafer.dies
     )
     wafer = wafer.with_step(
@@ -496,6 +497,14 @@ def diagnose(die: Die) -> str:
                 lines.append(f"    ↳ purification: junction leakage from deep-level-metal SRH recombination "
                              f"(minority-carrier lifetime τ {tau_us:.2g} µs) "
                              f"→ a leaky diode (purify harder — zone refining scrubs the metals fast, tiny k)")
+        # The diffusion fingerprint (phase-4 journey): an I_Dsat-LOW failure with the S/D series-R consumer
+        # engaged traces to an under-diffused junction — the high sheet resistance R_s (a cool/short predep
+        # dose) becomes a parasitic series resistance that starves the drive current (source degeneration).
+        R_series = device.knobs_in.get("R_series_ohm")
+        if R_series and any("i_dsat" in r.lower() and "(low)" in r.lower() for r in die.verdict.reasons):
+            lines.append(f"    ↳ diffusion: S/D series resistance {R_series:.0f} Ω (an under-diffused junction "
+                         f"→ high sheet resistance R_s {die.R_s:.0f} Ω/sq) starves I_Dsat via source "
+                         f"degeneration → drive too weak (lay down more predep dose — hotter/longer predep)")
     # The back-end fingerprint (G6): a part can die in *packaging* even with a perfect front end — a
     # stochastic assembly scrap (dice/bond) or a final-test bin-out (works, but too slow to sell).
     if die.assembled is False:
@@ -572,7 +581,8 @@ def rework_litho(
         red = device_step(red, recipe.device, wafer.channel_N_A,
                           contamination=_die_contamination(wafer.contamination, variation.na_factor(red.radius_frac)),
                           thermal_donor_density=recipe.czochralski.thermal_donor_density,
-                          dislocation_density=recipe.czochralski.interstitial_dislocation_density_at(red.radius_frac))
+                          dislocation_density=recipe.czochralski.interstitial_dislocation_density_at(red.radius_frac),
+                          sd_contact_squares=recipe.diffusion.sd_contact_squares)
         red = _verdict_die(red, specs, geometry_reason)
         new_dies.append(red)
 

@@ -17,12 +17,14 @@ from __future__ import annotations
 import pytest
 
 from fab_game.journey import (
+    DIFFUSION_SD_CONTACT_SQUARES,
     GROWTH_G_CENTER_K_PER_MM,
     GROWTH_RADIAL_BOOST,
     JourneyState,
     StageForecast,
     boule_profile,
     consequence_band,
+    diffusion_trajectory,
     finish,
     forecast,
     new_journey,
@@ -287,6 +289,91 @@ def test_no_cut_is_a_seam():
     assert grown.slice_z is None
     assert grown.current_recipe.czochralski.slice_z == 0.0           # the recipe default, untouched
     assert forecast(grown).yield_ == forecast(grown.cut(0.0)).yield_  # cut(0) is the identity (the seam)
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4 — the S/D diffusion stage (the predep dose → R_s → I_Dsat series-R consumer)
+# --------------------------------------------------------------------------- #
+def _diffused(predep_C: float, *, predep_min: float = 10.0, grade: str = "clean",
+              pull: float = 2.0, z: float = 0.5, seed: int = 0) -> JourneyState:
+    """A grown-cut-and-diffused state on a *clean* feed at the optimum pull / mid-cut — so the consequence
+    is the diffusion dose, not residual Na or the Scheil drift."""
+    return JourneyState(grade=grade, pull_rate=pull, slice_z=z, predep_C=predep_C, predep_min=predep_min,
+                        seed=seed)
+
+
+def test_diffuse_sets_the_predep_and_engages_the_series_r_consumer():
+    """``diffuse`` sets the predep dose **and** turns on the series-R consumer (``sd_contact_squares``) —
+    the wire that makes the dose a scored decision (without it ``R_s`` feeds nothing)."""
+    d = new_journey("clean").grow(2.0).commit().cut(0.5).commit().diffuse(900.0, 5.0).current_recipe.diffusion
+    assert d.T_predep_C == 900.0 and d.t_predep_min == 5.0
+    assert d.sd_contact_squares == DIFFUSION_SD_CONTACT_SQUARES   # consumer engaged → R_s now bites I_Dsat
+
+
+def test_diffusion_trajectory_raises_rs_and_lowers_idsat_as_dose_drops():
+    """The 'watch the dose set the junction' view: a shorter predep lays down less dose → ``R_s`` rises,
+    ``x_j`` shrinks, and (through the series-R consumer) the clean ``I_Dsat`` walks down toward the floor."""
+    traj = diffusion_trajectory(_diffused(900.0))               # the sweep is over predep TIME (descending)
+    ts = [t for t, _, _, _ in traj]
+    rs = [r for _, r, _, _ in traj]
+    xj = [x for _, _, x, _ in traj]
+    idsat = [i for _, _, _, i in traj]
+    assert ts == sorted(ts, reverse=True)                       # shortening predep (less dose)
+    assert rs == sorted(rs)                                     # R_s rises as the dose drops
+    assert xj == sorted(xj, reverse=True)                       # x_j shrinks (less dose, shallower)
+    assert idsat == sorted(idsat, reverse=True)                 # I_Dsat falls (more series R starves drive)
+
+
+def test_diffusion_window_is_graded_clean_to_ring_to_dead():
+    """THE policy check (gradual-failure): a nominal predep is clean, a cooler/shorter one walks through a
+    **graded** I_Dsat centre core (the radial t_ox non-uniformity grades it — the thicker-oxide centre
+    crosses the I_Dsat floor first), then dead — not an all-or-nothing flip."""
+    clean = forecast(_diffused(950.0, predep_min=10.0))
+    ring = forecast(_diffused(885.0, predep_min=4.0))
+    dead = forecast(_diffused(850.0, predep_min=3.0))
+    assert clean.band == "clean"
+    assert ring.band == "ring" and 0.0 < ring.yield_ < clean.yield_   # a partial centre core (rework territory)
+    assert dead.band == "dead" and dead.yield_ < ring.yield_
+
+
+def test_diffusion_channel_names_the_series_resistance_root():
+    """An under-diffused junction fails on ``I_Dsat`` **low** via S/D series resistance — named distinctly
+    from a defocus/over-etch over-current (``I_Dsat`` *high*); direction discriminates the root."""
+    f = forecast(_diffused(885.0, predep_min=4.0))
+    assert f.band != "clean" and f.channel is not None
+    assert "i_dsat" in f.channel.lower() and "series resistance" in f.channel.lower()
+
+
+def test_diffusion_is_one_sided_more_dose_never_fails():
+    """Honest one-sidedness (no faked over-diffusion failure): a *hotter/longer* predep only lowers ``R_s``,
+    so it stays clean — the over-diffusion harm (short-channel rolloff) is the device model's omitted scope
+    edge, not manufactured here (the ``gradual-failure`` 'inflate an unrelated variable' fudge avoided)."""
+    over = forecast(_diffused(1000.0, predep_min=15.0))
+    assert over.band == "clean"
+
+
+def test_diffuse_folds_into_the_recipe_on_commit():
+    """``commit`` bakes the diffusion decision (predep + the series-R consumer) into the accumulator,
+    preserving the grown + cut boule."""
+    s = new_journey("clean").grow(2.0).commit().cut(0.6).commit().diffuse(900.0, 5.0).commit()
+    assert s.recipe.diffusion.T_predep_C == 900.0 and s.recipe.diffusion.t_predep_min == 5.0
+    assert s.recipe.diffusion.sd_contact_squares == DIFFUSION_SD_CONTACT_SQUARES
+    assert s.recipe.czochralski.slice_z == 0.6 and s.recipe.czochralski.pull_rate_mm_min == 2.0  # priors survive
+
+
+def test_no_diffuse_is_a_seam():
+    """A journey that never diffuses leaves the series-R consumer **off** (``sd_contact_squares`` at the
+    recipe default 0.0) — the device reads the ideal-contact I_Dsat, byte-for-byte the pre-phase-4 line."""
+    grown_cut = JourneyState(grade="clean", pull_rate=2.0, slice_z=0.5)
+    assert grown_cut.predep_C is None
+    assert grown_cut.current_recipe.diffusion.sd_contact_squares == 0.0     # consumer off — the seam
+
+
+def test_diffuse_rejects_a_nonpositive_predep():
+    with pytest.raises(ValueError):
+        new_journey("clean").diffuse(0.0)
+    with pytest.raises(ValueError):
+        new_journey("clean").diffuse(950.0, 0.0)
 
 
 # --------------------------------------------------------------------------- #

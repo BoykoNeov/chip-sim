@@ -1,14 +1,15 @@
 """Integration test for the journey demo (the demo IS the integration check — ADR 0002/0005).
 
-The phase-1–3 journey demo wires the staged scaffold + the purification, crystal-growth *and* slice/cut
-stages through the validated line: ``compute`` is the end-to-end check that the refine/grow/cut → forecast
-(band + channel) → commit → finish chain holds together. Asserted on the robust thesis (purification walks
-dead→ring→clean; growth is a two-sided window graded on *both* sides with an interior optimum; the slice
-arc walks clean→ring→dead down the boule and is **coupled** to the phase-2 pull; the metal feed dies on
-leakage, not V_t), not brittle numbers (the mechanics are pinned in ``test_journey.py``). The figure is a
-"builds without error" smoke test only.
+The phase-1–4 journey demo wires the staged scaffold + the purification, crystal-growth, slice/cut *and*
+S/D diffusion stages through the validated line: ``compute`` is the end-to-end check that the
+refine/grow/cut/diffuse → forecast (band + channel) → commit → finish chain holds together. Asserted on
+the robust thesis (purification walks dead→ring→clean; growth is a two-sided window graded on *both* sides
+with an interior optimum; the slice arc walks clean→ring→dead down the boule and is **coupled** to the
+phase-2 pull; the diffusion arc walks clean→ring→dead as the predep dose drops, failing on the series-R
+``I_Dsat`` channel; the metal feed dies on leakage, not V_t), not brittle numbers (the mechanics are
+pinned in ``test_journey.py``). The figure is a "builds without error" smoke test only.
 
-``compute`` is heavier now (three stages, grid_n=11), so it runs **once** as a module fixture.
+``compute`` is heavier now (four stages, grid_n=11), so it runs **once** as a module fixture.
 """
 from __future__ import annotations
 
@@ -83,6 +84,30 @@ def test_demo_slice_is_coupled_to_the_phase2_pull(result):
 
 
 # --------------------------------------------------------------------------- #
+# Stage 4 — S/D diffusion (the graded I_Dsat centre core as the predep dose drops)
+# --------------------------------------------------------------------------- #
+def test_demo_diffusion_arc_walks_clean_to_ring_to_dead_as_dose_drops(result):
+    """A full predep is clean; shortening it (less dose → higher R_s → series-R degradation) walks a
+    *graded* I_Dsat centre core, then dead — failing on the named series-resistance channel."""
+    assert result.diffusion_bands[0] == "clean"             # a full predep dose: in spec
+    assert "ring" in result.diffusion_bands                 # a graded ring band (the rework signal)
+    assert result.diffusion_bands[-1] == "dead"             # too little dose: I_Dsat starved out of spec
+    assert 0.0 < result.diffusion_ring_forecast.yield_ < 1.0
+    ch = (result.diffusion_ring_forecast.channel or "").lower()
+    assert "i_dsat" in ch and "series resistance" in ch
+    # the dose sweep is monotone non-increasing as the predep shortens (R_s only walks one way)
+    assert list(result.diffusion_yields) == sorted(result.diffusion_yields, reverse=True)
+
+
+def test_demo_diffusion_trajectory_raises_rs_and_lowers_idsat(result):
+    """The 'watch the dose set the junction' view: as the predep shortens, R_s rises and I_Dsat falls."""
+    rs = [r for _, r, _, _ in result.diffusion_traj]
+    idsat = [i for _, _, _, i in result.diffusion_traj]
+    assert rs == sorted(rs)                                  # R_s rises as the dose drops
+    assert idsat == sorted(idsat, reverse=True)              # I_Dsat falls (series R starves the drive)
+
+
+# --------------------------------------------------------------------------- #
 # End to end + the purification channel contrast
 # --------------------------------------------------------------------------- #
 def test_demo_finish_runs_and_scores_the_grown_wafer(result):
@@ -106,5 +131,5 @@ def test_journey_figure_builds(result):
     from fab_game.plots import journey_figure
 
     fig = journey_figure(result)
-    assert len(fig.axes) >= 9                               # 3×3: purification + crystal-growth + slice rows
+    assert len(fig.axes) >= 12                              # 4×3: purification + growth + slice + diffusion rows
     plt.pyplot.close(fig)

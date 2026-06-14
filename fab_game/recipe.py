@@ -410,6 +410,19 @@ class DiffusionKnobs:
     unchanged (the seam). The spike's junction depth is set by the *budget* ``∫D(T(t))dt`` — for a
     fast ramp far less than the clock time would suggest (Arrhenius collapse near the peak), which
     is why RTA gives shallow junctions.
+
+    ``sd_contact_squares`` (the diffusion-journey consumer) turns the S/D sheet resistance ``R_s``
+    into a **device consequence**: the parasitic **source** series resistance is ``R_series = R_s·sd_contact_squares``
+    (the contact-to-channel square count ``n_□ = L_access/W`` — a flagged layout-geometry number), which
+    the device step feeds to :func:`chip.device.saturation_current` as source degeneration → a shallow,
+    **under-diffused** junction (high ``R_s``) starves ``I_Dsat``. Without it the diffusion knobs move
+    ``x_j``/``R_s`` but **nothing scored** (the device reads ``N_A``/``t_ox``/CD, never ``R_s``), so the
+    dose is inert — this is the wire that makes the predep dose a real decision. It defaults to **``0.0``**
+    → ideal contact, ``R_series = 0`` → the device call is byte-for-byte the ideal closed form (the seam,
+    G1–G7 banked demos unchanged); the journey dials in the flagged house value (a wide ``W = 10 µm``
+    device → ``n_□ ≈ 0.15``, so nominal ``R_series ≈ 12 Ω`` sits comfortably inside the ``I_Dsat`` window
+    and an under-diffused predep walks it out). One-sided by construction: *more* dose only lowers ``R_s``
+    (over-diffusion's harm is the short-channel tar pit the device model deliberately omits).
     """
 
     dopant: str = "P"                  # n⁺ phosphorus S/D into the p-type channel
@@ -418,6 +431,7 @@ class DiffusionKnobs:
     T_drivein_C: float = 950.0         # °C
     t_drivein_min: float = 8.0         # min → shallow x_j ≈ 0.10 µm
     drivein_program: "ThermalProgram | None" = None  # E1 spike/RTA T(t); None = isothermal (the seam)
+    sd_contact_squares: float = 0.0    # S/D series-R geometry n_□ = R_series/R_s; 0 = ideal contact (the seam)
     length_um: float = 2.0             # substrate depth domain
 
 

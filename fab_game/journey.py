@@ -7,13 +7,22 @@ grow the boule, slice a wafer, then (later phases) polish, diffuse, oxidize, pat
 real decision at each stage, watched as it lands downstream: from no-effect, through a graded yield ring,
 to an outright scrap.
 
-**Phases 1–3 build three stages — purification, crystal growth, and the slice/cut.** Every later stage
-runs at its recipe default (the journey just carries them). The slice stage is the first that **reads a
-prior committed decision**: a faster phase-2 pull flattens the boule's axial Scheil drift (CG-1), so you
-can cut a wafer *deeper* down the boule and still land in the ``V_t`` window — the journey's "watch it
-propagate" payoff. The scaffold is deliberately thin — an accumulating :class:`~fab_game.recipe.Recipe`
-plus the in-progress decision (a few idempotent overlay fields), **not** a nine-stage state machine — per
-the repo's anti-over-build rule: a stage gets built when it has a consumer.
+**Phases 1–4 build four stages — purification, crystal growth, the slice/cut, and the S/D diffusion.**
+Every later stage runs at its recipe default (the journey just carries them). The slice stage is the first
+that **reads a prior committed decision**: a faster phase-2 pull flattens the boule's axial Scheil drift
+(CG-1), so you can cut a wafer *deeper* down the boule and still land in the ``V_t`` window — the journey's
+"watch it propagate" payoff. The scaffold is deliberately thin — an accumulating
+:class:`~fab_game.recipe.Recipe` plus the in-progress decision (a few idempotent overlay fields), **not** a
+nine-stage state machine — per the repo's anti-over-build rule: a stage gets built when it has a consumer.
+
+**Honesty note (phase 4):** phases 1–3 add *zero new physics* — they re-sequence propagation chains the
+line already had (Na→Q_ox→V_t, Voronkov→yield, Scheil→V_t). Phase 4 is the exception: the diffusion
+outputs ``x_j``/``R_s`` fed **nothing scored** (the device reads ``N_A``/``t_ox``/CD, never ``R_s``), so
+the dose was inert. To make the dose a real decision phase 4 adds a genuine device term — an additive S/D
+**series resistance** on :func:`chip.device.saturation_current` (source degeneration, default-0 seam) —
+wiring ``R_s`` → ``I_Dsat``. So the journey's "adds no physics" claim is *formally false at phase 4*; the
+term is justified because phase 4 is its consumer, and it lands on the **existing** I_Dsat spec (no new
+window). See :func:`JourneyState.diffuse` / :data:`DIFFUSION_SD_CONTACT_SQUARES`.
 
 The purification stage is the showcase for the **gradual-failure policy** (the edge-loaded Na ring,
 :meth:`fab_game.variation.Variation.na_factor`). You start with a dirty feedstock and **refine it step by
@@ -75,6 +84,27 @@ DEFAULT_PULL_MM_MIN = 2.0        # the two-sided optimum at this hot zone (~93 %
 # effort. What makes the cut a real decision *today* is the phase-2 coupling: a faster pull flattens the
 # drift, so a flat boule can be cut deep while a slow-pulled one is already lost to its leakage rim.
 DEFAULT_SLICE_Z = 0.5            # a representative mid-boule cut (clean on a flat/optimum-pulled boule)
+
+# Diffusion (phase 4) — the S/D junction decision is the **predep dose** (how much dopant you lay down
+# before the drive-in redistributes it). It sets the diffused-layer **sheet resistance** ``R_s``; the
+# drive-in is deliberately NOT the lever (it conserves dose — sealed Neumann both ends — so it trades
+# junction depth for ``R_s`` weighting but barely moves ``R_s``, the same trap a slow pull was for the
+# Scheil drift). The consequence is a NEW device consumer (phase 4 is honestly NOT "zero new physics"
+# like phases 1–3): the diffusion outputs ``x_j``/``R_s`` fed nothing scored before — the device reads
+# ``N_A``/``t_ox``/CD, never ``R_s`` — so the dose was inert. Phase 4 wires ``R_s`` → a parasitic S/D
+# **series resistance** ``R_series = R_s·n_□`` → **source degeneration** (``chip.device`` v-add,
+# default-0 seam) that **starves** ``I_Dsat`` (lands on the EXISTING I_Dsat floor — no new spec). An
+# under-diffused (cool/short) predep → high ``R_s`` → low drive current → the wafer fails I_Dsat. ONE-SIDED
+# (like purification/slice): more dose only lowers ``R_s`` — over-diffusion's harm is the short-channel
+# tar pit the device model omits, so we do NOT fake a high-dose failure (the gradual-failure "inflate an
+# unrelated variable" fudge). Graded by the existing radial t_ox non-uniformity (edge oxide thinner →
+# higher C_ox → higher I_Dsat → survives; the thicker-oxide CENTRE crosses the floor first → an I_Dsat
+# **centre core**, same radial sense as the slice V_t core but a different channel).
+DIFFUSION_SD_CONTACT_SQUARES = 0.15   # the flagged house n_□ = R_series/R_s (a wide W=10µm device:
+#                                       L_access/W ≈ 1.5µm/10µm); nominal R_series ≈ 12 Ω sits comfortably
+#                                       inside the I_Dsat window, an under-diffused predep walks it out
+DEFAULT_PREDEP_C = 950.0          # °C — the nominal (clean) predep temperature = the recipe default
+DEFAULT_PREDEP_MIN = 10.0         # min — the nominal predep time = the recipe default
 
 # Consequence bands (the ok → rework → fail spectrum) — yield thresholds with margin so a boundary
 # forecast doesn't flicker (ADR 0005 §5: coarse player guidance, not a magnitude claim). The CLEAN floor
@@ -153,6 +183,12 @@ def _dominant_channel(result: LineResult, recipe: Recipe) -> str | None:
             return "grown-in voids/COPs (crystal pulled too fast)"
         return "killer particle (fab-floor defect)"
     if "i_dsat" in reasons or "i_d" in reasons:
+        # Discriminate the diffusion series-R root by DIRECTION (like the V_t high/low split): a parasitic
+        # S/D series resistance only ever STARVES the drive (I_Dsat *low*), and only when the diffusion
+        # consumer is engaged — so a defocus/over-etch CD-collapse over-current (I_Dsat *high*) stays the
+        # generic branch.
+        if recipe.diffusion.sd_contact_squares > 0.0 and "(low)" in reasons:
+            return "I_Dsat — S/D series resistance (junction under-diffused → high R_s starves the drive)"
         return "drive current (I_Dsat)"
     return worst.verdict.reasons[0] if worst.verdict.reasons else "unknown"
 
@@ -211,23 +247,55 @@ def boule_profile(state: "JourneyState", *, n_slices: int = 7, z_max: float = 0.
     return tuple(out)
 
 
+DEMO_PREDEP_C = 900.0            # the representative predep temperature the demo sweeps the TIME (dose) at
+#                                  (a wide graded I_Dsat band lives in the predep-time lever here; cf. the
+#                                  T lever, whose graded edge at a full 10-min predep is narrower)
+
+
+def diffusion_trajectory(state: "JourneyState", *, predep_C: float = DEMO_PREDEP_C,
+                         predep_sweep_min: tuple[float, ...] = (6.0, 5.0, 4.0, 3.0, 2.5, 2.0)):
+    """The S/D junction down a **predep-dose** sweep (predep *time*) — the phase-4 'watch the dose set the
+    junction' view.
+
+    For each predep time (at a fixed representative ``predep_C``), runs the line (``NO_VARIATION`` → the
+    clean signal, one die) with the diffusion stage engaged and returns
+    ``(predep_min, R_s_ohm_sq, x_j_um, i_dsat_mA)``. A shorter predep lays down **less dose** → a higher
+    sheet resistance ``R_s`` → (through the series-R consumer) a lower ``I_Dsat`` — the dose decision the
+    cut stage's :func:`boule_profile` is to the cut. The clean one-die ``I_Dsat`` walks toward the spec
+    floor as the dose drops; under variation the radial t_ox spread grades the crossing into a centre
+    core."""
+    out = []
+    for t in predep_sweep_min:
+        eng = state.diffuse(predep_C=predep_C, predep_min=t)
+        wafer = run_line(eng.current_recipe, seed=state.seed, variation=NO_VARIATION,
+                         specs=DEFAULT_SPECS, grid_n=1)
+        die = wafer.dies[0]
+        out.append((float(t), float(die.R_s) if die.R_s is not None else float("nan"),
+                    float(die.x_j_um) if die.x_j_um is not None else float("nan"),
+                    float(die.i_dsat_mA) if die.i_dsat_mA is not None else float("nan")))
+    return tuple(out)
+
+
 # --------------------------------------------------------------------------- #
 # The journey state — an immutable, accumulating recipe + the purification decision
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class JourneyState:
-    """An immutable staged build of one wafer's recipe — make a decision per fab stage (phase 1: purify).
+    """An immutable staged build of one wafer's recipe — a decision per fab stage (purify → grow → cut → diffuse).
 
-    ``recipe`` the accumulator (committed stages), ``grade``/``effort`` the *in-progress* purification
-    decision (folded into :attr:`current_recipe` until :meth:`commit`), ``seed``/``grid_n`` the forecast
-    determinism + resolution, ``log`` the append-only trail. Each action returns a **new** state (the
-    ``WaferState``/``GameSession`` discipline)."""
+    ``recipe`` the accumulator (committed stages); the *in-progress* decision is whichever stage's lever is
+    set — ``grade``/``effort`` (purify), ``pull_rate`` (grow), ``slice_z`` (cut), ``predep_C``/``predep_min``
+    (diffuse) — each folded into :attr:`current_recipe` until :meth:`commit`. ``seed``/``grid_n`` the
+    forecast determinism + resolution, ``log`` the append-only trail. Each action returns a **new** state
+    (the ``WaferState``/``GameSession`` discipline)."""
 
     recipe: Recipe = DEFAULT_RECIPE
     grade: str = DEFAULT_GRADE
     effort: float = 0.0
     pull_rate: float | None = None   # crystal-growth lever (mm/min); None = growth not engaged (the seam)
     slice_z: float | None = None     # slice/cut lever — axial fraction [0,1); None = cut not engaged (the seam)
+    predep_C: float | None = None    # diffusion lever — predep temperature (°C); None = diffusion not engaged (seam)
+    predep_min: float = DEFAULT_PREDEP_MIN  # predep time (min) — only meaningful once predep_C is set
     seed: int = 0
     grid_n: int = DEFAULT_GRID_N
     log: tuple[str, ...] = ()
@@ -253,6 +321,10 @@ class JourneyState:
             cz = replace(cz, slice_z=self.slice_z)
         if cz is not recipe.czochralski:                      # only touch the recipe when a lever is engaged
             recipe = replace(recipe, czochralski=cz)
+        if self.predep_C is not None:                         # diffusion stage engaged → overlay the predep
+            recipe = replace(recipe, diffusion=replace(           # dose + turn on the series-R consumer (n_□)
+                recipe.diffusion, T_predep_C=self.predep_C, t_predep_min=self.predep_min,
+                sd_contact_squares=DIFFUSION_SD_CONTACT_SQUARES))
         return recipe
 
     @property
@@ -263,6 +335,8 @@ class JourneyState:
             s += f" · pull {self.pull_rate:g} mm/min"
         if self.slice_z is not None:
             s += f" · cut z={self.slice_z:g}"
+        if self.predep_C is not None:
+            s += f" · predep {self.predep_C:g}°C/{self.predep_min:g}min"
         return s
 
     @property
@@ -315,6 +389,39 @@ class JourneyState:
             raise ValueError(f"slice_z must be in [0, 1), got {slice_z}")
         return replace(self, slice_z=slice_z,
                        log=self.log + (f"cut: slice z={slice_z:g} (axial fraction down the boule)",))
+
+    def diffuse(self, predep_C: float = DEFAULT_PREDEP_C,
+                predep_min: float = DEFAULT_PREDEP_MIN) -> "JourneyState":
+        """Set the S/D **predep dose** — the phase-4 diffusion lever (predep temperature °C + time min).
+
+        The decision is *how much dopant to lay down* before the drive-in redistributes it: the predep
+        (a constant-source ``erfc`` at the solubility limit, :func:`chip.diffusion_dopant.two_step`) sets
+        the diffused-layer **sheet resistance** ``R_s``. Engaging the stage also turns on the series-R
+        consumer (``sd_contact_squares`` = the house :data:`DIFFUSION_SD_CONTACT_SQUARES`), which wires
+        ``R_s`` → a parasitic **source** series resistance ``R_series = R_s·n_□`` → **source degeneration**
+        starving ``I_Dsat`` (:func:`chip.device.saturation_current`). So an **under-diffused** (cool/short)
+        predep → high ``R_s`` → low drive current → the wafer fails the I_Dsat floor (a graded,
+        **centre-weighted ``I_Dsat`` core**: the edge's thinner gate oxide gives more drive, so the
+        thicker-oxide centre crosses first — centre-weighted, blurred by CD scatter, not a clean monotone
+        like the slice V_t core). Use :func:`diffusion_trajectory` to *watch the dose set the junction*
+        first. The
+        **drive-in is deliberately not the lever** — it conserves dose, so it swings ``x_j`` but barely
+        moves ``R_s``. ONE-SIDED (like purify/slice): a hotter/longer predep only lowers ``R_s`` (the
+        over-diffusion harm — short-channel rolloff — is the device model's omitted scope edge, not faked
+        here). Call again to re-decide."""
+        if predep_C <= 0.0:
+            raise ValueError(f"predep temperature must be > 0 °C, got {predep_C}")
+        if predep_min <= 0.0:
+            raise ValueError(f"predep time must be > 0 min, got {predep_min}")
+        nxt = replace(self, predep_C=predep_C, predep_min=predep_min)
+        rs = nxt.current_recipe.diffusion
+        from chip.diffusion_dopant import two_step
+        from chip.junction import analyze_junction
+        _, drivein = two_step(rs.dopant, T_predep=rs.T_predep_C, t_predep_min=rs.t_predep_min,
+                              T_drivein=rs.T_drivein_C, t_drivein_min=rs.t_drivein_min, length_um=rs.length_um)
+        junc = analyze_junction(drivein, rs.dopant, nxt.current_recipe.effective_channel_N_A)
+        return replace(nxt, log=self.log + (f"diffuse: predep {predep_C:g}°C/{predep_min:g}min → "
+                                            f"R_s {junc.R_s:.0f} Ω/sq, x_j {junc.x_j_um:.3f} µm",))
 
     def commit(self) -> "JourneyState":
         """Fold the in-progress decision(s) into the accumulating recipe — the next stage builds on it.

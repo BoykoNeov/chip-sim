@@ -229,6 +229,54 @@ def test_saturation_current_zero_below_threshold_and_needs_geometry():
 
 
 # --------------------------------------------------------------------------- #
+# S/D series resistance — source degeneration (the diffusion-dose consumer)
+# --------------------------------------------------------------------------- #
+def test_series_resistance_zero_is_byte_for_byte_the_ideal_contact():
+    # The seam: R_series = 0 returns the ideal closed form EXACTLY (the quadratic branch is skipped), so
+    # demo_device and every banked run are byte-for-byte unchanged.
+    m = dev.threshold_voltage(1e17, 0.015, channel_length_um=1.0)
+    Vgs = m.V_t + 1.0
+    assert (dev.saturation_current(m, Vgs, width_um=10.0, R_series_ohm=0.0)
+            == dev.saturation_current(m, Vgs, width_um=10.0))
+
+
+def test_series_resistance_solves_the_source_degeneration_equation():
+    # The TIGHT self-consistency leg (the device's "Poisson anchor"): the returned current must satisfy
+    # the implicit relation I_D = β·(V_GS − V_t − I_D·R_S)² it was solved from — recompute β·(V_ov−I·R_S)²
+    # from the result and require it reproduce I to machine precision, AND lie on the physical branch
+    # (0 < I < the ideal I_D0).
+    m = dev.threshold_voltage(1e17, 0.015, channel_length_um=0.2)
+    Vgs = m.V_t + 1.0
+    W = 10.0
+    I0 = dev.saturation_current(m, Vgs, width_um=W)
+    R_S = 50.0
+    I = dev.saturation_current(m, Vgs, width_um=W, R_series_ohm=R_S)
+    beta = 0.5 * dev.MU_N_EFF * m.C_ox * (W / m.channel_length_um)
+    residual = beta * (Vgs - m.V_t - I * R_S) ** 2
+    assert residual == pytest.approx(I, rel=1e-12)                  # the implicit equation is satisfied
+    assert 0.0 < I < I0                                             # degraded, physical root
+
+
+def test_series_resistance_degrades_monotonically_and_matches_small_signal_gm():
+    # Benchmark/trend (loose): I_Dsat falls monotonically with R_S, and the small-R_S degradation matches
+    # the standard extrinsic transconductance g_m = g_m0/(1 + g_m0·R_S) — the cited source-degeneration
+    # consequence (Sze–Ng). For small R_S, I ≈ I0·(1 − g_m0·R_S), g_m0 = 2·β·V_ov = 2·I0/V_ov.
+    m = dev.threshold_voltage(1e17, 0.015, channel_length_um=0.2)
+    Vgs = m.V_t + 1.0
+    V_ov = 1.0
+    W = 10.0
+    I0 = dev.saturation_current(m, Vgs, width_um=W)
+    currents = [dev.saturation_current(m, Vgs, width_um=W, R_series_ohm=R) for R in (0.0, 5.0, 20.0, 100.0)]
+    assert currents == sorted(currents, reverse=True)              # monotonically degraded
+    g_m0 = 2.0 * I0 / V_ov
+    R_small = 0.5
+    I_small = dev.saturation_current(m, Vgs, width_um=W, R_series_ohm=R_small)
+    assert I_small == pytest.approx(I0 * (1.0 - g_m0 * R_small), rel=2e-3)   # first-order g_m degradation
+    # And the current vanishes as R_S → ∞ (an open S/D access path carries no drive).
+    assert dev.saturation_current(m, Vgs, width_um=W, R_series_ohm=1e9) < 1e-3 * I0
+
+
+# --------------------------------------------------------------------------- #
 # Input validation
 # --------------------------------------------------------------------------- #
 def test_invalid_inputs_raise():

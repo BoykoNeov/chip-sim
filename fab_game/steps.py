@@ -224,6 +224,7 @@ def etch_deposition_step(
 def device_step(
     die: Die, knobs: DeviceKnobs, channel_N_A: float, contamination: Contamination | None = None,
     thermal_donor_density: float = 0.0, dislocation_density: float = 0.0,
+    sd_contact_squares: float = 0.0,
 ) -> Die:
     """Device extraction → ``V_t``, ``I_Dsat`` *and* lifetime/leakage, *reading the inherited* ``t_ox``, ``cd``, *contamination*.
 
@@ -255,6 +256,15 @@ def device_step(
     them, **never moves** ``V_t``/``I_Dsat`` — slow pull makes the diode leaky, not the threshold wrong.
     Defaults to ``0.0`` (vacancy/boundary growth or CG-2 off → the seam; the ``rho_disl`` record key is
     added only when dislocations are present, so a vacancy/clean device record is byte-for-byte unchanged).
+
+    ``sd_contact_squares`` (the diffusion-journey consumer) is the S/D series-resistance geometry
+    ``n_□ = L_access/W``: combined with the **inherited** junction sheet resistance ``die.R_s`` (set by the
+    diffusion step) it gives the parasitic **source** series resistance ``R_series = R_s·n_□`` fed to
+    :func:`chip.device.saturation_current` as source degeneration — so a shallow, under-diffused junction
+    (high ``R_s``) **starves** ``I_Dsat`` (the fourth propagation read, after ``t_ox``/CD/contamination).
+    It **never** touches ``V_t`` (series resistance degrades drive, not threshold). Defaults to ``0.0`` →
+    ``R_series = 0`` → the ideal-contact closed form, byte-for-byte the prior ``I_Dsat`` (the seam; the
+    ``R_series_ohm`` record key is added only when engaged, so a clean device record is unchanged).
     """
     if die.t_ox_um is None or die.cd_um is None or die.resolved is False:
         reason = ("litho image not resolved" if die.resolved is False
@@ -268,7 +278,12 @@ def device_step(
     mos = dev.threshold_voltage(
         channel_N_A, die.t_ox_um, gate=knobs.gate, channel_length_um=die.cd_um, Q_ox=Q_ox,
     )
-    i_dsat = dev.saturation_current(mos, mos.V_t + knobs.overdrive_V, knobs.width_um)
+    # S/D series resistance (the diffusion-dose consumer): R_series = inherited R_s × the contact-square
+    # count. 0 when off (n_□ = 0 the seam) or before the junction is read (die.R_s is None) → the ideal
+    # saturation_current. Source degeneration then degrades only the drive current, never V_t.
+    R_series_ohm = die.R_s * sd_contact_squares if (sd_contact_squares > 0.0 and die.R_s is not None) else 0.0
+    i_dsat = dev.saturation_current(
+        mos, mos.V_t + knobs.overdrive_V, knobs.width_um, R_series_ohm=R_series_ohm)
     # G4b/A1: the SRH lifetime → junction reverse leakage. Two contributors on the same channel — the
     # deep-level metals (G4b) and a slow-pull grown-in dislocation population (A1, ξ < ξ_t) — both add to
     # 1/τ; clean feed grown on the vacancy side ⇒ τ_bulk + baseline (the seam, dislocation_density = 0).
@@ -279,6 +294,8 @@ def device_step(
         knobs_in["N_TD"] = thermal_donor_density            # (so a clean device record is byte-unchanged)
     if dislocation_density > 0.0:                            # A1 fingerprint — only on the interstitial side
         knobs_in["rho_disl"] = dislocation_density           # (so a vacancy/clean device record is byte-unchanged)
+    if R_series_ohm > 0.0:                                   # diffusion fingerprint — only when the consumer is on
+        knobs_in["R_series_ohm"] = R_series_ohm              # (so an ideal-contact device record is byte-unchanged)
     return die.record(
         "device",
         knobs_in=knobs_in,

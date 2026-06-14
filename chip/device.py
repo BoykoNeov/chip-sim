@@ -392,6 +392,7 @@ MU_N_EFF = 450.0                   # cm²/V·s — representative effective n-ch
 
 def saturation_current(
     mos: MOSDevice, V_GS: float, width_um: float, mu_eff: float = MU_N_EFF,
+    R_series_ohm: float = 0.0,
 ) -> float:
     """Long-channel saturation drain current ``I_Dsat = ½·μ·C_ox·(W/L)·(V_GS − V_t)²`` (A).
 
@@ -400,10 +401,39 @@ def saturation_current(
     faking short-channel ``V_t`` rolloff (the named scope edge). ``mu_eff`` is a representative effective
     **channel** mobility (surface-scattering-reduced, illustrative — not a validated transport value).
     Returns 0 below threshold (``V_GS ≤ V_t``). Requires :attr:`channel_length_um` to be set.
+
+    **Source series resistance (lifting the ``R_series = 0`` ideal-contact edge).** A parasitic **source**
+    access resistance ``R_series_ohm`` (Ω — the diffused *source* sheet resistance times its
+    contact-to-channel square count, plus contact resistance)
+    degrades the drive by **source degeneration**: the IR drop ``I_D·R_S`` across the source raises the
+    source potential and eats into the gate overdrive, so the device self-consistently solves the implicit
+    textbook relation
+
+        ``I_D = ½·μ·C_ox·(W/L)·(V_GS − V_t − I_D·R_S)²``        (the source-degeneration quadratic)
+
+    — a shallow, under-diffused junction (high S/D ``R_s``) **starves** ``I_Dsat``. It is the **source**
+    side specifically: in saturation the *drain* access resistance drops ``V_DS`` but (the device staying in
+    saturation) does **not** reduce ``I_Dsat`` (Sze–Ng), so only the source IR drop enters here. This is
+    *why* the S/D diffusion dose is a real process decision (it sets that ``R_s``); the consumer is
+    :mod:`fab_game`'s diffusion-journey stage. ``R_series_ohm`` defaults to ``0`` → the ideal-contact value, returned
+    **bit-for-bit** by the closed form (the quadratic is skipped entirely — the seam, so ``demo_device``
+    and the 2-D device are byte-for-byte unchanged). The standard small-signal consequence is the
+    extrinsic transconductance ``g_m = g_m0/(1 + g_m0·R_S)`` (any device text, e.g. Sze–Ng) — the
+    tight benchmark leg.
     """
     if mos.channel_length_um is None:
         raise ValueError("channel_length_um (the Phase-3 CD) must be set for the drive-current readout")
     if V_GS <= mos.V_t:
         return 0.0
     W_over_L = width_um / mos.channel_length_um           # ratio — units cancel
-    return 0.5 * mu_eff * mos.C_ox * W_over_L * (V_GS - mos.V_t) ** 2
+    beta = 0.5 * mu_eff * mos.C_ox * W_over_L             # the device transconductance factor (A/V²)
+    V_ov = V_GS - mos.V_t
+    if R_series_ohm <= 0.0:
+        return beta * V_ov ** 2                           # ideal contact — the closed form (the seam)
+    # Source degeneration: solve I_D = β·(V_ov − I_D·R_S)² for the physical root. Expanding gives the
+    # quadratic β·R_S²·I² − (2·β·R_S·V_ov + 1)·I + β·V_ov² = 0; the physical branch is the smaller root
+    # (I_D ≤ β·V_ov², and → β·V_ov² as R_S → 0 — continuous with the ideal-contact seam above).
+    a = beta * R_series_ohm ** 2
+    b = -(2.0 * beta * R_series_ohm * V_ov + 1.0)
+    c = beta * V_ov ** 2
+    return (-b - math.sqrt(b * b - 4.0 * a * c)) / (2.0 * a)

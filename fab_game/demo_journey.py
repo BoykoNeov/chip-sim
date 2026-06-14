@@ -1,7 +1,7 @@
-"""The journey demo (phases 1–3): a three-stage playthrough — purify a feed, grow the boule, cut a wafer.
+"""The journey demo (phases 1–4): purify a feed, grow the boule, cut a wafer, diffuse the S/D.
 
 The staged sand→chip journey, played start to finish (plan ``docs/plans/fab-journey.md``;
-:mod:`fab_game.journey`). Three stages so far:
+:mod:`fab_game.journey`). Four stages so far:
 
 **Stage 1 — purification.** Begin with a dirty **solar** feedstock and **refine it step by step**; at each
 step a forecast runs the whole line and reports the consequence **band** and the **channel** it would fail
@@ -26,13 +26,25 @@ spec, while a slow-pulled boule is already lost to its dislocation leakage rim *
 depth can't rescue it. Cutting at the seed is always safest; "use more of the boule" is the same deferred
 economics as purification's refining effort (the cost side).
 
+**Stage 4 — S/D diffusion.** On the cut wafer, set the **predep dose** (here the predep *time* at a
+representative temperature). The predep sets the diffused-layer sheet resistance ``R_s``; lay down too
+little dose → a high ``R_s`` → a parasitic S/D **series resistance** that **starves** the drive current
+``I_Dsat`` (source degeneration). The arc walks **clean** → a graded **centre-weighted ``I_Dsat`` core**
+(the thicker-oxide centre dies have the least drive, so they cross the floor first — same radial sense as
+the stage-3 ``V_t`` core but a *different channel*, and noisier: CD scatter blurs it, not a clean monotone)
+→ **dead**. The **drive-in is not the lever** (it conserves
+dose, so it barely moves ``R_s``); the decision is **one-sided** (more dose only lowers ``R_s`` — the
+over-diffusion harm, short-channel rolloff, is the device model's omitted scope edge, not faked).
+
 Then **commit** each decision into the recipe and **finish** — run the line and score the wafer (the
 :mod:`fab_game.game` economics, reused). A second feed (**metal**, Na-free but iron-laden) shows the other
 purification channel: it reads fine on ``V_t`` yet dies on junction **leakage** (deep-level metals).
 
-Zero new physics (it composes :func:`~fab_game.journey.forecast` / :func:`~fab_game.journey.finish` /
-:func:`~fab_game.journey.boule_profile`). The live UI is the deferred next increment — this banked demo is
-the *watch-a-playthrough* artifact over the headless core.
+Stages 1–3 add *no new physics* (they re-sequence existing chains). Stage 4 is the **exception**: the
+diffusion's ``x_j``/``R_s`` fed nothing scored, so making the dose a real decision needed a genuine device
+term — an additive S/D series resistance on :func:`chip.device.saturation_current` (default-0 seam) — that
+lands on the existing ``I_Dsat`` spec. The live UI is the deferred next increment — this banked demo is the
+*watch-a-playthrough* artifact over the headless core.
 
 Run headless (saves the figure, prints the playthrough):
 
@@ -44,9 +56,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .journey import (
+    DEMO_PREDEP_C,
     JourneyState,
     StageForecast,
     boule_profile,
+    diffusion_trajectory,
     finish,
     forecast,
     new_journey,
@@ -64,6 +78,8 @@ CLEAN_EFFORT = 1.5               # commit + finish here (refined clean)
 GROWTH_PULLS = (0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0)   # the pull-rate sweep (coarse — the suite runs this)
 SLOW_PULL = 0.5                  # the steep-drift / leakage-rim contrast pull (boule drift + the stage-3 coupling)
 SLICE_ZS = (0.0, 0.3, 0.55, 0.75, 0.85, 0.88, 0.90, 0.93)   # the cut sweep down the boule (clean → ring → dead)
+DIFFUSION_TIMES = (6.0, 5.0, 4.0, 3.5, 3.0, 2.5, 2.0)       # the predep-time (dose) sweep at DEMO_PREDEP_C
+#                                  (clean → a graded I_Dsat centre-weighted core → dead — the series-R consumer)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "fab-game-journey.png"
@@ -105,6 +121,17 @@ class JourneyDemoResult:
     slice_ring_forecast: StageForecast
     slice_commit_z: float                   # the deepest clean cut — "use as much boule as spec allows"
     slice_yields_slow: tuple[float, ...]    # the SAME cut sweep on a slow-pulled boule (already lost to its rim)
+    # Stage 4 — S/D diffusion (the predep dose → R_s → I_Dsat series-R consumer):
+    diffusion_predep_C: float               # the representative predep temperature the dose-time lever rides
+    diffusion_times: tuple[float, ...]
+    diffusion_traj: tuple                   # (predep_min, R_s, x_j, I_Dsat) — watch the dose set the junction
+    diffusion_yields: tuple[float, ...]     # forecast yield vs predep dose (clean → I_Dsat core → dead)
+    diffusion_bands: tuple[str, ...]
+    diffusion_channels: tuple
+    diffusion_arc: tuple[StageForecast, ...]
+    diffusion_ring_time: float              # the marginal (ring-band) predep — the I_Dsat centre core for the map
+    diffusion_ring_forecast: StageForecast
+    diffusion_commit_time: float            # the shortest clean predep — "use the least dose spec allows"
     # End to end:
     finish_result: LineResult
     finish_score: ScoreCard
@@ -167,8 +194,21 @@ def compute() -> JourneyDemoResult:
     slow_grown = pur.grow(SLOW_PULL).commit()
     slice_yields_slow = tuple(forecast(slow_grown.cut(z)).yield_ for z in SLICE_ZS)
 
-    # Commit the cut decision + finish (run + score the whole line).
-    played = grown.cut(SLICE_ZS[commit_si]).commit()
+    # Commit the cut decision (the wafer the diffusion stage dopes).
+    cut_committed = grown.cut(SLICE_ZS[commit_si]).commit()
+
+    # --- Stage 4: S/D diffusion (on the committed wafer — sweep the predep dose [time] at DEMO_PREDEP_C) ---
+    diff_states = [cut_committed.diffuse(DEMO_PREDEP_C, t) for t in DIFFUSION_TIMES]
+    d_arc = _arc(diff_states)
+    diffusion_yields = tuple(f.yield_ for f in d_arc)
+    diffusion_bands = tuple(f.band for f in d_arc)
+    diffusion_channels = tuple(f.channel for f in d_arc)
+    ring_di = next((i for i, b in enumerate(diffusion_bands) if b == "ring"), len(d_arc) // 2)
+    clean_di = [i for i, b in enumerate(diffusion_bands) if b == "clean"]
+    commit_di = clean_di[-1] if clean_di else 0   # the shortest clean predep — least dose/budget still in spec
+
+    # Commit the diffusion decision + finish (run + score the whole line).
+    played = cut_committed.diffuse(DEMO_PREDEP_C, DIFFUSION_TIMES[commit_di]).commit()
     finish_result, finish_score = finish(played)
 
     metal_forecast = forecast(new_journey("metal", seed=SEED))
@@ -186,14 +226,21 @@ def compute() -> JourneyDemoResult:
         slice_channels=slice_channels, slice_arc=tuple(s_arc),
         slice_ring_z=SLICE_ZS[ring_si], slice_ring_forecast=s_arc[ring_si],
         slice_commit_z=SLICE_ZS[commit_si], slice_yields_slow=slice_yields_slow,
+        diffusion_predep_C=DEMO_PREDEP_C, diffusion_times=DIFFUSION_TIMES,
+        diffusion_traj=diffusion_trajectory(cut_committed, predep_C=DEMO_PREDEP_C,
+                                            predep_sweep_min=DIFFUSION_TIMES),
+        diffusion_yields=diffusion_yields, diffusion_bands=diffusion_bands,
+        diffusion_channels=diffusion_channels, diffusion_arc=tuple(d_arc),
+        diffusion_ring_time=DIFFUSION_TIMES[ring_di], diffusion_ring_forecast=d_arc[ring_di],
+        diffusion_commit_time=DIFFUSION_TIMES[commit_di],
         finish_result=finish_result, finish_score=finish_score,
         metal_forecast=metal_forecast, log=played.log,
     )
 
 
 def print_summary(r: JourneyDemoResult) -> None:
-    """Print the two-stage playthrough — purify (dead→ring→clean), grow (the two-sided window), finish."""
-    print("\nThe journey — a two-stage playthrough: purify the feed, then grow the boule\n")
+    """Print the four-stage playthrough — purify, grow, cut, diffuse — then commit + finish."""
+    print("\nThe journey — a four-stage playthrough: purify the feed, grow the boule, cut a wafer, diffuse the S/D\n")
 
     print(f"  STAGE 1 — purification. Start with a {r.grade} feed (solar-grade: an intermediate, already")
     print("  partly-refined feed; raw 'sand' MGS is dirtier) and refine it step by step:\n")
@@ -226,18 +273,32 @@ def print_summary(r: JourneyDemoResult) -> None:
           f"{r.slice_yields_slow[r.slice_zs.index(r.slice_commit_z)]:.0%}")
     print(f"    (lost to its dislocation leakage rim before the cut). A bad pull can't be sliced away.\n")
 
-    print("  Commit all three decisions and finish — run the whole line and score the wafer:")
+    print(f"  STAGE 4 — S/D diffusion. On the cut wafer, set the **predep dose** (here the predep time at")
+    print(f"  {r.diffusion_predep_C:g}°C). It sets the diffused-layer sheet resistance R_s; too little dose →")
+    print(f"  a high R_s → parasitic series resistance starves the drive current I_Dsat (source degeneration):\n")
+    print(f"     {'predep':>7}  {'R_s':>8}  {'x_j(µm)':>7}  {'I_Dsat':>6}  {'yield':>6}  {'band':<5}  channel")
+    for (t, rs, xj, idsat), f in zip(r.diffusion_traj, r.diffusion_arc):
+        print(f"     {t:5.1f}m  {rs:7.0f}Ω  {xj:7.3f}  {idsat:5.2f}mA  {f.yield_:6.0%}  {f.band:<5}  "
+              f"{(f.channel or '—')[:42]}")
+    print(f"  → a full predep is clean; shorten it past ~{r.diffusion_ring_time:g} min → a graded I_Dsat")
+    print(f"    centre-weighted CORE ({r.diffusion_ring_forecast.yield_:.0%}; the thicker-oxide centre dies")
+    print(f"    have the least drive, so they cross the I_Dsat floor first — same radial sense as the stage-3")
+    print(f"    V_t core, a different channel) → dead. The drive-in is NOT the lever (it conserves dose →")
+    print(f"    barely moves R_s); ONE-SIDED — more dose only helps (over-diffusion's short-channel harm omitted).\n")
+
+    print("  Commit all four decisions and finish — run the whole line and score the wafer:")
     sc = r.finish_score
     print(f"     finish: yield {r.finish_result.yield_:.0%}  ·  {sc.n_good}/{sc.n_total} shipped  ·  "
-          f"profit {sc.profit:+.0f}  ·  cut at z={r.slice_commit_z:g}\n")
+          f"profit {sc.profit:+.0f}  ·  cut z={r.slice_commit_z:g} · predep {r.diffusion_commit_time:g}min\n")
 
     mf = r.metal_forecast
     print(f"  Contrast — a metal feed (Na-free, iron-laden) reads fine on V_t yet is {mf.band.upper()} on")
     print(f"    {mf.channel} (the deep-level-metal consequence net doping can't carry).\n")
 
-    print("  New: the journey's third stage — the slice/cut (where down the boule to take the wafer). The")
-    print("  first stage that READS a prior committed decision: how deep you can cut is set by the phase-2")
-    print("  pull. Zero new physics — it composes the validated line.\n")
+    print("  New: the journey's fourth stage — the S/D diffusion (the predep dose). Unlike stages 1–3 (which")
+    print("  re-sequence existing chains) this one needed a genuine new device term — an additive S/D series")
+    print("  resistance on saturation_current (default-0 seam) — because the diffusion's R_s fed nothing")
+    print("  scored before; it lands on the existing I_Dsat spec (no new window).\n")
 
 
 def save_figure(r: JourneyDemoResult) -> Path:
