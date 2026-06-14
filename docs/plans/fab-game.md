@@ -407,6 +407,8 @@ thing).
   > freely), a named scope edge. **The TUI is deliberately deferred** (the user scoped this to
   > "framing/scoring"; "roguelike framing" is a *session model*, not a UI — everything here is headless
   > and testable; a Textual front-end would be a thin driver of this session, added when wanted).
+  > **Shape later drafted (2026-06-14, still not built): `docs/plans/fab-game-tui.md`** — v1 is a thin
+  > `run_dashboard` dashboard mirror; this `GameSession` loop is its deferred v2 follow-on.
   > Mechanics-tested (ADR 0005 §5): determinism (a fixed `(seed, decisions)` reproduces the run),
   > bookkeeping closes (`budget = start + Σ profits`, append-only history), monotonicity (a better bin mix
   > never scores less), sandbox-vs-roguelike (the bankrupt gate is one mode flag), and the drift arc
@@ -617,7 +619,9 @@ correctness path) and ADR 0005 (no game engine as authority):
 - **Notebook + ipywidgets first** (matches `chip.ipynb`): the vertical slice as a guided,
   slider-driven run — choose a recipe, run the line, watch the wafer map and the failure trail.
 - **A Textual TUI next** for the roguelike "command the line, watch it ripple" feel — terminal,
-  Python-native, still a thin skin.
+  Python-native, still a thin skin. **Shape drafted (2026-06-14, not built): `docs/plans/fab-game-tui.md`**
+  — a thin driver of the §9 `run_dashboard`/`dashboard_summary` core (its already-tested headless
+  body), a new `[tui]` extra, no new physics/ADR.
 - **A web app** (Streamlit / small FastAPI+JS) only if a shareable surface is wanted.
 - **A real game engine** (Godot) only for a possible tycoon future — and even then the Python
   sim stays the authority, the engine is a pure front-end.

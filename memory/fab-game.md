@@ -26,6 +26,11 @@ default `speed_bins` grade everything `"pass"` so `score_wafer` prices revenue 0
 would be a binning-policy artifact, not a signal. The real safety net is `tests/test_dashboard.py`
 (10 tests), NOT the notebook run (`interact` swallows callback exceptions). **Remaining front-end =
 the Textual TUI + tycoon — both still deferred** (the named-consumer physics backlog stays exhausted).
+**Textual TUI shape DRAFTED, not built (2026-06-14): `docs/plans/fab-game-tui.md`** — v1 = a thin
+terminal driver of the §9 `run_dashboard`/`dashboard_summary` core (new `[tui]` extra carrying
+`textual`; one new headless helper `plots.wafer_map_text`; `importorskip`-gated `run_test()` pilot
+via an `asyncio.run` wrapper, NOT `pytest-asyncio`; xdist-safety to be verified, slow-mark escape
+hatch if it flakes like the notebook); v2 = the G7 `GameSession` roguelike loop. No new physics/ADR.
 
 **The seven synced choices:** (1) **full grand tour** — every distinct step,
 purification→Czochralski→wafer-prep→oxidation→litho→diffusion→etch/depo→device→dice/bond/test,
