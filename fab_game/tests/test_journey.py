@@ -230,13 +230,15 @@ def test_cut_sets_the_slice_position_and_composes_with_the_growth_overlay():
 
 def test_slice_window_is_graded_clean_to_ring_to_dead_down_the_boule():
     """THE policy check (gradual-failure): cutting near the seed is clean, cutting deeper walks through a
-    **graded** V_t edge ring (the radial t_ox non-uniformity grades the cliff — the outer dies cross the
-    spec ceiling first), then dead at the tail. Not an all-or-nothing flip."""
+    **graded** V_t centre core (the radial t_ox non-uniformity grades the cliff — the centre dies, highest
+    V_t, cross the spec ceiling first; the rim's thinner oxide → lower V_t survives longest), then dead at
+    the tail. Not an all-or-nothing flip. (The ``"ring"`` band token is the generic ok→rework→fail middle
+    band — for the *cut* that band is spatially a centre core, not an edge ring; cf. stage-1's Na rim.)"""
     clean = forecast(_grown_cut(2.0, 0.75))
     ring = forecast(_grown_cut(2.0, 0.88))
     dead = forecast(_grown_cut(2.0, 0.93))
     assert clean.band == "clean"
-    assert ring.band == "ring" and 0.0 < ring.yield_ < clean.yield_   # a partial edge ring (rework territory)
+    assert ring.band == "ring" and 0.0 < ring.yield_ < clean.yield_   # a partial centre core (rework territory)
     assert dead.band == "dead" and dead.yield_ < ring.yield_
 
 

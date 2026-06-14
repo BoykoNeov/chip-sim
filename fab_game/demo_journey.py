@@ -17,8 +17,10 @@ axial ``V_t`` drift (Scheil) **flattens** as the pull speeds up (CG-1).
 
 **Stage 3 — slice/cut.** On the committed boule, choose **where down it to cut** this wafer. The cut reads
 the boule's axial Scheil drift (stage 2): boron's k<1 walks ``V_t`` up toward the tail, so a wafer cut too
-deep lands above spec — failing the outer dies first (a graded ``V_t`` edge **ring**, the radial t_ox
-non-uniformity grading the cliff), then the whole wafer. It is the first stage that **reads a prior
+deep lands above spec — failing the **centre** dies first (a graded ``V_t`` **core**: the radial t_ox
+non-uniformity grades the cliff, the rim's thinner oxide gives it a lower ``V_t`` so it survives the high
+ceiling longest — the *inverse* of stage-1's Na edge ring), then the whole wafer. It is the first stage
+that **reads a prior
 committed decision** — the **coupling**: a flat boule (fast phase-2 pull) can be cut **deep** and stay in
 spec, while a slow-pulled boule is already lost to its dislocation leakage rim *before* the cut, so cut
 depth can't rescue it. Cutting at the seed is always safest; "use more of the boule" is the same deferred
@@ -99,7 +101,7 @@ class JourneyDemoResult:
     slice_bands: tuple[str, ...]
     slice_channels: tuple
     slice_arc: tuple[StageForecast, ...]
-    slice_ring_z: float                     # the marginal (ring-band) cut — the V_t edge ring for the map
+    slice_ring_z: float                     # the marginal (ring-band) cut — the V_t centre core for the map
     slice_ring_forecast: StageForecast
     slice_commit_z: float                   # the deepest clean cut — "use as much boule as spec allows"
     slice_yields_slow: tuple[float, ...]    # the SAME cut sweep on a slow-pulled boule (already lost to its rim)
@@ -215,8 +217,9 @@ def print_summary(r: JourneyDemoResult) -> None:
     print(f"     {'cut z':>5}  {'yield':>6}  {'band':<5}  channel")
     for z, f in zip(r.slice_zs, r.slice_arc):
         print(f"     {z:5.2f}  {f.yield_:6.0%}  {f.band:<5}  {f.channel or '—'}")
-    print(f"  → clean near the seed; cut past z≈{r.slice_ring_z:g} → a graded V_t edge RING "
-          f"({r.slice_ring_forecast.yield_:.0%}; the outer dies cross the ceiling first) → dead at the tail.")
+    print(f"  → clean near the seed; cut past z≈{r.slice_ring_z:g} → a graded V_t CORE "
+          f"({r.slice_ring_forecast.yield_:.0%}; the centre dies cross the high ceiling first, the rim's "
+          f"thinner oxide survives) → dead at the tail.")
     print(f"    The decision is set by the phase-2 pull (the COUPLING): a flat boule (fast pull) can be cut")
     print(f"    deep — at z={r.slice_commit_z:g} the optimum pull yields "
           f"{r.slice_yields[r.slice_zs.index(r.slice_commit_z)]:.0%} but a slow pull only "

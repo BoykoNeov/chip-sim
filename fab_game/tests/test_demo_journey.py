@@ -57,11 +57,12 @@ def test_demo_boule_drift_flattens_with_a_faster_pull(result):
 
 
 # --------------------------------------------------------------------------- #
-# Stage 3 — slice/cut (the graded V_t ring down the boule + the phase-2 coupling)
+# Stage 3 — slice/cut (the graded V_t centre core down the boule + the phase-2 coupling)
 # --------------------------------------------------------------------------- #
 def test_demo_slice_arc_walks_clean_to_ring_to_dead_down_the_boule(result):
-    """Cutting near the seed is clean; cutting deeper walks a *graded* V_t edge ring (the outer dies cross
-    the spec ceiling first), then dead at the tail — failing on the named Scheil-drift channel."""
+    """Cutting near the seed is clean; cutting deeper walks a *graded* V_t centre core (the centre dies, the
+    highest V_t, cross the spec ceiling first), then dead at the tail — failing on the named Scheil-drift
+    channel."""
     assert result.slice_bands[0] == "clean"                 # the seed end: in spec
     assert "ring" in result.slice_bands                     # a graded ring band exists (the rework signal)
     assert result.slice_bands[-1] == "dead"                 # the tail: Scheil-walked V_t out of spec

@@ -43,7 +43,7 @@ built when it has a consumer (the repo's anti-over-build rule, `scope-edge-backl
 |------|-------|--------|-----------------|
 | **1** | **Purification** | **BUILT** | refine a dirty feed; the edge-loaded Na ring is the graded consequence |
 | **2** | **Crystal growth (Czochralski)** | **BUILT** | set the boule pull rate at a radial hot zone — the two-sided Voronkov window (slow → dislocation leakage rim, fast → void core, clean OSF ring between), graded both ways; the axial Scheil drift flattens with a faster pull (CG-1) |
-| **3** | **Wafer prep — slice/cut** | **BUILT** | where down the boule to cut this wafer — it reads the axial Scheil drift (cut too deep → a graded V_t edge ring → dead), and how deep you can cut is set by the **phase-2 pull** (the first stage coupled to a prior decision). Polish/flatness/killer-defect deferred (TTV→defocus is a named scope edge) |
+| **3** | **Wafer prep — slice/cut** | **BUILT** | where down the boule to cut this wafer — it reads the axial Scheil drift (cut too deep → a graded V_t **centre core** → dead), and how deep you can cut is set by the **phase-2 pull** (the first stage coupled to a prior decision). Polish/flatness/killer-defect deferred (TTV→defocus is a named scope edge) |
 | 4 | Diffusion | stub | dose/temperature/time → junction depth + sheet resistance |
 | 5 | Oxidation | stub | ambient/T/time → gate oxide; the thin-oxide V_t lever |
 | 6 | Lithography | stub | focus/dose → the CD/NILS edge ring (the G1 dramatic knob) |
@@ -113,9 +113,12 @@ committed decision** — the journey's "watch the consequence propagate" payoff,
   doping — so `V_t` — *up* toward the tail (`boule_profile` is the *watch-it-develop* view of exactly this
   profile). Cut too deep and the wafer lands above the `V_t` window.
 - The consequence is **graded, not a cliff** (the gradual-failure policy, **zero new physics**): the radial
-  `t_ox` non-uniformity already in the line spreads `V_t` across the die map, so the **outer dies cross the
-  ceiling first** → a `V_t` **edge ring** before the whole wafer goes out. The arc walks **clean** (near the
-  seed) → a graded **ring** (~z 0.87–0.90) → **dead** (the tail).
+  `t_ox` non-uniformity already in the line spreads `V_t` across the die map, so the **centre dies (nominal,
+  highest `V_t`) cross the high ceiling first** while the **rim** (thinner gate oxide → lower `V_t`) survives
+  longest → a `V_t` **centre core** before the whole wafer goes out. This is the *inverse* radial signature
+  of stage-1's Na **edge** ring (Na is edge-loaded and pushes `V_t` *down* into the low bound, so the rim
+  fails first; here the high bound is hit centre-first — a nice two-V_t-failure contrast). The arc walks
+  **clean** (near the seed) → a graded middle band (~z 0.87–0.90) → **dead** (the tail).
 - **The coupling (the headline):** how deep you can cut and stay in spec is set by the **phase-2 pull**. A
   *faster* pull flattened the drift (CG-1), so a **flat boule can be cut deep**; a *slow*-pulled boule is
   already lost to its interstitial **dislocation leakage rim** (A1) *before* the cut, so cut depth can't
@@ -137,7 +140,7 @@ phase-2 coupling, not a price — the economics is named, not faked (no manufact
 seed, which would be the `gradual-failure-preferred` "inflate an unrelated variable" fudge).
 
 `demo_journey.py` is now a **three-stage** playthrough (a 3×3 figure: the slice-arc, the coupling, and the
-`V_t` edge-ring wafer map join the purification + growth rows); `test_journey.py` pins the graded ring, the
+`V_t` centre-core wafer map join the purification + growth rows); `test_journey.py` pins the graded core, the
 coupling, the channel naming, and the no-cut **seam** (an explicit `cut(0)` reproduces the no-cut forecast).
 
 ## Deferred (explicit)

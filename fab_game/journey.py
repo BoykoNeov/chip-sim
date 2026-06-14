@@ -65,8 +65,11 @@ DEFAULT_PULL_MM_MIN = 2.0        # the two-sided optimum at this hot zone (~93 %
 # solidified, ``czochralski.slice_z`` ∈ [0, 1)). It reads the boule's axial Scheil drift (G2): boron's
 # k<1 walks the substrate doping — so ``V_t`` — UP toward the tail, so a wafer cut too deep lands above
 # the ``V_t`` window. The consequence is graded (not a cliff): the radial t_ox non-uniformity already in
-# the line spreads ``V_t`` across the die map, so the outer dies cross the ceiling first → an **edge ring**
-# of ``V_t`` kills before the whole wafer goes out (the gradual-failure policy, no new physics). Honestly
+# the line spreads ``V_t`` across the die map — so the **centre** dies (nominal, highest ``V_t``) cross the
+# high ceiling first while the **rim** (thinner gate oxide → lower ``V_t``) survives longest → a **centre
+# core** of ``V_t`` kills before the whole wafer goes out. This is the *inverse* radial signature of stage-1's
+# Na **edge** ring (Na is edge-loaded and pushes ``V_t`` DOWN into the *low* bound, so the rim fails first;
+# here the high bound is hit centre-first) — the gradual-failure policy, no new physics. Honestly
 # **one-sided absent economics** — cutting at the seed (slice_z 0) is always safest; the value of cutting
 # deeper (more wafers per boule = throughput) is the same deferred cost side as purification's refining
 # effort. What makes the cut a real decision *today* is the phase-2 coupling: a faster pull flattens the
@@ -158,8 +161,9 @@ def forecast(state: "JourneyState") -> StageForecast:
     """Run the line at the current recipe (variation **on**, so the ring shows) → the consequence band.
 
     Reuses :func:`run_line` — zero new physics. Single seed (the journey's), like the dashboard; the bands
-    carry a margin so a boundary forecast does not flicker. ``clean`` ⇒ the feed is pure enough; ``ring`` ⇒
-    a marginal feed kills an edge ring (rework: refine harder); ``dead`` ⇒ scrapped."""
+    carry a margin so a boundary forecast does not flicker. ``clean`` ⇒ the recipe-so-far didn't bite;
+    ``ring`` ⇒ a marginal recipe kills **part** of the wafer (spatially an edge ring or a centre core,
+    depending on the stage — rework territory); ``dead`` ⇒ scrapped."""
     recipe = state.current_recipe
     wafer = run_line(recipe, seed=state.seed, variation=Variation(), specs=DEFAULT_SPECS, grid_n=state.grid_n)
     result = LineResult.of(state.label, wafer)
@@ -171,7 +175,7 @@ def forecast(state: "JourneyState") -> StageForecast:
     elif band == "dead":
         headline = f"DEAD — {y:.0%} yield, scrapped on {channel}"
     else:
-        headline = f"ring — {y:.0%} yield, an edge ring fails on {channel}"
+        headline = f"ring — {y:.0%} yield, part of the wafer fails on {channel}"
     return StageForecast(band=band, channel=channel, yield_=y, mean_vt=_mean_vt(result),
                          contamination=state.contamination.as_dict(), result=result, headline=headline)
 
@@ -301,9 +305,10 @@ class JourneyState:
 
         Reads the boule's axial Scheil drift (use :func:`boule_profile` to *watch it develop* first — the
         seed→tail ``V_t`` walk this cut samples): boron's k<1 raises the substrate doping (so ``V_t``)
-        toward the tail, so a wafer cut **too deep** lands above the ``V_t`` window — failing on the
-        edge dies first (a graded ``V_t`` ring, the radial t_ox non-uniformity grading the cliff), then the
-        whole wafer. Cutting at the **seed** (``slice_z`` 0) is always safest; how deep you can cut and stay
+        toward the tail, so a wafer cut **too deep** lands above the ``V_t`` window — failing the **centre**
+        dies first (a graded ``V_t`` **core**: the radial t_ox non-uniformity grades the cliff — the rim's
+        thinner oxide gives it a lower ``V_t``, so it survives the high ceiling longest), then the whole
+        wafer. Cutting at the **seed** (``slice_z`` 0) is always safest; how deep you can cut and stay
         in spec is set by the **phase-2 pull** (a faster pull flattened the drift — :func:`boule_profile`).
         Call again to re-cut (re-decide; the boule is unchanged, only where you take the wafer)."""
         if not 0.0 <= slice_z < 1.0:

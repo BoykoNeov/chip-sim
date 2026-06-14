@@ -61,8 +61,12 @@ schedule (variable-k Scheil = new physics); C1/CG-3 (standalone deepenings).
 stage that READS a prior committed decision** — the journey's "watch it propagate" payoff, finally end to
 end. The cut reads the boule's axial **Scheil drift** (`boule_profile` = the watch-it-develop view): boron
 `k<1` walks `V_t` UP toward the tail → cut too deep → above the `V_t` window. **Graded, NOT a cliff, with
-ZERO new physics:** the *existing* radial `t_ox` non-uniformity spreads `V_t` across the map so the OUTER
-dies cross the ceiling first → a `V_t` edge **ring** (arc clean → ring ~z 0.87–0.90 → dead at the tail).
+ZERO new physics:** the *existing* radial `t_ox` non-uniformity spreads `V_t` across the map so the CENTRE
+dies (nominal, highest `V_t`) cross the high ceiling first while the RIM (thinner oxide → lower `V_t`)
+survives longest → a `V_t` **centre CORE** (arc clean → middle band ~z 0.87–0.90 → dead at the tail). **THE
+finding (advisor caught my prose backwards before push):** it is a centre core, NOT an edge ring — the
+*inverse* radial signature of stage-1's Na edge ring (Na edge-loaded, pushes `V_t` DOWN→low bound→rim
+first; here the HIGH bound is hit centre-first). Verified by radial yield (0%→95% centre→rim) not assumed.
 **THE coupling (the headline test `test_slice_consequence_is_coupled_to_the_phase2_pull`):** how deep you
 can cut is set by the **phase-2 pull** — a fast pull flattened the drift (CG-1) so a flat boule cuts DEEP;
 a slow pull already lost the wafer to its A1 dislocation **leakage rim** BEFORE the cut → "a bad pull can't
@@ -74,7 +78,7 @@ flatness is a binary scrap and **TTV→focus-budget is a named scope edge** (new
 One-sided absent economics (→ the #1 open item, now shared). No-cut **seam** proven (`cut(0)` ≡ no-cut
 forecast). The stale commit-docstring "third stage = refactor" note UPDATED (the overlay holds for 3
 idempotent stages; refactor tips only at order-dependent/non-idempotent folding). `demo_journey` now a
-THREE-stage playthrough (**3×3** figure: slice-arc + the coupling + the `V_t` edge-ring map join the rows);
+THREE-stage playthrough (**3×3** figure: slice-arc + the coupling + the `V_t` centre-core map join the rows);
 **299 fab_game tests green** (+9: graded ring, coupling, channel, commit-fold, range guard, seam).
 **Deferred:** the across-wafer/polish handoff + the killer-defect map (wafer-prep's other half).
 
