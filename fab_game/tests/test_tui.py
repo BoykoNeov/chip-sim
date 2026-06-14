@@ -222,14 +222,20 @@ def test_hardcore_app_hides_the_guide_and_educational_shows_it_verbatim():
         async with app.run_test(size=(120, 50)) as pilot:
             await pilot.pause()
             assert app.educational is False
-            assert not app.query_one("#guide-box").has_class("shown")   # hidden → no reserved space
+            box = app.query_one("#guide-box")
+            # The COMPUTED display, not just the class: the selector resolved to display:none and the box
+            # occupies a ZERO region → it reserves no space, so the hardcore layout is byte-identical.
+            assert box.display is False and box.region.area == 0
             assert app.last_summary == dashboard_summary(run_dashboard())  # the seam, unperturbed by mode
 
     async def educational():
         app = FabLineApp(educational=True)
         async with app.run_test(size=(120, 50)) as pilot:
             await pilot.pause()
-            assert app.query_one("#guide-box").has_class("shown")        # the guide is visible
+            box = app.query_one("#guide-box")
+            # Resolved to actually VISIBLE (display:block + a non-empty on-screen region), not merely
+            # class-tagged — a CSS-selector typo would leave the class set but the panel blank.
+            assert box.display is True and box.region.area > 0
             # The panel is built from the stash verbatim (``yield Static(self.last_guide)``), so the stash
             # equalling the headless prose IS the fidelity pin (the App composes no prose of its own).
             assert app.last_guide == dashboard_guide()
@@ -260,7 +266,7 @@ def test_mode_select_screen_picks_educational_or_hardcore():
             await pilot.pause()
             assert not isinstance(app.screen, ModeSelectScreen)         # revealed the dashboard underneath
             assert app.educational is expect_edu
-            assert app.query_one("#guide-box").has_class("shown") is expect_shown
+            assert app.query_one("#guide-box").display is expect_shown  # the COMPUTED display, post-choice
 
     asyncio.run(pick("#mode-edu", expect_shown=True, expect_edu=True))
     asyncio.run(pick("#mode-hard", expect_shown=False, expect_edu=False))
@@ -283,7 +289,8 @@ def test_play_roguelike_inherits_the_educational_mode_and_shows_its_guide():
             await pilot.pause()
             screen = app.screen
             assert isinstance(screen, RoguelikeScreen) and screen._educational is True
-            assert screen.query_one("#game-guide-box").has_class("shown")
+            box = screen.query_one("#game-guide-box")
+            assert box.display is True and box.region.area > 0            # resolved to visible, not just tagged
             assert screen.last_guide == roguelike_guide()                 # the verbatim headless prose
             # The driven session is still the headless fresh run — the guide changed nothing.
             assert screen.session.budget == new_session(GameConfig(), seed=0).budget
