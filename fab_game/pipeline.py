@@ -70,6 +70,19 @@ def _aggregate(dies: tuple[Die, ...], attr: str) -> dict:
     return {f"mean_{attr}": float(np.mean(vals)) if vals else None, "n": len(vals)}
 
 
+def _die_contamination(contamination, na_factor: float):
+    """The wafer contamination vector with its mobile-ion ``Na`` scaled by this die's radial edge-loading
+    factor (:meth:`~fab_game.variation.Variation.na_factor`).
+
+    Returns the wafer vector **unchanged** when the factor is ``1.0`` — variation off, ``na_edge_boost = 0``,
+    or a clean ``Na = 0`` feed — so the seam is byte-identical and only a marginal feed under variation
+    allocates a per-die vector (the edge ring of ``V_t`` kills). Only ``Na`` is non-uniform (the modeled
+    edge-loading channel); the other species ride uniform (the named scope edge, now lifted only for Na)."""
+    if na_factor == 1.0:
+        return contamination
+    return replace(contamination, Na=contamination.Na * na_factor)
+
+
 def run_line(
     recipe: Recipe = DEFAULT_RECIPE,
     *,
@@ -220,7 +233,8 @@ def run_line(
     # 4. Device — per die, reading the inherited t_ox + cd + the wafer contamination (the propagation:
     #    Na → Q_ox → V_t; the residual-dopant net shift is already in effective_channel_N_A).
     dies = tuple(
-        device_step(d, recipe.device, recipe.effective_channel_N_A, contamination=recipe.contamination,
+        device_step(d, recipe.device, recipe.effective_channel_N_A,
+                    contamination=_die_contamination(recipe.contamination, variation.na_factor(d.radius_frac)),
                     thermal_donor_density=recipe.czochralski.thermal_donor_density,
                     dislocation_density=recipe.czochralski.interstitial_dislocation_density_at(d.radius_frac))
         for d in wafer.dies
@@ -555,7 +569,8 @@ def rework_litho(
         red = litho_step(d, corrected, variation.systematic_perturbation(d))
         red = etch_deposition_step(red, recipe.etch_deposition, recipe.litho.pitch_nm,
                                    variation.systematic_perturbation(d))
-        red = device_step(red, recipe.device, wafer.channel_N_A, contamination=wafer.contamination,
+        red = device_step(red, recipe.device, wafer.channel_N_A,
+                          contamination=_die_contamination(wafer.contamination, variation.na_factor(red.radius_frac)),
                           thermal_donor_density=recipe.czochralski.thermal_donor_density,
                           dislocation_density=recipe.czochralski.interstitial_dislocation_density_at(red.radius_frac))
         red = _verdict_die(red, specs, geometry_reason)

@@ -59,6 +59,14 @@ class Variation:
     # Systematic center-to-edge trends (full value at the wafer edge, linear in radius_frac):
     focus_tilt_nm: float = 55.0        # edge dies sit this many nm out of focus (focus bowl)
     t_ox_edge_frac: float = -0.025     # edge gate oxide ~2.5 % thinner (furnace non-uniformity)
+    na_edge_boost: float = 2.5         # mobile-ion Na edge-loading: edge dies see (1+boost)× the wafer Na
+    #                                    (handling/edge-bead/furnace radial gradients concentrate Na at the
+    #                                    rim) → an edge-RING of V_t kills at a marginal feed, not an all-or-
+    #                                    nothing flip (the gradual-failure policy: the honest slope under the
+    #                                    Na→Q_ox→V_t cliff). FLAGGED house number — the mechanism/direction is
+    #                                    real, the steepness illustrative (ADR 0005 §5); ~3.5× rim/centre is
+    #                                    well inside the real handling regime. Parabolic r² (a thin rim), not
+    #                                    the bowl's linear r. 0 ⇒ uniform Na (the pre-ring behaviour).
     # Die-to-die random scatter (Gaussian σ):
     focus_sigma_nm: float = 20.0       # focus jitter
     cd_sigma_nm: float = 1.5           # line-width roughness on the printed CD
@@ -69,6 +77,29 @@ class Variation:
         """The deterministic center-to-edge trends at this die: (defocus tilt nm, t_ox frac shift)."""
         r = die.radius_frac
         return self.focus_tilt_nm * r, self.t_ox_edge_frac * r
+
+    def na_factor(self, radius_frac: float) -> float:
+        """Edge-loaded mobile-ion Na multiplier at this die (``1 + na_edge_boost·r²``; ``1.0`` when off).
+
+        The honest *slope* under the Na→Q_ox→V_t **cliff** (the gradual-failure policy). Mobile-ion
+        sodium is edge-loaded in reality — edge handling/bead, furnace-tube radial gradients — so the
+        rim dies see more Na, their ``V_t`` is driven furthest down, and a marginal feed kills an
+        **edge ring** (some dies fail, not all): the canonical contamination wafer-map signature, the
+        graded ok→rework→fail band a uniform shift can't produce. Deterministic (no ``rng`` draw — a
+        center-to-edge trend like the focus bowl, so it never perturbs the random stream).
+
+        Seam-exact: ``1.0`` when ``enabled`` is False (uniform Na ⇒ ``demo_device``) and irrelevant to a
+        clean ``Na = 0`` feed (``0·factor = 0``). Composes with — does **not** double-count — the focus
+        bowl: the bowl kills the rim through CD→NILS, this through Q_ox→V_t (different spec channels, so
+        a marginal feed at a defocus offset stacks two real edge effects rather than one counted twice).
+        **Both** the parabolic ``r²`` *profile* and the ``na_edge_boost`` *steepness* are FLAGGED house
+        numbers (ADR 0005 §5 — cite the channel, flag the shape **and** the magnitude): real edge-loading
+        could be a sharper rim, so ``r²`` is illustrative, not derived (it matches the OSF-ring shape only
+        by convention, not by a shared cause).
+        """
+        if not self.enabled:
+            return 1.0
+        return 1.0 + self.na_edge_boost * radius_frac * radius_frac
 
     def perturbation(self, die: Die, rng: np.random.Generator) -> DiePerturbation:
         """Draw this die's full perturbation from ``rng`` — systematic trend **+** scatter.

@@ -76,9 +76,17 @@ Named scope edge (the honest ceiling)
   is built in :mod:`chip.lifetime` (G4b) but its **magnitudes** (capture cross-sections, the clean-bulk
   lifetime) are likewise the **loose/calibrated** leg — flagged there, not asserted with the segregation
   anchors. Oxygen → thermal donors stays the separate, contested-``k`` deferral (Czochralski's scope edge).
-* **Full activation / uniform contamination.** The impurity vector is a wafer-level scalar per species
-  (uniform across the die map — it composes orthogonally with the boule axial story, like
-  Czochralski's ``slice_z``); within-wafer contamination non-uniformity is out.
+* **Full activation / uniform contamination — Na non-uniformity now LIFTED (gradual-failure policy).** The
+  impurity vector is a wafer-level scalar per species, composing orthogonally with the boule axial story
+  (like ``slice_z``). The within-wafer non-uniformity of the **mobile-ion Na** channel is, however, now
+  modelled: a uniform Na shift drives every die's ``V_t`` together → an all-or-nothing **cliff**, but real
+  mobile-ion sodium is **edge-loaded** (edge handling/bead, furnace-tube radial gradients), so the rim dies
+  see more Na and a marginal feed kills an **edge ring** (the graded slope, not a flip). That radial trend
+  lives in the game's within-wafer layer (:meth:`fab_game.variation.Variation.na_factor`, a flagged
+  ``(1 + boost·r²)`` magnitude — direction/mechanism real, steepness illustrative), gated off when variation
+  is disabled (so the uniform seam is exact) and irrelevant to a clean ``Na = 0`` feed. The **other species
+  stay uniform** (this edge is lifted for Na only — the channel with the device consumer); full within-wafer
+  contamination fields remain out.
 
 Units — semiconductor-conventional CGS (as :mod:`chip.czochralski` / :mod:`chip.device`)
 ---------------------------------------------------------------------------------------
@@ -138,13 +146,19 @@ def pfann_swept_solute(zones, C0: float, k: float):
     return float(out) if out.ndim == 0 else out
 
 
-def front_purity(k: float, n_passes: int = 1) -> float:
+def front_purity(k: float, n_passes: float = 1) -> float:
     """Leading-end purity fraction ``C_front/C_0`` after ``n_passes`` zone passes — ``k`` for one pass.
 
     The single-pass leading-solid value is ``C(0)/C_0 = k`` (exact, from :func:`pfann_profile`). Multiple
     passes are modelled as the **front-tracking** approximation ``k^n`` (each pass re-scrubs the already-
-    graded leading end by ``k``): *exact at* ``n = 1``, **flagged** for ``n > 1`` (the rigorous
+    graded leading end by ``k``): *exact at* ``n = 1``, **flagged** for ``n ≠ 1`` (the rigorous
     multi-pass ultimate distribution is the named scope edge). ``n_passes = 0`` → ``1.0`` (no refining).
+
+    ``n_passes`` is **continuous** — ``k^n`` is smooth in ``n``, so a *fractional* pass models a partial
+    refining **effort** (a shorter sweep / a slower zone), the continuous lever a consumer can dial to
+    place the residual anywhere between passes (e.g. into the marginal band where a graded yield lives,
+    rather than leaping ~``1/k`` per integer pass). Still the same flagged front-tracking law — fractional
+    ``n`` does not sharpen the approximation, it just exposes its continuity.
     """
     if n_passes < 0:
         raise ValueError(f"n_passes must be ≥ 0, got {n_passes}")
@@ -196,7 +210,7 @@ class Contamination:
         return self.B - self.P
 
 
-def zone_refine(feed: Contamination, n_passes: int = 1) -> Contamination:
+def zone_refine(feed: Contamination, n_passes: float = 1) -> Contamination:
     """Zone-refine a feedstock impurity vector → the purified :class:`Contamination` at the leading end.
 
     Each species is scrubbed by **its own** cited segregation coefficient

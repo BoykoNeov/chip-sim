@@ -44,7 +44,10 @@ class PurificationKnobs:
     """
 
     grade: str = "clean"               # FEEDSTOCK_GRADES key — "clean" idealized baseline (the seam)
-    zone_passes: int = 1               # zone-refining passes (more = cleaner feed; the costly rework knob)
+    zone_passes: float = 1             # zone-refining passes/effort (more = cleaner feed; the costly rework
+    #                                    knob). CONTINUOUS — a fractional pass is a partial refining effort
+    #                                    (front_purity's k^n is smooth in n), so the residual Na can be dialed
+    #                                    into the marginal band instead of leaping ~1/k per integer pass.
 
 
 @dataclass(frozen=True)
