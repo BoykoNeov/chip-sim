@@ -1,30 +1,69 @@
 # `engines/diffusion` — the diffusion/heat spine
 
 The first and most-reused engine in the program (ARCHITECTURE.md §5): a
-conservative 1-D parabolic (diffusion / heat) solver. Sealed at Steel
-Phase 1a behind its validation suite and reused by Microchip (dopant profiles)
-and Planet (EBM heat transport); **unfrozen 2026-06-10** — now open + test-gated
-(the suite still gates; the surface is open to amendment). See `CONTRACT.md`.
+conservative 1-D parabolic (diffusion / heat) solver, validated at Steel
+Phase 1a behind its test suite and reused by Microchip (dopant profiles) and
+Planet (EBM heat transport). It is a plain tested library — no frozen contract,
+no governance ceremony; the suite gates every change. `CONTRACT.md` keeps that
+name (for the links that point at it) but is now just the detailed reference.
 
 ## Load pointer (per-session working set, §11)
 
-- **To *use* this engine** (from Steel/Chip/Planet): load **`CONTRACT.md`** only
-  — the one-page API contract. You do not need this folder's internals.
+- **To *use* this engine** (from Steel/Chip/Planet): the API + verified behaviors
+  are summarized below; `CONTRACT.md` is the detailed reference. You do not need
+  this folder's internals.
 - **To *modify* this engine:** `CONTRACT.md` + `diffusion1d.py` (and
-  `diffusion2d.py` for the 2-D regime) + `tests/`. The tests are the seal — they
-  must stay green, and they *are* the externalized memory of every contract
-  downstream relies on (§6).
+  `diffusion2d.py` for the 2-D regime) + `tests/`. The tests must stay green —
+  they are the externalized memory of every behavior downstream relies on (§6).
+
+## API at a glance
+
+```python
+from engines.diffusion import (
+    Diffusion1D, Grid, uniform_grid, grid_from_edges,
+    Dirichlet, Neumann, Robin, StateDependent,      # nonlinear D(u)
+    Diffusion2D, Grid2D, uniform_grid_2d, MaskedSurface,
+)
+
+grid   = uniform_grid(length, n)
+solver = Diffusion1D(grid, D, bc_left, bc_right, source=None,
+                     method="backward_euler")        # or crank_nicolson / forward_euler
+state  = solver.step(state, dt, t0=0.0)              # one step; plain ndarray in/out
+state  = solver.solve(state, t_end, dt, t0=0.0)      # march to t0+t_end
+q      = solver.total(state)                         # ∫u dx = Σ uᵢΔxᵢ
+J      = solver.flux(state, "left", t=0.0)           # Fick flux, +x positive
+```
+
+Solves `∂u/∂t = ∂/∂x(D(x,t) ∂u/∂x) + S(x,t)` (mass mode: `u=%C`; heat mode:
+`u=T`, Robin quench). `D` is a scalar / `D(x)` array / callable `D(t)` /
+`StateDependent(func)` for nonlinear `D(u)`. The per-step `state` is a plain
+`ndarray` (the only thing crossing the boundary, ADR 0001); the 2-D `state` is a
+`(nx, ny)` array. See `CONTRACT.md` for the full surface, BCs, and 2-D details.
+
+## What the tests guarantee
+
+- **erfc semi-infinite profile** + ~2nd-order spatial convergence (`test_erfc`).
+- **Exact conservation** of `Σ uᵢΔxᵢ` under no-flux, any dt, uniform/non-uniform
+  (`test_conservation`, `test_source`).
+- **Stability per method** — backward Euler unconditionally stable *and monotone*;
+  Crank–Nicolson stable but can oscillate; forward Euler conditionally monotone
+  under `dt ≤ 1/max|diag|` (`test_stability`, `test_explicit`).
+- **Temporal order** — BE 1st-, CN 2nd-order (`test_time_order`).
+- **Variable / nonlinear D** — callable `D(t)` and array `D(x)` harmonic-mean
+  faces (`test_variable_d`); `StateDependent` `D(u)` Picard path (`test_nonlinear_d`).
+- **2-D regime** — dimensional-collapse seam to the 1-D engine, 2-D conservation /
+  isotropy / monotonicity, `MaskedSurface` (`test_diffusion2d`).
 
 ## Files
 
 | File | What |
 |---|---|
-| `CONTRACT.md` | **The API contract.** Start here. PDE, modes, API, sign conventions, the guaranteed invariants, the validation boundary. |
+| `CONTRACT.md` | **The detailed reference.** PDE, modes, full API, sign conventions, the verified behaviors, the validation boundary. |
 | `diffusion1d.py` | The 1-D solver: `Diffusion1D`, `Grid`/`uniform_grid`/`grid_from_edges`, `Dirichlet`/`Neumann`/`Robin`, `StateDependent` (nonlinear `D(u)`). Cell-centered finite volume + θ-method stepping (`backward_euler` / `crank_nicolson` implicit, `forward_euler` explicit); Picard for the nonlinear path. |
 | `diffusion2d.py` | The 2-D solver (the third amendment, 2026-06-12): `Diffusion2D` on a tensor-product `Grid2D`/`uniform_grid_2d`, plus the `MaskedSurface` edge BC (Dirichlet window / no-flux mask). 5-point cell-centered finite volume, backward-Euler only, sparse `splu` cached per `dt`; reuses the 1-D BCs and harmonic-mean faces. |
-| `tests/` | The seal (45 tests): `test_erfc` (analytical limit + 2nd-order spatial convergence), `test_conservation` (exact no-flux mass balance), `test_stability` (unconditional stability, the implicit methods), `test_explicit` (`forward_euler` θ=0 — the CFL stability boundary + the unconditional-vs-conditional contrast), `test_source` (source-augmented conservation), `test_variable_d` (callable `D(t)` + array `D(x)`/harmonic mean), `test_time_order` (BE 1st- / CN 2nd-order in time), `test_robin_heat` (heat-mode Robin + flux bookkeeping), `test_nonlinear_d` (the `StateDependent` `D(u)` Picard path — degenerate seam, fixed point, conservation, Boltzmann similarity), `test_diffusion2d` (the 2-D regime — the dimensional-collapse seam to the 1-D engine, 2-D conservation/isotropy/monotonicity, O(dt) split-step convergence, the non-separable `MaskedSurface`). |
+| `tests/` | The test suite (45 tests): `test_erfc` (analytical limit + 2nd-order spatial convergence), `test_conservation` (exact no-flux mass balance), `test_stability` (unconditional stability, the implicit methods), `test_explicit` (`forward_euler` θ=0 — the CFL stability boundary + the unconditional-vs-conditional contrast), `test_source` (source-augmented conservation), `test_variable_d` (callable `D(t)` + array `D(x)`/harmonic mean), `test_time_order` (BE 1st- / CN 2nd-order in time), `test_robin_heat` (heat-mode Robin + flux bookkeeping), `test_nonlinear_d` (the `StateDependent` `D(u)` Picard path — degenerate seam, fixed point, conservation, Boltzmann similarity), `test_diffusion2d` (the 2-D regime — the dimensional-collapse seam to the 1-D engine, 2-D conservation/isotropy/monotonicity, O(dt) split-step convergence, the non-separable `MaskedSurface`). |
 
-## Run the seal
+## Run the tests
 
 ```powershell
 ./run_tests.ps1 engines/diffusion        # from repo root  (or just ./run_tests.ps1)

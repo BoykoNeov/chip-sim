@@ -86,3 +86,24 @@ Net: **keep the gate, drop the seal.**
 - **Drop the test-gate too (fully open engine).** Rejected outright: the suite is
   the engine's entire trustworthiness. Unfreezing removes immutability, not
   validation.
+
+## Follow-up — contract framing retired (2026-06-14)
+
+This ADR took the engine from *frozen + ADR-gated* to *open + test-gated* but
+kept the **"contract"** framing — the `CONTRACT.md` banner, the
+"= the contract" invariants heading, the "load this one page" / "the seal"
+language in the engine README, and the consumers'-dependency-surface promise.
+
+That framing is now dropped: `engines.diffusion` is treated as a plain tested
+library. The present-tense contract language was demoted to ordinary reference
+docs (`CONTRACT.md` retitled and re-bannered but kept at the same path so links
+don't break; engine README + `__init__` + the engine test comments reworded).
+**The test-gate is unchanged** — the suite still gates every edit; this drops
+the remaining *ceremony*, not the *validation*, continuing this ADR's own
+"keep the gate, drop the seal" direction one step further.
+
+Left untouched as historical record (rewording them would rewrite history, per
+this ADR's "no record" alternative and its `−` consequence on scattered prose):
+ADR 0001's frozen-`CONTRACT.md` language, this ADR's own decision text above,
+the build-narrative memories, the plan's dated build entries, and the
+consumer-side build narratives (e.g. `chip/coupling.py`'s v1.2 finding).

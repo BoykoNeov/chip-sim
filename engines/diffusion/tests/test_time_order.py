@@ -1,7 +1,7 @@
 """Temporal-order invariant: backward Euler is 1st-order, Crank–Nicolson is 2nd.
 
-The CONTRACT advertises Crank–Nicolson as "2nd-order in time"; nothing else in the
-seal checks temporal accuracy (the erfc convergence test deliberately couples
+The reference documents Crank–Nicolson as "2nd-order in time"; nothing else in the
+suite checks temporal accuracy (the erfc convergence test deliberately couples
 dt∝Δx² and uses backward Euler, so it measures *spatial* order only). Here the
 spatial error is held fixed (one grid) and removed by differencing against a
 tiny-dt reference solution, so the measured slopes are purely temporal.

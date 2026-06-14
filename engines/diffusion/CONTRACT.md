@@ -1,25 +1,25 @@
-# `engines.diffusion` — 1-D + 2-D conservative parabolic solver — CONTRACT
+# `engines.diffusion` — 1-D + 2-D conservative parabolic solver — reference
 
-> **Status: ACTIVE — unfrozen 2026-06-10** (originally FROZEN 2026-06-08, Steel
-> Phase 1a). Validated behind its passing suite (`engines/diffusion/tests/`, run
-> via `./run_tests.ps1`). This one page is still the unit of context downstream
+> **Reference docs for a tested library.** `engines.diffusion` is a plain Python
+> package validated behind its test suite (`engines/diffusion/tests/`, run via
+> `./run_tests.ps1`). This one page is the API + behavior reference downstream
 > projects load — Microchip and Planet depend on *this*, never on
-> `projects/steel/`. **Governance: open + test-gated.** The surface below is open
-> to amendment — gated by re-running the suite (and a deliberate update to any
-> invariant the amendment changes), no longer sealed behind an ADR + re-seal
-> (ADR 0004) — but an amendment must not silently break an existing consumer.
-> Opened so the engine
-> can grow past the v1 surface (the deferred nonlinear `D(u)` / 2-D / explicit
-> regimes noted below) by direct, test-gated amendment. **First amendment landed
-> 2026-06-10: native nonlinear `D(u)` (`StateDependent`, invariant 6)** — additive,
-> the 18 prior invariants pass unmodified. **Second amendment landed 2026-06-11:
-> explicit `forward_euler` (θ=0) stepping (invariant 3)** — additive (only the
-> θ=0 branch is new; the implicit paths are byte-for-byte unchanged, the 28 prior
-> invariants pass unmodified). **Third amendment landed 2026-06-12: the 2-D regime
-> (`Diffusion2D`, invariant 7)** — a *new module* (`diffusion2d.py`), tensor-product
-> finite volume, backward-Euler only; additive by construction (it imports the 1-D
-> primitives but touches no 1-D code path, so the 34 prior invariants pass unmodified);
-> **3-D is now the last deferred regime.**
+> `projects/steel/`. The suite gates every change; keep it green, and update the
+> relevant test deliberately whenever a documented behavior moves.
+>
+> **History.** The 1-D solver was validated at Steel Phase 1a (2026-06-08) and
+> has grown since: native nonlinear `D(u)` (`StateDependent`, 2026-06-10),
+> explicit `forward_euler` (θ=0) stepping (2026-06-11), and a 2-D regime
+> (`Diffusion2D`, 2026-06-12 — a separate `diffusion2d.py` that reuses the 1-D
+> primitives without touching a 1-D code path). Each addition was additive: the
+> prior behaviors below still pass unmodified. **3-D is the last regime not yet built.**
+>
+> **Contract framing retired 2026-06-14.** This page was formerly a frozen (Steel
+> Phase 1a), then open-but-governed, *contract* — ADR 0004 unfroze it to
+> "open + test-gated." That governance framing is now dropped: treat
+> `engines.diffusion` as an ordinary tested library, not a binding contract. The
+> test suite still gates. The file keeps the path `CONTRACT.md` so the links that
+> point here don't break.
 
 ## What it solves
 
@@ -41,7 +41,7 @@ not here — see "Validation boundary"):
 The two differ *only* by relabelling `(u, D, BC params)` — that symmetry is why
 one engine serves both, and why Planet's EBM heat transport is the same code.
 
-## Discretization (fixed)
+## Discretization
 
 - **Cell-centered finite volume.** The flux leaving a cell across a face equals
   the flux entering its neighbour across that face, so interior fluxes telescope
@@ -146,7 +146,7 @@ assembly; a compiled reimplementation (PyO3/Cython/…) parameterizes them nativ
 (e.g. `D₀,Q`; a BC enum + params) and exposes the same `state` array. The viz
 layer (ADR 0002) consumes the same `state` — never a live solver object.
 
-## Guaranteed invariants (what the test suite guarantees — = the contract)
+## What the test suite checks (the behaviors downstream code relies on)
 
 1. **erfc semi-infinite profile** within tolerance, and **~2nd-order spatial
    convergence** (`test_erfc.py`; measured rates ≈ 2.00). The headline analytical

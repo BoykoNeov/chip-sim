@@ -5,7 +5,7 @@ unconditionally stable *and monotone* — the discrete maximum principle forbids
 new extrema, so even at absurd dt the field stays bounded by its initial/boundary
 data and relaxes smoothly to steady state. Crank–Nicolson is unconditionally
 stable but *not* monotone; we assert only boundedness (no blow-up) for it, which
-documents the per-method guarantee the CONTRACT states.
+documents the per-method guarantee the reference states.
 """
 import numpy as np
 
