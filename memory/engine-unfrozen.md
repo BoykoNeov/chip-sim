@@ -1,6 +1,6 @@
 ---
 name: engine-unfrozen
-description: "engines.diffusion was UNFROZEN 2026-06-10 (governance open + test-gated, was frozen + ADR-gated). Future chip work MAY amend the engine directly (suite-gated, must not silently break consumers) — no longer forced to fit WITHIN the frozen surface. The whole v1.x 'fits within the frozen engine' framing is now a historical lineage, not a live constraint."
+description: "engines.diffusion was UNFROZEN 2026-06-10 (governance open + test-gated, was frozen + ADR-gated), then the whole CONTRACT framing was RETIRED 2026-06-14 → now a plain tested library (suite still gates, ceremony gone). Future chip work MAY amend the engine directly. The v1.x 'fits within the frozen engine' framing AND the 'contract/seal/invariant' framing are both historical lineage now, not live constraints."
 metadata: 
   node_type: memory
   type: project
@@ -90,6 +90,29 @@ O(dt²) — a Kronecker sum); and the genuinely-2-D piece is the non-separable `
   the numerical **frozen-coefficient** / "`D` frozen at the old state" scheme, "frozen
   dataclasses", `sealed`/`re-seal` BCs, and **ADRs 0001–0003** (historical, superseded by
   0004, not edited in place).
+
+**CONTRACT FRAMING RETIRED (2026-06-14, commit `2a8b74e`, pushed):** at the user's direction
+("drop the engine(s) contracts" → chose **demote, don't delete**), the whole *contract /
+governance / frozen-invariants* framing was dropped. `engines.diffusion` is now treated as a
+**plain tested library**: the suite still gates every change, only the ceremony is gone (ADR
+0004's "keep the gate, drop the seal" taken one step further). Concretely:
+`CONTRACT.md` **kept at the same path** (so the ~20 links don't dangle — the user explicitly
+declined "delete + fix refs") but retitled "— reference", the FROZEN/ACTIVE governance banner
+replaced by a plain status + dated retirement note + history, `## Guaranteed invariants (= the
+contract)` → `## What the test suite checks`, `## Discretization (fixed)` → `## Discretization`;
+engine `README.md` contract/seal language → reference + a self-sufficient "API at a glance" +
+"What the tests guarantee" folded in; `__init__.py` + the engine **test comments** (comments
+only) dropped the "the CONTRACT states/advertises" authority framing. The de-governancing trace
+lives as a **dated, additive `## Follow-up` in ADR 0004** (the record its own "no record"
+alternative demanded). **Left as historical record** (rewording = rewriting history): ADR 0001's
+frozen-`CONTRACT.md` language, ADR 0004's decision text, the build-narrative memories/plan
+entries, and consumer-side narratives — incl. `chip/coupling.py`'s v1.2 "fits within the
+contract" finding (advisor wanted it demoted; diverged — it's a dated build narrative, same
+category as chip's README narratives). Engine suite 45 green, fast lane 659 green. So: the body
+above still says "the invariants are still 'the contract'" / "chip loads CONTRACT.md as its
+one-page dependency surface" — **those were true 2026-06-10→06-13; as of 06-14 the "contract"
+authority framing is gone**, though the *file* CONTRACT.md and the *behaviors* it documents both
+still exist (just as plain reference + a still-gating suite).
 
 **Scope note:** this repo vendors its own copy of `engines/diffusion`. steel-sim /
 planet-sim (their own repos, same engine lineage) are **untouched** — their copies stay

@@ -1,6 +1,6 @@
 """Heat-mode boundary checks: Robin (convective quench) + flux bookkeeping.
 
-Not one of the three named seal invariants, but it covers the shipped heat-mode
+Not one of the three headline invariants, but it covers the shipped heat-mode
 boundary and pins the :meth:`flux` sign convention. Scope guard: this stays a
 unit check of the BC math — the lumped-capacitance / Jominy validation belongs to
 the Steel Phase-2 triad, not here.

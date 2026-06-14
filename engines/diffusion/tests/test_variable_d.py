@@ -1,7 +1,7 @@
 """Variable-diffusivity invariants: the callable ``D(t)`` and array ``D(x)`` paths.
 
-The contract permits ``D`` as a scalar, a cell-centered array ``D(x)``, or
-a callable ``D(t)``. The three named seal tests all use a *scalar* ``D``, so these
+The engine accepts ``D`` as a scalar, a cell-centered array ``D(x)``, or
+a callable ``D(t)``. The three headline tests all use a *scalar* ``D``, so these
 two surfaces — and the harmonic-mean face diffusivity that exists solely for
 unequal ``D`` — would otherwise be left untested. ``D(t)`` is not hypothetical:
 it is exactly steel's mass mode when carbon diffuses *during* cooling (Phase 1c).

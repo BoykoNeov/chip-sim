@@ -6,7 +6,7 @@ fluxes telescope. In exact arithmetic the conservation is exact; in floating
 point the only residual is accumulated ``solve_banded`` backward-error (largest
 at absurd dt, where the implicit matrix is ill-conditioned for the conserved
 mode) — measured here at the ~1e-11 level over a long huge-dt run, so a 1e-9
-relative bound is a strong "machine-precision conservation" seal with margin.
+relative bound is a strong "machine-precision conservation" guarantee with margin.
 Also checks the consistent corollary that a prescribed Neumann inflow changes the
 total at exactly the prescribed rate.
 """
