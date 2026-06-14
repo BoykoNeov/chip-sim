@@ -19,6 +19,8 @@ engines/diffusion/   # the 1-D diffusion/heat solver (+ its own tests)
 chip/                # the simulator: diffusion_dopant, junction, oxidation, litho, device,
                      #   coupling (Phase 1↔2 OED + segregation), diffusion_highconc (v1.3 D(N) box),
                      #   plots, demos, chip.ipynb
+fab_game/            # the fab-line game layered on chip (ADR 0005): sand → a binned chip + a scored
+                     #   roguelike; demos, tui.py (Textual UI), fab_game.ipynb, gallery
 docs/decisions/      # ADRs 0001–0005 (language/perf, visualization/UX, test policy, engine unfreeze,
                      #   fab-game layering)
 docs/plans/          # microchip-fabrication.md — the full build plan;
@@ -108,6 +110,30 @@ same phase/version label. This catalog is the launch-pad; that section is the de
 **The guided interactive tour:** [`chip/chip.ipynb`](chip/chip.ipynb) is the single notebook — one
 section per phase, each with `ipywidgets` sliders re-running a validated module live, ending on the
 coherent process→device flow. `pip install -e ".[viz,notebook]"`, then `jupyter lab chip/chip.ipynb`.
+
+## The fab-line game (a second entry point)
+
+Layered **on top of** this physics is a gamified full-production-line simulator
+([`fab_game/`](fab_game/README.md); the layering decision is
+[ADR 0005](docs/decisions/0005-fab-game-layering.md)): *recipe in → **yield** out, and you can see
+**why** a die died.* It runs the whole line **sand → a binned, packaged chip** — Czochralski boule,
+wafer prep, purification, the validated diffusion/oxidation/litho/device back end, etch & deposition,
+packaging — and scores it as a roguelike (one boule = one run, each wafer a turn). The validated
+physics stays in `chip/` + `engines/` (cited triads); `fab_game/` owns only what *cannot* be
+physics-validated — the stochastic spread, the spec windows, the yield, the rework — enforced by a
+one-way `fab_game → chip/engines` import.
+
+```powershell
+pip install -e ".[viz]"                 # compute + figures (add ,tui for the TUI / ,notebook for the notebook)
+python -m fab_game.demo_game            # the roguelike payoff: three strategies down one boule
+python -m fab_game.tui                  # play it — the Textual TUI (dashboard + roguelike screen; needs .[tui])
+jupyter lab fab_game/fab_game.ipynb     # the interactive skin + the §9 guided dashboard
+```
+
+**Prefer to click?** A separate **interactive gallery** of the game-layer artifacts is at
+[`docs/fab-game.html`](docs/fab-game.html) (`python -m fab_game.gallery`), cross-linked from the chip
+gallery. The full writeup — every milestone G1–G7, the crystal-growth deepenings, and the scope-edge
+promotions — lives in [`fab_game/README.md`](fab_game/README.md).
 
 ## Provenance
 
