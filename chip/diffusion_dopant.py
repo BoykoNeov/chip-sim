@@ -222,6 +222,7 @@ class DopantProfile:
     surface_flux_dose: float
     length: float
     method: str
+    effective_Dt: float | None = None  # ∫D(T(t))dt of a transient (spike) anneal; None = isothermal step
 
     def erfc_profile(self) -> np.ndarray:
         """The analytic predep ``erfc`` profile at this step's ``x``, ``t``, ``D`` (cm⁻³)."""
@@ -331,6 +332,7 @@ def two_step(
     t_predep_min: float = 15.0,
     T_drivein: float = 1100.0,
     t_drivein_min: float = 30.0,
+    drivein_program: "ThermalProgram | None" = None,
     N_surface: float | None = None,
     length_um: float = 3.0,
     n_cells: int = 600,
@@ -348,10 +350,194 @@ def two_step(
     actual ``erfc`` (not a delta), so its profile is only **near-Gaussian** and is **not**
     asserted against :func:`analytic_drivein_gaussian` — the demo's job is the junction (see the
     module docstring's exact-anchor-vs-demo split). Times are in **minutes** (the process unit).
+
+    ``drivein_program`` (E1, optional) replaces the isothermal drive-in with a **transient**
+    (spike/RTA) anneal :class:`ThermalProgram` ``T(t)`` (:func:`drive_in_program`). When set,
+    ``T_drivein``/``t_drivein_min`` are **bypassed** — the program governs both the temperature
+    schedule *and* the duration (``program.duration``). ``None`` (default) is the isothermal step,
+    bit-for-bit unchanged (the seam).
     """
     grid = uniform_grid(length_um * CM_PER_UM, n_cells)
     predep = predeposit(grid, dopant, T_predep, t_predep_min * 60.0,
                         N_surface=N_surface, n_steps=n_steps)
-    drivein = drive_in(grid, predep.N, dopant, T_drivein, t_drivein_min * 60.0,
-                       n_steps=n_steps)
+    if drivein_program is None:
+        drivein = drive_in(grid, predep.N, dopant, T_drivein, t_drivein_min * 60.0,
+                           n_steps=n_steps)
+    else:
+        drivein = drive_in_program(grid, predep.N, dopant, drivein_program, n_steps=n_steps)
     return predep, drivein
+
+
+# --------------------------------------------------------------------------- #
+# 4. Transient thermal budget — the spike/RTA anneal (E1: the D(T(t)) path)
+# --------------------------------------------------------------------------- #
+# E1 (scope-edge backlog). A spike / rapid-thermal anneal (RTA) ramps the wafer through a
+# temperature schedule T(t) rather than holding one setpoint, so the diffusivity is the
+# time-varying ``D(T(t))``. The verify-at-build gate ("is T emergent or just the setpoint?")
+# resolves to **setpoint**: in silicon the dopant/thermal diffusivity ratio √(D/α) ≈ 1.2e-6, so
+# at a junction's length scale the thermal field is always flat — T(t) is spatially uniform over
+# the diffusion domain. So this is NOT a heat-mode engine consumer (that premise is falsified,
+# the same way Robin-G was; heat-mode stays Steel-program-only). It is the engine's already-
+# shipped **time-dependent D(t)** path — the exact twin of OED's ``coupling.effective_Dt``: a
+# ``D(T(t))`` closure marched by the engine, the run depending on history only through the
+# integrated budget ``∫D dt`` (the τ-substitution, ``engines.diffusion test_variable_d``).
+@dataclass(frozen=True)
+class ThermalProgram:
+    """A transient anneal temperature schedule ``T(t)`` (°C) — the spike/RTA profile.
+
+    A piecewise-linear spike: a heating ramp from ``T_base`` to ``T_peak`` at ``ramp_up_C_per_s``,
+    an optional ``hold_s`` dwell at the peak, then a cooling ramp back to ``T_base`` at
+    ``ramp_down_C_per_s``. ``__call__(t)`` returns the temperature (°C) at time ``t`` (s); before
+    ``0`` and after :attr:`duration` it reads ``T_base`` (where ``D`` is negligible). All rates are
+    magnitudes (``|dT/dt|`` > 0). The degenerate :meth:`isothermal` constructor (``T_base ==
+    T_peak``) is the seam — a flat schedule that reproduces the isothermal :func:`drive_in`.
+    """
+
+    T_peak: float                  # °C — the peak (anneal) temperature
+    ramp_up_C_per_s: float         # °C/s — heating rate to the peak (magnitude > 0)
+    ramp_down_C_per_s: float       # °C/s — cooling rate from the peak (magnitude > 0)
+    hold_s: float = 0.0            # s — dwell at the peak (0 = a pure spike, no plateau)
+    T_base: float = 600.0          # °C — ramp endpoints; below this D is negligible (Arrhenius)
+
+    def __post_init__(self) -> None:
+        if self.ramp_up_C_per_s <= 0.0 or self.ramp_down_C_per_s <= 0.0:
+            raise ValueError("ramp rates must be positive magnitudes (°C/s)")
+        if self.hold_s < 0.0:
+            raise ValueError("hold_s must be ≥ 0")
+        if self.T_peak < self.T_base:
+            raise ValueError("T_peak must be ≥ T_base")
+
+    @classmethod
+    def isothermal(cls, T_celsius: float, duration_s: float) -> "ThermalProgram":
+        """A flat schedule ``T(t) = T_celsius`` over ``[0, duration_s]`` — the degenerate seam.
+
+        ``T_base == T_peak`` collapses both ramps to zero width, so :meth:`__call__` returns
+        ``T_celsius`` everywhere and the duration is ``duration_s``. Fed to :func:`drive_in_program`
+        it reproduces :func:`drive_in` at ``T_celsius`` **bit-for-bit** (the engine's
+        constant-callable-``D`` == scalar-``D`` guarantee).
+        """
+        return cls(T_peak=T_celsius, ramp_up_C_per_s=1.0, ramp_down_C_per_s=1.0,
+                   hold_s=float(duration_s), T_base=T_celsius)
+
+    @property
+    def ramp_up_s(self) -> float:
+        """Duration of the heating ramp (s)."""
+        return (self.T_peak - self.T_base) / self.ramp_up_C_per_s
+
+    @property
+    def ramp_down_s(self) -> float:
+        """Duration of the cooling ramp (s)."""
+        return (self.T_peak - self.T_base) / self.ramp_down_C_per_s
+
+    @property
+    def duration(self) -> float:
+        """Total anneal time ``ramp_up + hold + ramp_down`` (s) — the drive-in step length."""
+        return self.ramp_up_s + self.hold_s + self.ramp_down_s
+
+    def __call__(self, t: float) -> float:
+        """Temperature (°C) at time ``t`` (s): ramp up → hold at peak → ramp down → ``T_base``."""
+        t = float(t)
+        up = self.ramp_up_s
+        hold_end = up + self.hold_s
+        if t <= 0.0:
+            return self.T_base
+        if t < up:
+            return self.T_base + self.ramp_up_C_per_s * t
+        if t <= hold_end:
+            return self.T_peak
+        if t < self.duration:
+            return self.T_peak - self.ramp_down_C_per_s * (t - hold_end)
+        return self.T_base
+
+
+def thermal_budget(dopant: Dopant | str, program: ThermalProgram, *, n_steps: int = 600) -> float:
+    """The integrated diffusion budget ``∫₀^duration D(T(t)) dt`` (cm²) of a transient anneal.
+
+    The diffusion age the schedule deposits — the direct analogue of OED's
+    :func:`coupling.effective_Dt` (an oxidation-driven ``∫D_eff dt``), here driven by the anneal's
+    ``T(t)`` instead. A sealed-surface profile depends on the schedule **only through** this integral
+    (the engine's ``τ = ∫D dt`` time-substitution guarantee), so it is *the* characterization of a
+    spike anneal. Trapezoidal over the same ``n_steps`` sub-grid :func:`drive_in_program` marches, so
+    the budget and the solve see one integral.
+    """
+    d = DOPANTS[dopant] if isinstance(dopant, str) else dopant
+    t_grid = np.linspace(0.0, program.duration, n_steps + 1)
+    D = np.array([diffusivity(d, program(t)) for t in t_grid])
+    return float(np.trapezoid(D, t_grid))
+
+
+def equivalent_isothermal_time(dopant: Dopant | str, T_peak_celsius: float, budget: float) -> float:
+    """The isothermal time at ``T_peak`` giving the same ``budget`` — ``t_eq = budget / D(T_peak)`` (s).
+
+    The inverse of :func:`thermal_budget`: how long a *constant-``T_peak``* drive-in would take to
+    deposit the spike's ``∫D dt``. For a spike this is **far less** than the total ramp duration —
+    Arrhenius ``D`` collapses away from the peak, so only a narrow window near ``T_peak`` contributes
+    (see :func:`spike_budget_time_laplace`). That is *why* RTA gives shallow junctions: the budget,
+    not the clock time, sets the depth. (``D0``-independent: ``budget ∝ D0`` and ``D(T_peak) ∝ D0``.)
+    """
+    D_peak = diffusivity(dopant, T_peak_celsius)
+    if D_peak <= 0.0:
+        raise ValueError("D(T_peak) must be positive")
+    return budget / D_peak
+
+
+def spike_budget_time_laplace(dopant: Dopant | str, program: ThermalProgram) -> float:
+    """Closed-form (Laplace-asymptotic) equivalent isothermal time of a spike — the *finding* leg.
+
+    Expanding the Arrhenius exponent linearly about the peak, ``D(T(t)) ≈ D(T_peak)·exp(−s/s₀)`` on
+    each ramp shoulder with thermal width ``s₀ = k·T_peak²/(Ea·β)`` (``β = |dT/dt|``, ``T_peak`` in
+    **K**). Integrating each shoulder (ramps that span ``≫ s₀`` so the exponential tail is captured)
+    and adding the hold gives
+
+        ``t_eq ≈ hold + (k·T_peak²/Ea)·(1/β_up + 1/β_down)``        (s),
+
+    a clean closed form **independent of ``D0``** (units ``eV·K²/eV / (K/s) = s``). It quantifies the
+    collapse :func:`equivalent_isothermal_time` measures: e.g. ramping a 50 °C/s spike from 600 → 1050 °C
+    (a ~9 s shoulder) contributes only ~1 s of peak-equivalent budget — the top ~50 °C is all that counts.
+    The asymptotic match to the exact (trapezoid) :func:`thermal_budget` is the tight, cited leg.
+    """
+    d = DOPANTS[dopant] if isinstance(dopant, str) else dopant
+    T_peak_K = program.T_peak + ABS_ZERO
+    s0 = K_BOLTZMANN_EV * T_peak_K ** 2 / d.Ea          # thermal width of the peak (K)
+    shoulder = s0 / program.ramp_up_C_per_s + s0 / program.ramp_down_C_per_s
+    return program.hold_s + shoulder
+
+
+def drive_in_program(
+    grid: Grid,
+    N_initial: np.ndarray,
+    dopant: Dopant | str,
+    program: ThermalProgram,
+    *,
+    n_steps: int = 600,
+    method: str = "backward_euler",
+) -> DopantProfile:
+    """Sealed-surface drive-in under a **transient** anneal ``T(t)`` → a :class:`DopantProfile`.
+
+    The spike/RTA twin of :func:`drive_in`: redistributes a fixed dose with the surface sealed
+    (:class:`~engines.diffusion.Neumann` ``(0)`` both ends, dose conserved to machine precision)
+    while the diffusivity follows the schedule — ``D(t) = D(T(t))``, the engine's already-supported
+    time-dependent-``D`` callable (no engine amendment; E1's heat-mode premise is falsified — see the
+    §4 banner). The step runs for ``program.duration``. The reported ``D`` is the **time-averaged**
+    diffusivity ``∫D dt / duration``, so ``D·t = effective_Dt`` (the budget) and
+    :meth:`DopantProfile.gaussian_profile` stays self-consistent; for the
+    :meth:`ThermalProgram.isothermal` seam ``D`` reduces to ``D(T)`` exactly, reproducing
+    :func:`drive_in` bit-for-bit.
+    """
+    d = DOPANTS[dopant] if isinstance(dopant, str) else dopant
+    t_seconds = program.duration
+
+    def D_of_t(ts: float) -> float:
+        return diffusivity(d, program(ts))
+
+    N, dose, surf_flux = _diffuse(
+        grid, D_of_t, np.asarray(N_initial, float), Neumann(0.0), Neumann(0.0),
+        t_seconds, n_steps, method,
+    )
+    budget = thermal_budget(d, program, n_steps=n_steps)
+    D_avg = budget / t_seconds if t_seconds > 0.0 else 0.0
+    return DopantProfile(
+        x=grid.centers, N=N, t=t_seconds, D=D_avg, stage="drive-in",
+        N_surface=float(N[0]), dose=dose, surface_flux_dose=surf_flux,
+        length=grid.length, method=method, effective_Dt=budget,
+    )

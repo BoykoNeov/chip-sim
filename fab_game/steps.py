@@ -74,11 +74,16 @@ def diffusion_junction(knobs: DiffusionKnobs, channel_N_A: float) -> tuple[dict,
         knobs.dopant,
         T_predep=knobs.T_predep_C, t_predep_min=knobs.t_predep_min,
         T_drivein=knobs.T_drivein_C, t_drivein_min=knobs.t_drivein_min,
+        drivein_program=knobs.drivein_program,
         length_um=knobs.length_um,
     )
     junc = analyze_junction(drivein, knobs.dopant, channel_N_A)
     knobs_in = {"dopant": knobs.dopant, "T_drivein_C": knobs.T_drivein_C,
                 "t_drivein_min": knobs.t_drivein_min}
+    if knobs.drivein_program is not None:  # E1: a spike anneal bypasses the isothermal T/t knobs
+        prog = knobs.drivein_program
+        knobs_in["drivein_spike_peak_C"] = prog.T_peak
+        knobs_in["drivein_spike_duration_s"] = prog.duration
     outputs = {"x_j_um": junc.x_j_um, "R_s": junc.R_s}
     return knobs_in, outputs
 

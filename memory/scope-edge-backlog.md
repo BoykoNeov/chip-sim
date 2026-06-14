@@ -1,6 +1,6 @@
 ---
 name: scope-edge-backlog
-description: "scope-edge backlog doc (docs/plans/scope-edge-backlog.md) — the bag of named-but-unbuilt edges across the whole line, triaged by CONSUMER (promote-or-defer each); spine is the deferrals. C1 thermal-donors + D1 under-etch + A2 OSF ring (→ [[fab-game-a2]]) all BUILT (2026-06-14). A2 SPLIT: ring BUILT (closed-form, CG-2 made radial), Robin-G sourcing FALSIFIED/deferred (engine can't beat a steady-gradient closed form). Next promotable = A1 (CG-2 interstitial→leakage); E1 spike-anneal = the one real heat-mode consumer (trigger)."
+description: "scope-edge backlog doc (docs/plans/scope-edge-backlog.md) — the bag of named-but-unbuilt edges across the whole line, triaged by CONSUMER (promote-or-defer each); spine is the deferrals. C1 thermal-donors + D1 under-etch + A1 interstitial→leakage + A2 OSF ring all BUILT (2026-06-14). A2 SPLIT: ring BUILT (closed-form), Robin-G FALSIFIED. E1 SPLIT (→ [[fab-game-e1]]): the D(t) thermal-budget path BUILT, the emergent-T heat-mode clause FALSIFIED (√(D/α)≈1e-6 → T is the setpoint over the junction; joins Robin-G). BACKLOG NOW EXHAUSTED — Next promotable = NONE; no chip-side heat-mode consumer → heat-mode Steel-only."
 metadata: 
   node_type: memory
   type: project
@@ -49,10 +49,16 @@ doc's primary content is **the deferrals** — which edges have no consumer yet 
   layer thickness; **split from under-etch** though the user grouped them), D3 package rebond
   (`recipe.py:295` "named, deferred edge" → a **game-layer rework rule** mirroring `rework_litho`, NOT a
   `chip/` triad), **Robin-`G` heat-mode sourcing (premise FALSIFIED 2026-06-14 — a steady gradient is
-  closed-form; the engine can't earn its place; home = the Steel program)**, and **E1 transient
-  spike/laser anneal `T(x,t)`→`D(T(t))` (the ONE credible chip-side heat-mode consumer — emergent `T`
-  lag+Robin quench couples to the shipped `D(T(t))` diffusion engine → `x_j`/`R_s`/`V_t`; trigger
-  recorded, the verify-at-build gate is "is `T` emergent or just the setpoint?")**.
+  closed-form; the engine can't earn its place; home = the Steel program)**, and **E1's emergent-`T`
+  heat mode (premise FALSIFIED 2026-06-14 → [[fab-game-e1]] — `√(D/α)≈1e-6` ⇒ `T` is the setpoint over
+  the junction; building heat-mode would reproduce it = proof of redundancy).**
+
+**E1 SPLIT/BUILT (2026-06-14) → [[fab-game-e1]]:** the verify-at-build gate ("is `T` emergent or just the
+setpoint?") resolved to **SETPOINT**, so E1 splits like A2: the **`D(t)` thermal-budget path is BUILT**
+(`diffusion_dopant.py` §4 `ThermalProgram`/`thermal_budget`/`drive_in_program`, the OED `effective_Dt`
+twin — a faster ramp → smaller `∫D dt` → shallower `x_j`, why RTA), while the **emergent-`T` heat-mode
+engine is FALSIFIED/deferred** (joins Robin-`G`). **The backlog is now EXHAUSTED: Next promotable = NONE,
+and there is NO chip-side heat-mode consumer → heat-mode is Steel-program-only.**
 
 **Citation discipline (advisor):** for unbuilt items the doc names the model *class* + *kind* of source
 + a "pin at build" flag — NO confabulated volume:page citations (e.g. thermal donors → "Kaiser–Frisch–

@@ -22,6 +22,7 @@ own guarantees** re-instantiated in dopant mass mode — no new calibration:
 The diffusivity ``D₀, Ea`` are cited Fair data (not fit to junction depth), which is what
 makes the junction/sheet-resistance benchmark in ``test_junction.py`` a genuine cross-check.
 """
+import dataclasses
 import math
 
 import numpy as np
@@ -202,3 +203,98 @@ def test_two_step_drivein_is_only_near_gaussian_not_exact():
     max_dev = np.max(np.abs(drivein.N[active] - near[active]) / drivein.N[active])
     assert abs(drivein.N[0] - near[0]) / drivein.N[0] < 0.02   # near-Gaussian at the surface
     assert 0.02 < max_dev < 0.20                               # but measurably not exact (tail)
+
+
+# --------------------------------------------------------------------------- #
+# E1 — the transient spike/RTA thermal budget: D(T(t)) → ∫D dt (the D(t) path)
+# --------------------------------------------------------------------------- #
+# The heat-mode premise is FALSIFIED (√(D/α) ≈ 1.2e-6 → T flat over the junction → setpoint, not
+# emergent); this is the engine's already-shipped time-dependent D(t), the twin of OED's
+# effective_Dt. The legs: the isothermal SEAM (constant program == drive_in bit-for-bit), the
+# EQUIVALENCE inverse (equivalent_isothermal_time genuinely inverts thermal_budget), dose
+# CONSERVATION under D(t), and the FINDING (Arrhenius collapse → t_eq ≪ ramp time, Laplace form).
+def test_isothermal_program_recovers_drivein_bit_for_bit():
+    # The seam: a flat ThermalProgram == the scalar-D drive_in, BIT-FOR-BIT (the engine's
+    # constant-callable-D == scalar-D guarantee, test_callable_D_constant_equals_scalar). Same
+    # grid / dose / n_steps. D = budget/t reduces to D(T) exactly, so even the D field matches.
+    grid = uniform_grid(3.0e-4, 600)
+    seed = dd.analytic_drivein_gaussian(grid.centers, 200.0, dd.diffusivity("B", 1100.0), 1e15)
+    iso = dd.drive_in(grid, seed, "B", 1050.0, 90.0)
+    ramp = dd.drive_in_program(grid, seed, "B", dd.ThermalProgram.isothermal(1050.0, 90.0))
+    assert np.max(np.abs(ramp.N - iso.N)) < 1e-12              # byte-for-byte profile
+    assert ramp.D == pytest.approx(iso.D, rel=1e-12)          # reported D == D(T) for isothermal
+    assert ramp.t == pytest.approx(iso.t)                     # duration == hold_s
+    assert ramp.effective_Dt == pytest.approx(iso.D * iso.t, rel=1e-10)  # budget == D·t
+
+
+def test_equivalent_isothermal_time_inverts_thermal_budget():
+    # The tight equivalence leg: a transient drive-in equals an isothermal drive_in at
+    # (T_peak, equivalent_isothermal_time(T_peak, budget)) — numeric vs numeric, shared spatial
+    # truncation cancels (far tighter than vs the closed form). This validates
+    # equivalent_isothermal_time as the genuine inverse of thermal_budget (the τ=∫D dt substitution
+    # made concrete through our own functions), and that the run depends on T(t) only via the budget.
+    grid = uniform_grid(4.0e-4, 800)
+    seed = dd.analytic_drivein_gaussian(grid.centers, 200.0, dd.diffusivity("B", 1050.0), 1e15)
+    prog = dd.ThermalProgram(T_peak=1050.0, ramp_up_C_per_s=40.0, ramp_down_C_per_s=40.0, hold_s=2.0)
+    budget = dd.thermal_budget("B", prog, n_steps=2000)
+    t_eq = dd.equivalent_isothermal_time("B", 1050.0, budget)
+    ramp = dd.drive_in_program(grid, seed, "B", prog, n_steps=2000)
+    iso_eq = dd.drive_in(grid, seed, "B", 1050.0, t_eq, n_steps=2000)
+    assert np.max(np.abs(ramp.N - iso_eq.N)) / iso_eq.N.max() < 1e-5   # numeric≈numeric (O(dt) cancels)
+    assert ramp.effective_Dt == pytest.approx(budget, rel=1e-12)      # the budget the profile carries
+    # Looser secondary: vs the analytic Gaussian at the budget age (call the analytic form directly,
+    # not .gaussian_profile()) — the same warm-started-propagation leg as the exact-Gaussian test.
+    tau0 = dd.diffusivity("B", 1050.0) * 200.0
+    N_ana = dd.analytic_drivein_gaussian(grid.centers, 1.0, tau0 + budget, 1e15)
+    assert np.max(np.abs(ramp.N - N_ana)) / N_ana.max() < 3e-3
+
+
+def test_thermal_budget_drivein_conserves_dose():
+    # Sealed (no-flux both ends) drive-in under a time-varying D(T(t)) conserves dose to machine
+    # precision — the engine's structural finite-volume guarantee, here exercised with a spike D(t).
+    grid = uniform_grid(3.0e-4, 600)
+    predep = dd.predeposit(grid, "B", 950.0, 15 * 60.0)
+    prog = dd.ThermalProgram(T_peak=1100.0, ramp_up_C_per_s=50.0, ramp_down_C_per_s=50.0, hold_s=1.0)
+    ramp = dd.drive_in_program(grid, predep.N, "B", prog)
+    assert ramp.dose == pytest.approx(predep.dose, rel=1e-10)
+    assert abs(ramp.surface_flux_dose) < 1e-6 * ramp.dose     # sealed surface carries ~no flux
+
+
+def test_spike_budget_collapses_to_a_narrow_peak_window_laplace():
+    # THE finding (not the tautology ∫D dt < D_max·t): the Arrhenius integral is dominated by a
+    # narrow window near the peak, so the equivalent isothermal time is set by the ramp RATE, not the
+    # ramp duration. Laplace asymptotics give the D0-independent closed form
+    # t_eq ≈ hold + (k·T_peak²/Ea)·(1/β_up + 1/β_down); a 50 °C/s spike 600→1050→600 °C (an 18 s ramp)
+    # deposits only ~1.6 s of peak-equivalent budget — an ~11× collapse. *This* is why RTA is shallow.
+    spike = dd.ThermalProgram(T_peak=1050.0, ramp_up_C_per_s=50.0, ramp_down_C_per_s=50.0,
+                              hold_s=0.0, T_base=600.0)
+    budget = dd.thermal_budget("B", spike, n_steps=4000)
+    t_eq = dd.equivalent_isothermal_time("B", 1050.0, budget)
+    laplace = dd.spike_budget_time_laplace("B", spike)
+    assert t_eq == pytest.approx(laplace, rel=0.10)           # exact (trapezoid) ≈ Laplace (~6%)
+    assert t_eq < 0.3 * spike.duration                       # the collapse: t_eq ≪ the 18 s ramp
+
+
+def test_equivalent_isothermal_time_is_D0_independent():
+    # t_eq = budget/D(T_peak); budget ∝ D0 and D(T_peak) ∝ D0, so t_eq cancels D0 EXACTLY — a clean
+    # invariance (two dopants differing only in D0 give the identical equivalent time).
+    spike = dd.ThermalProgram(T_peak=1050.0, ramp_up_C_per_s=50.0, ramp_down_C_per_s=50.0, T_base=600.0)
+    B = dd.DOPANTS["B"]
+    B2 = dataclasses.replace(B, name="B2", D0=B.D0 * 10.0)    # same Ea, 10× pre-exponential
+    teq_B = dd.equivalent_isothermal_time(B, 1050.0, dd.thermal_budget(B, spike, n_steps=2000))
+    teq_B2 = dd.equivalent_isothermal_time(B2, 1050.0, dd.thermal_budget(B2, spike, n_steps=2000))
+    assert teq_B == pytest.approx(teq_B2, rel=1e-12)
+
+
+def test_thermal_program_isothermal_and_validation():
+    # ThermalProgram mechanics: the isothermal seam is flat at T everywhere; a spike peaks at T_peak
+    # and returns to T_base; bad rates raise.
+    iso = dd.ThermalProgram.isothermal(1000.0, 30.0)
+    assert iso(0.0) == iso(15.0) == iso(30.0) == 1000.0       # flat schedule
+    assert iso.duration == pytest.approx(30.0)
+    spike = dd.ThermalProgram(T_peak=1050.0, ramp_up_C_per_s=50.0, ramp_down_C_per_s=25.0, hold_s=2.0)
+    assert spike(spike.ramp_up_s) == pytest.approx(1050.0)    # reaches the peak
+    assert spike.ramp_down_s == pytest.approx(2.0 * spike.ramp_up_s)  # half-rate ⇒ twice as long
+    assert spike(spike.duration + 1.0) == spike.T_base        # back to base after the anneal
+    with pytest.raises(ValueError):
+        dd.ThermalProgram(T_peak=1000.0, ramp_up_C_per_s=0.0, ramp_down_C_per_s=10.0)

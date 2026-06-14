@@ -22,6 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from chip.czochralski import Boule
+from chip.diffusion_dopant import ThermalProgram
 from chip.purification import FEEDSTOCK_GRADES, Contamination, zone_refine
 
 
@@ -397,13 +398,23 @@ class WaferPrepKnobs:
 
 @dataclass(frozen=True)
 class DiffusionKnobs:
-    """Source/drain two-step diffusion knobs → :func:`chip.diffusion_dopant.two_step`."""
+    """Source/drain two-step diffusion knobs → :func:`chip.diffusion_dopant.two_step`.
+
+    ``drivein_program`` (E1, optional) swaps the isothermal drive-in for a **transient**
+    spike/RTA anneal :class:`chip.diffusion_dopant.ThermalProgram` ``T(t)``. When set,
+    ``T_drivein_C``/``t_drivein_min`` are **bypassed** — the program governs the schedule *and* the
+    duration (``program.duration``). ``None`` (default) is the isothermal step, byte-for-byte
+    unchanged (the seam). The spike's junction depth is set by the *budget* ``∫D(T(t))dt`` — for a
+    fast ramp far less than the clock time would suggest (Arrhenius collapse near the peak), which
+    is why RTA gives shallow junctions.
+    """
 
     dopant: str = "P"                  # n⁺ phosphorus S/D into the p-type channel
     T_predep_C: float = 950.0          # °C
     t_predep_min: float = 10.0         # min
     T_drivein_C: float = 950.0         # °C
     t_drivein_min: float = 8.0         # min → shallow x_j ≈ 0.10 µm
+    drivein_program: "ThermalProgram | None" = None  # E1 spike/RTA T(t); None = isothermal (the seam)
     length_um: float = 2.0             # substrate depth domain
 
 

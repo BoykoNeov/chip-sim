@@ -548,8 +548,15 @@ are now BUILT.**
 **The remaining named edges** — across the whole line, not just crystal growth — are catalogued with a
 **consumer verdict each** (promote-or-defer) in `docs/plans/scope-edge-backlog.md`: the CG follow-ons
 (interstitial cost, the OSF ring + Robin-`G(r)`, striations, facets, the transient Stefan front), the
-engine's 3-D regime, oxygen/thermal donors, under-etch, CMP, and package rebond. Its spine is the
-*deferrals* — which edges have no consumer yet and stay fenced (the anti-over-build bar).
+engine's 3-D regime, oxygen/thermal donors, under-etch, CMP, package rebond, and the transient
+spike/RTA anneal. Its spine is the *deferrals* — which edges have no consumer yet and stay fenced (the
+anti-over-build bar). **Promoted out of it so far (2026-06-14):** **C1** oxygen→thermal donors, **D1**
+under-etch, **A1** interstitial→leakage, **A2** OSF ring (closed-form), and **E1** spike/RTA anneal →
+the `D(T(t))` thermal-budget path (`chip/diffusion_dopant.py` §4 — `ThermalProgram`/`thermal_budget`/
+`drive_in_program`, the OED `effective_Dt` twin; a faster ramp → smaller `∫D dt` → shallower `x_j`).
+**E1 also closed the heat-mode search:** its emergent-`T` engine clause is FALSIFIED (`√(D/α)≈1e-6` →
+`T` is the setpoint over the junction; joins Robin-`G`), so **there is no chip-side heat-mode consumer
+— heat-mode is Steel-program-only.** **Next promotable = NONE** (every remaining edge lacks a consumer).
 
 ---
 

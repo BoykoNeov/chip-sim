@@ -1202,6 +1202,73 @@ def thermal_donor_figure(result):
     return fig
 
 
+# --------------------------------------------------------------------------- #
+# E1 — spike/RTA thermal budget: the budget accrues near the peak → shallower x_j
+# --------------------------------------------------------------------------- #
+def _budget_accrual_panel(ax, result) -> None:
+    """T(t) (left) + the cumulative ∫D dt fraction (right) for the representative spike — the budget
+    is deposited in a narrow window near the peak (the Arrhenius collapse)."""
+    t = np.asarray(result.t_profile)
+    T = np.asarray(result.T_profile)
+    frac = np.asarray(result.cumulative_budget_frac)
+    ax.plot(t, T, color="#d62728", lw=1.8, label="T(t) — the spike")
+    ax.axhline(result.peak_C, color="#d62728", ls=":", lw=1.0, alpha=0.6)
+    ax.set_xlabel("anneal time (s)", fontsize=9)
+    ax.set_ylabel("temperature T (°C)", fontsize=9, color="#d62728")
+    ax.tick_params(axis="y", labelcolor="#d62728")
+    ax2 = ax.twinx()
+    ax2.plot(t, frac, color="#2f6db5", lw=2.0, label="cumulative ∫D dt")
+    ax2.set_ylabel("budget ∫₀ᵗ D dt  (fraction of total)", fontsize=9, color="#2f6db5")
+    ax2.tick_params(axis="y", labelcolor="#2f6db5")
+    ax2.set_ylim(-0.02, 1.02)
+    ax.set_title(f"Budget accrues near the peak: a {result.ref_duration_s:.0f} s spike deposits the\n"
+                 f"diffusion of only ~{result.ref_t_eq_s:.1f} s at {result.peak_C:.0f} °C "
+                 f"({result.ref_duration_s / result.ref_t_eq_s:.0f}× collapse)", fontsize=10)
+    ax.legend(fontsize=8, loc="center left")
+    ax2.legend(fontsize=8, loc="center right")
+
+
+def _ramp_sweep_panel(ax, result) -> None:
+    """x_j (left) vs ramp rate + the equivalent isothermal time t_eq, exact vs the Laplace closed form
+    (right) — faster ramp → less budget → shallower junction."""
+    rates = np.asarray(result.ramp_rates)
+    ax.plot(rates, np.asarray(result.x_j_um) * 1e3, color="#2ca02c", lw=1.9, marker="o", ms=4,
+            label="spike x_j")
+    ax.axhline(result.x_j_iso_um * 1e3, color="0.45", ls="--", lw=1.2,
+               label=f"isothermal baseline ({result.T_iso_C:.0f} °C/{result.t_iso_min:.0f} min)")
+    ax.set_xlabel("ramp rate |dT/dt| (°C/s)", fontsize=9)
+    ax.set_ylabel("junction depth x_j (nm)", fontsize=9, color="#2ca02c")
+    ax.tick_params(axis="y", labelcolor="#2ca02c")
+    ax.set_xscale("log")
+    ax2 = ax.twinx()
+    ax2.plot(rates, result.t_eq_laplace_s, color="#9467bd", lw=2.0,
+             label="t_eq — Laplace closed form")
+    ax2.plot(rates, result.t_eq_numeric_s, color="#9467bd", ls="none", marker="s", ms=4.5,
+             mfc="none", label="t_eq — exact ∫D dt")
+    ax2.set_ylabel("equivalent isothermal time t_eq (s)", fontsize=9, color="#9467bd")
+    ax2.tick_params(axis="y", labelcolor="#9467bd")
+    ax.set_title("Faster ramp → smaller budget → shallower x_j\n(t_eq ∝ 1/β; the D0-independent Laplace "
+                 "form tracks the exact budget)", fontsize=10)
+    ax.legend(fontsize=8, loc="upper right")
+    ax2.legend(fontsize=8, loc="center right")
+
+
+def thermal_budget_figure(result):
+    """Assemble the E1 artifact from a :class:`~fab_game.demo_thermal_budget.DemoResult` (2 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5.0))
+    _budget_accrual_panel(axes[0], result)
+    _ramp_sweep_panel(axes[1], result)
+    fig.suptitle("E1 — spike/RTA anneal: D(T(t)) → the ∫D dt thermal budget sets the junction depth "
+                 "(heat-mode FALSIFIED, √(D/α)≈1e-6 → T is the setpoint; the OED effective_Dt twin, no engine)\n"
+                 "the τ=∫D dt substitution + the Laplace asymptotics are the anchors; the spike recipe "
+                 "numbers are illustrative — opt-in, seam-safe (drivein_program=None → isothermal)",
+                 fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
+    return fig
+
+
 def fab_game_figure(result):
     """Assemble the 2×2 G1 artifact figure from a :class:`~fab_game.demo_fab_game.DemoResult`."""
     import matplotlib.pyplot as plt

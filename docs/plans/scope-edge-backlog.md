@@ -35,7 +35,7 @@ The consumer column is the one that decides everything else.
 | A1 | **CG-2 interstitial → dislocation/leakage** | §6a CG-2 | reverse leakage via `lifetime.py` (G4b) | **✅ BUILT (2026-06-14)** |
 | A2 | **OSF ring (radial `G(r)`)** + Robin-mode sourcing | §6a CG-2 | edge-vs-center yield non-uniformity | **SPLIT (2026-06-14): ring ✅ BUILT (closed-form); Robin-`G` DEFERRED (premise FALSIFIED)** |
 | A3 | **Striations** | §6a CG-1/CG-2 | none as a killer; at most a variance feed | DEFERRED (game-layer at most) |
-| E1 | **Transient spike/laser anneal `T(x,t)` → `D(T(t))`** | heat-mode consumer search | `x_j`/`R_s`/`V_t` via emergent thermal budget | DEFERRED (trigger recorded — the one real heat-mode consumer) |
+| E1 | **Transient spike/RTA anneal `T(t)` → `D(T(t))`** | heat-mode consumer search | `x_j`/`R_s` via the `∫D dt` thermal budget | **SPLIT (2026-06-14): heat-mode FALSIFIED (`√(D/α)≈1e-6` → setpoint); the `D(t)` budget path ✅ BUILT** |
 | A4 | **CG-3 facets / interface curvature** | §6a CG-3 | none reads it | DEFERRED (no consumer) |
 | A5 | **Transient Stefan front `X(t)`** | §6a CG-3 | none reads it; quasi-steady balance suffices | DEFERRED (engine-physics, no consumer) |
 | B1 | **Engine 3-D regime** | [[engine-unfrozen]] | none (device is 1-D depth + 2-D x-section) | DEFERRED (record the trigger only) |
@@ -319,30 +319,60 @@ This group exists because A2's verification (above) asked a sharper question tha
 **does the shipped Robin/heat-mode engine have *any* chip-side consumer a closed form can't serve?** The
 answer fixes the rule — heat-mode beats a closed form **only** for a *transient* problem (`k(T)` /
 arbitrary time-dependent BC / layered media / field coupling), never a steady gradient — and surfaces the
-single candidate that meets it.
+single candidate that meets it: **E1**. On verification (below) **E1's heat-mode clause is also
+falsified** — the spike anneal's `T(t)` is spatially uniform over the junction (`√(D/α)≈1e-6`), so its
+real content is the already-shipped `D(t)` budget path. **The search therefore closes with NO chip-side
+heat-mode consumer: heat-mode is Steel-program-only.** What E1 *did* yield is the `D(t)` thermal-budget
+deepening (`∫D dt` → shallower `x_j`).
 
-### E1 — Transient spike/laser anneal `T(x,t)` → `D(T(t))`  ·  DEFERRED (record the trigger — the one real heat-mode consumer)
+### E1 — Transient spike/RTA anneal `T(t)` → `D(T(t))`  ·  SPLIT on verification (2026-06-14)
 
-- **Model class.** The dopant step runs at a flat plateau today (closed-form erfc/Gaussian, or the
-  engine for `D(N)`). A **spike / laser anneal** is different: the ramp is fast enough that the wafer
-  interior **lags** the surface and a convective/radiative **quench (Robin)** governs cooldown, so
-  `T(x,t)` is **emergent**, not the prescribed setpoint, and the effective thermal budget `∫ D(T(t)) dt`
-  varies through depth. That defeats the closed form (arbitrary `T(t)`, `k(T)`) and couples straight into
-  the **already-wired dopant-diffusion engine** via `D = D(T(t))`. This is the one place the shipped
-  Robin **heat mode genuinely earns its place** in chip-sim — A2's failed promise relocated to a problem
-  that *actually needs* a transient solve.
-- **Consumer.** `x_j` / `R_s` → `V_t` through the existing junction/device chain — **main-line**.
-- **Triad tier.** Tight = the engine's heat invariants (finally used for real) + the slow-ramp limit
-  (`T → setpoint` ⇒ the closed-form plateau, the seam); flagged = the spike-profile / `k(T)` magnitudes
-  and the interior lag.
-- **Engine/ADR.** **No new engine physics** — the *shipped* heat mode + the *shipped* `D(T(t))` diffusion
-  path, coupled consumer-side. Likely no ADR (ADR 0004 pre-authorizes test-gated engine use).
-- **THE verify-at-build gate (the bar that caught A2).** Confirm `T` is genuinely **emergent**, not
-  prescribed. For an ordinary furnace step `T ≈ setpoint` and you just integrate `D(T(t)) dt` — the
-  closed form wins and the engine is decorative again. The consumer is *specifically* spike/laser, where
-  the lag-and-quench **is** the physics. Build only after that premise is verified.
-- **Verdict.** **DEFERRED — record the trigger, don't build (yet).** Unlike B1 (3-D, no consumer at all)
-  this *has* a credible consumer; it is parked pending the emergent-`T` verification, not for lack of one.
+> **Verified at build-time (2026-06-14) — the heat-mode premise is FALSIFIED; E1 splits like A2.** The
+> backlog parked E1 as *"the one real heat-mode consumer,"* pending the gate *"is `T` emergent or just
+> the setpoint?"* Running that gate against the physics, the heat-mode clause is **false** — so the
+> emergent-`T` engine build and the real (`D(t)`) deepening separate, exactly as A2's ring/Robin-`G` did.
+
+- **THE verify-at-build gate — resolved against heat-mode.** In silicon the **dopant/thermal
+  diffusivity ratio** `√(D_dopant/α_thermal) ≈ √(1.5e-13 / 0.1) ≈ 1.2e-6` (order-of-magnitude robust —
+  α_Si never drops below ~0.1 cm²/s). Heat is ~10⁶× more diffusive than dopant, so **at a junction's
+  length scale the thermal field is always flat**: to sharpen a thermal gradient across a 0.5 µm junction
+  needs a ~25 ns pulse, during which a boron atom moves ~0.001 nm. Two independent legs: (a) E1's
+  *named* consumer (dopant diffusion via `D(T)`) can only see a spatially-uniform `T(t)` → `D(T(t))`
+  **is** the engine's already-shipped `D(t)`; (b) the one place `T` *is* spatially emergent — the
+  ~775 µm **wafer-thickness** gradient in a flash/spike anneal — has **no chip-diffusion consumer** (its
+  would-be consumer is thermoelastic slip/stress, unmodeled, not E1). This is how TSUPREM/Sentaurus
+  actually model thermal ramps: a uniform `T(t)` through `D(T(t))`, never a heat PDE coupled to dopant.
+  (Melt/liquid-phase laser anneal — the *only* place a transient heat solve genuinely bites — is the
+  separately-deferred **A5** Stefan front, a different regime with liquid `D`, not solid `D(T(t))`.)
+- **Consumer (of the real `D(t)` part).** `x_j` / `R_s` via the existing junction chain — the spike's
+  junction depth is set by the **thermal budget** `∫D(T(t))dt`, not the clock time.
+- **The `D(t)` budget path — ✅ BUILT (2026-06-14), the OED `effective_Dt` twin.** `chip/diffusion_dopant.py`
+  §4 — `ThermalProgram` (a piecewise-linear spike `T(t)` with `.isothermal` as the seam),
+  `thermal_budget = ∫D(T(t))dt` (the direct analogue of `coupling.effective_Dt`, just driven by `T(t)`
+  instead of the oxidation rate), `equivalent_isothermal_time = budget/D(T_peak)`, `drive_in_program`
+  (sealed drive-in under the schedule via the engine's callable-`D(t)` — `_diffuse` unchanged), and
+  `spike_budget_time_laplace` (the `D0`-independent Laplace closed form `t_eq ≈ hold + (k·T_peak²/Ea)·
+  (1/β_up+1/β_down)`). Triad: tight = the **seam** (`ThermalProgram.isothermal` ⇒ `drive_in` **bit-for-bit**,
+  the constant-callable-`D`==scalar guarantee) + the **equivalence inverse** (`equivalent_isothermal_time`
+  genuinely inverts `thermal_budget` — a ramp run == an isothermal `drive_in` at `t_eq`, numeric≈numeric)
+  + dose **conservation** under `D(t)` + the **Laplace** finding (exact budget ≈ Laplace to ~5 %); no
+  conservation amendment (sealed drive-in inherits it). **THE finding:** the Arrhenius integral is
+  dominated by a narrow window near the peak — a 19 s spike to 1050 °C deposits only ~2.5 s of
+  peak-equivalent budget (a ~7× collapse; the top ~50 °C of the ramp carries ~84 % of `∫D dt`), so a
+  faster ramp → smaller budget → **shallower** `x_j` (why RTA gives shallow junctions). Wired via
+  `DiffusionKnobs.drivein_program` (opt-in; `None` ⇒ the isothermal step, the pipeline byte-for-byte) →
+  `two_step(drivein_program=…)` → `diffusion_junction`. Banked `fab_game/demo_thermal_budget.py`
+  (`fab-game-e1.png`, 2 panels: the budget-accrual collapse · `x_j`/`t_eq` vs ramp rate).
+- **The heat-mode engine — DEFERRED, premise FALSIFIED (joins Robin-`G`).** Building heat-mode here would
+  reproduce the uniform-`T` setpoint — *proof of its own redundancy*, the same structural failure A2's
+  Robin-`G` hit. **No remaining chip-side heat-mode consumer exists** — heat-mode is confirmed
+  **Steel-program-only** (`test_robin_heat.py`). The rule A2 surfaced holds and is now closed: heat-mode
+  beats a closed form only for a *transient* problem, and E1's "transient" turned out to be a
+  spatially-uniform `T(t)` the `D(t)` path already serves.
+- **Engine/ADR.** None — consumer-side `D(t)`, no engine touch, no ADR (the OED precedent exactly).
+- **Verdict.** **SPLIT (2026-06-14):** the `D(t)` thermal-budget path **✅ BUILT** (RTA → `∫D dt` →
+  shallower `x_j`); the emergent-`T` heat-mode engine **DEFERRED — premise falsified** (`√(D/α)≈1e-6` →
+  `T` is the setpoint over the junction; heat-mode's home is the Steel program).
 
 ---
 
@@ -364,19 +394,25 @@ Promote in **consumer strength × cost** order; everything else stays deferred a
    radial, the engine does **not** participate; **Robin-`G` sourcing stays DEFERRED — premise falsified**
    (a steady gradient is closed-form; the shipped engine cannot beat it). With **A1** now built, the
    OSF ring is the one annulus clean of *both* failure modes (void core / leaky rim).
+5. **E1 — transient spike/RTA anneal → `D(T(t))`, the `D(t)` budget path.** ✅ **BUILT (2026-06-14).** The
+   `∫D(T(t))dt` thermal-budget deepening (the OED `effective_Dt` twin) → a faster ramp deposits less
+   budget → a shallower `x_j` (why RTA gives shallow junctions). The **heat-mode engine clause is
+   FALSIFIED** (`√(D/α)≈1e-6` → `T` is the setpoint over the junction), joining Robin-`G`.
 
-**Next promotable = A1 is DONE.** The remaining named-but-credible deepening is **E1** (transient
-spike/laser anneal → `D(T(t))`, the one real heat-mode consumer — trigger recorded, pending the
-emergent-`T` verification); everything else below stays deferred for lack of a consumer.
+**Next promotable = NONE.** With E1 verified, **the named-consumer search is exhausted**: every remaining
+edge lacks a device/yield consumer (or had one, Robin-`G`/E1-heat-mode, that verification falsified). The
+backlog is now a pure list of honestly-deferred frontier — which is the point. **Heat-mode is confirmed
+Steel-program-only**; there is no chip-side heat-mode consumer left to find.
 
 **Stay deferred (no consumer — this is the point, not a backlog of work):** A3 striations (game-layer
 variance at most), A4 facets/curvature (nothing reads shape), A5 transient Stefan `X(t)` (quasi-steady
-suffices), B1 engine 3-D (no 3-D device — trigger recorded), D2 CMP (no thickness observable), D3
-rebond (game rework rule, not physics), **Robin-`G` heat-mode sourcing (premise FALSIFIED 2026-06-14 — a
-steady gradient is closed-form; the heat mode's home is the Steel program), and E1 transient spike/laser
-anneal (a *credible* heat-mode consumer — trigger recorded, pending the emergent-`T` verification).** Each
-is fenced behind a *named consumer that does not yet exist* (or, for Robin-`G`, one that turned out not to
-exist); promoting any without that consumer would be the unvalidated-API guess the gate exists to catch.
+suffices; also the *only* place a transient heat solve bites — melt laser anneal — but a different,
+liquid-`D` regime, not E1's solid `D(T(t))`), B1 engine 3-D (no 3-D device — trigger recorded), D2 CMP
+(no thickness observable), D3 rebond (game rework rule, not physics), **Robin-`G` heat-mode sourcing AND
+E1's emergent-`T` heat mode (both premises FALSIFIED 2026-06-14 — a steady *or* a junction-uniform
+gradient is closed-form; heat mode's home is the Steel program).** Each is fenced behind a *named consumer
+that does not exist* (or, for Robin-`G`/E1-heat-mode, one that turned out not to exist); promoting any
+without that consumer would be the unvalidated-API guess the gate exists to catch.
 
 ---
 
