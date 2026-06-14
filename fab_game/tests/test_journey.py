@@ -17,8 +17,11 @@ from __future__ import annotations
 import pytest
 
 from fab_game.journey import (
+    GROWTH_G_CENTER_K_PER_MM,
+    GROWTH_RADIAL_BOOST,
     JourneyState,
     StageForecast,
+    boule_profile,
     consequence_band,
     finish,
     forecast,
@@ -146,6 +149,66 @@ def test_refine_rejects_a_nonpositive_step():
 def test_unknown_grade_rejected_at_construction():
     with pytest.raises(ValueError):
         new_journey("unobtainium")
+
+
+# --------------------------------------------------------------------------- #
+# Phase 2 — the crystal growth stage (the two-sided Voronkov window, graded both ways)
+# --------------------------------------------------------------------------- #
+def _grown(pull: float, *, grade: str = "clean", seed: int = 0) -> JourneyState:
+    """A growth-stage state on a *clean* feed (so the consequence is the boule, not residual Na)."""
+    return JourneyState(grade=grade, pull_rate=pull, seed=seed)
+
+
+def test_grow_sets_the_pull_at_the_radial_hot_zone():
+    """``grow`` sets the pull rate and engages the **radial** hot zone (so both consequences grade)."""
+    cz = new_journey("clean").grow(2.0).current_recipe.czochralski
+    assert cz.pull_rate_mm_min == 2.0
+    assert cz.thermal_gradient_K_per_mm == GROWTH_G_CENTER_K_PER_MM
+    assert cz.radial_gradient_boost == GROWTH_RADIAL_BOOST     # radial → graded core+rim, not a cliff
+
+
+def test_growth_window_is_two_sided_and_graded_on_both_sides():
+    """THE policy check (gradual-failure): pull too slow → a **graded** leakage rim, the optimum → clean,
+    too fast → a **graded** void core — neither side is an all-or-nothing cliff (the radial hot zone grades
+    them). This is the whole reason the growth stage uses the radial profile, not a uniform gradient."""
+    slow_a, slow_b = forecast(_grown(0.75)), forecast(_grown(1.5))
+    opt = forecast(_grown(2.0))
+    fast_a, fast_b = forecast(_grown(2.5)), forecast(_grown(4.0))
+    assert opt.band == "clean"                                # the optimum clears (~96 %)
+    # slow side: partial and CLIMBING toward the optimum — graded, not a 0↔1 flip
+    assert 0.0 < slow_a.yield_ < slow_b.yield_ < opt.yield_
+    # fast side: partial and FALLING away from the optimum — graded
+    assert opt.yield_ > fast_a.yield_ > fast_b.yield_ > 0.0
+
+
+def test_growth_channels_name_dislocations_when_slow_and_voids_when_fast():
+    """The two grown-in channels, named: slow pull → dislocation **leakage** (rim), fast pull → **voids**
+    (core) — the same wafer's two failure modes, distinguished from the purification roots."""
+    slow = forecast(_grown(0.75)).channel.lower()
+    fast = forecast(_grown(4.0)).channel.lower()
+    assert "leakage" in slow and "dislocation" in slow
+    assert "void" in fast
+
+
+def test_boule_profile_drifts_up_the_boule_and_faster_pull_flattens_it():
+    """The 'watch it develop' view: Scheil walks V_t up the boule (seed → tail); a faster pull (CG-1's
+    k_eff → 1) **flattens** that drift — a smaller seed→tail swing."""
+    slow, fast = boule_profile(_grown(0.5)), boule_profile(_grown(3.0))
+    assert slow[-1][1] > slow[0][1]                           # V_t rises seed → tail (the drift)
+    swing = lambda p: p[-1][1] - p[0][1]
+    assert swing(fast) < swing(slow)                          # faster pull → flatter boule (CG-1)
+
+
+def test_grow_folds_into_the_recipe_on_commit():
+    """``commit`` bakes the growth decision (pull + the radial hot zone) into the accumulator recipe."""
+    s = new_journey("clean").grow(2.0).commit()
+    assert s.recipe.czochralski.pull_rate_mm_min == 2.0
+    assert s.recipe.czochralski.radial_gradient_boost == GROWTH_RADIAL_BOOST
+
+
+def test_grow_rejects_a_nonpositive_pull():
+    with pytest.raises(ValueError):
+        new_journey("clean").grow(0.0)
 
 
 # --------------------------------------------------------------------------- #

@@ -1,6 +1,6 @@
 ---
 name: fab-journey
-description: the staged sand→chip journey front-end — phase 1 (purification stage) BUILT; the cost-side decision + difficulty + live UI deferred
+description: the staged sand→chip journey front-end — phases 1-2 (purification + crystal growth) BUILT; the cost-side decision + difficulty + live UI deferred
 metadata:
   type: project
 ---
@@ -37,7 +37,23 @@ price (cheap-dirty MGS vs expensive-clean EGS) + a per-pass refining cost — is
 much to refine* a real two-sided Goldilocks decision (ring penalizes under-refining, cost
 penalizes over-refining; the shape the G7 oxide lever has). **The natural next increment.**
 
-**Deferred:** the other 8 stages' interactive logic (run at recipe defaults today — see the
+**Phase 2 (crystal growth) BUILT 2026-06-14** — `JourneyState.grow(pull_rate)` (the boule pull
+lever) on a FIXED RADIAL hot zone (`GROWTH_G_CENTER_K_PER_MM=4`, `GROWTH_RADIAL_BOOST=4`).
+Genuinely **two-sided** (no economics needed): slow → dislocation **leakage rim**, fast → void
+**core**, clean **OSF ring** between, interior optimum ~2 mm/min (≈96%). **THE call (user-approved
+vs [[gradual-failure-preferred]]):** a UNIFORM gradient makes the slow side a leakage **CLIFF**
+(verified 0.5→0%, 0.75→100%) — the **radial** profile (A2's already-wired knob, *used* not rebuilt)
+grades BOTH sides. Caps <100% (OSF core/rim always cost a few) → `CLEAN_BAND` lowered 0.95→**0.90**,
+`DEFAULT_GRID_N` 9→**11** (coarse dicing over-weights core/rim). `forecast`/`_dominant_channel` reads
+the growth regime to name dislocation-leakage vs grown-in-voids (vs the purification roots);
+`boule_profile` = the axial Scheil drift (CG-1 flattens it faster). **Honest caveat:** "no economics"
+is only BRACKETED — within the clean window throughput (faster=more wafers) is the same deferred cost.
+demo_journey now a TWO-stage playthrough (2×3 figure); 28 journey tests (the policy test:
+`test_growth_window_is_two_sided_and_graded_on_both_sides`). **Deferred:** Level-2 variable mid-pull
+schedule (variable-k Scheil = new physics); C1/CG-3 (standalone deepenings); the cut/slice stage
+(phase 3, reads the boule drift).
+
+**Deferred:** the other stages' interactive logic (run at recipe defaults today — see the
 plan's stage table), all difficulty mechanics ("start easy, difficulty later"), the live UI
 (notebook `interact` / Textual journey screen — the scripted playthrough is phase-1's artifact).
 Default grade `solar` is an *intermediate* (already partly-refined) feed, chosen for the clean

@@ -381,22 +381,60 @@ def _journey_arc_panel(ax, result) -> None:
     ax.legend(fontsize=8, loc="center left")
 
 
-def journey_figure(result):
-    """Assemble the journey artifact from a :class:`~fab_game.demo_journey.JourneyDemoResult` (3 panels).
+def _journey_boule_panel(ax, result) -> None:
+    """Axial V_t down the boule (seed→tail) at a slow vs the optimum pull — CG-1 flattens the Scheil drift."""
+    ax.plot([z for z, _ in result.boule_slow], [v for _, v in result.boule_slow],
+            color="#d62728", lw=1.6, marker="o", ms=4, label="slow pull (steep drift)")
+    ax.plot([z for z, _ in result.boule_opt], [v for _, v in result.boule_opt],
+            color="#2ca02c", lw=1.6, marker="s", ms=4, label=f"optimum pull {result.growth_optimum_pull:g}")
+    ax.set_xlabel("axial position z (seed → tail)", fontsize=9)
+    ax.set_ylabel("mean V_t (V)", fontsize=9)
+    ax.set_title("Watch the boule develop: Scheil walks V_t up\nthe boule; a faster pull flattens it (CG-1)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
 
-    The refining trajectory (the scrub), the consequence arc (dead→ring→clean), and the wafer map at the
-    graded ring effort — the purification stage of the staged sand→chip journey, end to end.
+
+def _journey_growth_arc_panel(ax, result) -> None:
+    """Forecast yield vs pull rate, banded — the two-sided Voronkov window (leakage rim ↔ void core)."""
+    p = list(result.growth_pulls)
+    y = [100.0 * v for v in result.growth_yields]
+    ax.axhspan(0, 5, color="#d62728", alpha=0.10)
+    ax.axhspan(5, 90, color="#ff7f0e", alpha=0.10)
+    ax.axhspan(90, 100, color="#2ca02c", alpha=0.10)
+    ax.plot(p, y, color="0.2", lw=1.7, marker="o", ms=5, zorder=3)
+    ax.axvline(result.growth_optimum_pull, color="#2ca02c", ls="--", lw=1.1,
+               label=f"optimum {result.growth_optimum_pull:g} mm/min")
+    ax.set_xlabel("pull rate (mm/min)", fontsize=9)
+    ax.set_ylabel("forecast yield (%)", fontsize=9)
+    ax.set_ylim(-3, 103)
+    ax.set_title("Two-sided window: slow → leakage rim,\nfast → void core, clean ring between (graded both)",
+                 fontsize=10)
+    ax.text(p[0], 48, "leakage\nrim", color="#cc6600", fontsize=8, ha="left", va="center")
+    ax.text(p[-1], 48, "void\ncore", color="#cc6600", fontsize=8, ha="right", va="center")
+    ax.legend(fontsize=8, loc="lower center")
+
+
+def journey_figure(result):
+    """Assemble the journey artifact from a :class:`~fab_game.demo_journey.JourneyDemoResult` (2×3 panels).
+
+    Row 1 — **purification**: the refining scrub, the dead→ring→clean consequence arc, and the wafer map at
+    the graded Na ring. Row 2 — **crystal growth**: the axial boule drift (CG-1 flattening), the two-sided
+    Voronkov pull window (leakage rim ↔ void core), and the wafer map at the optimum (the clean OSF ring).
     """
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
-    _journey_trajectory_panel(axes[0], result)
-    _journey_arc_panel(axes[1], result)
-    _wafer_map(axes[2], result.ring_forecast.result.wafer,
-               f"the graded ring — refine ×{result.ring_effort:g}")
-    fig.suptitle(f"The journey, stage 1 — purify a {result.grade} feed: refine until the consequence "
-                 "forecast clears (dead → ring → clean)", fontsize=11)
-    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    fig, axes = plt.subplots(2, 3, figsize=(15, 9.2))
+    _journey_trajectory_panel(axes[0][0], result)
+    _journey_arc_panel(axes[0][1], result)
+    _wafer_map(axes[0][2], result.ring_forecast.result.wafer,
+               f"stage 1: the graded Na ring — refine ×{result.ring_effort:g}")
+    _journey_boule_panel(axes[1][0], result)
+    _journey_growth_arc_panel(axes[1][1], result)
+    _wafer_map(axes[1][2], result.growth_optimum_forecast.result.wafer,
+               f"stage 2: the clean OSF ring — pull {result.growth_optimum_pull:g} mm/min")
+    fig.suptitle("The journey — stage 1: purify a feed (the Na ring)  →  stage 2: grow the boule "
+                 "(the two-sided Voronkov window)", fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
     return fig
 
 

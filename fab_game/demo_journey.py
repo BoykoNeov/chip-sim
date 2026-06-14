@@ -1,23 +1,27 @@
-"""The journey demo (phase 1): watch a purification-stage playthrough — refine a dirty feed until it clears.
+"""The journey demo (phases 1–2): a two-stage playthrough — purify a feed, then grow the boule.
 
-The staged sand→chip journey's first stage, played start to finish (plan ``docs/plans/fab-journey.md``;
-:mod:`fab_game.journey`). You begin with a dirty **solar** feedstock and **refine it step by step**; at
-each step a forecast runs the whole line and reports the consequence **band** and the **channel** it would
-fail on. The arc is the showcase for the gradual-failure policy:
+The staged sand→chip journey, played start to finish (plan ``docs/plans/fab-journey.md``;
+:mod:`fab_game.journey`). Two stages so far:
 
-* raw (effort 0) → **DEAD** — residual mobile-ion Na drives ``V_t`` out of spec, the whole wafer scrapped;
-* a fractional pass → **RING** — Na drops into the marginal band, so only the edge-loaded rim fails
-  (a graded yield, the rework signal — refine harder);
-* one full pass → **CLEAN** — the feed is pure enough, full yield.
+**Stage 1 — purification.** Begin with a dirty **solar** feedstock and **refine it step by step**; at each
+step a forecast runs the whole line and reports the consequence **band** and the **channel** it would fail
+on. The arc walks **dead** (residual mobile-ion Na → ``V_t`` out of spec) → a graded **ring** (only the
+edge-loaded rim fails — the rework signal) → **clean**.
 
-Then **commit** the decision into the recipe and **finish** — run the line and score the wafer (the
-:mod:`fab_game.game` economics, reused). A second feed (**metal**, Na-free but iron-laden) shows the *other*
-channel: it reads fine on ``V_t`` yet dies on junction **leakage** — the consequence net doping can't carry.
+**Stage 2 — crystal growth.** On the now-clean feed, set the boule **pull rate**. Riding a fixed *radial*
+hot zone, the pull rate is a genuinely **two-sided** decision (no economics needed) where *both* failures
+are graded (the gradual-failure policy): too **slow** → an interstitial dislocation **leakage rim**, too
+**fast** → a vacancy **void core**, with a clean **OSF ring** between — pull rate moves the ring. The arc
+walks **ring** (slow, leakage) → **clean** (the optimum ~``V*``) → **ring** (fast, voids), and the boule's
+axial ``V_t`` drift (Scheil) **flattens** as the pull speeds up (CG-1).
 
-Zero new physics (it composes :func:`~fab_game.journey.forecast` / :func:`~fab_game.journey.finish`); the
-segregation + the contamination→device chain are tested elsewhere. The live UI (a notebook ``interact`` /
-a Textual journey screen) is the deferred next increment — this banked demo is the *watch-a-playthrough*
-artifact over the headless core.
+Then **commit** each decision into the recipe and **finish** — run the line and score the wafer (the
+:mod:`fab_game.game` economics, reused). A second feed (**metal**, Na-free but iron-laden) shows the other
+purification channel: it reads fine on ``V_t`` yet dies on junction **leakage** (deep-level metals).
+
+Zero new physics (it composes :func:`~fab_game.journey.forecast` / :func:`~fab_game.journey.finish` /
+:func:`~fab_game.journey.boule_profile`). The live UI is the deferred next increment — this banked demo is
+the *watch-a-playthrough* artifact over the headless core.
 
 Run headless (saves the figure, prints the playthrough):
 
@@ -31,6 +35,7 @@ from pathlib import Path
 from .journey import (
     JourneyState,
     StageForecast,
+    boule_profile,
     finish,
     forecast,
     new_journey,
@@ -45,6 +50,7 @@ GRADE = "solar"                  # the showcase feed: walks dead → ring → cl
 MAX_EFFORT = 1.5                 # the refining sweep (zone passes)
 STEP = 0.25                      # one refine() increment
 CLEAN_EFFORT = 1.5               # commit + finish here (refined clean)
+GROWTH_PULLS = (0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0)   # the pull-rate sweep (coarse — the suite runs this)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "fab-game-journey.png"
@@ -53,48 +59,73 @@ OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "fab-game-journey.png"
 
 @dataclass(frozen=True)
 class JourneyDemoResult:
-    """The purification-stage playthrough bundle — the refining arc, the ring, the finish, the contrast."""
+    """The two-stage playthrough bundle — the purification arc, the growth window, the finish, the contrast."""
 
     grade: str
+    # Stage 1 — purification:
     trajectory: tuple                       # (effort, Contamination) — the impurity vector vs effort
     efforts: tuple[float, ...]
     yields: tuple[float, ...]               # forecast yield at each effort (the consequence arc)
-    bands: tuple[str, ...]                  # "dead" / "ring" / "clean" at each effort
-    channels: tuple                          # the failing channel at each effort (or None)
-    arc: tuple[StageForecast, ...]          # the full forecast at each effort
-    ring_effort: float                      # the effort whose band is "ring" (the graded wafer map)
+    bands: tuple[str, ...]
+    channels: tuple
+    arc: tuple[StageForecast, ...]
+    ring_effort: float
     ring_forecast: StageForecast
-    finish_result: LineResult               # the committed, refined feed run + scored end-to-end
+    # Stage 2 — crystal growth:
+    growth_pulls: tuple[float, ...]
+    growth_yields: tuple[float, ...]        # forecast yield at each pull (the two-sided window)
+    growth_bands: tuple[str, ...]
+    growth_channels: tuple
+    growth_arc: tuple[StageForecast, ...]
+    growth_optimum_pull: float              # the best-yield pull (the clean ring)
+    growth_optimum_forecast: StageForecast
+    boule_slow: tuple                       # axial (z, V_t) at a slow pull — the steep Scheil drift
+    boule_opt: tuple                        # axial (z, V_t) at the optimum pull — flattened (CG-1)
+    # End to end:
+    finish_result: LineResult
     finish_score: ScoreCard
-    metal_forecast: StageForecast           # the leakage-channel contrast (Na-free, Fe-laden)
-    log: tuple[str, ...]                    # the playthrough's append-only trail
+    metal_forecast: StageForecast           # the leakage-channel purification contrast
+    log: tuple[str, ...]
+
+
+def _arc(states):
+    forecasts = [forecast(s) for s in states]
+    return forecasts
 
 
 def compute() -> JourneyDemoResult:
-    """Play the purification stage: refine a solar feed across the arc, commit + finish, the metal contrast."""
+    """Play both stages: refine a solar feed (arc), grow the clean boule (two-sided window), commit + finish."""
+    # --- Stage 1: purification (refine the solar feed across the arc) ---
     n = int(round(MAX_EFFORT / STEP))
-    efforts: list[float] = []
-    yields: list[float] = []
-    bands: list[str] = []
-    channels: list = []
-    arc: list[StageForecast] = []
-    for i in range(n + 1):
-        st = JourneyState(grade=GRADE, effort=round(i * STEP, 6), seed=SEED)
-        f = forecast(st)
-        efforts.append(st.effort)
-        yields.append(f.yield_)
-        bands.append(f.band)
-        channels.append(f.channel)
-        arc.append(f)
-
+    pur_states = [JourneyState(grade=GRADE, effort=round(i * STEP, 6), seed=SEED) for i in range(n + 1)]
+    arc = _arc(pur_states)
+    efforts = tuple(s.effort for s in pur_states)
+    yields = tuple(f.yield_ for f in arc)
+    bands = tuple(f.band for f in arc)
+    channels = tuple(f.channel for f in arc)
     ring_i = next((i for i, b in enumerate(bands) if b == "ring"), len(arc) // 2)
-    ring_effort, ring_forecast = efforts[ring_i], arc[ring_i]
 
-    # The multi-step playthrough (builds the append-only log), then commit + finish at a refined-clean effort.
+    # Play + commit the purification (the clean feed the growth stage grows on).
     played = new_journey(GRADE, seed=SEED)
     for _ in range(int(round(CLEAN_EFFORT / STEP))):
         played = played.refine(STEP)
     played = played.commit()
+
+    # --- Stage 2: crystal growth (on the committed clean feed — sweep the pull rate) ---
+    growth_states = [played.grow(p) for p in GROWTH_PULLS]
+    g_arc = _arc(growth_states)
+    growth_yields = tuple(f.yield_ for f in g_arc)
+    growth_bands = tuple(f.band for f in g_arc)
+    growth_channels = tuple(f.channel for f in g_arc)
+    opt_i = max(range(len(growth_yields)), key=lambda i: growth_yields[i])
+    growth_optimum_pull = GROWTH_PULLS[opt_i]
+
+    # The boule axial drift (CG-1 flattening): a slow pull vs the optimum.
+    boule_slow = boule_profile(played.grow(0.5))
+    boule_opt = boule_profile(played.grow(growth_optimum_pull))
+
+    # Commit the growth decision + finish (run + score the whole line).
+    played = played.grow(growth_optimum_pull).commit()
     finish_result, finish_score = finish(played)
 
     metal_forecast = forecast(new_journey("metal", seed=SEED))
@@ -102,40 +133,49 @@ def compute() -> JourneyDemoResult:
     return JourneyDemoResult(
         grade=GRADE,
         trajectory=refining_trajectory(GRADE, max_effort=MAX_EFFORT, step=STEP),
-        efforts=tuple(efforts), yields=tuple(yields), bands=tuple(bands),
-        channels=tuple(channels), arc=tuple(arc),
-        ring_effort=ring_effort, ring_forecast=ring_forecast,
+        efforts=efforts, yields=yields, bands=bands, channels=channels, arc=tuple(arc),
+        ring_effort=efforts[ring_i], ring_forecast=arc[ring_i],
+        growth_pulls=GROWTH_PULLS, growth_yields=growth_yields, growth_bands=growth_bands,
+        growth_channels=growth_channels, growth_arc=tuple(g_arc),
+        growth_optimum_pull=growth_optimum_pull, growth_optimum_forecast=g_arc[opt_i],
+        boule_slow=boule_slow, boule_opt=boule_opt,
         finish_result=finish_result, finish_score=finish_score,
         metal_forecast=metal_forecast, log=played.log,
     )
 
 
 def print_summary(r: JourneyDemoResult) -> None:
-    """Print the purification-stage playthrough — the dead → ring → clean arc, the finish, the contrast."""
-    print("\nThe journey — stage 1: silicon purification (refine a dirty feed until it clears)\n")
-    print(f"  You start with a {r.grade} feedstock (solar-grade — an intermediate feed, already partly")
-    print("  refined; the raw 'sand' grade MGS is dirtier and needs more passes) and refine it step by")
-    print("  step. At each step the forecast runs the whole line and reports the band + the channel:\n")
+    """Print the two-stage playthrough — purify (dead→ring→clean), grow (the two-sided window), finish."""
+    print("\nThe journey — a two-stage playthrough: purify the feed, then grow the boule\n")
+
+    print(f"  STAGE 1 — purification. Start with a {r.grade} feed (solar-grade: an intermediate, already")
+    print("  partly-refined feed; raw 'sand' MGS is dirtier) and refine it step by step:\n")
     print(f"     {'effort':>6}  {'Na (cm⁻³)':>11}  {'yield':>6}  {'band':<5}  channel")
     for e, f in zip(r.efforts, r.arc):
-        ch = f.channel or "—"
-        print(f"     {e:6.2f}  {f.contamination['Na']:11.2e}  {f.yield_:6.0%}  {f.band:<5}  {ch}")
-    print(f"\n  → dead (Na out of spec) → a graded RING at effort {r.ring_effort:g} "
-          f"({r.ring_forecast.yield_:.0%} yield — the rework band) → clean. The continuous refining")
-    print("    effort is the lever; a fractional pass lands the ring that whole passes leap over.\n")
+        print(f"     {e:6.2f}  {f.contamination['Na']:11.2e}  {f.yield_:6.0%}  {f.band:<5}  {f.channel or '—'}")
+    print(f"  → dead (Na) → a graded RING at effort {r.ring_effort:g} ({r.ring_forecast.yield_:.0%}) → clean.\n")
 
-    print("  Commit the decision and finish — run the whole line and score the wafer:")
+    print("  STAGE 2 — crystal growth. On the clean feed, set the boule pull rate (a fixed radial hot zone):\n")
+    print(f"     {'pull':>5}  {'yield':>6}  {'band':<5}  channel")
+    for p, f in zip(r.growth_pulls, r.growth_arc):
+        print(f"     {p:5.2f}  {f.yield_:6.0%}  {f.band:<5}  {f.channel or '—'}")
+    print(f"  → too slow → a graded dislocation LEAKAGE rim; the optimum ~{r.growth_optimum_pull:g} mm/min →")
+    print(f"    a clean OSF ring ({r.growth_optimum_forecast.yield_:.0%}); too fast → a graded void CORE.")
+    print(f"    Both sides graded (the radial hot zone) — no cliff. The boule's axial V_t drift also flattens")
+    print(f"    with a faster pull: seed→tail swing {r.boule_slow[-1][1] - r.boule_slow[0][1]:+.3f} V "
+          f"(slow) vs {r.boule_opt[-1][1] - r.boule_opt[0][1]:+.3f} V (optimum) — CG-1.\n")
+
+    print("  Commit both decisions and finish — run the whole line and score the wafer:")
     sc = r.finish_score
     print(f"     finish: yield {r.finish_result.yield_:.0%}  ·  {sc.n_good}/{sc.n_total} shipped  ·  "
           f"profit {sc.profit:+.0f}\n")
 
     mf = r.metal_forecast
     print(f"  Contrast — a metal feed (Na-free, iron-laden) reads fine on V_t yet is {mf.band.upper()} on")
-    print(f"    a different channel: {mf.channel}.")
-    print("    (the deep-level-metal consequence net doping can't carry — purify harder to scrub it.)\n")
+    print(f"    {mf.channel} (the deep-level-metal consequence net doping can't carry).\n")
 
-    print("  New: the staged journey scaffold + the purification stage (decision → multi-step refine →")
-    print("  consequence forecast → commit → finish). Zero new physics — it composes the validated line.\n")
+    print("  New: the journey's second stage — crystal growth (the two-sided Voronkov pull window, graded")
+    print("  both ways). Zero new physics — it composes the validated line.\n")
 
 
 def save_figure(r: JourneyDemoResult) -> Path:
@@ -154,7 +194,7 @@ def save_figure(r: JourneyDemoResult) -> Path:
 def main() -> None:
     import sys
     if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")     # cm⁻³, →, · on legacy codepages
+        sys.stdout.reconfigure(encoding="utf-8")     # cm⁻³, →, ·, ξ on legacy codepages
 
     r = compute()
     print_summary(r)

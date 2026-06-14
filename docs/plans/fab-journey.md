@@ -42,7 +42,7 @@ built when it has a consumer (the repo's anti-over-build rule, `scope-edge-backl
 | Phase | Stage | Status | One-line intent |
 |------|-------|--------|-----------------|
 | **1** | **Purification** | **BUILT** | refine a dirty feed; the edge-loaded Na ring is the graded consequence |
-| 2 | Crystal growth (Czochralski) | stub | multi-step pull; orientation, diameter, pull rate, length → Scheil V_t drift + grown-in defects (the `GameSession` boule already models the slice curve — reconcile, don't fork) |
+| **2** | **Crystal growth (Czochralski)** | **BUILT** | set the boule pull rate at a radial hot zone — the two-sided Voronkov window (slow → dislocation leakage rim, fast → void core, clean OSF ring between), graded both ways; the axial Scheil drift flattens with a faster pull (CG-1) |
 | 3 | Wafer prep (slice/polish) | stub | kerf/waste, count, TTV/bow → flatness scrap + the killer-defect map |
 | 4 | Diffusion | stub | dose/temperature/time → junction depth + sheet resistance |
 | 5 | Oxidation | stub | ambient/T/time → gate oxide; the thin-oxide V_t lever |
@@ -79,6 +79,30 @@ feed (Na-free, iron-laden) reads fine on `V_t` yet dies on **leakage** — the c
 Surfaces: `fab_game/demo_journey.py` (a *watch-a-playthrough* artifact + the `J1` gallery card / figure)
 and `tests/test_journey.py` + `tests/test_demo_journey.py`.
 
+## Phase 2 — the crystal growth stage (BUILT 2026-06-14)
+
+On the committed-clean feed, the decision is the boule **pull rate** (`JourneyState.grow(pull_rate)`),
+riding a *fixed radial hot zone* (`GROWTH_G_CENTER_K_PER_MM`, `GROWTH_RADIAL_BOOST`). Unlike purification's
+one-sided lever this is a genuinely **two-sided** decision, and — the key call (user-approved, against the
+`gradual-failure-preferred` policy) — the **radial** profile makes *both* failures graded, not a cliff:
+
+- pull **too slow** (ξ<ξ_t at the rim) → interstitial **dislocations → a leakage rim** (graded);
+- pull **too fast** (ξ>ξ_t at the centre) → vacancy **voids/COPs → a core** (graded);
+- the **clean OSF ring** sits between, and pull rate moves it — an interior optimum ~`V*` (≈96% at the
+  hot zone; it caps below 100% because the OSF core/rim always cost a few dies — perfect silicon is hard,
+  hence `CLEAN_BAND = 0.90`).
+
+A uniform gradient would make the slow side an all-or-nothing **leakage cliff** (verified); the radial
+profile (A2's already-wired knob — *used*, not rebuilt) is what grades it. `forecast` names the channel by
+reading the growth regime (dislocation leakage vs grown-in voids vs the purification roots). The
+multi-step "watch it develop" is `boule_profile` — the axial Scheil `V_t` drift seed→tail, which a faster
+pull **flattens** (CG-1). **Honest caveat:** "no economics needed" is only *bracketed* — within the clean
+window what separates pulls is **throughput** (faster = more wafers) = the same deferred economics.
+
+**Deferred here:** Level-2 *variable mid-pull schedule* (a true recalibrate-as-you-grow = variable-`k`
+Scheil, new physics); C1 oxygen/thermal-donors, CG-3 Stefan (already standalone deepenings); the
+across-wafer-to-cut handoff (the boule's axial drift feeds phase 3).
+
 ## Deferred (explicit)
 
 - **The refining / grade economics — the cost side of the decision (the #1 open item).** Today `finish`
@@ -92,7 +116,7 @@ and `tests/test_journey.py` + `tests/test_demo_journey.py`.
   them); built when each has a consumer.
 - **All difficulty mechanics** — per the user's "start easy, difficulty later."
 - **The live interactive UI** — a notebook `interact` cell and/or a Textual journey screen driving the
-  headless core. The scripted playthrough + figure is phase 1's visible artifact; the live UI is the
+  headless core. The scripted playthrough + figure is phases 1–2's visible artifact; the live UI is the
   next increment.
 
 ## References

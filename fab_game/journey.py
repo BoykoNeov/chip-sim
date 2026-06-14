@@ -39,15 +39,29 @@ from .pipeline import LineResult, run_line
 from .recipe import DEFAULT_RECIPE, Recipe
 from .scoring import ScoreCard, score_wafer
 from .spec import DEFAULT_SPECS
-from .variation import Variation
+from .variation import NO_VARIATION, Variation
 
 DEFAULT_GRADE = "solar"          # start with an intermediate (dirty) feed — the refining IS the gameplay
 DEFAULT_STEP = 0.25              # one refine() increment, in zone-passes (≈ half a decade of Na per step)
-DEFAULT_GRID_N = 9               # the forecast map resolution (enough dies to read a ring)
+DEFAULT_GRID_N = 11              # forecast map resolution — fine enough to resolve the OSF core/ring/rim
+#                                  (at 11 the radial growth optimum reads a clean ~96 %; coarser dicing
+#                                  over-weights the core/rim and the optimum never clears "clean")
+
+# Crystal growth (phase 2) — the pull-rate decision rides a fixed RADIAL hot zone so BOTH grown-in
+# consequences are graded (the gradual-failure policy): a vacancy void CORE (pull too fast) + an
+# interstitial dislocation/leakage RIM (pull too slow) + a clean OSF ring between, with pull rate moving
+# the ring. The centre gradient + boost are FLAGGED house knobs (chosen so the two-sided window has an
+# interior optimum ~V*); ξ_t + the Voronkov criterion are the cited tight legs. (Uniform G would make the
+# slow side an all-or-nothing leakage CLIFF — the radial profile is what grades it; A2's wired knob.)
+GROWTH_G_CENTER_K_PER_MM = 4.0   # the centre interface gradient G_center (radial: G(r)=G_center·(1+boost·r²))
+GROWTH_RADIAL_BOOST = 4.0        # the radial steepness — sets the void-core/leak-rim spread (the OSF ring)
+DEFAULT_PULL_MM_MIN = 2.0        # the two-sided optimum at this hot zone (~93 %: minimal core + cleared rim)
 
 # Consequence bands (the ok → rework → fail spectrum) — yield thresholds with margin so a boundary
-# forecast doesn't flicker (ADR 0005 §5: coarse player guidance, not a magnitude claim).
-CLEAN_BAND = 0.95                # ≥ this yield: clean — the decision didn't bite
+# forecast doesn't flicker (ADR 0005 §5: coarse player guidance, not a magnitude claim). The CLEAN floor
+# is 0.90, not 1.0: the radial growth optimum caps ~93 % (the OSF core/rim always cost a few dies — perfect
+# silicon is hard), so "clean" must mean "as clean as this stage gets", not "flawless".
+CLEAN_BAND = 0.90                # ≥ this yield: clean — the decision didn't (meaningfully) bite
 DEAD_BAND = 0.05                 # ≤ this yield: dead — scrap (essentially every die out)
 
 
@@ -87,21 +101,30 @@ def _mean_vt(result: LineResult) -> float | None:
     return sum(vts) / len(vts) if vts else None
 
 
-def _dominant_channel(result: LineResult) -> str | None:
+def _dominant_channel(result: LineResult, recipe: Recipe) -> str | None:
     """Name the channel the dead dies fail on (the consequence the player watches propagate), or ``None``.
 
-    Reads the worst (outer-most) dead die's verdict reasons — for purification the kill is wafer-level, so
-    one die is representative. Distinguishes the mobile-ion ``V_t`` ring from deep-level-metal leakage (the
-    "looks fine on threshold but dies on leakage" story the metal grade carries)."""
+    Reads the worst (outer-most) dead die's verdict reasons. The same verdict word can have **different
+    roots** in different stages, so it reads the crystal-growth regime to disambiguate: with the Voronkov
+    hot zone engaged (``thermal_gradient`` set), a *killer particle* is a **grown-in void/COP** (pull too
+    fast) and *leakage* is from **grown-in dislocations** (pull too slow) — otherwise leakage is a
+    deep-level **metal** (the purification story) and a particle is a fab-floor defect."""
     dead = result.dead_dies
     if not dead:
         return None
     worst = max(dead, key=lambda d: d.radius_frac)
     reasons = " ".join(worst.verdict.reasons).lower()
+    grown_in = recipe.czochralski.thermal_gradient_K_per_mm is not None   # Voronkov hot zone engaged
     if "v_t" in reasons:
         return "V_t — mobile-ion Na → gate-oxide charge"
     if "leak" in reasons:
+        if grown_in:
+            return "junction leakage — grown-in dislocations (crystal pulled too slow)"
         return "junction leakage — deep-level metal (Fe/Cu)"
+    if "particle" in reasons or "defect" in reasons:
+        if grown_in:
+            return "grown-in voids/COPs (crystal pulled too fast)"
+        return "killer particle (fab-floor defect)"
     if "i_dsat" in reasons or "i_d" in reasons:
         return "drive current (I_Dsat)"
     return worst.verdict.reasons[0] if worst.verdict.reasons else "unknown"
@@ -115,16 +138,16 @@ def forecast(state: "JourneyState") -> StageForecast:
     a marginal feed kills an edge ring (rework: refine harder); ``dead`` ⇒ scrapped."""
     recipe = state.current_recipe
     wafer = run_line(recipe, seed=state.seed, variation=Variation(), specs=DEFAULT_SPECS, grid_n=state.grid_n)
-    result = LineResult.of(f"{state.grade} · refine ×{state.effort:g}", wafer)
+    result = LineResult.of(state.label, wafer)
     y = result.yield_
     band = consequence_band(y)
-    channel = _dominant_channel(result) if band != "clean" else None
+    channel = _dominant_channel(result, recipe) if band != "clean" else None
     if band == "clean":
-        headline = f"clean — {y:.0%} yield, no consequence (feed pure enough)"
+        headline = f"clean — {y:.0%} yield, no meaningful consequence"
     elif band == "dead":
         headline = f"DEAD — {y:.0%} yield, scrapped on {channel}"
     else:
-        headline = f"ring — {y:.0%} yield, an edge ring fails on {channel} (rework: refine harder)"
+        headline = f"ring — {y:.0%} yield, an edge ring fails on {channel}"
     return StageForecast(band=band, channel=channel, yield_=y, mean_vt=_mean_vt(result),
                          contamination=state.contamination.as_dict(), result=result, headline=headline)
 
@@ -142,6 +165,24 @@ def refining_trajectory(grade: str, *, max_effort: float = 2.0, step: float = DE
     return tuple((round(i * step, 6), zone_refine(feed, i * step)) for i in range(n + 1))
 
 
+def boule_profile(state: "JourneyState", *, n_slices: int = 7, z_max: float = 0.9):
+    """The axial V_t profile down the boule (seed → tail) at the current pull — the 'watch it develop' view.
+
+    Runs the line (``NO_VARIATION`` → the clean Scheil signal, one die) at ``n_slices`` axial positions and
+    returns ``(slice_z, mean_V_t)`` pairs. Scheil segregation walks the substrate doping (so ``V_t``) up the
+    boule; a **faster pull flattens** that drift (CG-1's ``k_eff → 1``). This is the boule developing as it
+    is pulled — the profile the cut stage (phase 3) will read to choose where to slice."""
+    out = []
+    for i in range(n_slices):
+        z = i * z_max / (n_slices - 1) if n_slices > 1 else 0.0
+        rec = replace(state.current_recipe,
+                      czochralski=replace(state.current_recipe.czochralski, slice_z=z))
+        wafer = run_line(rec, seed=state.seed, variation=NO_VARIATION, specs=DEFAULT_SPECS, grid_n=1)
+        vt = wafer.dies[0].V_t
+        out.append((round(z, 4), float(vt) if vt is not None else float("nan")))
+    return tuple(out)
+
+
 # --------------------------------------------------------------------------- #
 # The journey state — an immutable, accumulating recipe + the purification decision
 # --------------------------------------------------------------------------- #
@@ -157,15 +198,36 @@ class JourneyState:
     recipe: Recipe = DEFAULT_RECIPE
     grade: str = DEFAULT_GRADE
     effort: float = 0.0
+    pull_rate: float | None = None   # crystal-growth lever (mm/min); None = growth not engaged (the seam)
     seed: int = 0
     grid_n: int = DEFAULT_GRID_N
     log: tuple[str, ...] = ()
 
     @property
     def current_recipe(self) -> Recipe:
-        """The accumulator with the in-progress purification decision (grade + refining effort) folded in."""
-        return replace(self.recipe, purification=replace(self.recipe.purification,
-                                                         grade=self.grade, zone_passes=self.effort))
+        """The accumulator with the in-progress decisions folded in: the purification grade + effort, and
+        (when a pull rate is set) the crystal-growth pull at the fixed radial hot zone.
+
+        The overlay is idempotent for an already-committed decision (re-applying the value it baked), so a
+        single :meth:`commit` can fold whichever stage is in progress — the thin two-stage scaffold, not a
+        per-stage state machine."""
+        recipe = replace(self.recipe, purification=replace(self.recipe.purification,
+                                                           grade=self.grade, zone_passes=self.effort))
+        if self.pull_rate is not None:
+            recipe = replace(recipe, czochralski=replace(
+                recipe.czochralski,
+                pull_rate_mm_min=self.pull_rate,
+                thermal_gradient_K_per_mm=GROWTH_G_CENTER_K_PER_MM,
+                radial_gradient_boost=GROWTH_RADIAL_BOOST))
+        return recipe
+
+    @property
+    def label(self) -> str:
+        """A short human label for the current recipe-so-far (grade · refine, and pull rate if grown)."""
+        s = f"{self.grade}·refine×{self.effort:g}"
+        if self.pull_rate is not None:
+            s += f" · pull {self.pull_rate:g} mm/min"
+        return s
 
     @property
     def contamination(self) -> Contamination:
@@ -188,10 +250,28 @@ class JourneyState:
         return replace(nxt, log=self.log + (f"refine +{step:g} → effort {nxt.effort:g}: "
                                             f"Na {c.Na:.2e} cm⁻³",))
 
+    def grow(self, pull_rate: float = DEFAULT_PULL_MM_MIN) -> "JourneyState":
+        """Set (or recalibrate) the boule pull rate — the crystal-growth lever (mm/min).
+
+        The pull rate rides the fixed radial hot zone (:data:`GROWTH_G_CENTER_K_PER_MM` /
+        :data:`GROWTH_RADIAL_BOOST`): too fast → a vacancy void **core**, too slow → an interstitial
+        dislocation/leakage **rim**, the clean OSF ring between — pull rate moves the ring. Call again to
+        recalibrate (re-decide + re-observe — the Level-1 multi-step; a true variable mid-pull *schedule*
+        is the named deferred Level-2)."""
+        if pull_rate <= 0:
+            raise ValueError(f"pull rate must be > 0 mm/min, got {pull_rate}")
+        return replace(self, pull_rate=pull_rate,
+                       log=self.log + (f"grow: pull {pull_rate:g} mm/min "
+                                       f"(ξ_centre = {pull_rate / GROWTH_G_CENTER_K_PER_MM:.3f})",))
+
     def commit(self) -> "JourneyState":
-        """Fold the purification decision into the accumulating recipe (the next stage builds on it)."""
-        return replace(self, recipe=self.current_recipe,
-                       log=self.log + (f"committed purification: {self.grade} × {self.effort:g} passes",))
+        """Fold the in-progress decision(s) into the accumulating recipe — the next stage builds on it.
+
+        One ``commit`` folds whichever stage is in progress (the overlay is idempotent for an already-
+        committed decision); for two stages this thin scaffold suffices — no per-stage state machine. (When
+        a third stage lands, the clean refactor is "actions modify the recipe directly, commit is just a log
+        boundary" — not now.)"""
+        return replace(self, recipe=self.current_recipe, log=self.log + (f"committed: {self.label}",))
 
 
 def new_journey(grade: str = DEFAULT_GRADE, *, seed: int = 0, grid_n: int = DEFAULT_GRID_N,
