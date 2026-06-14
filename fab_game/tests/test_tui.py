@@ -22,7 +22,15 @@ from __future__ import annotations
 import pytest
 
 from fab_game.dashboard import dashboard_summary, run_dashboard
+from fab_game.game import GameConfig, new_session, play
 from fab_game.plots import WAFER_FAIL_GLYPH, WAFER_PASS_GLYPH, _grid_n, wafer_map_text
+from fab_game.session_view import (
+    history_trail,
+    inspect_line,
+    oxide_recipe,
+    session_header,
+    session_summary,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -108,5 +116,88 @@ def test_app_run_button_shows_the_failure_trail():
             assert "NILS" in app.last_summary
             assert app.last_summary == dashboard_summary(run_dashboard(defocus_nm=250.0))
             assert WAFER_FAIL_GLYPH in app.last_map
+
+    asyncio.run(scenario())
+
+
+# --------------------------------------------------------------------------- #
+# 3. The v2 roguelike screen (importorskip textual) — navigation/seam + the fidelity loop
+# --------------------------------------------------------------------------- #
+def test_play_button_opens_the_roguelike_screen_on_a_fresh_run():
+    """The dashboard's *Play roguelike* button pushes ``RoguelikeScreen``; it opens on a fresh run whose
+    panels equal the headless ``session_view`` renderers of ``new_session`` verbatim; ``escape`` pops back."""
+    pytest.importorskip("textual")
+    import asyncio
+
+    from fab_game.tui import FabLineApp, RoguelikeScreen
+
+    async def scenario():
+        app = FabLineApp()
+        async with app.run_test(size=(120, 50)) as pilot:
+            await pilot.pause()
+            await pilot.click("#play-game")                     # the button wiring → push_screen
+            await pilot.pause()
+            screen = app.screen
+            assert isinstance(screen, RoguelikeScreen)
+            seam = new_session(GameConfig(), seed=0)            # the screen's default fresh run
+            assert screen.last_header == session_header(seam)  # rendered verbatim (never recomputed)
+            assert "roguelike" in screen.last_header and "0/" in screen.last_header
+            assert screen.last_trail == history_trail(seam) and "no turns played yet" in screen.last_trail
+            assert screen.last_inspect == inspect_line(seam, oxide_recipe(20.0))  # seed-slice projection
+            assert "slice z=0.00" in screen.last_inspect
+            await pilot.press("escape")                          # escape pops back to the dashboard
+            await pilot.pause()
+            assert not isinstance(app.screen, RoguelikeScreen)
+
+    asyncio.run(scenario())
+
+
+def test_roguelike_screen_drives_the_session_exactly_like_the_headless_model():
+    """Drive a known process / adapt / scrap sequence through the screen's buttons and assert the
+    resulting session equals the headless ``play(new_session(cfg, seed), [same decisions])`` **verbatim**
+    (budget / score / history) — the §5 fidelity contract: the thin driver never diverges from the model.
+    Also: the boule exhausts → the action buttons disable and the inspect panel shows the end tally."""
+    pytest.importorskip("textual")
+    import asyncio
+
+    from textual.widgets import Button, Input
+
+    from fab_game.tui import FabLineApp, RoguelikeScreen
+
+    cfg = GameConfig(n_wafers=3, z_max=0.9, grid_n=3)
+    decisions = [oxide_recipe(20.0), oxide_recipe(17.0), "scrap"]   # process · adapt (thin) · scrap the tail
+
+    async def scenario():
+        app = FabLineApp()
+        async with app.run_test(size=(120, 50)) as pilot:
+            await pilot.pause()
+            screen = RoguelikeScreen(cfg, seed=5)
+            await app.push_screen(screen)
+            await pilot.pause()
+
+            screen.query_one("#in-oxide", Input).value = "20"   # turn 0: process at the seam oxide
+            await pilot.click("#process")
+            await pilot.pause()
+            screen.query_one("#in-oxide", Input).value = "17"   # turn 1: adapt — thin the gate oxide
+            await pilot.click("#process")
+            await pilot.pause()
+            await pilot.click("#scrap")                          # turn 2: scrap the doomed tail
+            await pilot.pause()
+
+            expected = play(new_session(cfg, seed=5), decisions)
+            assert screen.session.budget == expected.budget
+            assert screen.session.score == expected.score
+            assert [(r.wafer_index, r.scorecard.revenue, r.scorecard.cost, r.scrapped, r.scorecard.n_good)
+                    for r in screen.session.history] == \
+                   [(r.wafer_index, r.scorecard.revenue, r.scorecard.cost, r.scrapped, r.scorecard.n_good)
+                    for r in expected.history]
+            # The run is over: the action buttons disable (the honest affordance) and the inspect panel
+            # shows the end-of-run tally — all rendered from the headless renderers verbatim.
+            assert screen.session.done and screen.session.boule_exhausted
+            assert screen.query_one("#process", Button).disabled
+            assert screen.query_one("#scrap", Button).disabled
+            assert screen.last_header == session_header(expected)
+            assert screen.last_inspect == session_summary(expected)
+            assert screen.last_trail == history_trail(expected)
 
     asyncio.run(scenario())

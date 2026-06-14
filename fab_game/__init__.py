@@ -72,6 +72,16 @@ from .game import (
     process_wafer,
     scrap_wafer,
 )
+from .session_view import (
+    history_trail,
+    inspect_line,
+    oxide_recipe,
+    projected_vt,
+    session_header,
+    session_summary,
+    turn_line,
+    turn_recipe,
+)
 
 __all__ = [
     # state
@@ -97,4 +107,7 @@ __all__ = [
     # game / roguelike session (G7)
     "GameConfig", "GameSession", "RunRecord", "ReworkSpec", "MARKET_BINS",
     "new_session", "process_wafer", "scrap_wafer", "play",
+    # session_view (the headless renderers the TUI v2 roguelike screen drives)
+    "turn_recipe", "oxide_recipe", "projected_vt", "inspect_line", "session_header",
+    "turn_line", "history_trail", "session_summary",
 ]

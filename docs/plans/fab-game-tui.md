@@ -1,7 +1,14 @@
 # Plan — fab-game Textual TUI (the deferred terminal front-end)
 
-Status: **v1 BUILT (2026-06-14)** (drafted same day). The plan below is the as-built shape; the
-roguelike loop (§7) stays the deferred v2. **What landed:** `fab_game/tui.py` (`FabLineApp` — the
+Status: **v1 BUILT (2026-06-14); v2 roguelike loop BUILT (2026-06-14)** (drafted same day). The plan
+below is the as-built shape. **v2 (§7) landed:** `fab_game/session_view.py` (the headless renderers —
+`turn_recipe`/`oxide_recipe`/`projected_vt`/`inspect_line`/`session_header`/`turn_line`/`history_trail`/
+`session_summary`, re-exported from `__init__`, tested by `tests/test_session_view.py`) + a
+`RoguelikeScreen` in `tui.py` driving `game.py`'s `GameSession` (oxide-knob *adapt* lever + Process/Scrap
+Buttons, panels rendered from `session_view` verbatim, `session.done`-guarded + buttons disabled when
+over), opened from a *Play roguelike* button on `FabLineApp`. The pilot leg pins the §5 fidelity contract:
+a driven Process/adapt/Scrap sequence yields a session **equal to** the headless
+`play(new_session(cfg, seed), [same decisions])`. **What landed in v1:** `fab_game/tui.py` (`FabLineApp` — the
 only module importing `textual`, *not* re-exported from `fab_game/__init__`, mirroring `plots.py`),
 the new headless `fab_game.plots.wafer_map_text(wafer, *, color=False)` renderer, the `[tui]` extra
 (`textual>=8`, verified on 8.2.7), and `fab_game/tests/test_tui.py` (4 pure-renderer legs + 2
@@ -155,13 +162,24 @@ On landing, the existing TUI stubs point here: **fab-game.md §9** ("A Textual T
 this — at most append "(plan drafted at `docs/plans/fab-game-tui.md`)" to the existing
 `[[fab-game]]` "Textual TUI deferred" line when convenient.
 
-## 7. v2 sketch — the roguelike loop (deferred)
+## 7. v2 — the roguelike loop (**BUILT 2026-06-14**)
 
-When v1 is banked and a session loop is wanted: add a second Textual screen driving
-`fab_game.game.GameSession` — `process_wafer` / `scrap_wafer` / the oxide-thinning *adapt* lever —
-down one boule (one run), surfacing the G2 Scheil `V_t` drift as the difficulty curve and the
-`ScoreCard` (budget / revenue / profit) as the running score. Still a thin driver: `game.py` already
-owns the entire session model headless and tested (G7); the screen only renders it and binds keys.
+As sketched and built: a second Textual screen (`RoguelikeScreen`) driving `fab_game.game.GameSession`
+— `process_wafer` / `scrap_wafer` / the oxide-thinning *adapt* lever — down one boule (one run),
+surfacing the G2 Scheil `V_t` drift as the difficulty curve (the `inspect_line` decision support) and the
+`ScoreCard` (budget / score / per-turn profit + bin mix) as the running ledger. A thin driver: `game.py`
+owns the session model and the new headless `session_view.py` owns the strings (both tested without
+Textual — the §9/§4 discipline that the load-bearing string-building lives outside the swallow-prone
+interactive surface); the screen only renders them and binds buttons.
+
+**Two as-built notes beyond the sketch.** (a) *No wafer map on this screen* — the `RunRecord` carries no
+`WaferState`, and the spatial map is the dashboard screen's job; the roguelike screen is the
+economic/decision arc (header + inspect + ledger). (b) *Actions are Buttons, not the sketched "binds
+keys"* — the oxide `Input` is auto-focused, so a single-letter action binding would be shadowed the
+moment the player edits it (the same footgun §4/`FabLineApp` documents); only `escape`/`q` (non-contextual)
+are bindings. The action handlers no-op + the buttons disable once `session.done` (the model *raises* when
+the run is over — a thin driver must never let that throw into the swallow-prone loop).
+
 The tycoon economy stays deferred (ADR 0005).
 
 ## 8. What this is NOT

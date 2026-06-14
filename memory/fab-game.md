@@ -40,9 +40,28 @@ in `tests/test_tui.py`: 4 pure-renderer legs + 2 `importorskip` App-pilot legs (
 **Verified:** fast lane 637 green; clean 5×5 under `-n auto` → **no notebook-style flake** (`run_test`
 is in-process asyncio, no zmq → the slow/`xdist_group` escape hatch was NOT needed); textual-absent →
 4 pass/2 skip. As-built deviation: the button-click pilot test needs `run_test(size=(120,50))` (the
-default 80×24 screen clips the Run button below the fold). **Remaining front-end = the G7
-`GameSession` roguelike loop (TUI v2) + the tycoon — both still deferred** (named-consumer physics
-backlog stays exhausted). No new physics/ADR.
+default 80×24 screen clips the Run button below the fold). No new physics/ADR.
+
+**>> Textual TUI v2 — the G7 roguelike loop — BUILT 2026-06-14 (`docs/plans/fab-game-tui.md` §7):**
+the deferred session loop landed. NEW headless `fab_game/session_view.py` = the load-bearing string
+renderers for a `GameSession` (`turn_recipe`/`oxide_recipe`/`projected_vt`/`inspect_line`/
+`session_header`/`turn_line`/`history_trail`/`session_summary`), import-pure (peer to `dashboard.py`,
+re-exported from `__init__`, tested by `tests/test_session_view.py` — the §9 discipline: the
+swallow-prone Textual surface renders these verbatim, so they're tested WITHOUT textual). `tui.py`
+gained `RoguelikeScreen` driving `game.py`'s `GameSession` down one boule: ONE oxide-minutes Input
+(the *adapt* lever) + **Process/Scrap/New-run/Back Buttons** (NOT letter bindings — the auto-focused
+Input would shadow them, the same v1 footgun; only `escape`/`q` are bindings), opened from a *Play
+roguelike* button on `FabLineApp` (`escape` pops back). **THE bug found + fixed:** naming the repaint
+helper `_render` **overrode Textual's internal `Widget._render()`** → `visual=None` → render crash;
+renamed `_repaint`/`_apply_action` (don't shadow Textual internals). Two as-built calls: (a) **no wafer
+map** (the `RunRecord` carries no `WaferState`; the map is the dashboard screen's job — this screen is
+the economic/decision arc); (b) action handlers **no-op + buttons disable once `session.done`** (the
+model *raises* when over — a thin driver must never throw into the swallow-prone loop, advisor's catch).
+The pilot's load-bearing leg is **fidelity not movement**: a driven Process/adapt/Scrap sequence yields
+a session == headless `play(new_session(cfg, seed), [same decisions])` verbatim. **Verified:** fast lane
+651 green under `-n auto` (no flake across 3 repeats), `import fab_game` stays textual-free.
+**Remaining front-end = the tycoon ONLY** (roguelike loop now built; named-consumer physics backlog
+stays exhausted).
 
 **The seven synced choices:** (1) **full grand tour** — every distinct step,
 purification→Czochralski→wafer-prep→oxidation→litho→diffusion→etch/depo→device→dice/bond/test,
