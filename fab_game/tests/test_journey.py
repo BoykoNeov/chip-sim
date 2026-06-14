@@ -212,6 +212,82 @@ def test_grow_rejects_a_nonpositive_pull():
 
 
 # --------------------------------------------------------------------------- #
+# Phase 3 — the slice/cut stage (reads the boule drift; coupled to the phase-2 pull)
+# --------------------------------------------------------------------------- #
+def _grown_cut(pull: float, z: float, *, grade: str = "clean", seed: int = 0) -> JourneyState:
+    """A grown-and-cut state on a *clean* feed — the consequence is the Scheil drift, not residual Na."""
+    return JourneyState(grade=grade, pull_rate=pull, slice_z=z, seed=seed)
+
+
+def test_cut_sets_the_slice_position_and_composes_with_the_growth_overlay():
+    """``cut`` sets the axial cut position and overlays it onto the recipe — *composing* with the growth
+    overlay (the pull + the radial hot zone survive the cut)."""
+    cz = new_journey("clean").grow(2.0).cut(0.6).current_recipe.czochralski
+    assert cz.slice_z == 0.6
+    assert cz.pull_rate_mm_min == 2.0                          # the growth overlay is not clobbered
+    assert cz.radial_gradient_boost == GROWTH_RADIAL_BOOST
+
+
+def test_slice_window_is_graded_clean_to_ring_to_dead_down_the_boule():
+    """THE policy check (gradual-failure): cutting near the seed is clean, cutting deeper walks through a
+    **graded** V_t edge ring (the radial t_ox non-uniformity grades the cliff — the outer dies cross the
+    spec ceiling first), then dead at the tail. Not an all-or-nothing flip."""
+    clean = forecast(_grown_cut(2.0, 0.75))
+    ring = forecast(_grown_cut(2.0, 0.88))
+    dead = forecast(_grown_cut(2.0, 0.93))
+    assert clean.band == "clean"
+    assert ring.band == "ring" and 0.0 < ring.yield_ < clean.yield_   # a partial edge ring (rework territory)
+    assert dead.band == "dead" and dead.yield_ < ring.yield_
+
+
+def test_slice_consequence_is_coupled_to_the_phase2_pull():
+    """THE journey payoff — the slice stage *reads a prior committed decision*: the SAME deep cut is clean
+    on a flat boule (a fast phase-2 pull flattened the Scheil drift) but dead on a slow-pulled one (already
+    lost to its interstitial dislocation leakage rim before the cut). A bad pull can't be sliced away."""
+    deep = 0.85
+    fast = forecast(_grown_cut(2.0, deep))      # flat boule (optimum pull) — cuts deep, stays in spec
+    slow = forecast(_grown_cut(0.5, deep))      # slow pull — the leakage rim already killed it
+    assert fast.band == "clean"
+    assert slow.yield_ < fast.yield_ and slow.band in ("ring", "dead")
+    # the worst die dies on the dislocation *leakage* rim (the growth decision), not the cut — the existing
+    # worst-die heuristic resolves the multi-channel wafer without new priority logic (advisor).
+    assert "leakage" in (slow.channel or "").lower()
+
+
+def test_slice_channel_names_the_scheil_drift_when_cut_too_deep():
+    """A clean feed cut too deep fails on V_t **high** (Scheil-walked substrate doping) — named distinctly
+    from the purification V_t-*low* mobile-ion Na channel (the direction discriminates the root)."""
+    f = forecast(_grown_cut(2.0, 0.90))
+    assert f.band != "clean"
+    assert f.channel is not None
+    assert "scheil" in f.channel.lower() and "v_t" in f.channel.lower()
+
+
+def test_cut_folds_into_the_recipe_on_commit():
+    """``commit`` bakes the cut (the slice position) into the accumulator — preserving the grown boule."""
+    s = new_journey("clean").grow(2.0).commit().cut(0.6).commit()
+    assert s.recipe.czochralski.slice_z == 0.6
+    assert s.recipe.czochralski.pull_rate_mm_min == 2.0       # the prior growth commit survives
+
+
+def test_cut_rejects_an_out_of_range_position():
+    """The cut is an axial fraction ∈ [0, 1) — the seed end inclusive, the tail end open."""
+    with pytest.raises(ValueError):
+        new_journey("clean").cut(1.0)
+    with pytest.raises(ValueError):
+        new_journey("clean").cut(-0.1)
+
+
+def test_no_cut_is_a_seam():
+    """A journey that never cuts leaves ``slice_z`` at the recipe default (0.0) — the new lever is a true
+    seam: an explicit cut at the seed reproduces the no-cut forecast bit-for-bit."""
+    grown = JourneyState(grade="clean", pull_rate=2.0)
+    assert grown.slice_z is None
+    assert grown.current_recipe.czochralski.slice_z == 0.0           # the recipe default, untouched
+    assert forecast(grown).yield_ == forecast(grown.cut(0.0)).yield_  # cut(0) is the identity (the seam)
+
+
+# --------------------------------------------------------------------------- #
 # finish — run + score the whole line, end to end
 # --------------------------------------------------------------------------- #
 def test_finish_runs_and_scores_a_refined_feed():

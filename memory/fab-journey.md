@@ -1,8 +1,10 @@
 ---
 name: fab-journey
-description: the staged sand→chip journey front-end — phases 1-2 (purification + crystal growth) BUILT; the cost-side decision + difficulty + live UI deferred
-metadata:
+description: the staged sand→chip journey front-end — phases 1-3 (purification + crystal growth + slice/cut) BUILT; the cost-side decision + difficulty + live UI deferred
+metadata: 
+  node_type: memory
   type: project
+  originSessionId: dbb05de6-d8c9-43a5-8b51-794f149318e3
 ---
 
 The staged sand→chip **journey** — a new player-facing front-end (sibling to the roguelike
@@ -29,13 +31,15 @@ GameSession discipline: frozen/immutable, action→new state, append-only log, d
 - Surfaces: `demo_journey.py` (watch-a-playthrough) + the **J1** gallery card +
   `docs/figures/fab-game-journey.png`; tests `test_journey.py` (16) + `test_demo_journey.py` (4).
 
-**THE #1 open item (advisor — deferred but NAMED, not silently shipped):** the purification
-*decision is currently ONE-SIDED.* The consequence spectrum is built (under-refining →
-ring/dead) but refining is **free** and grades are all one price → the optimal play is
-trivially "refine until clean" (a cleanup slider, not a decision). The **cost side** — a grade
-price (cheap-dirty MGS vs expensive-clean EGS) + a per-pass refining cost — is what makes *how
-much to refine* a real two-sided Goldilocks decision (ring penalizes under-refining, cost
-penalizes over-refining; the shape the G7 oxide lever has). **The natural next increment.**
+**THE #1 open item (advisor — deferred but NAMED, not silently shipped) — now shared by TWO stages:**
+the purification *and* the slice/cut decisions are both ONE-SIDED absent economics. Purification: refining
+is **free** + grades are one price → "refine until clean". Slice/cut: cutting at the seed is always safest
+→ "camp at the seed"; the value of cutting deeper = **more wafers per boule** = throughput. The **cost
+side** — a grade/per-pass refining price + a per-wafer-vs-throughput cost — is the same missing half for
+both: the ring/Scheil-drift penalizes under-doing it, cost penalizes over-doing it (the two-sided
+Goldilocks shape the G7 oxide lever has). The consequence spectrum (forecast bands) is built for both;
+**the natural next increment.** (Crystal growth is the exception — the radial hot zone gave it
+two-sidedness with NO economics.)
 
 **Phase 2 (crystal growth) BUILT 2026-06-14** — `JourneyState.grow(pull_rate)` (the boule pull
 lever) on a FIXED RADIAL hot zone (`GROWTH_G_CENTER_K_PER_MM=4`, `GROWTH_RADIAL_BOOST=4`).
@@ -49,13 +53,34 @@ the growth regime to name dislocation-leakage vs grown-in-voids (vs the purifica
 `boule_profile` = the axial Scheil drift (CG-1 flattens it faster). **Honest caveat:** "no economics"
 is only BRACKETED — within the clean window throughput (faster=more wafers) is the same deferred cost.
 demo_journey now a TWO-stage playthrough (2×3 figure); 28 journey tests (the policy test:
-`test_growth_window_is_two_sided_and_graded_on_both_sides`). **Deferred:** Level-2 variable mid-pull
-schedule (variable-k Scheil = new physics); C1/CG-3 (standalone deepenings); the cut/slice stage
-(phase 3, reads the boule drift).
+`test_growth_window_is_two_sided_and_graded_on_both_sides`). **Deferred here:** Level-2 variable mid-pull
+schedule (variable-k Scheil = new physics); C1/CG-3 (standalone deepenings).
 
-**Deferred:** the other stages' interactive logic (run at recipe defaults today — see the
-plan's stage table), all difficulty mechanics ("start easy, difficulty later"), the live UI
-(notebook `interact` / Textual journey screen — the scripted playthrough is phase-1's artifact).
+**Phase 3 (slice/cut) BUILT 2026-06-14** — `JourneyState.cut(slice_z)` (axial fraction ∈ [0,1); new
+`slice_z` overlay field, composes with the growth overlay on the shared `czochralski` knobs). **The first
+stage that READS a prior committed decision** — the journey's "watch it propagate" payoff, finally end to
+end. The cut reads the boule's axial **Scheil drift** (`boule_profile` = the watch-it-develop view): boron
+`k<1` walks `V_t` UP toward the tail → cut too deep → above the `V_t` window. **Graded, NOT a cliff, with
+ZERO new physics:** the *existing* radial `t_ox` non-uniformity spreads `V_t` across the map so the OUTER
+dies cross the ceiling first → a `V_t` edge **ring** (arc clean → ring ~z 0.87–0.90 → dead at the tail).
+**THE coupling (the headline test `test_slice_consequence_is_coupled_to_the_phase2_pull`):** how deep you
+can cut is set by the **phase-2 pull** — a fast pull flattened the drift (CG-1) so a flat boule cuts DEEP;
+a slow pull already lost the wafer to its A1 dislocation **leakage rim** BEFORE the cut → "a bad pull can't
+be sliced away." `_dominant_channel` disambiguates the cut's `V_t`-**high** Scheil-drift root (keyed on
+direction `(high)` AND `slice_z>0`) from purification's `V_t`-**low** Na — the existing worst-die heuristic
+names the leakage rim on the slow-pull side (no new priority logic). **Honest scope (advisor):** this is the
+**cut**, not all of wafer-prep — polish/flatness (TTV/bow/CMP) + the killer-defect map run at DEFAULTS;
+flatness is a binary scrap and **TTV→focus-budget is a named scope edge** (new physics, deferred).
+One-sided absent economics (→ the #1 open item, now shared). No-cut **seam** proven (`cut(0)` ≡ no-cut
+forecast). The stale commit-docstring "third stage = refactor" note UPDATED (the overlay holds for 3
+idempotent stages; refactor tips only at order-dependent/non-idempotent folding). `demo_journey` now a
+THREE-stage playthrough (**3×3** figure: slice-arc + the coupling + the `V_t` edge-ring map join the rows);
+**299 fab_game tests green** (+9: graded ring, coupling, channel, commit-fold, range guard, seam).
+**Deferred:** the across-wafer/polish handoff + the killer-defect map (wafer-prep's other half).
+
+**Deferred:** the remaining stages' interactive logic (stages 4–8 + wafer-prep's polish half run at recipe
+defaults today — see the plan's stage table), all difficulty mechanics ("start easy, difficulty later"),
+the live UI (notebook `interact` / Textual journey screen — the scripted playthrough is phases 1–3's artifact).
 Default grade `solar` is an *intermediate* (already partly-refined) feed, chosen for the clean
 ring at 0.25 steps; the raw-"sand" MGS narrative is noted in the demo. [[fab-game]]
 [[gradual-failure-preferred]] [[scope-edge-backlog]]

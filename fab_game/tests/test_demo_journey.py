@@ -1,13 +1,14 @@
 """Integration test for the journey demo (the demo IS the integration check — ADR 0002/0005).
 
-The phase-1–2 journey demo wires the staged scaffold + the purification *and* crystal-growth stages
-through the validated line: ``compute`` is the end-to-end check that the refine/grow → forecast (band +
-channel) → commit → finish chain holds together. Asserted on the robust thesis (purification walks
-dead→ring→clean; growth is a two-sided window graded on *both* sides with an interior optimum; the metal
-feed dies on leakage, not V_t), not brittle numbers (the mechanics are pinned in ``test_journey.py``). The
-figure is a "builds without error" smoke test only.
+The phase-1–3 journey demo wires the staged scaffold + the purification, crystal-growth *and* slice/cut
+stages through the validated line: ``compute`` is the end-to-end check that the refine/grow/cut → forecast
+(band + channel) → commit → finish chain holds together. Asserted on the robust thesis (purification walks
+dead→ring→clean; growth is a two-sided window graded on *both* sides with an interior optimum; the slice
+arc walks clean→ring→dead down the boule and is **coupled** to the phase-2 pull; the metal feed dies on
+leakage, not V_t), not brittle numbers (the mechanics are pinned in ``test_journey.py``). The figure is a
+"builds without error" smoke test only.
 
-``compute`` is heavier now (two stages, grid_n=11), so it runs **once** as a module fixture.
+``compute`` is heavier now (three stages, grid_n=11), so it runs **once** as a module fixture.
 """
 from __future__ import annotations
 
@@ -56,6 +57,31 @@ def test_demo_boule_drift_flattens_with_a_faster_pull(result):
 
 
 # --------------------------------------------------------------------------- #
+# Stage 3 — slice/cut (the graded V_t ring down the boule + the phase-2 coupling)
+# --------------------------------------------------------------------------- #
+def test_demo_slice_arc_walks_clean_to_ring_to_dead_down_the_boule(result):
+    """Cutting near the seed is clean; cutting deeper walks a *graded* V_t edge ring (the outer dies cross
+    the spec ceiling first), then dead at the tail — failing on the named Scheil-drift channel."""
+    assert result.slice_bands[0] == "clean"                 # the seed end: in spec
+    assert "ring" in result.slice_bands                     # a graded ring band exists (the rework signal)
+    assert result.slice_bands[-1] == "dead"                 # the tail: Scheil-walked V_t out of spec
+    assert 0.0 < result.slice_ring_forecast.yield_ < 1.0    # the ring is a partial wafer
+    assert "scheil" in (result.slice_ring_forecast.channel or "").lower()
+    # the cut sweep is monotone non-increasing down the boule (V_t only walks one way)
+    assert list(result.slice_yields) == sorted(result.slice_yields, reverse=True)
+
+
+def test_demo_slice_is_coupled_to_the_phase2_pull(result):
+    """THE payoff: the same cut sweep is high-then-graded on the flat (optimum-pull) boule but stays low on
+    the slow-pulled one (already lost to its leakage rim) — a flat boule can be cut deep, a slow one can't be
+    sliced back to life."""
+    deep_i = result.slice_zs.index(result.slice_commit_z)   # the deepest clean cut on the flat boule
+    assert result.slice_yields[deep_i] >= 0.90              # flat boule: still clean this deep
+    assert result.slice_yields_slow[deep_i] < result.slice_yields[deep_i]   # the slow boule is already lost
+    assert max(result.slice_yields_slow) < max(result.slice_yields)         # the slow curve sits below throughout
+
+
+# --------------------------------------------------------------------------- #
 # End to end + the purification channel contrast
 # --------------------------------------------------------------------------- #
 def test_demo_finish_runs_and_scores_the_grown_wafer(result):
@@ -79,5 +105,5 @@ def test_journey_figure_builds(result):
     from fab_game.plots import journey_figure
 
     fig = journey_figure(result)
-    assert len(fig.axes) >= 6                               # 2×3: purification row + crystal-growth row
+    assert len(fig.axes) >= 9                               # 3×3: purification + crystal-growth + slice rows
     plt.pyplot.close(fig)

@@ -414,16 +414,54 @@ def _journey_growth_arc_panel(ax, result) -> None:
     ax.legend(fontsize=8, loc="lower center")
 
 
+def _journey_slice_arc_panel(ax, result) -> None:
+    """Forecast yield vs cut depth (axial z), banded — clean near the seed → a graded V_t edge ring → dead."""
+    z = list(result.slice_zs)
+    y = [100.0 * v for v in result.slice_yields]
+    ax.axhspan(0, 5, color="#d62728", alpha=0.10)
+    ax.axhspan(5, 90, color="#ff7f0e", alpha=0.10)
+    ax.axhspan(90, 100, color="#2ca02c", alpha=0.10)
+    ax.plot(z, y, color="0.2", lw=1.7, marker="o", ms=5, zorder=3)
+    ax.axvline(result.slice_commit_z, color="#2ca02c", ls="--", lw=1.1,
+               label=f"deepest clean cut z={result.slice_commit_z:g}")
+    ax.axvline(result.slice_ring_z, color="#ff7f0e", ls=":", lw=1.2,
+               label=f"the ring ({result.slice_ring_forecast.yield_:.0%}) at z={result.slice_ring_z:g}")
+    ax.set_xlabel("cut position z (seed → tail)", fontsize=9)
+    ax.set_ylabel("forecast yield (%)", fontsize=9)
+    ax.set_ylim(-3, 103)
+    ax.set_title("Where to cut: clean near the seed → a graded\nV_t edge ring → dead (Scheil walks V_t up)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="lower left")
+
+
+def _journey_coupling_panel(ax, result) -> None:
+    """The phase-2 → phase-3 coupling: the same cut sweep on a flat (fast-pull) vs a slow-pulled boule."""
+    z = list(result.slice_zs)
+    ax.axhspan(90, 100, color="#2ca02c", alpha=0.08)
+    ax.plot(z, [100.0 * v for v in result.slice_yields], color="#2ca02c", lw=1.7, marker="s", ms=4,
+            label=f"flat boule (pull {result.growth_optimum_pull:g}) — cut deep")
+    ax.plot(z, [100.0 * v for v in result.slice_yields_slow], color="#d62728", lw=1.7, marker="o", ms=4,
+            label=f"slow pull {result.slow_pull:g} — lost to its leakage rim")
+    ax.set_xlabel("cut position z (seed → tail)", fontsize=9)
+    ax.set_ylabel("forecast yield (%)", fontsize=9)
+    ax.set_ylim(-3, 103)
+    ax.set_title("The coupling: a flat boule can be cut deep; a slow\npull is dead before the cut "
+                 "(can't slice it away)", fontsize=10)
+    ax.legend(fontsize=8, loc="center right")
+
+
 def journey_figure(result):
-    """Assemble the journey artifact from a :class:`~fab_game.demo_journey.JourneyDemoResult` (2×3 panels).
+    """Assemble the journey artifact from a :class:`~fab_game.demo_journey.JourneyDemoResult` (3×3 panels).
 
     Row 1 — **purification**: the refining scrub, the dead→ring→clean consequence arc, and the wafer map at
     the graded Na ring. Row 2 — **crystal growth**: the axial boule drift (CG-1 flattening), the two-sided
     Voronkov pull window (leakage rim ↔ void core), and the wafer map at the optimum (the clean OSF ring).
+    Row 3 — **slice/cut**: where-to-cut (clean → V_t edge ring → dead down the boule), the phase-2 coupling
+    (a flat boule cuts deep; a slow pull is dead before the cut), and the wafer map at the V_t edge ring.
     """
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(2, 3, figsize=(15, 9.2))
+    fig, axes = plt.subplots(3, 3, figsize=(15, 13.6))
     _journey_trajectory_panel(axes[0][0], result)
     _journey_arc_panel(axes[0][1], result)
     _wafer_map(axes[0][2], result.ring_forecast.result.wafer,
@@ -432,9 +470,13 @@ def journey_figure(result):
     _journey_growth_arc_panel(axes[1][1], result)
     _wafer_map(axes[1][2], result.growth_optimum_forecast.result.wafer,
                f"stage 2: the clean OSF ring — pull {result.growth_optimum_pull:g} mm/min")
+    _journey_slice_arc_panel(axes[2][0], result)
+    _journey_coupling_panel(axes[2][1], result)
+    _wafer_map(axes[2][2], result.slice_ring_forecast.result.wafer,
+               f"stage 3: the V_t edge ring — cut z={result.slice_ring_z:g}")
     fig.suptitle("The journey — stage 1: purify a feed (the Na ring)  →  stage 2: grow the boule "
-                 "(the two-sided Voronkov window)", fontsize=12)
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
+                 "(the Voronkov window)  →  stage 3: cut a wafer (the Scheil V_t ring)", fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
     return fig
 
 

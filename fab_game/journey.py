@@ -1,14 +1,18 @@
-"""The staged sand→chip journey — decide at each fab stage, watch the consequence propagate (phase 1).
+"""The staged sand→chip journey — decide at each fab stage, watch the consequence propagate (phases 1–3).
 
 The player-facing framing the roguelike (:mod:`fab_game.game`) and the dashboard
 (:mod:`fab_game.dashboard`) never gave. Instead of one wafer down a boule (game) or four live sliders
 (dashboard), a *journey* builds **one wafer's recipe stage by stage** — pick the feedstock and purify it,
-then (later phases) slice, polish, diffuse, oxidize, pattern, etch, package — a real decision at each
-stage, watched as it lands downstream: from no-effect, through a graded yield ring, to an outright scrap.
+grow the boule, slice a wafer, then (later phases) polish, diffuse, oxidize, pattern, etch, package — a
+real decision at each stage, watched as it lands downstream: from no-effect, through a graded yield ring,
+to an outright scrap.
 
-**Phase 1 builds the first stage — silicon purification — only.** Every later stage runs at its recipe
-default (the journey just carries them). The scaffold is deliberately thin — an accumulating
-:class:`~fab_game.recipe.Recipe` plus the purification decision, **not** a nine-stage state machine — per
+**Phases 1–3 build three stages — purification, crystal growth, and the slice/cut.** Every later stage
+runs at its recipe default (the journey just carries them). The slice stage is the first that **reads a
+prior committed decision**: a faster phase-2 pull flattens the boule's axial Scheil drift (CG-1), so you
+can cut a wafer *deeper* down the boule and still land in the ``V_t`` window — the journey's "watch it
+propagate" payoff. The scaffold is deliberately thin — an accumulating :class:`~fab_game.recipe.Recipe`
+plus the in-progress decision (a few idempotent overlay fields), **not** a nine-stage state machine — per
 the repo's anti-over-build rule: a stage gets built when it has a consumer.
 
 The purification stage is the showcase for the **gradual-failure policy** (the edge-loaded Na ring,
@@ -56,6 +60,18 @@ DEFAULT_GRID_N = 11              # forecast map resolution — fine enough to re
 GROWTH_G_CENTER_K_PER_MM = 4.0   # the centre interface gradient G_center (radial: G(r)=G_center·(1+boost·r²))
 GROWTH_RADIAL_BOOST = 4.0        # the radial steepness — sets the void-core/leak-rim spread (the OSF ring)
 DEFAULT_PULL_MM_MIN = 2.0        # the two-sided optimum at this hot zone (~93 %: minimal core + cleared rim)
+
+# Slice/cut (phase 3) — the wafer-prep decision is **where down the boule to cut** (the axial fraction
+# solidified, ``czochralski.slice_z`` ∈ [0, 1)). It reads the boule's axial Scheil drift (G2): boron's
+# k<1 walks the substrate doping — so ``V_t`` — UP toward the tail, so a wafer cut too deep lands above
+# the ``V_t`` window. The consequence is graded (not a cliff): the radial t_ox non-uniformity already in
+# the line spreads ``V_t`` across the die map, so the outer dies cross the ceiling first → an **edge ring**
+# of ``V_t`` kills before the whole wafer goes out (the gradual-failure policy, no new physics). Honestly
+# **one-sided absent economics** — cutting at the seed (slice_z 0) is always safest; the value of cutting
+# deeper (more wafers per boule = throughput) is the same deferred cost side as purification's refining
+# effort. What makes the cut a real decision *today* is the phase-2 coupling: a faster pull flattens the
+# drift, so a flat boule can be cut deep while a slow-pulled one is already lost to its leakage rim.
+DEFAULT_SLICE_Z = 0.5            # a representative mid-boule cut (clean on a flat/optimum-pulled boule)
 
 # Consequence bands (the ok → rework → fail spectrum) — yield thresholds with margin so a boundary
 # forecast doesn't flicker (ADR 0005 §5: coarse player guidance, not a magnitude claim). The CLEAN floor
@@ -116,6 +132,14 @@ def _dominant_channel(result: LineResult, recipe: Recipe) -> str | None:
     reasons = " ".join(worst.verdict.reasons).lower()
     grown_in = recipe.czochralski.thermal_gradient_K_per_mm is not None   # Voronkov hot zone engaged
     if "v_t" in reasons:
+        # Disambiguate the two V_t roots by *direction* (the spec reason says "(high)"/"(low)"): the
+        # purification story drives V_t **down** (mobile-ion Na → Q_ox → V_FB down), the slice/cut story
+        # drives it **up** (cutting deep down the boule → Scheil-walked high substrate N_A). Only name the
+        # cut when a slice was actually taken (advisor: key the high branch on direction AND the stage
+        # being engaged) — so a high-V_t from some other root isn't auto-blamed on the cut.
+        sliced_deep = recipe.czochralski.slice_z > 0.0
+        if "(high)" in reasons and sliced_deep:
+            return "V_t — Scheil axial drift (cut too far down the boule → high substrate doping)"
         return "V_t — mobile-ion Na → gate-oxide charge"
     if "leak" in reasons:
         if grown_in:
@@ -199,34 +223,42 @@ class JourneyState:
     grade: str = DEFAULT_GRADE
     effort: float = 0.0
     pull_rate: float | None = None   # crystal-growth lever (mm/min); None = growth not engaged (the seam)
+    slice_z: float | None = None     # slice/cut lever — axial fraction [0,1); None = cut not engaged (the seam)
     seed: int = 0
     grid_n: int = DEFAULT_GRID_N
     log: tuple[str, ...] = ()
 
     @property
     def current_recipe(self) -> Recipe:
-        """The accumulator with the in-progress decisions folded in: the purification grade + effort, and
-        (when a pull rate is set) the crystal-growth pull at the fixed radial hot zone.
+        """The accumulator with the in-progress decisions folded in: the purification grade + effort, the
+        crystal-growth pull (at the fixed radial hot zone) when set, and the slice/cut axial position when set.
 
-        The overlay is idempotent for an already-committed decision (re-applying the value it baked), so a
-        single :meth:`commit` can fold whichever stage is in progress — the thin two-stage scaffold, not a
-        per-stage state machine."""
+        Each lever overlays a single recipe slice (purification, or the shared Czochralski knobs — pull +
+        slice compose on it), and is **idempotent** for an already-committed decision (re-applying the value
+        it baked). So a single :meth:`commit` can fold whichever stage is in progress, and a lever left
+        ``None`` is a true seam — the overlay is the identity, so a journey that never grows/cuts is
+        byte-identical to the recipe default (``slice_z`` 0)."""
         recipe = replace(self.recipe, purification=replace(self.recipe.purification,
                                                            grade=self.grade, zone_passes=self.effort))
+        cz = recipe.czochralski
         if self.pull_rate is not None:
-            recipe = replace(recipe, czochralski=replace(
-                recipe.czochralski,
-                pull_rate_mm_min=self.pull_rate,
-                thermal_gradient_K_per_mm=GROWTH_G_CENTER_K_PER_MM,
-                radial_gradient_boost=GROWTH_RADIAL_BOOST))
+            cz = replace(cz, pull_rate_mm_min=self.pull_rate,
+                         thermal_gradient_K_per_mm=GROWTH_G_CENTER_K_PER_MM,
+                         radial_gradient_boost=GROWTH_RADIAL_BOOST)
+        if self.slice_z is not None:
+            cz = replace(cz, slice_z=self.slice_z)
+        if cz is not recipe.czochralski:                      # only touch the recipe when a lever is engaged
+            recipe = replace(recipe, czochralski=cz)
         return recipe
 
     @property
     def label(self) -> str:
-        """A short human label for the current recipe-so-far (grade · refine, and pull rate if grown)."""
+        """A short human label for the recipe-so-far (grade · refine, the pull rate if grown, the cut if sliced)."""
         s = f"{self.grade}·refine×{self.effort:g}"
         if self.pull_rate is not None:
             s += f" · pull {self.pull_rate:g} mm/min"
+        if self.slice_z is not None:
+            s += f" · cut z={self.slice_z:g}"
         return s
 
     @property
@@ -264,13 +296,31 @@ class JourneyState:
                        log=self.log + (f"grow: pull {pull_rate:g} mm/min "
                                        f"(ξ_centre = {pull_rate / GROWTH_G_CENTER_K_PER_MM:.3f})",))
 
+    def cut(self, slice_z: float = DEFAULT_SLICE_Z) -> "JourneyState":
+        """Slice a wafer from the boule at axial fraction ``slice_z`` ∈ [0, 1) — the phase-3 wafer-prep lever.
+
+        Reads the boule's axial Scheil drift (use :func:`boule_profile` to *watch it develop* first — the
+        seed→tail ``V_t`` walk this cut samples): boron's k<1 raises the substrate doping (so ``V_t``)
+        toward the tail, so a wafer cut **too deep** lands above the ``V_t`` window — failing on the
+        edge dies first (a graded ``V_t`` ring, the radial t_ox non-uniformity grading the cliff), then the
+        whole wafer. Cutting at the **seed** (``slice_z`` 0) is always safest; how deep you can cut and stay
+        in spec is set by the **phase-2 pull** (a faster pull flattened the drift — :func:`boule_profile`).
+        Call again to re-cut (re-decide; the boule is unchanged, only where you take the wafer)."""
+        if not 0.0 <= slice_z < 1.0:
+            raise ValueError(f"slice_z must be in [0, 1), got {slice_z}")
+        return replace(self, slice_z=slice_z,
+                       log=self.log + (f"cut: slice z={slice_z:g} (axial fraction down the boule)",))
+
     def commit(self) -> "JourneyState":
         """Fold the in-progress decision(s) into the accumulating recipe — the next stage builds on it.
 
-        One ``commit`` folds whichever stage is in progress (the overlay is idempotent for an already-
-        committed decision); for two stages this thin scaffold suffices — no per-stage state machine. (When
-        a third stage lands, the clean refactor is "actions modify the recipe directly, commit is just a log
-        boundary" — not now.)"""
+        One ``commit`` folds whichever stage is in progress: each lever (purify / grow / cut) overlays a
+        recipe slice **idempotently** (re-applying the value it baked), so re-committing is a no-op and the
+        order of the three doesn't matter — this thin scaffold suffices for all three. The clean refactor
+        ("actions modify the recipe directly; commit is just a log boundary") only earns its keep once a
+        stage needs **order-dependent or non-idempotent** folding — a knob whose committed value can't be
+        re-derived from the state (e.g. an accumulating thermal budget). None of purify/grow/cut is — so
+        not yet."""
         return replace(self, recipe=self.current_recipe, log=self.log + (f"committed: {self.label}",))
 
 

@@ -43,7 +43,7 @@ built when it has a consumer (the repo's anti-over-build rule, `scope-edge-backl
 |------|-------|--------|-----------------|
 | **1** | **Purification** | **BUILT** | refine a dirty feed; the edge-loaded Na ring is the graded consequence |
 | **2** | **Crystal growth (Czochralski)** | **BUILT** | set the boule pull rate at a radial hot zone — the two-sided Voronkov window (slow → dislocation leakage rim, fast → void core, clean OSF ring between), graded both ways; the axial Scheil drift flattens with a faster pull (CG-1) |
-| 3 | Wafer prep (slice/polish) | stub | kerf/waste, count, TTV/bow → flatness scrap + the killer-defect map |
+| **3** | **Wafer prep — slice/cut** | **BUILT** | where down the boule to cut this wafer — it reads the axial Scheil drift (cut too deep → a graded V_t edge ring → dead), and how deep you can cut is set by the **phase-2 pull** (the first stage coupled to a prior decision). Polish/flatness/killer-defect deferred (TTV→defocus is a named scope edge) |
 | 4 | Diffusion | stub | dose/temperature/time → junction depth + sheet resistance |
 | 5 | Oxidation | stub | ambient/T/time → gate oxide; the thin-oxide V_t lever |
 | 6 | Lithography | stub | focus/dose → the CD/NILS edge ring (the G1 dramatic knob) |
@@ -103,20 +103,62 @@ window what separates pulls is **throughput** (faster = more wafers) = the same 
 Scheil, new physics); C1 oxygen/thermal-donors, CG-3 Stefan (already standalone deepenings); the
 across-wafer-to-cut handoff (the boule's axial drift feeds phase 3).
 
+## Phase 3 — the slice/cut stage (BUILT 2026-06-14)
+
+On the committed, grown boule the decision is **where down it to cut** this wafer
+(`JourneyState.cut(slice_z)`, the axial fraction ∈ [0, 1)). It is the **first stage that reads a prior
+committed decision** — the journey's "watch the consequence propagate" payoff, finally realized end to end:
+
+- The cut reads the boule's axial **Scheil drift** (phase 2 / G2): boron's `k < 1` walks the substrate
+  doping — so `V_t` — *up* toward the tail (`boule_profile` is the *watch-it-develop* view of exactly this
+  profile). Cut too deep and the wafer lands above the `V_t` window.
+- The consequence is **graded, not a cliff** (the gradual-failure policy, **zero new physics**): the radial
+  `t_ox` non-uniformity already in the line spreads `V_t` across the die map, so the **outer dies cross the
+  ceiling first** → a `V_t` **edge ring** before the whole wafer goes out. The arc walks **clean** (near the
+  seed) → a graded **ring** (~z 0.87–0.90) → **dead** (the tail).
+- **The coupling (the headline):** how deep you can cut and stay in spec is set by the **phase-2 pull**. A
+  *faster* pull flattened the drift (CG-1), so a **flat boule can be cut deep**; a *slow*-pulled boule is
+  already lost to its interstitial **dislocation leakage rim** (A1) *before* the cut, so cut depth can't
+  rescue it — "a bad pull can't be sliced away." The forecast names the channel correctly on each side (the
+  Scheil-drift `V_t`-*high* root when cut deep, distinct from purification's mobile-ion `V_t`-*low* Na; the
+  leakage rim when slow-pulled — the existing worst-die heuristic resolves the multi-channel wafer).
+
+**Scope (honest — this is the *cut*, not all of wafer-prep).** Phase 3 ships the slice/cut decision; the
+rest of the wafer-prep stage — **polish/flatness** (TTV/bow/CMP) and the **killer-defect map** — runs at
+recipe defaults. Flatness today is a *binary* whole-wafer scrap (out-of-spec → reject), and the wire that
+would grade it (**TTV → focus budget → an edge ring of CD/NILS**) is an explicit **named scope edge** =
+new physics, deferred (per `chip.wafer_prep`'s own ceiling note). So "wafer-prep BUILT" means the slice/cut
+*decision*; polish + defects are carried, not yet decisions.
+
+**Honestly one-sided absent economics** (like purification): cutting at the seed (`slice_z` 0) is always
+safest, and "use more of the boule" (a deeper cut = more wafers per boule = throughput) is the **same
+deferred cost side** as purification's refining effort. What makes the cut a real decision *today* is the
+phase-2 coupling, not a price — the economics is named, not faked (no manufactured low-`V_t` failure at the
+seed, which would be the `gradual-failure-preferred` "inflate an unrelated variable" fudge).
+
+`demo_journey.py` is now a **three-stage** playthrough (a 3×3 figure: the slice-arc, the coupling, and the
+`V_t` edge-ring wafer map join the purification + growth rows); `test_journey.py` pins the graded ring, the
+coupling, the channel naming, and the no-cut **seam** (an explicit `cut(0)` reproduces the no-cut forecast).
+
 ## Deferred (explicit)
 
-- **The refining / grade economics — the cost side of the decision (the #1 open item).** Today `finish`
-  charges only the wafer cost: refining is free and every grade is the same price, so the optimal play is
-  trivially "refine until clean" — a *one-sided cleanup lever*, not yet a two-sided decision. The
-  trade-off the user named ("more passes = cleaner but costs money/time") plus a **grade price** (cheap
-  dirty MGS vs expensive clean EGS) makes *how much to refine* a real Goldilocks decision: the ring
-  penalizes under-refining, cost penalizes over-refining (the shape the G7 oxide lever already has). The
-  consequence spectrum (the forecast bands) is built; this is its missing other half — the next increment.
-- **The other eight stages' interactive logic** — they run at recipe defaults today (the journey carries
-  them); built when each has a consumer.
+- **The economics — the cost side of the decision (the #1 open item, now shared by TWO stages).** Today
+  `finish` charges only the wafer cost, so two stages are *one-sided absent a price*: **purification**
+  (refining is free + every grade is the same price → "refine until clean") and **the slice/cut** (cutting
+  at the seed is always safest → "camp at the seed"; the value of cutting deeper = **more wafers per boule**
+  = throughput). A **grade/per-pass refining price** *and* a **per-wafer-vs-throughput** cost are the same
+  missing half: the ring/Scheil-drift penalizes under-doing it, cost penalizes over-doing it (the
+  two-sided Goldilocks shape the G7 oxide lever already has). The consequence spectrum (the forecast bands)
+  is built for both; the cost side is its other half — the natural next increment. (Crystal growth is the
+  exception — its two-sidedness needed no economics; the radial hot zone supplied it.)
+- **The polish/flatness + killer-defect half of wafer-prep** — phase 3 ships the *cut*; TTV/bow/CMP +
+  the defect map run at defaults (flatness is a binary scrap, and TTV→focus-budget is a named scope edge =
+  new physics). Built when graded.
+- **The remaining stages' interactive logic (4–8 + wafer-prep's polish half)** — they run at recipe
+  defaults today (the journey carries them); built when each has a consumer.
 - **All difficulty mechanics** — per the user's "start easy, difficulty later."
 - **The live interactive UI** — a notebook `interact` cell and/or a Textual journey screen driving the
-  headless core. The scripted playthrough + figure is phases 1–2's visible artifact; the live UI is the
+  headless core. The scripted playthrough + figure is phases 1–3's visible artifact; the live UI is the
   next increment.
 
 ## References

@@ -80,9 +80,10 @@ LINE = [
          "A roguelike run down one boule: thin the gate oxide against the rising Scheil V_t drift — a "
          "Goldilocks lever (over-thinning hits the I_Dsat ceiling)."),
     Demo("demo_journey", "J1",
-         "The staged sand→chip journey (phases 1–2): purify a feed (refine → the graded Na ring), then grow "
-         "the boule (the two-sided Voronkov pull window — leakage rim ↔ void core, graded both ways) — "
-         "commit each decision and finish to a scored wafer."),
+         "The staged sand→chip journey (phases 1–3): purify a feed (refine → the graded Na ring), grow the "
+         "boule (the two-sided Voronkov pull window — leakage rim ↔ void core), then cut a wafer (where down "
+         "the boule — a graded Scheil V_t ring, how deep set by the phase-2 pull) — commit each decision and "
+         "finish to a scored wafer."),
 ]
 
 # The deepenings — the crystal-growth triad + the scope-edge promotions, each promoting a named edge
