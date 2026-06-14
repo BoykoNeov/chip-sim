@@ -1,6 +1,6 @@
 ---
 name: fab-journey
-description: the staged sand→chip journey front-end — phases 1-4 (purification + crystal growth + slice/cut + S/D diffusion) BUILT; the cost-side decision + difficulty + live UI deferred
+description: the staged sand→chip journey front-end — phases 1-5 (purification + crystal growth + slice/cut + S/D diffusion + oxidation) BUILT; the cost-side decision + difficulty + live UI deferred
 metadata: 
   node_type: memory
   type: project
@@ -111,9 +111,35 @@ centre-core map join the rows); journey/demo tests pin graded core, channel, one
 Honesty: the plan's "journey adds zero new physics" is **formally false at phase 4** — recorded in the plan +
 module docstrings, not carried stale.
 
-**Deferred:** the remaining stages' interactive logic (stages 5–8 + wafer-prep's polish half run at recipe
+**Phase 5 (oxidation) BUILT 2026-06-14** — `JourneyState.oxidize(minutes)` (gate-oxide **time** at dry/recipe-T;
+new `oxide_min` overlay). **The cleanest stage + the inverse of phase 4:** (a) **genuinely two-sided, NO economics**
+(like growth) — `t_ox` is read TWO ways at once: `V_t=…+Q_dep/C_ox` UP, `I_Dsat∝C_ox(…)²` DOWN → too thin → low
+`V_t`/over-current, too thick → high `V_t`/starved drive, clean window ~17–22min (≈14nm@20min); (b) **RESTORES
+"zero new physics"** that phase 4 broke (the t_ox→V_t/I_Dsat chain is the device's *core* read — no new term).
+Lever = **time** not (T,min) (monotone reaction-limited; T risks the Massoud band). **Graded by its OWN radial
+`t_ox` non-uniformity** (edge ~2.5% thinner, `Variation.t_ox_edge_frac`) — the spread phases 3–4 *borrowed*,
+finally grading its HOME (advisor honesty: NOT "first stage graded by native variation" — purification's Na ring is
+too; the real novelty = borrowed-spread-comes-home + **opposite radii**). **THE only stage whose two sides fail at
+OPPOSITE radii:** under → thinnest **rim** first → EDGE RING (echoes stage-1 Na ring); over → thickest **centre**
+first → CENTRE CORE (echoes slice/diffusion cores). **Channel discriminator = THE load-bearing item (advisor):**
+oxidation collides with Scheil(V_t-high)/Na(V_t-low)/series-R(I_Dsat-low); the V_t/I_Dsat **sign is NOT unique** (a
+deep Scheil cut also raises V_t + drags I_Dsat down) → `_dominant_channel` keys on the **inherited `t_ox` itself**
+(`_oxidation_root`, checked FIRST, off `_nominal_oxide_nm` by >6% flagged band; nominal recipe's ~3% spread never
+trips → seam + phase 1–4 channel tests untouched). **THE test runs the oxide failure on a FULL journey** (committed
+cut + diffusion consumer ON, both over+under) → proves no mis-attribution. **Coupling:** how much oxide before the
+`V_t` ceiling = set by the **cut** (deeper cut → higher N_A → higher baseline V_t → less ceiling room; verified
+24.5→19.5min as z 0→0.85) — sibling of pull↔cut, existing `V_t=f(N_A,t_ox)`, no new physics. **Seam = lever at
+NOMINAL** (advisor) — `oxide_min=None`⇒nominal 20min (a MOSFET always has gate oxide), NOT an off switch. demo now
+**5-stage (5×3 fig)**; map = under-oxidized **edge ring** (spans both ring topologies). Showcase sweep on a
+**latitude baseline** (mid cut, ideal downstream) so both sides grade; the accumulated deep-cut+lean-predep wafer's
+tighter window = the margins-compound coupling, not a bug. **Same discriminator applied to `pipeline.diagnose()`
+too** (advisor nudge — repo closes rather than carries): over-oxide I_Dsat-low names the oxide not series-R, before
+that fingerprint (2 boundary cases stay deferred-latent: fully-dead-thick worst-die on the thinner rim → Scheil;
+thick I_Dsat-high → impossible w/o CD-collapse). **#1 open item still 3 stages** (purify/slice/diffuse — oxidation is the no-economics exception, like growth).
+
+**Deferred:** the remaining stages' interactive logic (stages 6–8 + wafer-prep's polish half run at recipe
 defaults today — see the plan's stage table), all difficulty mechanics ("start easy, difficulty later"),
-the live UI (notebook `interact` / Textual journey screen — the scripted playthrough is phases 1–4's artifact).
+the live UI (notebook `interact` / Textual journey screen — the scripted playthrough is phases 1–5's artifact).
 Default grade `solar` is an *intermediate* (already partly-refined) feed, chosen for the clean
 ring at 0.25 steps; the raw-"sand" MGS narrative is noted in the demo. [[fab-game]]
 [[gradual-failure-preferred]] [[scope-edge-backlog]]

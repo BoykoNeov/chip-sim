@@ -1,7 +1,7 @@
-"""The journey demo (phases 1–4): purify a feed, grow the boule, cut a wafer, diffuse the S/D.
+"""The journey demo (phases 1–5): purify a feed, grow the boule, cut a wafer, diffuse the S/D, grow the gate oxide.
 
 The staged sand→chip journey, played start to finish (plan ``docs/plans/fab-journey.md``;
-:mod:`fab_game.journey`). Four stages so far:
+:mod:`fab_game.journey`). Five stages so far:
 
 **Stage 1 — purification.** Begin with a dirty **solar** feedstock and **refine it step by step**; at each
 step a forecast runs the whole line and reports the consequence **band** and the **channel** it would fail
@@ -40,11 +40,22 @@ Then **commit** each decision into the recipe and **finish** — run the line an
 :mod:`fab_game.game` economics, reused). A second feed (**metal**, Na-free but iron-laden) shows the other
 purification channel: it reads fine on ``V_t`` yet dies on junction **leakage** (deep-level metals).
 
-Stages 1–3 add *no new physics* (they re-sequence existing chains). Stage 4 is the **exception**: the
-diffusion's ``x_j``/``R_s`` fed nothing scored, so making the dose a real decision needed a genuine device
-term — an additive S/D series resistance on :func:`chip.device.saturation_current` (default-0 seam) — that
-lands on the existing ``I_Dsat`` spec. The live UI is the deferred next increment — this banked demo is the
-*watch-a-playthrough* artifact over the headless core.
+**Stage 5 — oxidation.** Grow the **gate oxide** — set how long. The thickness ``t_ox`` is the one quantity
+the device reads *two ways at once*: ``V_t`` rises with it (``Q_dep/C_ox``) **and** ``I_Dsat`` falls (``C_ox``
+down). So oxidation is the first genuinely **two-sided** stage that needs **no economics** (like growth) — grow
+too little → low ``V_t`` / over-current, too much → high ``V_t`` / starved drive — and it **restores** the
+"zero new physics" framing stage 4 broke (no new device term: the t_ox→V_t/I_Dsat chain is the device's core
+read). The arc walks an **under-oxidized EDGE ring** (the thinnest rim fails first — echoing stage-1's Na ring)
+→ a clean window → an **over-oxidized CENTRE core** (the thickest centre fails first — cf. the stage-3/4 cores):
+the only stage whose two sides fail at **opposite radii**, both graded by the oxidation step's *own* radial
+``t_ox`` non-uniformity (the spread stages 3–4 borrowed, finally grading its home). How much oxide you can grow
+is set by the **cut** (a deeper cut → higher ``V_t`` → less room to the ceiling — the V_t-budget coupling).
+
+Stages 1–3 + 5 add *no new physics* (they re-sequence existing chains; stage 5 restores that framing). Stage 4
+is the **exception**: the diffusion's ``x_j``/``R_s`` fed nothing scored, so making the dose a real decision
+needed a genuine device term — an additive S/D series resistance on :func:`chip.device.saturation_current`
+(default-0 seam) — that lands on the existing ``I_Dsat`` spec. The live UI is the deferred next increment —
+this banked demo is the *watch-a-playthrough* artifact over the headless core.
 
 Run headless (saves the figure, prints the playthrough):
 
@@ -56,6 +67,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .journey import (
+    DEFAULT_OXIDE_MIN,
     DEMO_PREDEP_C,
     JourneyState,
     StageForecast,
@@ -64,6 +76,7 @@ from .journey import (
     finish,
     forecast,
     new_journey,
+    oxidation_trajectory,
     refining_trajectory,
 )
 from .pipeline import LineResult
@@ -80,6 +93,11 @@ SLOW_PULL = 0.5                  # the steep-drift / leakage-rim contrast pull (
 SLICE_ZS = (0.0, 0.3, 0.55, 0.75, 0.85, 0.88, 0.90, 0.93)   # the cut sweep down the boule (clean → ring → dead)
 DIFFUSION_TIMES = (6.0, 5.0, 4.0, 3.5, 3.0, 2.5, 2.0)       # the predep-time (dose) sweep at DEMO_PREDEP_C
 #                                  (clean → a graded I_Dsat centre-weighted core → dead — the series-R consumer)
+OXIDE_MINUTES = (15.0, 16.0, 16.5, 17.0, 18.0, 20.0, 22.0, 23.0, 24.0)   # the gate-oxide-time sweep
+#                                  (under-oxidized EDGE ring → clean window → over-oxidized CENTRE core)
+OX_SHOWCASE_Z = 0.5              # the oxide window is shown on a representative MID cut (ideal downstream
+#                                  contacts) so the gate oxide is the binding decision and BOTH sides grade;
+#                                  a deeper cut / leaner predep tightens it (margins compound — the coupling)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "fab-game-journey.png"
@@ -132,6 +150,17 @@ class JourneyDemoResult:
     diffusion_ring_time: float              # the marginal (ring-band) predep — the I_Dsat centre core for the map
     diffusion_ring_forecast: StageForecast
     diffusion_commit_time: float            # the shortest clean predep — "use the least dose spec allows"
+    # Stage 5 — oxidation (the two-sided gate-oxide-time window, graded by the radial t_ox non-uniformity):
+    oxide_showcase_z: float                 # the mid cut the oxide window is shown on (the latitude baseline)
+    oxide_minutes: tuple[float, ...]
+    oxide_traj: tuple                       # (minutes, t_ox_nm, V_t, I_Dsat) — watch the oxide set the device
+    oxide_yields: tuple[float, ...]         # forecast yield vs oxide time (thin edge ring → clean → thick core)
+    oxide_bands: tuple[str, ...]
+    oxide_channels: tuple
+    oxide_arc: tuple[StageForecast, ...]
+    oxide_ring_min: float                   # the under-oxidized EDGE-ring oxide time — the map (echoes the Na ring)
+    oxide_ring_forecast: StageForecast
+    oxide_commit_min: float                 # the clean gate oxide committed on the fully-accumulated wafer
     # End to end:
     finish_result: LineResult
     finish_score: ScoreCard
@@ -207,9 +236,32 @@ def compute() -> JourneyDemoResult:
     clean_di = [i for i, b in enumerate(diffusion_bands) if b == "clean"]
     commit_di = clean_di[-1] if clean_di else 0   # the shortest clean predep — least dose/budget still in spec
 
-    # Commit the diffusion decision + finish (run + score the whole line).
+    # Commit the diffusion decision (the wafer the oxidation stage grows the gate oxide on).
     played = cut_committed.diffuse(DEMO_PREDEP_C, DIFFUSION_TIMES[commit_di]).commit()
-    finish_result, finish_score = finish(played)
+
+    # --- Stage 5: oxidation (the two-sided gate-oxide-time window) ---
+    # Shown on the committed grown boule at a representative MID cut with ideal downstream contacts, so the
+    # gate oxide is the binding decision and BOTH sides grade (the fully-accumulated wafer — a deeper cut +
+    # a leaner predep — has a tighter window: margins compound, the journey's propagation lesson / coupling).
+    ox_base = grown.cut(OX_SHOWCASE_Z).commit()
+    ox_states = [ox_base.oxidize(m) for m in OXIDE_MINUTES]
+    o_arc = _arc(ox_states)
+    oxide_yields = tuple(f.yield_ for f in o_arc)
+    oxide_bands = tuple(f.band for f in o_arc)
+    oxide_channels = tuple(f.channel for f in o_arc)
+    # The under-oxidized EDGE-ring map: the thin-side ring (before the clean window) with the *highest* yield
+    # — the clearest partial ring (only the thinnest rim failing), not a near-dead one.
+    _first_clean = next((i for i, b in enumerate(oxide_bands) if b == "clean"), len(oxide_bands))
+    _thin_rings = [i for i in range(_first_clean) if oxide_bands[i] == "ring"]
+    thin_ring_oi = max(_thin_rings, key=lambda i: oxide_yields[i]) if _thin_rings else 0
+    # The clean gate oxide we proceed with is committed on the FULLY-ACCUMULATED wafer (deep cut + the leaner
+    # predep), whose window is tighter than the showcase baseline's — so pick the clean oxide there directly.
+    acc_clean = [m for m in OXIDE_MINUTES if forecast(played.oxidize(m)).band == "clean"]
+    oxide_commit_min = acc_clean[len(acc_clean) // 2] if acc_clean else DEFAULT_OXIDE_MIN
+
+    # Commit a clean gate oxide + finish (run + score the whole line).
+    oxidized = played.oxidize(oxide_commit_min).commit()
+    finish_result, finish_score = finish(oxidized)
 
     metal_forecast = forecast(new_journey("metal", seed=SEED))
 
@@ -233,14 +285,20 @@ def compute() -> JourneyDemoResult:
         diffusion_channels=diffusion_channels, diffusion_arc=tuple(d_arc),
         diffusion_ring_time=DIFFUSION_TIMES[ring_di], diffusion_ring_forecast=d_arc[ring_di],
         diffusion_commit_time=DIFFUSION_TIMES[commit_di],
+        oxide_showcase_z=OX_SHOWCASE_Z, oxide_minutes=OXIDE_MINUTES,
+        oxide_traj=oxidation_trajectory(ox_base, minutes_sweep=OXIDE_MINUTES),
+        oxide_yields=oxide_yields, oxide_bands=oxide_bands, oxide_channels=oxide_channels,
+        oxide_arc=tuple(o_arc), oxide_ring_min=OXIDE_MINUTES[thin_ring_oi],
+        oxide_ring_forecast=o_arc[thin_ring_oi], oxide_commit_min=oxide_commit_min,
         finish_result=finish_result, finish_score=finish_score,
-        metal_forecast=metal_forecast, log=played.log,
+        metal_forecast=metal_forecast, log=oxidized.log,
     )
 
 
 def print_summary(r: JourneyDemoResult) -> None:
-    """Print the four-stage playthrough — purify, grow, cut, diffuse — then commit + finish."""
-    print("\nThe journey — a four-stage playthrough: purify the feed, grow the boule, cut a wafer, diffuse the S/D\n")
+    """Print the five-stage playthrough — purify, grow, cut, diffuse, oxidize — then commit + finish."""
+    print("\nThe journey — a five-stage playthrough: purify the feed, grow the boule, cut a wafer, diffuse the "
+          "S/D, grow the gate oxide\n")
 
     print(f"  STAGE 1 — purification. Start with a {r.grade} feed (solar-grade: an intermediate, already")
     print("  partly-refined feed; raw 'sand' MGS is dirtier) and refine it step by step:\n")
@@ -286,19 +344,37 @@ def print_summary(r: JourneyDemoResult) -> None:
     print(f"    V_t core, a different channel) → dead. The drive-in is NOT the lever (it conserves dose →")
     print(f"    barely moves R_s); ONE-SIDED — more dose only helps (over-diffusion's short-channel harm omitted).\n")
 
-    print("  Commit all four decisions and finish — run the whole line and score the wafer:")
+    print(f"  STAGE 5 — oxidation. On the wafer (shown at a representative z={r.oxide_showcase_z:g} cut so the")
+    print(f"  gate oxide is the binding decision), grow the **gate oxide** — set how long. t_ox is read TWO ways")
+    print(f"  at once: thicker → V_t up (Q_dep/C_ox) AND I_Dsat down (C_ox down). The first genuinely two-sided")
+    print(f"  stage with NO economics (like growth) — and it adds ZERO new physics (phase 5 RESTORES that):\n")
+    print(f"     {'oxide':>6}  {'t_ox':>6}  {'V_t':>5}  {'I_Dsat':>6}  {'yield':>6}  {'band':<5}  channel")
+    for (m, tox, vt, idsat), f in zip(r.oxide_traj, r.oxide_arc):
+        print(f"     {m:4.1f}m  {tox:5.1f}n  {vt:5.2f}  {idsat:5.2f}mA  {f.yield_:6.0%}  {f.band:<5}  "
+              f"{(f.channel or '—')[:40]}")
+    print(f"  → grow too LITTLE → V_t under the floor / I_Dsat over the ceiling, failing the thinnest **rim**")
+    print(f"    first → an EDGE RING (at ~{r.oxide_ring_min:g} min, {r.oxide_ring_forecast.yield_:.0%}; echoes")
+    print(f"    stage-1's Na ring); the window is clean; grow too MUCH → V_t over the ceiling / I_Dsat starved,")
+    print(f"    failing the thickest **centre** first → a CENTRE CORE (cf. the slice/diffusion cores). The two")
+    print(f"    sides fail at OPPOSITE radii — the only stage that does — both GRADED by the radial t_ox spread.")
+    print(f"    How much oxide you can grow is set by the cut (a deeper cut → higher V_t → less ceiling room).\n")
+
+    print("  Commit all five decisions and finish — run the whole line and score the wafer:")
     sc = r.finish_score
     print(f"     finish: yield {r.finish_result.yield_:.0%}  ·  {sc.n_good}/{sc.n_total} shipped  ·  "
-          f"profit {sc.profit:+.0f}  ·  cut z={r.slice_commit_z:g} · predep {r.diffusion_commit_time:g}min\n")
+          f"profit {sc.profit:+.0f}  ·  cut z={r.slice_commit_z:g} · predep {r.diffusion_commit_time:g}min · "
+          f"oxide {r.oxide_commit_min:g}min\n")
 
     mf = r.metal_forecast
     print(f"  Contrast — a metal feed (Na-free, iron-laden) reads fine on V_t yet is {mf.band.upper()} on")
     print(f"    {mf.channel} (the deep-level-metal consequence net doping can't carry).\n")
 
-    print("  New: the journey's fourth stage — the S/D diffusion (the predep dose). Unlike stages 1–3 (which")
-    print("  re-sequence existing chains) this one needed a genuine new device term — an additive S/D series")
-    print("  resistance on saturation_current (default-0 seam) — because the diffusion's R_s fed nothing")
-    print("  scored before; it lands on the existing I_Dsat spec (no new window).\n")
+    print("  New: the journey's fifth stage — the oxidation (the gate-oxide time). It RESTORES the 'zero new")
+    print("  physics' framing phase 4 broke (no new device term at all): t_ox→V_t/I_Dsat is the device's core")
+    print("  read. The first genuinely two-sided stage that needs no economics (grow too little → low V_t /")
+    print("  over-current, too much → high V_t / starved drive), graded by the oxidation step's OWN radial")
+    print("  t_ox non-uniformity (the spread stages 3–4 borrowed, finally grading its home) — the two sides")
+    print("  failing at OPPOSITE radii (under → edge ring, over → centre core).\n")
 
 
 def save_figure(r: JourneyDemoResult) -> Path:

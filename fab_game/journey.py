@@ -106,6 +106,35 @@ DIFFUSION_SD_CONTACT_SQUARES = 0.15   # the flagged house n_□ = R_series/R_s (
 DEFAULT_PREDEP_C = 950.0          # °C — the nominal (clean) predep temperature = the recipe default
 DEFAULT_PREDEP_MIN = 10.0         # min — the nominal predep time = the recipe default
 
+# Oxidation (phase 5) — the gate-oxide-growth decision is the **oxide time** (how long to grow the thin
+# dry-O₂ gate oxide; the recipe holds the ambient/T/orientation). The grown ``t_ox`` is the one quantity
+# the device reads **two ways at once**: ``V_t = V_FB + 2φ_F + Q_dep/C_ox`` (thicker oxide → larger ``V_t``)
+# AND ``I_Dsat ∝ C_ox·(V_GS−V_t)²`` (thicker oxide → lower ``C_ox`` → lower ``I_Dsat``). So oxidation is the
+# first genuinely **TWO-SIDED** stage that needs **no economics** (like crystal growth, not the one-sided
+# purify/slice/diffuse): too **thin** → ``V_t`` under the floor + ``I_Dsat`` over the ceiling (a low
+# threshold / over-current), too **thick** → ``V_t`` over the ceiling + ``I_Dsat`` under the floor (a high
+# threshold / starved drive), with a clean window between. It adds **ZERO new physics** — the t_ox→V_t/I_Dsat
+# chain is the device's *core* read — so phase 5 RESTORES the "zero new physics" framing phase 4 broke (no
+# new device term at all). The grading is the oxidation step's **own** radial ``t_ox`` non-uniformity (edge
+# ~2.5 % thinner, :attr:`fab_game.variation.Variation.t_ox_edge_frac`) — the spread phases 3–4 *borrowed*,
+# finally grading its **home** stage; and the two sides fail at **opposite radii** (the only stage that does):
+# under-oxidized → the thinnest **rim** crosses the thin-side bounds first → an EDGE RING (echoing stage-1's
+# Na ring); over-oxidized → the thickest **centre** crosses the thick-side bounds first → a CENTRE CORE
+# (echoing the slice/diffusion cores). The lever is **time**, not (T, minutes): in the thin reaction-limited
+# regime ``t_ox ≈ (B/A)·t`` is monotone, and temperature moves both Deal–Grove constants and risks the
+# Massoud thin-dry band — a second knob the window doesn't need.
+DEFAULT_OXIDE_MIN = 20.0          # the recipe-nominal gate-oxide time (≈14 nm dry/1000 °C) = the seam. NOTE:
+#                                   oxide_min=None ⇒ the recipe NOMINAL, not "stage disengaged" — you cannot
+#                                   make a MOSFET with no gate oxide, so the seam is the lever AT NOMINAL
+#                                   (bit-identical to the pre-phase-5 journey), not an off switch like the
+#                                   diffusion consumer's default-0.
+OXIDE_OFF_NOMINAL_FRAC = 0.06     # the |t_ox − nominal|/nominal band that flags an oxidation root in the
+#                                   channel trail. The nominal recipe's radial+jitter t_ox spread is ~3 %
+#                                   and the pass band ~±9 %, so 6 % cleanly separates "the oxide IS the
+#                                   cause" from a nominal-oxide V_t/I_Dsat death that is really Na/Scheil/
+#                                   series-R (so the phase 1–4 channel tests, all at nominal oxide, are
+#                                   untouched — their worst die never trips this band). FLAGGED house number.
+
 # Consequence bands (the ok → rework → fail spectrum) — yield thresholds with margin so a boundary
 # forecast doesn't flicker (ADR 0005 §5: coarse player guidance, not a magnitude claim). The CLEAN floor
 # is 0.90, not 1.0: the radial growth optimum caps ~93 % (the OSF core/rim always cost a few dies — perfect
@@ -150,6 +179,43 @@ def _mean_vt(result: LineResult) -> float | None:
     return sum(vts) / len(vts) if vts else None
 
 
+def _nominal_oxide_nm(ox_knobs) -> float:
+    """The known-good gate-oxide thickness (nm) — the reference an oxidation root is measured against.
+
+    Grown for the **nominal** :data:`DEFAULT_OXIDE_MIN` at the recipe's own ambient/T/orientation (so it
+    stays coherent if those move), NOT a hardcoded ~14 nm. The phase-5 channel discriminator flags a die
+    whose *inherited* ``t_ox`` is off this by more than :data:`OXIDE_OFF_NOMINAL_FRAC`."""
+    from chip.oxidation import grow_oxide
+    return grow_oxide(ox_knobs.ambient, ox_knobs.T_celsius, DEFAULT_OXIDE_MIN,
+                      orientation=ox_knobs.orientation).t_ox_nm
+
+
+def _oxidation_root(worst, ox_knobs, reasons: str) -> str | None:
+    """Name a gate-oxide-thickness root for a ``V_t``/``I_Dsat`` death, or ``None`` (oxide is in band).
+
+    Phase 5 collides with every other parametric root — over-oxidation's ``V_t``-high looks like the Scheil
+    cut, under-oxidation's ``V_t``-low like the mobile-ion Na, its ``I_Dsat``-low like the S/D series
+    resistance. The V_t/I_Dsat **sign pattern is not unique** (a deep Scheil cut raises ``N_A`` → raises
+    ``V_t`` → lowers the overdrive → *also* drags ``I_Dsat`` down — the same signs as over-oxidation), so we
+    key on the **unambiguous** fingerprint: the die's *inherited* ``t_ox`` itself, off the known-good
+    thickness (advisor). Only fires for a ``V_t``/``I_Dsat`` *parametric* reason (not a functional particle/
+    void/bridge kill) and only when the oxide is genuinely off nominal — the nominal recipe's ~3 % radial+
+    jitter spread never trips the 6 % band, so the seam and the phase 1–4 channel tests are untouched."""
+    if worst.t_ox_um is None:
+        return None
+    if not ("v_t" in reasons or "i_dsat" in reasons or "i_d" in reasons):
+        return None                                       # a functional kill — oxide thickness is not the root
+    t_ox_nm = worst.t_ox_um * 1.0e3
+    nominal_nm = _nominal_oxide_nm(ox_knobs)
+    if t_ox_nm > nominal_nm * (1.0 + OXIDE_OFF_NOMINAL_FRAC):
+        return (f"gate oxide too thick — over-oxidized (V_t high + I_Dsat starved; "
+                f"{t_ox_nm:.1f} nm vs ~{nominal_nm:.1f} nm nominal — grow less oxide)")
+    if t_ox_nm < nominal_nm * (1.0 - OXIDE_OFF_NOMINAL_FRAC):
+        return (f"gate oxide too thin — under-oxidized (V_t low + I_Dsat over the ceiling; "
+                f"{t_ox_nm:.1f} nm vs ~{nominal_nm:.1f} nm nominal — grow more oxide)")
+    return None
+
+
 def _dominant_channel(result: LineResult, recipe: Recipe) -> str | None:
     """Name the channel the dead dies fail on (the consequence the player watches propagate), or ``None``.
 
@@ -157,13 +223,19 @@ def _dominant_channel(result: LineResult, recipe: Recipe) -> str | None:
     roots** in different stages, so it reads the crystal-growth regime to disambiguate: with the Voronkov
     hot zone engaged (``thermal_gradient`` set), a *killer particle* is a **grown-in void/COP** (pull too
     fast) and *leakage* is from **grown-in dislocations** (pull too slow) — otherwise leakage is a
-    deep-level **metal** (the purification story) and a particle is a fab-floor defect."""
+    deep-level **metal** (the purification story) and a particle is a fab-floor defect. The **gate-oxide**
+    root (phase 5) is checked **first** for a ``V_t``/``I_Dsat`` death — it collides with the Na/Scheil/
+    series-R roots on the V_t/I_Dsat *sign*, so it is discriminated on the inherited ``t_ox`` (see
+    :func:`_oxidation_root`)."""
     dead = result.dead_dies
     if not dead:
         return None
     worst = max(dead, key=lambda d: d.radius_frac)
     reasons = " ".join(worst.verdict.reasons).lower()
     grown_in = recipe.czochralski.thermal_gradient_K_per_mm is not None   # Voronkov hot zone engaged
+    oxide_root = _oxidation_root(worst, recipe.oxidation, reasons)         # phase 5: t_ox off nominal → the gate oxide
+    if oxide_root is not None:
+        return oxide_root
     if "v_t" in reasons:
         # Disambiguate the two V_t roots by *direction* (the spec reason says "(high)"/"(low)"): the
         # purification story drives V_t **down** (mobile-ion Na → Q_ox → V_FB down), the slice/cut story
@@ -252,6 +324,29 @@ DEMO_PREDEP_C = 900.0            # the representative predep temperature the dem
 #                                  T lever, whose graded edge at a full 10-min predep is narrower)
 
 
+def oxidation_trajectory(state: "JourneyState", *,
+                         minutes_sweep: tuple[float, ...] = (14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0)):
+    """The gate device down a gate-oxide-**time** sweep — the phase-5 'watch the oxide set the device' view.
+
+    For each oxidation time, runs the line (``NO_VARIATION`` → the clean signal, one die) with the oxidation
+    stage engaged and returns ``(minutes, t_ox_nm, V_t, i_dsat_mA)``. A longer oxidation grows a thicker
+    gate oxide → ``V_t`` rises (``Q_dep/C_ox``) **and** ``I_Dsat`` falls (``C_ox`` down): the two-sided
+    consequence the player reads. The clean one-die device walks from the thin-side (``V_t`` low / ``I_Dsat``
+    over the ceiling) up through the window to the thick-side (``V_t`` high / ``I_Dsat`` starved); under
+    variation the radial ``t_ox`` spread grades each crossing into an edge ring (thin) or a centre core
+    (thick)."""
+    out = []
+    for m in minutes_sweep:
+        eng = state.oxidize(m)
+        wafer = run_line(eng.current_recipe, seed=state.seed, variation=NO_VARIATION,
+                         specs=DEFAULT_SPECS, grid_n=1)
+        die = wafer.dies[0]
+        out.append((float(m), float(die.t_ox_um) * 1.0e3 if die.t_ox_um is not None else float("nan"),
+                    float(die.V_t) if die.V_t is not None else float("nan"),
+                    float(die.i_dsat_mA) if die.i_dsat_mA is not None else float("nan")))
+    return tuple(out)
+
+
 def diffusion_trajectory(state: "JourneyState", *, predep_C: float = DEMO_PREDEP_C,
                          predep_sweep_min: tuple[float, ...] = (6.0, 5.0, 4.0, 3.0, 2.5, 2.0)):
     """The S/D junction down a **predep-dose** sweep (predep *time*) — the phase-4 'watch the dose set the
@@ -285,9 +380,9 @@ class JourneyState:
 
     ``recipe`` the accumulator (committed stages); the *in-progress* decision is whichever stage's lever is
     set — ``grade``/``effort`` (purify), ``pull_rate`` (grow), ``slice_z`` (cut), ``predep_C``/``predep_min``
-    (diffuse) — each folded into :attr:`current_recipe` until :meth:`commit`. ``seed``/``grid_n`` the
-    forecast determinism + resolution, ``log`` the append-only trail. Each action returns a **new** state
-    (the ``WaferState``/``GameSession`` discipline)."""
+    (diffuse), ``oxide_min`` (oxidize) — each folded into :attr:`current_recipe` until :meth:`commit`.
+    ``seed``/``grid_n`` the forecast determinism + resolution, ``log`` the append-only trail. Each action
+    returns a **new** state (the ``WaferState``/``GameSession`` discipline)."""
 
     recipe: Recipe = DEFAULT_RECIPE
     grade: str = DEFAULT_GRADE
@@ -296,6 +391,8 @@ class JourneyState:
     slice_z: float | None = None     # slice/cut lever — axial fraction [0,1); None = cut not engaged (the seam)
     predep_C: float | None = None    # diffusion lever — predep temperature (°C); None = diffusion not engaged (seam)
     predep_min: float = DEFAULT_PREDEP_MIN  # predep time (min) — only meaningful once predep_C is set
+    oxide_min: float | None = None   # oxidation lever — gate-oxide time (min); None = recipe NOMINAL (the seam,
+    #                                  i.e. the lever at nominal — not an off switch; a MOSFET always has a gate oxide)
     seed: int = 0
     grid_n: int = DEFAULT_GRID_N
     log: tuple[str, ...] = ()
@@ -325,6 +422,8 @@ class JourneyState:
             recipe = replace(recipe, diffusion=replace(           # dose + turn on the series-R consumer (n_□)
                 recipe.diffusion, T_predep_C=self.predep_C, t_predep_min=self.predep_min,
                 sd_contact_squares=DIFFUSION_SD_CONTACT_SQUARES))
+        if self.oxide_min is not None:                        # oxidation stage engaged → overlay the oxide time
+            recipe = replace(recipe, oxidation=replace(recipe.oxidation, minutes=self.oxide_min))
         return recipe
 
     @property
@@ -337,6 +436,8 @@ class JourneyState:
             s += f" · cut z={self.slice_z:g}"
         if self.predep_C is not None:
             s += f" · predep {self.predep_C:g}°C/{self.predep_min:g}min"
+        if self.oxide_min is not None:
+            s += f" · oxide {self.oxide_min:g}min"
         return s
 
     @property
@@ -423,12 +524,41 @@ class JourneyState:
         return replace(nxt, log=self.log + (f"diffuse: predep {predep_C:g}°C/{predep_min:g}min → "
                                             f"R_s {junc.R_s:.0f} Ω/sq, x_j {junc.x_j_um:.3f} µm",))
 
+    def oxidize(self, minutes: float = DEFAULT_OXIDE_MIN) -> "JourneyState":
+        """Set the gate-oxide growth **time** — the phase-5 oxidation lever (min, dry O₂ at the recipe T).
+
+        The decision is *how much gate oxide to grow*: the thin dry-O₂ oxide thickness ``t_ox``
+        (:func:`chip.oxidation.grow_oxide`) the device reads **two ways at once** — ``V_t = V_FB + 2φ_F +
+        Q_dep/C_ox`` (thicker → higher ``V_t``) and ``I_Dsat ∝ C_ox·(V_GS−V_t)²`` (thicker → lower
+        ``I_Dsat``). So this is the first genuinely **two-sided** stage with **no economics** (like crystal
+        growth): grow **too little** → ``V_t`` under the floor + ``I_Dsat`` over the ceiling (a low
+        threshold / over-current); grow **too much** → ``V_t`` over the ceiling + ``I_Dsat`` under the floor
+        (a high threshold / starved drive); a clean window between. **Zero new physics** — the t_ox→V_t/I_Dsat
+        chain is the device's core read (phase 5 RESTORES the framing phase 4 broke). The consequence is
+        **graded** by the oxidation step's own radial ``t_ox`` non-uniformity (edge ~2.5 % thinner), and the
+        two sides fail at **opposite radii**: under-oxidized → the thinnest **rim** crosses first → an **edge
+        ring** (cf. stage-1's Na ring); over-oxidized → the thickest **centre** crosses first → a **centre
+        core** (cf. the slice/diffusion cores). How much oxide you can grow before the ``V_t`` ceiling bites
+        is **set by the phase-3 cut** (a deeper cut → higher ``N_A`` → higher baseline ``V_t`` → less
+        headroom): the V_t budget is shared, the same propagation payoff as the cut↔pull coupling. The lever
+        is **time**, not temperature (a single monotone knob; ``T``/ambient/orientation stay at the recipe
+        default). Use :func:`oxidation_trajectory` to *watch the oxide set the device* first. Call again to
+        re-decide."""
+        if minutes <= 0.0:
+            raise ValueError(f"oxidation time must be > 0 min, got {minutes}")
+        from chip.oxidation import grow_oxide
+        nxt = replace(self, oxide_min=minutes)
+        ox = nxt.current_recipe.oxidation
+        g = grow_oxide(ox.ambient, ox.T_celsius, ox.minutes, orientation=ox.orientation)
+        return replace(nxt, log=self.log + (f"oxidize: {minutes:g} min → gate oxide "
+                                            f"{g.t_ox_nm:.1f} nm ({g.regime})",))
+
     def commit(self) -> "JourneyState":
         """Fold the in-progress decision(s) into the accumulating recipe — the next stage builds on it.
 
-        One ``commit`` folds whichever stage is in progress: each lever (purify / grow / cut) overlays a
-        recipe slice **idempotently** (re-applying the value it baked), so re-committing is a no-op and the
-        order of the three doesn't matter — this thin scaffold suffices for all three. The clean refactor
+        One ``commit`` folds whichever stage is in progress: each lever (purify / grow / cut / diffuse /
+        oxidize) overlays a recipe slice **idempotently** (re-applying the value it baked), so re-committing
+        is a no-op and the order doesn't matter — this thin scaffold suffices for all of them. The clean refactor
         ("actions modify the recipe directly; commit is just a log boundary") only earns its keep once a
         stage needs **order-dependent or non-idempotent** folding — a knob whose committed value can't be
         re-derived from the state (e.g. an accumulating thermal budget). None of purify/grow/cut is — so

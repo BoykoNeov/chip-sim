@@ -7,11 +7,13 @@ through a graded yield ring, to an outright scrap.
 
 This is a **phased** build. It is also, deliberately, *mostly* a *sequencing/exposure* problem over
 already-validated physics: the `Recipe` (`fab_game/recipe.py`) is already grouped by fab stage, and
-`run_line` already chains them. Phases 1–3 add **zero new physics** — they compose `run_line` +
+`run_line` already chains them. Phases 1–3 **and 5** add **zero new physics** — they compose `run_line` +
 `score_wafer` and surface a decision + a consequence at each stage (ADR 0005). **Phase 4 is the documented
 exception:** the diffusion outputs (`x_j`/`R_s`) fed *nothing scored* (the device reads `N_A`/`t_ox`/CD,
 never `R_s`), so the dose was inert — making it a real decision required one genuine device term (an
 additive S/D series resistance on `chip.device.saturation_current`, default-0 seam). See Phase 4 below.
+**Phase 5 (oxidation) explicitly restores the zero-new-physics framing** — the `t_ox → V_t/I_Dsat` chain is
+the device's core read (no new term), and it is the first genuinely *two-sided* stage that needs no economics.
 
 ## The decision (what the user asked for)
 
@@ -48,7 +50,7 @@ built when it has a consumer (the repo's anti-over-build rule, `scope-edge-backl
 | **2** | **Crystal growth (Czochralski)** | **BUILT** | set the boule pull rate at a radial hot zone — the two-sided Voronkov window (slow → dislocation leakage rim, fast → void core, clean OSF ring between), graded both ways; the axial Scheil drift flattens with a faster pull (CG-1) |
 | **3** | **Wafer prep — slice/cut** | **BUILT** | where down the boule to cut this wafer — it reads the axial Scheil drift (cut too deep → a graded V_t **centre core** → dead), and how deep you can cut is set by the **phase-2 pull** (the first stage coupled to a prior decision). Polish/flatness/killer-defect deferred (TTV→defocus is a named scope edge) |
 | **4** | **S/D diffusion** | **BUILT** | the **predep dose** → diffused-layer sheet resistance `R_s` → (a new S/D **series-resistance** device term) source degeneration that **starves** `I_Dsat` → a graded `I_Dsat` **centre core**. The drive-in is *not* the lever (it conserves dose). The **one stage that adds real physics** (the dose was inert — `R_s` fed nothing scored); lands on the existing `I_Dsat` spec |
-| 5 | Oxidation | stub | ambient/T/time → gate oxide; the thin-oxide V_t lever |
+| **5** | **Oxidation** | **BUILT** | the **gate-oxide time** → `t_ox`, read **two ways at once** (`V_t = …+Q_dep/C_ox` up, `I_Dsat ∝ C_ox(…)²` down). The first genuinely **two-sided** stage with **no economics** (too thin → low V_t / over-current → a thin-side **edge ring**; too thick → high V_t / starved drive → a thick-side **centre core**) — the only stage whose two sides fail at **opposite radii**, both graded by its *own* radial `t_ox` non-uniformity. **Restores** the "zero new physics" framing phase 4 broke; couples to the cut (a deeper cut eats the `V_t` ceiling headroom) |
 | 6 | Lithography | stub | focus/dose → the CD/NILS edge ring (the G1 dramatic knob) |
 | 7 | Etch & deposition | stub | over/under-etch, conformality → bridges/voids (functional shorts/opens) |
 | 8 | Device / packaging | stub | gate geometry, assembly funnel → the binned, scored chip |
@@ -186,6 +188,75 @@ graded core, the channel naming, the one-sidedness, and the no-diffuse **seam** 
 `sd_contact_squares = 0` ⇒ ideal-contact `I_Dsat`). `chip/tests/test_device.py` carries the device term's
 triad.
 
+## Phase 5 — the oxidation stage (BUILT 2026-06-14)
+
+On the wafer the decision is **how much gate oxide to grow** — the oxidation **time**
+(`JourneyState.oxidize(minutes)`, dry O₂ at the recipe's `T`/orientation; a new `oxide_min` overlay field).
+This is the **cleanest stage yet**, and the inverse of phase 4 in two ways:
+
+- **The two-way read (the genuinely two-sided lever, no economics).** The grown `t_ox` is the one quantity
+  the device reads *twice at once*: `V_t = V_FB + 2φ_F + Q_dep/C_ox` rises with it, **and**
+  `I_Dsat ∝ C_ox·(V_GS − V_t)²` falls with it (`C_ox = ε_ox/t_ox`). So — unlike the one-sided
+  purify/slice/diffuse — oxidation is two-sided *with no economics* (like crystal growth): grow **too
+  little** → `V_t` under the floor **+** `I_Dsat` over the ceiling (a low threshold / over-current); grow
+  **too much** → `V_t` over the ceiling **+** `I_Dsat` under the floor (a high threshold / starved drive); a
+  clean window between (verified: ~17–22 min clean, ≈14 nm at 20 min; thin side fails ≤16 min, thick side
+  ≥23 min). The lever is **time**, not `(T, minutes)` — in the thin reaction-limited regime `t_ox ≈ (B/A)·t`
+  is monotone, and temperature moves both Deal–Grove constants and risks the Massoud thin-dry band (a second
+  knob the window doesn't need).
+- **It RESTORES "zero new physics" (the honest counter to phase 4).** The `t_ox → V_t/I_Dsat` chain is the
+  device's *core* read — already wired, already the G7 oxide lever — so phase 5 adds **no** new device term
+  at all (the explicit antidote to phase 4's series-resistance addition).
+
+**Graded by its *own* native non-uniformity — and the only stage with opposite-radii sides.** The grading is
+the oxidation step's **own** radial `t_ox` non-uniformity (edge ~2.5 % thinner, `Variation.t_ox_edge_frac`)
+— the spread phases 3–4 *borrowed* to grade *their* cliffs, finally grading its **home** stage. (Honest
+correction, advisor: this is *not* "the first stage graded by its own variation" — purification's Na ring is
+also native; the accurate novelty is the *borrowed-spread-comes-home* + the opposite radii.) And the two
+sides fail at **opposite radii** — the only stage that does: under-oxidized → the thinnest **rim** crosses
+the thin-side bounds first → an **edge ring** (echoing stage-1's Na ring); over-oxidized → the thickest
+**centre** crosses the thick-side bounds first → a **centre core** (echoing the slice/diffusion cores).
+Verified by the inner/outer half pass-rate split (isolated on a non-grown wafer so the growth void core
+doesn't confound it).
+
+**The channel discriminator (the load-bearing correctness item, advisor).** The oxidation failure collides
+with **every** parametric root — over-oxidation's `V_t`-high looks like the Scheil cut, under-oxidation's
+`V_t`-low like mobile-ion Na, its `I_Dsat`-low like the S/D series resistance. The V_t/I_Dsat **sign pattern
+is *not* unique** (a deep Scheil cut also raises `V_t` and drags `I_Dsat` down — the same signs as
+over-oxidation), so `_dominant_channel` discriminates on the **inherited `t_ox` itself** (`_oxidation_root`,
+checked *first* for a `V_t`/`I_Dsat` death): the worst die's `t_ox` off the known-good thickness
+(`_nominal_oxide_nm` — grown at the nominal time for the recipe's `T`/ambient, not hardcoded) by more than a
+flagged 6 % band. The nominal recipe's ~3 % radial+jitter spread never trips it (so the seam and the phase
+1–4 channel tests are untouched), and the load-bearing test runs the oxidation failure on a **full journey**
+(committed cut + the diffusion consumer **on**), both over- and under-oxidized, to prove it isn't silently
+mis-attributed to the cut or the diffusion. **The same fix was applied to the line's per-die trail
+`pipeline.diagnose()`** (the canonical "why did this die" namer), before its series-R fingerprint — so an
+over-oxidized `I_Dsat`-low death that a user diagnoses on a finished wafer names the gate oxide, not the
+series resistance (the repo closes the collision rather than carrying it; one shared discriminator, two
+call sites). Two boundary cases stay deferred (both latent — unreachable in the journey): a *fully*-dead
+over-oxidation where the outermost dead die sits on the 2.5 %-thinner rim (~+5 %, inside the band) → named
+the Scheil cut, and a thick-oxide `I_Dsat`-*high* death (impossible without a CD-collapse stage).
+
+**The coupling (zero new physics, the propagation payoff again).** How much oxide you can grow before the
+`V_t` ceiling bites is **set by the phase-3 cut**: a deeper cut → higher `N_A` → higher baseline `V_t` →
+less headroom to the ceiling → over-oxidation bites *sooner* (verified: the clean ceiling drops ~24.5 → 19.5
+min as `slice_z` 0 → 0.85). The V_t budget is shared between the cut and the oxide — the sibling of phase
+3's pull↔cut coupling, the *existing* `V_t = f(N_A, t_ox)` equation, no new physics.
+
+**The seam is "lever at nominal", not "stage disengaged" (advisor).** You cannot make a MOSFET with **no**
+gate oxide, so `oxide_min = None` is the recipe **nominal** (20 min) — bit-identical to the pre-phase-5
+journey — *not* an off switch like the diffusion consumer's default-0. `oxidize(DEFAULT_OXIDE_MIN)`
+reproduces the no-oxidize forecast exactly.
+
+`oxidation_trajectory` is the *watch-the-oxide-set-the-device* view (oxide time → `t_ox`/`V_t`/`I_Dsat`).
+`demo_journey.py` is now a **five-stage** playthrough (a 5×3 figure: the two-way read, the two-sided window,
+and the under-oxidized **edge-ring** map join the prior four rows — the edge ring chosen for the map so the
+figure spans both ring topologies). The oxidation showcase sweep runs on a **latitude baseline** (the grown
+boule at a representative mid cut, ideal downstream) so both sides grade — the fully-accumulated wafer (deep
+cut + lean predep) has a *tighter* window, which is the coupling/margins-compound lesson, not a bug. Tests
+in `test_journey.py`/`test_demo_journey.py` pin the two-sided window, the opposite-radii signature, the
+full-journey channel discriminator, the coupling, and the nominal-oxide seam.
+
 ## Deferred (explicit)
 
 - **The economics — the cost side of the decision (the #1 open item, now shared by THREE stages).** Today
@@ -197,16 +268,17 @@ triad.
   the same missing half across all three: the ring/Scheil-drift/`R_s` penalizes under-doing it, cost
   penalizes over-doing it (the two-sided Goldilocks shape the G7 oxide lever already has). The consequence
   spectrum (the forecast bands) is built for all; the cost side is its other half — the natural next
-  increment. (Crystal growth is the exception — its two-sidedness needed no economics; the radial hot zone
-  supplied it.)
+  increment. (Crystal growth **and oxidation** are the exceptions — their two-sidedness needs no economics;
+  the radial hot zone / the `t_ox` two-way read supply it.)
 - **The polish/flatness + killer-defect half of wafer-prep** — phase 3 ships the *cut*; TTV/bow/CMP +
   the defect map run at defaults (flatness is a binary scrap, and TTV→focus-budget is a named scope edge =
   new physics). Built when graded.
-- **The remaining stages' interactive logic (5–8 + wafer-prep's polish half)** — they run at recipe
-  defaults today (the journey carries them); built when each has a consumer.
+- **The remaining stages' interactive logic (6–8 + wafer-prep's polish half)** — lithography, etch &
+  deposition, device/packaging run at recipe defaults today (the journey carries them); built when each has
+  a consumer. (Phase 5 oxidation is now built; 1–5 are interactive.)
 - **All difficulty mechanics** — per the user's "start easy, difficulty later."
 - **The live interactive UI** — a notebook `interact` cell and/or a Textual journey screen driving the
-  headless core. The scripted playthrough + figure is phases 1–4's visible artifact; the live UI is the
+  headless core. The scripted playthrough + figure is phases 1–5's visible artifact; the live UI is the
   next increment.
 
 ## References

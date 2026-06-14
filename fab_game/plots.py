@@ -490,8 +490,48 @@ def _journey_diffusion_arc_panel(ax, result) -> None:
     ax.legend(fontsize=8, loc="lower left")
 
 
+def _journey_oxidation_panel(ax, result) -> None:
+    """Watch the oxide set the device: gate-oxide time → t_ox up, V_t up AND I_Dsat down (the two-sided read)."""
+    m = [pt for pt, _, _, _ in result.oxide_traj]
+    vt = [v for _, _, v, _ in result.oxide_traj]
+    idsat = [i for _, _, _, i in result.oxide_traj]
+    ax.plot(m, vt, color="#b5651d", lw=1.8, marker="o", ms=4, label="V_t (V)")
+    ax.set_xlabel("gate-oxide time (min) — thicker →", fontsize=9)
+    ax.set_ylabel("threshold V_t (V)", fontsize=9, color="#b5651d")
+    ax.tick_params(axis="y", labelcolor="#b5651d")
+    ax2 = ax.twinx()
+    ax2.plot(m, idsat, color="#2f6db5", lw=1.6, marker="s", ms=3, label="I_Dsat (mA)")
+    ax2.set_ylabel("drive current I_Dsat (mA)", fontsize=9, color="#2f6db5")
+    ax2.tick_params(axis="y", labelcolor="#2f6db5")
+    ax.set_title("Watch the oxide set the device: thicker t_ox →\nV_t up AND I_Dsat down (read two ways at once)",
+                 fontsize=10)
+
+
+def _journey_oxidation_arc_panel(ax, result) -> None:
+    """Forecast yield vs gate-oxide time, banded — the two-sided window (thin edge ring ↔ thick centre core)."""
+    m = list(result.oxide_minutes)
+    y = [100.0 * v for v in result.oxide_yields]
+    ax.axhspan(0, 5, color="#d62728", alpha=0.10)
+    ax.axhspan(5, 90, color="#ff7f0e", alpha=0.10)
+    ax.axhspan(90, 100, color="#2ca02c", alpha=0.10)
+    ax.plot(m, y, color="0.2", lw=1.7, marker="o", ms=5, zorder=3)
+    ax.axvline(result.oxide_commit_min, color="#2ca02c", ls="--", lw=1.1,
+               label=f"committed clean oxide {result.oxide_commit_min:g} min")
+    ax.axvline(result.oxide_ring_min, color="#ff7f0e", ls=":", lw=1.2,
+               label=f"the thin edge ring ({result.oxide_ring_forecast.yield_:.0%}) at {result.oxide_ring_min:g} min")
+    ax.set_xlabel(f"gate-oxide time (min) — thicker →  (shown at a z={result.oxide_showcase_z:g} mid cut)",
+                  fontsize=9)
+    ax.set_ylabel("forecast yield (%)", fontsize=9)
+    ax.set_ylim(-3, 103)
+    ax.set_title("Two-sided window (no economics): too thin → edge\nring, too thick → centre core (graded both)",
+                 fontsize=10)
+    ax.text(m[0], 48, "thin\nedge ring", color="#cc6600", fontsize=8, ha="left", va="center")
+    ax.text(m[-1], 48, "thick\ncentre core", color="#cc6600", fontsize=8, ha="right", va="center")
+    ax.legend(fontsize=8, loc="lower center")
+
+
 def journey_figure(result):
-    """Assemble the journey artifact from a :class:`~fab_game.demo_journey.JourneyDemoResult` (4×3 panels).
+    """Assemble the journey artifact from a :class:`~fab_game.demo_journey.JourneyDemoResult` (5×3 panels).
 
     Row 1 — **purification**: the refining scrub, the dead→ring→clean consequence arc, and the wafer map at
     the graded Na ring. Row 2 — **crystal growth**: the axial boule drift (CG-1 flattening), the two-sided
@@ -499,11 +539,13 @@ def journey_figure(result):
     Row 3 — **slice/cut**: where-to-cut (clean → V_t centre core → dead down the boule), the phase-2 coupling
     (a flat boule cuts deep; a slow pull is dead before the cut), and the wafer map at the V_t centre core.
     Row 4 — **S/D diffusion**: the dose → R_s → I_Dsat read, the clean → I_Dsat-core → dead arc, and the
-    wafer map at the I_Dsat centre-weighted core.
+    wafer map at the I_Dsat centre-weighted core. Row 5 — **oxidation**: the t_ox → V_t/I_Dsat two-way read,
+    the two-sided gate-oxide-time window (thin edge ring ↔ thick centre core), and the wafer map at the
+    under-oxidized **edge ring** (the opposite-radii bookend to the stage-3/4 cores; echoes the Na ring).
     """
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(4, 3, figsize=(15, 18))
+    fig, axes = plt.subplots(5, 3, figsize=(15, 22.5))
     _journey_trajectory_panel(axes[0][0], result)
     _journey_arc_panel(axes[0][1], result)
     _wafer_map(axes[0][2], result.ring_forecast.result.wafer,
@@ -520,10 +562,15 @@ def journey_figure(result):
     _journey_diffusion_arc_panel(axes[3][1], result)
     _wafer_map(axes[3][2], result.diffusion_ring_forecast.result.wafer,
                f"stage 4: the I_Dsat centre-weighted core — predep {result.diffusion_ring_time:g} min")
-    fig.suptitle("The journey — stage 1: purify (the Na edge ring)  →  stage 2: grow (the Voronkov window)  "
-                 "→  stage 3: cut (the Scheil V_t core)  →  stage 4: diffuse (the series-R I_Dsat core)",
+    _journey_oxidation_panel(axes[4][0], result)
+    _journey_oxidation_arc_panel(axes[4][1], result)
+    _wafer_map(axes[4][2], result.oxide_ring_forecast.result.wafer,
+               f"stage 5: the under-oxidized edge ring — oxide {result.oxide_ring_min:g} min "
+               f"(z={result.oxide_showcase_z:g} baseline)")
+    fig.suptitle("The journey — purify (Na edge ring)  →  grow (Voronkov window)  →  cut (Scheil V_t core)  "
+                 "→  diffuse (series-R I_Dsat core)  →  oxidize (the two-sided gate-oxide window)",
                  fontsize=12)
-    fig.tight_layout(rect=(0, 0, 1, 0.97))
+    fig.tight_layout(rect=(0, 0, 1, 0.975))
     return fig
 
 

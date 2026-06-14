@@ -1,15 +1,16 @@
 """Integration test for the journey demo (the demo IS the integration check — ADR 0002/0005).
 
-The phase-1–4 journey demo wires the staged scaffold + the purification, crystal-growth, slice/cut *and*
-S/D diffusion stages through the validated line: ``compute`` is the end-to-end check that the
-refine/grow/cut/diffuse → forecast (band + channel) → commit → finish chain holds together. Asserted on
-the robust thesis (purification walks dead→ring→clean; growth is a two-sided window graded on *both* sides
+The phase-1–5 journey demo wires the staged scaffold + the purification, crystal-growth, slice/cut, S/D
+diffusion *and* oxidation stages through the validated line: ``compute`` is the end-to-end check that the
+refine/grow/cut/diffuse/oxidize → forecast (band + channel) → commit → finish chain holds together. Asserted
+on the robust thesis (purification walks dead→ring→clean; growth is a two-sided window graded on *both* sides
 with an interior optimum; the slice arc walks clean→ring→dead down the boule and is **coupled** to the
 phase-2 pull; the diffusion arc walks clean→ring→dead as the predep dose drops, failing on the series-R
-``I_Dsat`` channel; the metal feed dies on leakage, not V_t), not brittle numbers (the mechanics are
+``I_Dsat`` channel; the oxidation window is two-sided and graded on both flanks — too thin / too thick — about
+an interior clean plateau; the metal feed dies on leakage, not V_t), not brittle numbers (the mechanics are
 pinned in ``test_journey.py``). The figure is a "builds without error" smoke test only.
 
-``compute`` is heavier now (four stages, grid_n=11), so it runs **once** as a module fixture.
+``compute`` is heavier now (five stages, grid_n=11), so it runs **once** as a module fixture.
 """
 from __future__ import annotations
 
@@ -108,6 +109,39 @@ def test_demo_diffusion_trajectory_raises_rs_and_lowers_idsat(result):
 
 
 # --------------------------------------------------------------------------- #
+# Stage 5 — oxidation (the two-sided gate-oxide-time window, graded both ways)
+# --------------------------------------------------------------------------- #
+def test_demo_oxidation_window_is_two_sided_and_graded(result):
+    """The gate-oxide-time window has a clean **interior** plateau with *partial* (graded, not 0↔1) yields on
+    both flanks — too thin (under-oxidized) and too thick (over-oxidized), each a graded ring band."""
+    assert "clean" in result.oxide_bands                    # the window clears
+    assert result.oxide_bands[0] in ("dead", "ring")        # thin end: under-oxidized (low V_t / over-current)
+    assert result.oxide_bands[-1] in ("dead", "ring")       # thick end: over-oxidized (high V_t / starved drive)
+    assert "ring" in result.oxide_bands                      # a graded ring band exists on at least one flank
+    # the clean plateau is interior — not the thinnest or the thickest oxide (a real two-sided window)
+    clean_is = [i for i, b in enumerate(result.oxide_bands) if b == "clean"]
+    assert 0 < clean_is[0] and clean_is[-1] < len(result.oxide_bands) - 1
+
+
+def test_demo_oxidation_trajectory_raises_vt_and_lowers_idsat(result):
+    """The 'watch the oxide set the device' view: as the oxide thickens, t_ox and V_t rise while I_Dsat falls
+    (the two-way read — thicker oxide raises the threshold and lowers the drive at once)."""
+    tox = [t for _, t, _, _ in result.oxide_traj]
+    vt = [v for _, _, v, _ in result.oxide_traj]
+    idsat = [i for _, _, _, i in result.oxide_traj]
+    assert tox == sorted(tox)                                # thicker oxide with time
+    assert vt == sorted(vt)                                  # V_t rises (Q_dep/C_ox)
+    assert idsat == sorted(idsat, reverse=True)              # I_Dsat falls (lower C_ox)
+
+
+def test_demo_oxidation_edge_ring_map_is_a_partial_wafer(result):
+    """The under-oxidized **edge ring** chosen for the map is a genuine partial wafer (the thinnest rim
+    failing, not a near-dead wafer) — the opposite-radii bookend to the stage-3/4 cores."""
+    assert 0.0 < result.oxide_ring_forecast.yield_ < 1.0
+    assert "oxide" in (result.oxide_ring_forecast.channel or "").lower()
+
+
+# --------------------------------------------------------------------------- #
 # End to end + the purification channel contrast
 # --------------------------------------------------------------------------- #
 def test_demo_finish_runs_and_scores_the_grown_wafer(result):
@@ -131,5 +165,5 @@ def test_journey_figure_builds(result):
     from fab_game.plots import journey_figure
 
     fig = journey_figure(result)
-    assert len(fig.axes) >= 12                              # 4×3: purification + growth + slice + diffusion rows
+    assert len(fig.axes) >= 15                              # 5×3: purification + growth + slice + diffusion + oxidation
     plt.pyplot.close(fig)

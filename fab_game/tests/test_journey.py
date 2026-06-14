@@ -17,6 +17,7 @@ from __future__ import annotations
 import pytest
 
 from fab_game.journey import (
+    DEFAULT_OXIDE_MIN,
     DIFFUSION_SD_CONTACT_SQUARES,
     GROWTH_G_CENTER_K_PER_MM,
     GROWTH_RADIAL_BOOST,
@@ -28,6 +29,7 @@ from fab_game.journey import (
     finish,
     forecast,
     new_journey,
+    oxidation_trajectory,
     refining_trajectory,
 )
 from fab_game.pipeline import LineResult
@@ -374,6 +376,146 @@ def test_diffuse_rejects_a_nonpositive_predep():
         new_journey("clean").diffuse(0.0)
     with pytest.raises(ValueError):
         new_journey("clean").diffuse(950.0, 0.0)
+
+
+# --------------------------------------------------------------------------- #
+# Phase 5 — the oxidation stage (two-sided, no economics; graded by its own t_ox non-uniformity)
+# --------------------------------------------------------------------------- #
+def _oxidized(minutes: float, *, grade: str = "clean", pull: float = 2.0, z: float = 0.5,
+              predep_C: float | None = None, seed: int = 0) -> JourneyState:
+    """A grown-cut-and-oxidized state on a *clean* feed at the optimum pull / mid-cut — so the consequence
+    is the gate-oxide thickness, not residual Na or the Scheil drift. ``predep_C`` engages the diffusion
+    series-R consumer too (for the full-journey channel-collision test)."""
+    return JourneyState(grade=grade, pull_rate=pull, slice_z=z, predep_C=predep_C, oxide_min=minutes,
+                        seed=seed)
+
+
+def _pass_rate(fc: StageForecast, *, inner_half: bool) -> float:
+    """Pass-rate over the inner (``radius_frac < 0.5``) or outer half of the wafer map — the radial signature."""
+    sel = [d for d in fc.result.wafer.dies if (d.radius_frac < 0.5) == inner_half]
+    return sum(d.verdict.passed for d in sel) / len(sel)
+
+
+def test_oxidize_sets_the_oxide_time_and_keeps_T_ambient_default():
+    """``oxidize`` overlays the gate-oxide **time** onto the recipe; ``T``/ambient/orientation stay at the
+    recipe default (time is the only lever — a single monotone knob, no second temperature knob)."""
+    ox = new_journey("clean").oxidize(24.0).current_recipe.oxidation
+    assert ox.minutes == 24.0
+    assert ox.ambient == "dry" and ox.T_celsius == 1000.0    # untouched — the lever is time alone
+
+
+def test_oxidation_window_is_two_sided_and_graded_on_both_sides():
+    """THE policy check (the cleanest two-sided stage — like crystal growth, no economics): grow **too
+    little** oxide → fails (low V_t / over-current), the nominal grows **clean**, grow **too much** → fails
+    (high V_t / starved drive); and *both* sides are **graded** (a ring band, not an all-or-nothing flip) by
+    the oxidation step's own radial ``t_ox`` non-uniformity."""
+    thin_dead = forecast(_oxidized(14.0))
+    thin_ring = forecast(_oxidized(16.5))
+    clean = forecast(_oxidized(20.0))
+    thick_ring = forecast(_oxidized(23.0))
+    thick_dead = forecast(_oxidized(24.5))
+    assert clean.band == "clean"
+    # thin side: dead → a partial graded ring as the oxide thickens toward the window
+    assert thin_dead.band == "dead" and 0.0 < thin_ring.yield_ < clean.yield_
+    # thick side: a partial graded ring → dead as the oxide thickens past the window
+    assert 0.0 < thick_ring.yield_ < clean.yield_ and thick_dead.band == "dead"
+
+
+def test_oxidation_sides_fail_at_opposite_radii():
+    """THE phase-5 signature (the only stage whose two sides fail at *opposite radii*): under-oxidized →
+    the thinnest **rim** crosses the thin-side bounds first → an **edge ring** (the outer half fails harder,
+    echoing stage-1's Na ring); over-oxidized → the thickest **centre** crosses the thick-side bounds first →
+    a **centre core** (the inner half fails harder, echoing the slice/diffusion cores).
+
+    Isolated on a **non-grown** wafer (no pull → no Voronkov void core, no killer particles) so the only
+    radial structure is the oxidation step's own ``t_ox`` non-uniformity — the growth optimum still scatters
+    a small centre void core (capping its yield ~96 %) that would confound the inner/outer pass-rate split."""
+    under = forecast(JourneyState(grade="clean", oxide_min=17.5, seed=0))   # too thin → edge ring
+    over = forecast(JourneyState(grade="clean", oxide_min=24.0, seed=0))    # too thick → centre core
+    assert under.band == "ring" and over.band == "ring"
+    assert _pass_rate(under, inner_half=True) > _pass_rate(under, inner_half=False)   # edge ring (rim fails)
+    assert _pass_rate(over, inner_half=True) < _pass_rate(over, inner_half=False)     # centre core (centre fails)
+
+
+def test_oxidation_trajectory_raises_vt_and_lowers_idsat_with_time():
+    """The 'watch the oxide set the device' view: a longer oxidation grows a thicker ``t_ox`` → ``V_t``
+    rises (``Q_dep/C_ox``) **and** ``I_Dsat`` falls (``C_ox`` down) — the two-sided consequence, read off one
+    clean die down the oxide-time sweep."""
+    traj = oxidation_trajectory(_oxidized(20.0))
+    ms = [m for m, _, _, _ in traj]
+    tox = [t for _, t, _, _ in traj]
+    vt = [v for _, _, v, _ in traj]
+    idsat = [i for _, _, _, i in traj]
+    assert ms == sorted(ms)                                  # ascending oxide time
+    assert tox == sorted(tox)                                # thicker oxide with time
+    assert vt == sorted(vt)                                  # V_t rises with thickness
+    assert idsat == sorted(idsat, reverse=True)              # I_Dsat falls (lower C_ox)
+
+
+def test_oxidation_channel_names_the_gate_oxide_on_a_full_journey():
+    """THE load-bearing channel test (advisor): the oxidation failure collides with **every** parametric
+    root — over-oxidation's V_t-high looks like the Scheil cut, under-oxidation's V_t-low like mobile-ion Na,
+    its I_Dsat-low like the S/D series resistance. On a **full journey** (committed cut + the diffusion
+    series-R consumer ON) the oxide death must still be named the **gate oxide** — discriminated on the
+    inherited ``t_ox`` (the V_t/I_Dsat sign is *not* unique: a deep Scheil cut also raises V_t and drags
+    I_Dsat down) — never silently mis-attributed to the cut or the diffusion."""
+    over = forecast(_oxidized(24.0, predep_C=950.0))         # over-oxidized, diffusion consumer engaged
+    under = forecast(_oxidized(15.0, predep_C=950.0))        # under-oxidized, diffusion consumer engaged
+    assert over.band != "clean" and "too thick" in over.channel and "oxide" in over.channel.lower()
+    assert under.band != "clean" and "too thin" in under.channel and "oxide" in under.channel.lower()
+    # …and NOT the colliding roots the sign pattern would otherwise grab:
+    assert "scheil" not in over.channel.lower() and "series resistance" not in over.channel.lower()
+    assert "mobile-ion" not in under.channel.lower()
+
+
+def test_oxidation_window_tightens_with_a_deeper_cut():
+    """The phase-3 → phase-5 **coupling** (the V_t budget is shared): a deeper cut → higher ``N_A`` → higher
+    baseline ``V_t`` → less headroom to the ``V_t`` ceiling → over-oxidation bites **sooner**. The same thick
+    oxide that is clean on a shallow cut is over the ceiling on a deep one — 'how much oxide you can grow is
+    set by how deep you cut' (the cut↔pull coupling's sibling, zero new physics)."""
+    thick = 22.5
+    shallow = forecast(_oxidized(thick, z=0.0))
+    deep = forecast(_oxidized(thick, z=0.85))
+    assert shallow.band == "clean"                           # clean on a shallow (low-N_A) cut
+    assert deep.yield_ < shallow.yield_ and deep.band != "clean"   # the deep cut ate the V_t headroom
+
+
+def test_oxidize_folds_into_the_recipe_on_commit():
+    """``commit`` bakes the oxidation decision (the oxide time) into the accumulator, preserving the priors."""
+    s = new_journey("clean").grow(2.0).commit().cut(0.5).commit().oxidize(22.0).commit()
+    assert s.recipe.oxidation.minutes == 22.0
+    assert s.recipe.czochralski.slice_z == 0.5 and s.recipe.czochralski.pull_rate_mm_min == 2.0  # priors survive
+
+
+def test_nominal_oxide_is_a_seam():
+    """A journey that never oxidizes leaves ``oxidation.minutes`` at the recipe nominal — the lever AT
+    NOMINAL is the identity (you cannot make a MOSFET with no gate oxide, so the seam is nominal-oxide, not
+    an off switch): an explicit ``oxidize(DEFAULT_OXIDE_MIN)`` reproduces the no-oxidize forecast bit-for-bit."""
+    grown_cut = JourneyState(grade="clean", pull_rate=2.0, slice_z=0.5)
+    assert grown_cut.oxide_min is None
+    assert grown_cut.current_recipe.oxidation.minutes == DEFAULT_OXIDE_MIN          # the recipe nominal, untouched
+    assert forecast(grown_cut).yield_ == forecast(grown_cut.oxidize(DEFAULT_OXIDE_MIN)).yield_
+
+
+def test_diagnose_names_the_oxide_not_series_resistance_on_over_oxidation():
+    """The line's per-die trail (:func:`fab_game.pipeline.diagnose`) has the **same** I_Dsat-low collision as
+    ``_dominant_channel``: an over-oxidized death with the diffusion series-R consumer engaged must name the
+    **gate oxide** (too thick), not the S/D series resistance — closed by the same ``t_ox``-off-nominal check
+    (before the series-R fingerprint). The journey surfaces ``_dominant_channel``, but a user can ``diagnose``
+    a deliberately over-oxidized finished wafer, so the trail is kept honest too."""
+    from fab_game.pipeline import diagnose
+    over = forecast(_oxidized(24.0, predep_C=950.0))         # over-oxidized, the series-R consumer engaged
+    dead = [d for d in over.result.wafer.dies if d.verdict.failed
+            and any("i_dsat" in r.lower() and "(low)" in r.lower() for r in d.verdict.reasons)]
+    assert dead, "expected an I_Dsat-low over-oxidation death to diagnose"
+    trail = diagnose(dead[0])
+    assert "oxidation" in trail and "too THICK" in trail
+    assert "series resistance" not in trail                  # the series-R fingerprint is suppressed (oxide claimed it)
+
+
+def test_oxidize_rejects_a_nonpositive_time():
+    with pytest.raises(ValueError):
+        new_journey("clean").oxidize(0.0)
 
 
 # --------------------------------------------------------------------------- #

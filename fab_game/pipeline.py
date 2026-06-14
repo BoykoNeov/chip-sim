@@ -497,11 +497,35 @@ def diagnose(die: Die) -> str:
                 lines.append(f"    ↳ purification: junction leakage from deep-level-metal SRH recombination "
                              f"(minority-carrier lifetime τ {tau_us:.2g} µs) "
                              f"→ a leaky diode (purify harder — zone refining scrubs the metals fast, tiny k)")
+        # The oxidation fingerprint (phase-5 journey): a V_t/I_Dsat parametric death with the die's gate
+        # oxide off the nominal thickness is an over/under-oxidation root — checked BEFORE the series-R
+        # fingerprint because an over-oxidized I_Dsat-LOW death (thick oxide → low C_ox) otherwise reads as
+        # series resistance (the same I_Dsat-low sign). Discriminated on the inherited t_ox itself, not the
+        # V_t/I_Dsat sign (a deep Scheil cut also drags I_Dsat down — the sign is not unique; this mirrors
+        # the journey's journey._oxidation_root). Nominal = the DEFAULT_RECIPE oxide (the canonical ~14 nm),
+        # the same 6 % band; a nominal-oxide V_t/I_Dsat death stays attributed to its real root.
+        oxide_named = False
+        if (die.t_ox_um is not None
+                and any(("v_t" in r.lower() or "i_dsat" in r.lower()) for r in die.verdict.reasons)):
+            from chip.oxidation import grow_oxide
+            ox = DEFAULT_RECIPE.oxidation
+            nominal_nm = grow_oxide(ox.ambient, ox.T_celsius, ox.minutes, orientation=ox.orientation).t_ox_nm
+            t_ox_nm = die.t_ox_um * 1.0e3
+            if t_ox_nm > nominal_nm * 1.06:
+                lines.append(f"    ↳ oxidation: gate oxide too THICK ({t_ox_nm:.1f} nm vs ~{nominal_nm:.1f} nm "
+                             f"nominal) → V_t up + C_ox down starves I_Dsat (grow less oxide — shorten the bake)")
+                oxide_named = True
+            elif t_ox_nm < nominal_nm * 0.94:
+                lines.append(f"    ↳ oxidation: gate oxide too THIN ({t_ox_nm:.1f} nm vs ~{nominal_nm:.1f} nm "
+                             f"nominal) → V_t down + C_ox up over-drives I_Dsat (grow more oxide — longer bake)")
+                oxide_named = True
         # The diffusion fingerprint (phase-4 journey): an I_Dsat-LOW failure with the S/D series-R consumer
         # engaged traces to an under-diffused junction — the high sheet resistance R_s (a cool/short predep
         # dose) becomes a parasitic series resistance that starves the drive current (source degeneration).
+        # Suppressed when the oxidation fingerprint already claimed the death (an over-oxidized I_Dsat-low).
         R_series = device.knobs_in.get("R_series_ohm")
-        if R_series and any("i_dsat" in r.lower() and "(low)" in r.lower() for r in die.verdict.reasons):
+        if (not oxide_named and R_series
+                and any("i_dsat" in r.lower() and "(low)" in r.lower() for r in die.verdict.reasons)):
             lines.append(f"    ↳ diffusion: S/D series resistance {R_series:.0f} Ω (an under-diffused junction "
                          f"→ high sheet resistance R_s {die.R_s:.0f} Ω/sq) starves I_Dsat via source "
                          f"degeneration → drive too weak (lay down more predep dose — hotter/longer predep)")
