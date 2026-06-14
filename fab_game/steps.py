@@ -218,7 +218,7 @@ def etch_deposition_step(
 
 def device_step(
     die: Die, knobs: DeviceKnobs, channel_N_A: float, contamination: Contamination | None = None,
-    thermal_donor_density: float = 0.0,
+    thermal_donor_density: float = 0.0, dislocation_density: float = 0.0,
 ) -> Die:
     """Device extraction → ``V_t``, ``I_Dsat`` *and* lifetime/leakage, *reading the inherited* ``t_ox``, ``cd``, *contamination*.
 
@@ -242,6 +242,14 @@ def device_step(
     not re-shifted here — it is recorded only so the failure trail can name the donor compensation as a
     ``V_t`` root cause (the C1 fingerprint, like ``Q_ox`` for Na). Defaults to ``0.0`` (no donors → the
     seam — the record key is added only when donors are present, so a clean device record is unchanged).
+
+    ``dislocation_density`` (cm⁻², A1) is this die's grown-in interstitial-side dislocation population
+    (a too-slow Czochralski pull, ``ξ < ξ_t`` — :meth:`CzochralskiKnobs.interstitial_dislocation_density_at`,
+    keyed on the die's ``radius_frac`` so the A2 radial **rim** is leaky per die). It is a *second
+    contributor* to the same SRH leakage channel as the deep-level metals (``1/τ += K·ρ_disl``) and, like
+    them, **never moves** ``V_t``/``I_Dsat`` — slow pull makes the diode leaky, not the threshold wrong.
+    Defaults to ``0.0`` (vacancy/boundary growth or CG-2 off → the seam; the ``rho_disl`` record key is
+    added only when dislocations are present, so a vacancy/clean device record is byte-for-byte unchanged).
     """
     if die.t_ox_um is None or die.cd_um is None or die.resolved is False:
         reason = ("litho image not resolved" if die.resolved is False
@@ -256,12 +264,16 @@ def device_step(
         channel_N_A, die.t_ox_um, gate=knobs.gate, channel_length_um=die.cd_um, Q_ox=Q_ox,
     )
     i_dsat = dev.saturation_current(mos, mos.V_t + knobs.overdrive_V, knobs.width_um)
-    # G4b: the deep-level metals' SRH lifetime → junction reverse leakage (clean ⇒ τ_bulk + baseline).
-    leak = life.device_leakage(contamination, channel_N_A)
+    # G4b/A1: the SRH lifetime → junction reverse leakage. Two contributors on the same channel — the
+    # deep-level metals (G4b) and a slow-pull grown-in dislocation population (A1, ξ < ξ_t) — both add to
+    # 1/τ; clean feed grown on the vacancy side ⇒ τ_bulk + baseline (the seam, dislocation_density = 0).
+    leak = life.device_leakage(contamination, channel_N_A, dislocation_density=dislocation_density)
     knobs_in = {"gate": knobs.gate, "width_um": knobs.width_um, "overdrive_V": knobs.overdrive_V,
                 "Q_ox": Q_ox, "N_A": channel_N_A}
     if thermal_donor_density > 0.0:                          # C1 fingerprint — only when donors are present
         knobs_in["N_TD"] = thermal_donor_density            # (so a clean device record is byte-unchanged)
+    if dislocation_density > 0.0:                            # A1 fingerprint — only on the interstitial side
+        knobs_in["rho_disl"] = dislocation_density           # (so a vacancy/clean device record is byte-unchanged)
     return die.record(
         "device",
         knobs_in=knobs_in,

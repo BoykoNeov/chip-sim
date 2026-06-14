@@ -289,6 +289,48 @@ def test_void_density_rises_monotonically_above_threshold():
     assert cz.void_defect_density(xi_t + 0.4) == pytest.approx(cz.COP_DENSITY_PER_RATIO_EXCESS_CM2 * 0.4)
 
 
+# --------------------------------------------------------------------------- #
+# A1: the interstitial side — grown-in dislocation density, the mirror of the COP density.
+# Same flagged-phenomenology tier as the void density: the TIGHT leg is the definitional
+# flip at ξ_t (0 at and above it, by construction — a guard, not an anchor); the coefficient
+# is FLAGGED. It feeds the LEAKAGE channel (chip.lifetime), not the yield map.
+# --------------------------------------------------------------------------- #
+def test_dislocation_density_is_zero_at_and_above_the_threshold_the_seam():
+    # The seam / by-construction guard: NO dislocations at or above ξ_t (vacancy/boundary growth) — the
+    # mirror of the void density's "0 at and below ξ_t". A vacancy-side ξ leaves the diode untouched.
+    xi_t = cz.VORONKOV_CRITICAL_RATIO
+    assert cz.dislocation_defect_density(xi_t) == 0.0               # exactly at the V/I boundary
+    assert cz.dislocation_defect_density(xi_t + 0.05) == 0.0        # vacancy side → no dislocations
+    assert cz.dislocation_defect_density(xi_t + 1.0) == 0.0
+
+
+def test_dislocation_density_rises_monotonically_below_threshold():
+    # Below ξ_t the dislocation density rises monotonically with the DEFICIT ξ_t−ξ (a slower pull / steeper
+    # G), continuous at the threshold (→0⁺). The *direction* is criterion-driven; the slope is flagged.
+    xi_t = cz.VORONKOV_CRITICAL_RATIO
+    ratios = [xi_t, xi_t - 0.02, xi_t - 0.05, xi_t - 0.10, 0.0]     # toward ξ=0 (the deepest interstitial)
+    dens = [cz.dislocation_defect_density(r) for r in ratios]
+    assert dens == sorted(dens)                                     # monotone non-decreasing as ξ falls
+    assert dens[0] == 0.0 and dens[1] > 0.0                         # switches on just below ξ_t
+    assert cz.dislocation_defect_density(xi_t - 1e-9) == pytest.approx(0.0, abs=1e-3)  # continuous at ξ_t
+    # Linear in the deficit with the (flagged) coefficient.
+    assert cz.dislocation_defect_density(xi_t - 0.04) == pytest.approx(
+        cz.DISLOCATION_DENSITY_PER_RATIO_DEFICIT_CM2 * 0.04)
+
+
+def test_dislocation_and_void_densities_are_complementary_across_the_ring():
+    # The two densities are reflections of each other across ξ_t: at most one is non-zero at any ξ, and
+    # they are exactly zero TOGETHER only at ξ = ξ_t — the OSF (V/I) boundary, the one defect-free point.
+    xi_t = cz.VORONKOV_CRITICAL_RATIO
+    for xi in (0.02, 0.09, xi_t, 0.20, 0.40):
+        void = cz.void_defect_density(xi)
+        disloc = cz.dislocation_defect_density(xi)
+        assert not (void > 0.0 and disloc > 0.0)                    # never both — disjoint regimes
+    assert cz.void_defect_density(xi_t) == 0.0 and cz.dislocation_defect_density(xi_t) == 0.0  # the clean point
+    with pytest.raises(ValueError):
+        cz.dislocation_defect_density(0.05, coefficient=-1.0)       # coefficient ≥ 0
+
+
 def test_voronkov_realistic_magnitude_typical_cz_is_vacancy_rich():
     # The HONEST magnitude (the load-bearing flag, like CG-1's): realistic CZ (V≈1 mm/min, G≈3.5 K/mm)
     # gives ξ≈0.29 > ξ_t → VACANCY-rich (historically COP-containing) — NOT defect-free by default.

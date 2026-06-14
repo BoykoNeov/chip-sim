@@ -72,8 +72,11 @@ Named scope edge (the honest ceiling)
   **interstitial-rich** (dislocation loops). Pulling faster (or running a cooler hot zone, lower
   ``G``) pushes ``V/G`` up into voids, so the COP killer-defect density rises — the in-model cost
   CG-1 lacked. The **OSF-ring radial pattern** is now **BUILT (A2, opt-in)** — see the §1f bullet
-  below. **Remaining deferred brakes:** the *interstitial*-side dislocation/leakage consequence
-  (only the vacancy/void→GOI density is wired), constitutional-supercooling **striations**, and the
+  below — and the *interstitial*-side ``ξ < ξ_t`` consequence is now **BUILT (A1, opt-in)** too: a
+  mirror dislocation density (:func:`dislocation_defect_density`, §1g) feeding the junction-**leakage**
+  channel of :mod:`chip.lifetime` (slow pull → dislocations → a leaky diode), completing the criterion's
+  symmetry through a *different* device output (leakage, not yield) and giving slow pull a cost — see the
+  §1g bullet below. **Remaining deferred brakes:** constitutional-supercooling **striations** and the
   dislocation-free Dash neck.
   ``G`` is a **flagged house knob** here — or, now **BUILT (CG-3, opt-in)**, derived from the Stefan
   interface heat balance (next bullet); only the criterion *form* + ``ξ_t`` are cited (plan §6a
@@ -118,8 +121,22 @@ Named scope edge (the honest ceiling)
   topology signs (vacancy centre / interstitial edge); flagged = the ``G(r)`` profile, the radial
   boost, the ring width, and **its on-wafer existence itself**. **No engine** (the Robin-``G`` sourcing
   was falsified/deferred — closed-form house profile). Off by default (``boost = 0`` ⇒ uniform ⇒ CG-2
-  byte-for-byte). **Still deferred:** the literal *degraded ring* (the OSF band's own stacking-fault
-  **leakage** → the interstitial/:mod:`chip.lifetime` channel = the separately-deferred A1 edge).
+  byte-for-byte). **Still deferred:** ~~the literal *degraded ring*~~ — now **BUILT (A1)**, next bullet.
+* **The interstitial side — grown-in dislocations → leakage — now BUILT (A1, opt-in), the COP mirror.**
+  CG-2 wired only the vacancy side (``ξ > ξ_t`` → voids → *yield*); A1 wires the mirror ``ξ < ξ_t``
+  (slow pull / over-steep ``G``) → **dislocation loops** (:func:`dislocation_defect_density`, §1g —
+  ``coefficient·(ξ_t − ξ)``, the reflection of :func:`void_defect_density` across ``ξ_t``). These are
+  recombination centres, so they feed the junction-**leakage** channel of :mod:`chip.lifetime` (G4b;
+  ``1/τ += K·ρ_disl``), **not** the yield map — completing the criterion's symmetry through a *different*
+  device output. THE payoff: a **two-sided** defect window — too-fast costs yield (COP), too-slow costs
+  leakage (dislocations), the optimum **at** ``ξ_t`` (where both are zero, the cited coefficient-robust
+  location). It is also the consumer of A2's interstitial **rim** (the OSF rim was clean *of voids* but
+  is dislocation-leaky). **Honest magnitude (lead with it):** realistic CZ is vacancy-side (ξ ≈ 0.29),
+  so this is a **corner** — the value is the symmetry (slow pull is no longer free), not a main-line
+  trade-off. Tight = the ``ξ_t`` flip (by-construction guard, not an anchor); flagged = the density
+  coefficient here **and** the lifetime ``K`` (only their product sets the leakage depth). **No engine,
+  no conservation law** (CG-2's tier). Off by default (``ξ ≥ ξ_t`` or CG-2 off ⇒ ``ρ_disl = 0`` ⇒ the
+  seam). **Still deferred:** the dislocation→``τ`` *magnitude* (flagged), high-injection, gettering.
 * **Full dopant activation at 300 K** (inherited from the Masetti/junction resistivity model): the
   electrically-active concentration is taken equal to the chemical one — fine at the substrate
   ``~1e15–1e17`` here; the active-vs-chemical edge is the repo's standing ceiling.
@@ -723,6 +740,72 @@ def radial_defect_regime(
     """
     g_r = radial_thermal_gradient(radius_frac, G_center, boost=boost)
     return grown_in_defect_regime(voronkov_ratio(pull_rate_mm_min, g_r), critical_ratio=critical_ratio)
+
+
+# --------------------------------------------------------------------------- #
+# 1g. The interstitial side of Voronkov — grown-in dislocations → leakage (A1, the COP mirror)
+# --------------------------------------------------------------------------- #
+# CG-2 (§1c) wired only the VACANCY side of the criterion: ξ > ξ_t → voids/COPs →
+# :func:`void_defect_density` → the G3 Poisson **yield** map. Its mirror is the INTERSTITIAL side,
+# ξ < ξ_t (slow pull / over-steep G): the front freezes in self-interstitial-supersaturated silicon,
+# which precipitates as **dislocation loops / A-(swirl) defects** (Voronkov, J. Cryst. Growth 59:625,
+# 1982 — the SAME cited regime split, already pinned in §1c). Those dislocations are electrically
+# **recombination centres**, not killer particles — so they do **not** feed the Poisson yield map;
+# they shorten the minority-carrier lifetime and raise junction reverse leakage, the SEPARATE device
+# channel :mod:`chip.lifetime` (G4b) already owns for the deep-level metals (``1/τ += K·ρ_disl``). That
+# leakage consumer is the one the interstitial side has and the vacancy side does not — so the
+# criterion's symmetry is completed through a *different* device output, not a second yield term.
+#
+# THE TWO-SIDED WINDOW (the A1 payoff — but read the honest magnitude next). Before A1, pulling
+# SLOWER was free on yield: CG-1 flattened the doping (a benefit) and CG-2's COP cost only switched on
+# ABOVE ξ_t, so the interstitial side carried no cost (the escape from voids was free). A1 closes it:
+# too-fast (ξ > ξ_t) costs **yield** (COP voids), too-slow (ξ < ξ_t) costs **leakage** (dislocations),
+# with the defect-free optimum AT ξ = ξ_t — the OSF (V/I) boundary — where BOTH densities are zero. The
+# optimum's LOCATION is the cited ξ_t (coefficient-robust, the tight leg); only the cost DEPTHS on
+# either side are flagged.
+#
+# HONEST MAGNITUDE (load-bearing — the CG-2 finding restated; lead with it). Realistic CZ sits at
+# ξ ≈ 0.29 > ξ_t — the VACANCY side — so the interstitial/dislocation cost only bites at a
+# **deliberately** slow pull or an over-steep hot zone (ξ < ξ_t). It is a CORNER, not the main-line
+# lever: its value is the criterion's symmetry (slow pull is no longer free) and the radial RIM it
+# lights up — A2's OSF interstitial rim (§1f) was clean *of voids* but is dislocation-LEAKY; A1 is that
+# rim's consumer — not a trade-off you would operate at.
+#
+# FIDELITY (plan §6a flagged-phenomenology tier — EXACTLY CG-2's: NO conservation law, NO engine).
+# Tight = the definitional regime flip at ξ = ξ_t (the legit limit leg) — the density is 0 at and above
+# ξ_t BY CONSTRUCTION (a guard, NOT an anchor — the v1.11/CG-2 reminder). Flagged = the dislocation-
+# density coefficient HERE and the :data:`chip.lifetime.DISLOCATION_RECOMBINATION_COEFF` it feeds; only
+# their PRODUCT sets the leakage depth (ONE flagged magnitude, factored across two modules for
+# modularity — the void_defect_density → poisson_yield split mirrored). The DIRECTION (a density that
+# switches on at ξ_t and rises with the deficit ξ_t − ξ) is criterion-driven.
+DISLOCATION_DENSITY_PER_RATIO_DEFICIT_CM2: float = 1.0e6   # FLAGGED house: ρ_disl (cm⁻²) per unit (ξ_t − ξ)
+
+
+def dislocation_defect_density(
+    ratio: float,
+    *,
+    critical_ratio: float = VORONKOV_CRITICAL_RATIO,
+    coefficient: float = DISLOCATION_DENSITY_PER_RATIO_DEFICIT_CM2,
+) -> float:
+    """Grown-in interstitial-side **dislocation density** (cm⁻²) from the Voronkov ratio — FLAGGED (A1).
+
+    The exact mirror of the vacancy-side :func:`void_defect_density`, reflected across ``ξ_t``: ``0`` at
+    and **above** ``ξ_t`` (no interstitial supersaturation → no dislocations — a *by-construction* guard,
+    not an anchor) and rising linearly with the **deficit** ``ξ_t − ξ`` below it (``coefficient·(ξ_t −
+    ξ)``). Unlike the void density (which feeds the Poisson **yield** map), these dislocations are
+    recombination centres → they feed the junction-**leakage** channel of :mod:`chip.lifetime`
+    (:func:`chip.lifetime.dislocation_recombination_rate`, ``1/τ += K·ρ_disl``) — the device output net
+    doping cannot carry, the same channel the deep-level metals use (G4b). The *direction* (switches on
+    at ``ξ_t``, monotone below) is criterion-driven; the ``coefficient`` is **house/flagged** (ADR 0005
+    §5) and compounds with the lifetime ``K`` — only their product sets the leakage depth. One-sided
+    (interstitial only); the vacancy side (``ξ > ξ_t``) is :func:`void_defect_density`. Like the void
+    density it is uniform **per call**, but A2's radial wiring reuses it *per wafer radius* (the
+    interstitial **rim** of the OSF picture, §1f).
+    """
+    if coefficient < 0.0:
+        raise ValueError(f"coefficient must be ≥ 0, got {coefficient}")
+    deficit = critical_ratio - ratio
+    return coefficient * deficit if deficit > 0.0 else 0.0
 
 
 # --------------------------------------------------------------------------- #

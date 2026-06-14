@@ -492,9 +492,11 @@ has a home and a cited model, **not yet detailed**. Ordered by feasibility again
   > (unmodeled), not yield. The plateau *location* is the cited `ξ_t` (coefficient-robust).
   > **Provenance:** a wafer-level grown-in/`ξ`/regime note (the per-die failure trail still reads a caught
   > particle — per-particle grown-in-vs-process tagging needs a 2nd Poisson draw → deferred). **Deferred:**
-  > interstitial-side dislocation/leakage cost (only vacancy→GOI wired), Robin-`G` sourcing, striations,
-  > CG-3 Stefan front. (The **OSF-ring radial pattern** — density uniform here — is now **BUILT** as A2:
-  > CG-2 made radial, `czochralski.py` §1f, see the scope-edge backlog.) Fast lane 506→**522**
+  > Robin-`G` sourcing, striations, CG-3 Stefan front. (The **OSF-ring radial pattern** — density uniform
+  > here — is now **BUILT** as A2: CG-2 made radial, `czochralski.py` §1f; and the **interstitial-side
+  > dislocation/leakage cost** — only vacancy→GOI was wired here — is now **BUILT** as A1:
+  > `dislocation_defect_density` §1g → `chip.lifetime` junction leakage, the two-sided window with the
+  > optimum at `ξ_t`; both see the scope-edge backlog.) Fast lane 506→**522**
   > (+16: czochralski +7, `test_voronkov` 5, `test_demo_voronkov` 4). No engine touch, no ADR.
 - **CG-3 — Stefan moving-interface solidification (the honest hard one).** The actual solid–liquid
   front — latent heat, the interface position/shape, facets — as a **free-boundary (Stefan) problem**:

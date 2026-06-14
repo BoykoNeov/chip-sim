@@ -32,7 +32,7 @@ The consumer column is the one that decides everything else.
 |---|------|--------|--------------------|---------|
 | C1 | **Oxygen / thermal donors** | new front-of-line | `V_t` / resistivity via net doping (G4a chain) | **✅ BUILT (2026-06-14)** |
 | D1 | **Under-etch** | G5 (`etch_deposition.py`) | residual/bridge → functional kill (yield) | **✅ BUILT (2026-06-14)** |
-| A1 | **CG-2 interstitial → dislocation/leakage** | §6a CG-2 | reverse leakage via `lifetime.py` (G4b) | **PROMOTABLE (corner)** |
+| A1 | **CG-2 interstitial → dislocation/leakage** | §6a CG-2 | reverse leakage via `lifetime.py` (G4b) | **✅ BUILT (2026-06-14)** |
 | A2 | **OSF ring (radial `G(r)`)** + Robin-mode sourcing | §6a CG-2 | edge-vs-center yield non-uniformity | **SPLIT (2026-06-14): ring ✅ BUILT (closed-form); Robin-`G` DEFERRED (premise FALSIFIED)** |
 | A3 | **Striations** | §6a CG-1/CG-2 | none as a killer; at most a variance feed | DEFERRED (game-layer at most) |
 | E1 | **Transient spike/laser anneal `T(x,t)` → `D(T(t))`** | heat-mode consumer search | `x_j`/`R_s`/`V_t` via emergent thermal budget | DEFERRED (trigger recorded — the one real heat-mode consumer) |
@@ -46,7 +46,7 @@ The consumer column is the one that decides everything else.
 
 ## Group A — Crystal-growth follow-ons (the §6a cluster)
 
-### A1 — CG-2 interstitial-side dislocation / leakage cost  ·  PROMOTABLE (corner case)
+### A1 — CG-2 interstitial-side dislocation / leakage cost  ·  ✅ BUILT (2026-06-14)
 
 - **Model class.** CG-2 ([[fab-game-cg2]]) wired only the *vacancy* side of the Voronkov
   criterion (`ξ > ξ_t` → voids/COPs → gate-oxide-integrity kill). The mirror side `ξ < ξ_t`
@@ -63,11 +63,27 @@ The consumer column is the one that decides everything else.
   `ξ = ξ_t` (the legit limit leg) and zero-above-threshold by construction; flagged = the
   dislocation→`τ` coefficient. No conservation law (like CG-2/G5).
 - **Engine/ADR.** None — algebraic, consumer-side, like CG-2.
-- **Verdict.** **PROMOTABLE but a corner.** Honest magnitude (the CG-2 finding): realistic CZ sits
-  at `ξ ≈ 0.29 > ξ_t` → *vacancy*-rich, so the interstitial side only bites at deliberately slow
-  pull or an over-steep `G`. It completes the criterion's symmetry and gives slow-pull a cost (today
-  slow pull is free on yield), but it is not the main-line lever. Cheap; build after the higher-value
-  items unless symmetry is wanted for its own sake.
+- **As built (2026-06-14).** `chip/czochralski.py` §1g — `dislocation_defect_density(ξ) =
+  coeff·max(0, ξ_t − ξ)` (the **mirror** of `void_defect_density`, reflected across `ξ_t`;
+  `DISLOCATION_DENSITY_PER_RATIO_DEFICIT_CM2` flagged) — feeds `chip/lifetime.py`'s new
+  `dislocation_recombination_rate(ρ_disl) = K·ρ_disl` (`DISLOCATION_RECOMBINATION_COEFF` flagged) via
+  a `dislocation_density=` kwarg on `srh_lifetime`/`device_leakage` (`1/τ += K·ρ_disl`, the **same**
+  channel as the deep-level metals — a *new contributor*, not a new output). **No new game knob** —
+  `CzochralskiKnobs.interstitial_dislocation_density[_at(r)]` reads the *existing* `(V, G)` and
+  switches on automatically on the interstitial side; threaded to **both** `device_step` call sites
+  (main + rework) keyed on `radius_frac`. **THE payoff:** the Voronkov criterion is now **two-sided** —
+  too-fast costs **yield** (CG-2 COP voids), too-slow costs **leakage** (A1 dislocations), the
+  defect-free optimum **at** `ξ_t` (where both densities are zero; the cited, coefficient-robust
+  location). It is also **A2's deferred consumer**: the OSF interstitial **rim** (clean *of voids*) is
+  dislocation-**leaky** per die → the OSF ring is the one annulus clean of *both* failure modes. Banked
+  `fab_game/demo_dislocation.py` (`fab-game-a1.png`, 3 panels: two-sided window · leakage ladder with
+  V_t the flat bystander · the radial void-core/leaky-rim/clean-ring map). Fast lane +20 (czochralski +3,
+  lifetime +4, `test_dislocation` 8 wiring, `test_demo_dislocation` 4 — minus 1 absorbed). No engine, no ADR.
+- **Verdict.** **✅ BUILT — but a corner, as predicted.** Honest magnitude (the CG-2 finding, led with):
+  realistic CZ sits at `ξ ≈ 0.29 > ξ_t` → *vacancy*-rich, so the interstitial side only bites at a
+  *deliberately* slow pull or an over-steep `G`. Its value is the criterion's **symmetry** (slow pull is
+  no longer free on yield) and **A2's rim**, not a main-line trade-off. **Still deferred:** the
+  dislocation→`τ` *magnitude* (flagged), high-injection, gettering/precipitation.
 
 ### A2 — OSF ring (radial pattern) + Robin-mode `G(r)` sourcing  ·  SPLIT on verification (2026-06-14)
 
@@ -338,14 +354,20 @@ Promote in **consumer strength × cost** order; everything else stays deferred a
    the G4a chain), the cited KFR fourth-power kinetics, no engine touch.
 2. **D1 — Under-etch.** ✅ **BUILT (2026-06-14)** — the cheap G5-tier completion, reuses the
    functional-kill consumer. Bundled with C1 as the two quick, high-confidence deepenings.
-3. **A1 — CG-2 interstitial → leakage** *(next)*. Completes Voronkov's symmetry through the `lifetime.py`
-   leakage channel — but a corner (realistic CZ is vacancy-rich), so value is symmetry, not main-line.
+3. **A1 — CG-2 interstitial → leakage.** ✅ **BUILT (2026-06-14).** Completes Voronkov's symmetry through
+   the `lifetime.py` leakage channel (slow pull → dislocations → `1/τ += K·ρ_disl` → a leaky diode) → a
+   **two-sided** defect window (fast→yield, slow→leakage, optimum at `ξ_t`); also A2's deferred
+   *degraded-rim* consumer (the OSF rim is clean *of voids* but dislocation-leaky). A corner — realistic
+   CZ is vacancy-rich — so the value is symmetry, not main-line.
 4. **A2 — OSF ring (radial `G(r)`), closed-form.** ✅ **BUILT (2026-06-14).** The ring shipped as a
    **closed-form** radial `G(r)` → per-die OSF non-uniformity (edge-vs-center yield), §8-bounded to 1-D
    radial, the engine does **not** participate; **Robin-`G` sourcing stays DEFERRED — premise falsified**
-   (a steady gradient is closed-form; the shipped engine cannot beat it). **Next promotable = A1**
-   (CG-2 interstitial → dislocation/leakage, the `lifetime.py` channel — a corner, realistic CZ is
-   vacancy-rich; also the home of A2's deferred *degraded-ring* leakage).
+   (a steady gradient is closed-form; the shipped engine cannot beat it). With **A1** now built, the
+   OSF ring is the one annulus clean of *both* failure modes (void core / leaky rim).
+
+**Next promotable = A1 is DONE.** The remaining named-but-credible deepening is **E1** (transient
+spike/laser anneal → `D(T(t))`, the one real heat-mode consumer — trigger recorded, pending the
+emergent-`T` verification); everything else below stays deferred for lack of a consumer.
 
 **Stay deferred (no consumer — this is the point, not a backlog of work):** A3 striations (game-layer
 variance at most), A4 facets/curvature (nothing reads shape), A5 transient Stefan `X(t)` (quasi-steady

@@ -27,10 +27,14 @@ lifetimes (``σ`` the capture cross-section, ``v_th`` the carrier thermal veloci
 (``n_1·p_1 = n_i²``). In the **p-type bulk under low injection** (the channel/body of our n-MOS) this
 collapses to a single minority-electron lifetime — the model the game consumes::
 
-    1/τ = 1/τ_bulk + Σ_i σ_n,i·v_th·N_i        (the deep-level metals add their recombination rates)
+    1/τ = 1/τ_bulk + Σ_i σ_n,i·v_th·N_i + K·ρ_disl   (deep-level metals + grown-in dislocations add rates)
 
 — the **electron** capture cross-section governs (p-type ⇒ electrons are the minority carrier); ``τ_bulk``
 is the clean-material baseline. The minority-carrier **diffusion length** ``L = √(D·τ)`` falls out of it.
+The ``K·ρ_disl`` term (A1, :func:`dislocation_recombination_rate`) is a *second contributor on the same
+channel*: grown-in interstitial-side **dislocations** from a too-slow Czochralski pull (``ξ < ξ_t`` —
+:func:`chip.czochralski.dislocation_defect_density`) are recombination centres too, so a slow pull — not
+just a dirty feed — can make the diode leaky. Both default off (``ρ_disl = 0``, the seam).
 
 The reverse junction leakage (the device killer)
 ------------------------------------------------
@@ -137,6 +141,15 @@ D_MINORITY: float = 36.0
 # generation leakage integrates over. FLAGGED house number (~1 V is V_bi for these dopings).
 JUNCTION_VOLTAGE_V: float = 1.0
 
+# Dislocation recombination strength (s⁻¹ per cm⁻² of grown-in dislocation) — FLAGGED house number (A1).
+# Grown-in INTERSTITIAL-side dislocations (slow-pull Czochralski, ξ < ξ_t —
+# :func:`chip.czochralski.dislocation_defect_density`) are recombination centres, so they add a rate
+# ``K·ρ_disl`` to ``1/τ`` — the SAME lifetime/leakage channel the deep-level metals use, a *different*
+# contributor (crystal growth, not a metal trap). LOOSE: it compounds with the czochralski density
+# coefficient — only their PRODUCT sets the leakage depth (one flagged magnitude across two modules).
+# The realistic growth regime is vacancy-side (ξ ≈ 0.29 > ξ_t), so this is a corner (chip.czochralski §1g).
+DISLOCATION_RECOMBINATION_COEFF: float = 30.0
+
 
 # --------------------------------------------------------------------------- #
 # 1. The full SRH statistics (the shared core of the analytic + conservation legs)
@@ -185,16 +198,41 @@ def recombination_rate(metals, sigma: dict[str, float] = CAPTURE_SIGMA_N, v_th: 
     return rate
 
 
-def srh_lifetime(metals, tau_bulk: float = TAU_BULK, sigma: dict[str, float] = CAPTURE_SIGMA_N,
-                 v_th: float = V_TH) -> float:
-    """Minority-carrier SRH lifetime ``τ`` (s): ``1/τ = 1/τ_bulk + Σ_i σ_n,i·v_th·N_i``.
+def dislocation_recombination_rate(
+    dislocation_density_cm2: float, coeff: float = DISLOCATION_RECOMBINATION_COEFF) -> float:
+    """Added SRH recombination rate ``K·ρ_disl`` (s⁻¹) from grown-in interstitial-side dislocations (A1).
 
-    The clean limit is recovered **bit-for-bit** — ``metals = None`` (or all-zero) gives ``τ = τ_bulk``
-    exactly (the seam: a clean feed never moves lifetime). A deep-level metal adds its recombination
-    rate, so ``τ`` falls monotonically as the feedstock dirties (and recovers as zone refining scrubs
-    the metal — :mod:`chip.purification`).
+    Grown-in dislocations (slow-pull Czochralski, ``ξ < ξ_t`` — :func:`chip.czochralski.
+    dislocation_defect_density`) act as recombination centres, adding their rate to ``1/τ`` exactly the
+    way the deep-level metals do (:func:`recombination_rate`) — a *different* contributor (crystal
+    growth, not a metal trap) on the same channel. ``0.0`` at ``ρ_disl = 0`` (the seam: a
+    vacancy/boundary growth — or no Czochralski criterion at all — adds nothing). ``coeff`` is a
+    **flagged** house number (s⁻¹ per cm⁻²) that compounds with the czochralski density coefficient —
+    only their product sets the leakage depth, and the realistic regime is vacancy-side (a corner).
     """
-    return 1.0 / (1.0 / tau_bulk + recombination_rate(metals, sigma, v_th))
+    if dislocation_density_cm2 < 0.0:
+        raise ValueError(f"dislocation density must be ≥ 0, got {dislocation_density_cm2}")
+    return coeff * dislocation_density_cm2
+
+
+def srh_lifetime(metals, tau_bulk: float = TAU_BULK, sigma: dict[str, float] = CAPTURE_SIGMA_N,
+                 v_th: float = V_TH, *, dislocation_density: float = 0.0) -> float:
+    """Minority-carrier SRH lifetime ``τ`` (s): ``1/τ = 1/τ_bulk + Σ_i σ_n,i·v_th·N_i + K·ρ_disl``.
+
+    The clean limit is recovered **bit-for-bit** — ``metals = None`` (or all-zero) **and**
+    ``dislocation_density = 0`` (the default) gives ``τ = τ_bulk`` exactly (the seam: a clean feed grown
+    on the vacancy side never moves lifetime). A deep-level metal adds its recombination rate
+    (:func:`recombination_rate`); a slow-pull grown-in **dislocation** population adds its own
+    (:func:`dislocation_recombination_rate`, A1) — the two contributors **add** in ``1/τ`` — so ``τ``
+    falls monotonically as the feedstock dirties (recovered by zone refining — :mod:`chip.purification`)
+    *or* as the pull drops below the Voronkov ``ξ_t`` (recovered by pulling toward ``ξ_t`` —
+    :mod:`chip.czochralski`).
+    """
+    return 1.0 / (
+        1.0 / tau_bulk
+        + recombination_rate(metals, sigma, v_th)
+        + dislocation_recombination_rate(dislocation_density)
+    )
 
 
 def diffusion_length(tau: float, D: float = D_MINORITY) -> float:
@@ -273,16 +311,19 @@ class DiodeLeakage:
 def device_leakage(
     metals, N_A: float, *, tau_bulk: float = TAU_BULK, V_J: float = JUNCTION_VOLTAGE_V,
     D: float = D_MINORITY, n_i: float = NI_300K, sigma: dict[str, float] = CAPTURE_SIGMA_N,
-    v_th: float = V_TH,
+    v_th: float = V_TH, dislocation_density: float = 0.0,
 ) -> DiodeLeakage:
-    """Read the deep-level-metal consequence (τ, L, J_gen) off the wafer ``metals`` + substrate ``N_A``.
+    """Read the device leakage consequence (τ, L, J_gen) off the wafer ``metals`` + substrate ``N_A``.
 
     Convenience wiring of :func:`srh_lifetime` → :func:`diffusion_length` / :func:`generation_leakage_density`
     for the fab-line game's device step. ``metals`` may be a :class:`chip.purification.Contamination`,
-    a dict, or ``None`` (clean) — clean gives ``τ = τ_bulk`` and the baseline leakage (the seam). *Bad
-    purification in, a leaky low-lifetime diode out* — the metals' device consequence.
+    a dict, or ``None`` (clean); ``dislocation_density`` (cm⁻², A1) is the grown-in interstitial-side
+    dislocation population (:func:`chip.czochralski.dislocation_defect_density`). Both default to the
+    clean baseline — ``metals = None`` / ``dislocation_density = 0`` gives ``τ = τ_bulk`` and the baseline
+    leakage (the seam). *Bad purification* (deep-level metals) **or** *too-slow a pull* (grown-in
+    dislocations) in, a leaky low-lifetime diode out — the device consequence net doping cannot carry.
     """
-    tau = srh_lifetime(metals, tau_bulk, sigma, v_th)
+    tau = srh_lifetime(metals, tau_bulk, sigma, v_th, dislocation_density=dislocation_density)
     return DiodeLeakage(
         tau=tau, L_diff=diffusion_length(tau, D),
         j_leak=generation_leakage_density(tau, N_A, V_J, n_i), N_A=N_A,

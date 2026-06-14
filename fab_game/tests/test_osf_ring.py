@@ -105,8 +105,13 @@ def test_radial_density_is_per_die_vacancy_core_clean_rim():
 
 def test_radial_scatter_kills_the_core_and_spares_the_rim():
     """The consequence end-to-end on a clean line: a radial growth scatters COPs that kill dies **only in
-    the vacancy core** — every killed die sits inside the ring radius (the rim has zero grown-in density,
-    so it is never drawn), and kills do happen. The edge-vs-centre non-uniformity made physical."""
+    the vacancy core** — every die killed *by a grown-in COP* sits inside the ring radius (the rim has zero
+    void density, so it is never drawn), and kills do happen. The edge-vs-centre non-uniformity made physical.
+
+    NB this asserts the **void / particle-kill** channel (``killed_by_defect``) — the rim is clean *of COPs*.
+    With A1 on, the interstitial rim additionally carries grown-in **dislocation leakage** (a *separate*
+    device channel, ξ < ξ_t → ``j_leak`` — :mod:`test_dislocation`), which does *not* set ``killed_by_defect``;
+    so "spares the rim" here means spared the COP kills, not that the rim is defect-free."""
     cz = CzochralskiKnobs(pull_rate_mm_min=_V, thermal_gradient_K_per_mm=_GC, radial_gradient_boost=_BOOST)
     r = Recipe(czochralski=cz, wafer_prep=WaferPrepKnobs(defect_density=0.0))     # clean line: COPs only
     ring = cz.osf_ring_radius
@@ -114,9 +119,9 @@ def test_radial_scatter_kills_the_core_and_spares_the_rim():
     for seed in range(10):
         w = run_line(r, seed=seed, variation=_DEFECTS_ONLY, grid_n=7)
         killed = [d for d in w.dies if d.killed_by_defect]
-        # The rim is provably clean — no die at/beyond the ring is ever killed by a grown-in COP.
+        # The rim is provably clean OF COPs — no die at/beyond the ring is ever killed by a grown-in void.
         assert all(d.radius_frac < ring for d in killed), \
-            f"a rim die (r ≥ {ring:.3f}) was killed — the interstitial rim must stay clean"
+            f"a rim die (r ≥ {ring:.3f}) was killed by a COP — the interstitial rim must stay void-clean"
         total_core_kills += len(killed)
     assert total_core_kills > 0                                                   # kills do cluster in the core
 

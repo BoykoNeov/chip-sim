@@ -166,3 +166,47 @@ def test_invalid_inputs_raise():
         life.generation_leakage_density(0.0, N_A=1.0e17)              # τ must be positive
     with pytest.raises(ValueError):
         life.diffusion_length(-1.0e-6)                                 # τ must be ≥ 0
+    with pytest.raises(ValueError):
+        life.dislocation_recombination_rate(-1.0)                      # A1: ρ_disl must be ≥ 0
+
+
+# --------------------------------------------------------------------------- #
+# A1: grown-in dislocations — a second contributor on the same SRH leakage channel
+# --------------------------------------------------------------------------- #
+def test_dislocation_recombination_rate_is_linear_and_seam_at_zero():
+    # K·ρ_disl: linear in the density, zero at ρ_disl = 0 (the seam — vacancy/boundary growth adds nothing).
+    assert life.dislocation_recombination_rate(0.0) == 0.0
+    K = life.DISLOCATION_RECOMBINATION_COEFF
+    assert life.dislocation_recombination_rate(1.0e5) == pytest.approx(K * 1.0e5)
+    assert life.dislocation_recombination_rate(2.0e5) == pytest.approx(2.0 * life.dislocation_recombination_rate(1.0e5))
+
+
+def test_dislocations_add_to_the_metal_rate_on_the_same_channel():
+    # The dislocation rate and the metal rate ADD in 1/τ (the same channel, two contributors).
+    metals = Contamination(Fe=1.0e12)
+    rho = 8.0e4
+    inv_metal_only = 1.0 / life.srh_lifetime(metals)
+    inv_disloc_only = 1.0 / life.srh_lifetime(None, dislocation_density=rho)
+    inv_both = 1.0 / life.srh_lifetime(metals, dislocation_density=rho)
+    # 1/τ_both = 1/τ_bulk + metal_rate + disloc_rate, so the two excesses over the bulk rate add exactly.
+    inv_bulk = 1.0 / life.TAU_BULK
+    assert inv_both == pytest.approx((inv_metal_only - inv_bulk) + (inv_disloc_only - inv_bulk) + inv_bulk)
+
+
+def test_dislocation_density_shortens_lifetime_and_is_seam_bitexact_at_zero():
+    # The default dislocation_density = 0 reproduces the metal-only lifetime BIT-FOR-BIT (the seam),
+    # and a positive ρ_disl shortens τ monotonically — a slow pull, not a dirty feed, makes it leaky.
+    assert life.srh_lifetime(None, dislocation_density=0.0) == life.srh_lifetime(None)
+    assert life.srh_lifetime(None) == life.TAU_BULK
+    taus = [life.srh_lifetime(None, dislocation_density=rho) for rho in (0.0, 1.0e4, 1.0e5, 2.0e5)]
+    assert all(t1 < t0 for t0, t1 in zip(taus, taus[1:]))
+
+
+def test_device_leakage_rises_with_dislocation_density_clean_feed():
+    # A clean (metal-free) feed with grown-in dislocations still leaks — the A1 isolation: the leakage
+    # comes from the crystal-growth dislocations, not contamination. Seam: ρ_disl = 0 is the baseline.
+    base = life.device_leakage(None, N_A=1.0e17)
+    leaky = life.device_leakage(None, N_A=1.0e17, dislocation_density=8.0e4)
+    assert leaky.j_leak > base.j_leak
+    assert leaky.tau < base.tau
+    assert life.device_leakage(None, N_A=1.0e17, dislocation_density=0.0).j_leak == base.j_leak

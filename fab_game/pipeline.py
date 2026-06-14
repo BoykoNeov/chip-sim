@@ -146,12 +146,23 @@ def run_line(
     if cz.is_osf_radial:
         # The OSF ring is radial — record the ring location + the centre/edge topology + the centre/edge
         # density (the boundary where the vacancy-core kills stop), so the map's non-uniformity is legible.
+        # The vacancy COPs (centre) feed yield (here); the interstitial dislocations (rim/edge, A1) feed
+        # the device-step LEAKAGE channel — record the rim density too so the leaky rim is legible.
         prep_summary["osf_ring_radius"] = cz.osf_ring_radius
         prep_summary["osf_zone_regimes"] = cz.osf_zone_regimes
         prep_summary["grown_in_density_center"] = cz.grown_in_defect_density_at(0.0)
         prep_summary["grown_in_density_edge"] = cz.grown_in_defect_density_at(1.0)
+        prep_summary["dislocation_density_edge"] = cz.interstitial_dislocation_density_at(1.0)
+        prep_summary["dislocation_density_center"] = cz.interstitial_dislocation_density_at(0.0)
     elif grown_in > 0.0:
         prep_summary["grown_in_defect_density"] = grown_in
+        prep_summary["voronkov_ratio"] = cz.voronkov_ratio
+        prep_summary["grown_in_regime"] = cz.grown_in_defect_regime
+    elif cz.interstitial_dislocation_density > 0.0:
+        # A1: an interstitial-side growth (ξ < ξ_t) seeds NO voids (grown_in = 0) but a uniform
+        # dislocation population that feeds the device-step leakage channel — record it at the wafer
+        # level so a slow-pull leakage scrap is not read as a fab-floor metal contamination.
+        prep_summary["dislocation_density"] = cz.interstitial_dislocation_density
         prep_summary["voronkov_ratio"] = cz.voronkov_ratio
         prep_summary["grown_in_regime"] = cz.grown_in_defect_regime
     wafer = replace(wafer, geometry=geometry).with_step(
@@ -210,7 +221,8 @@ def run_line(
     #    Na → Q_ox → V_t; the residual-dopant net shift is already in effective_channel_N_A).
     dies = tuple(
         device_step(d, recipe.device, recipe.effective_channel_N_A, contamination=recipe.contamination,
-                    thermal_donor_density=recipe.czochralski.thermal_donor_density)
+                    thermal_donor_density=recipe.czochralski.thermal_donor_density,
+                    dislocation_density=recipe.czochralski.interstitial_dislocation_density_at(d.radius_frac))
         for d in wafer.dies
     )
     wafer = wafer.with_step(
@@ -454,12 +466,22 @@ def diagnose(die: Die) -> str:
             lines.append(f"    ↳ crystal growth: thermal donors {N_TD:.2e} cm⁻³ (crucible oxygen + ~450 °C "
                          f"anneal) compensated the substrate → net N_A down → V_t down (lower the oxygen / "
                          f"shorten the donor anneal)")
-        # The deep-level-metal fingerprint (G4b): a leakage failure traces to SRH recombination from
-        # residual Fe/Cu — the device output net doping cannot carry (the gap G4a named, now wired).
+        # The leakage fingerprint: a leakage failure traces to SRH recombination shortening the
+        # minority-carrier lifetime. Two contributors on the same channel — name the one responsible:
+        # a grown-in DISLOCATION population (A1, the rho_disl fingerprint — a too-slow interstitial-side
+        # pull) vs the deep-level METALS (G4b, residual Fe/Cu) — the device output net doping cannot carry.
         if any("leakage" in r for r in die.verdict.reasons):
-            lines.append(f"    ↳ purification: junction leakage from deep-level-metal SRH recombination "
-                         f"(minority-carrier lifetime τ {device.outputs.get('tau_us', float('nan')):.2g} µs) "
-                         f"→ a leaky diode (purify harder — zone refining scrubs the metals fast, tiny k)")
+            tau_us = device.outputs.get("tau_us", float("nan"))
+            rho_disl = device.knobs_in.get("rho_disl")
+            if rho_disl:
+                lines.append(f"    ↳ crystal growth: junction leakage from grown-in DISLOCATIONS "
+                             f"(interstitial-side Voronkov, ρ_disl {rho_disl:.2e} cm⁻²; ξ < ξ_t — too "
+                             f"slow a pull / over-steep hot zone) → SRH recombination shortens τ "
+                             f"({tau_us:.2g} µs) → a leaky diode (pull faster / lower G toward the ξ_t window)")
+            else:
+                lines.append(f"    ↳ purification: junction leakage from deep-level-metal SRH recombination "
+                             f"(minority-carrier lifetime τ {tau_us:.2g} µs) "
+                             f"→ a leaky diode (purify harder — zone refining scrubs the metals fast, tiny k)")
     # The back-end fingerprint (G6): a part can die in *packaging* even with a perfect front end — a
     # stochastic assembly scrap (dice/bond) or a final-test bin-out (works, but too slow to sell).
     if die.assembled is False:
@@ -534,7 +556,8 @@ def rework_litho(
         red = etch_deposition_step(red, recipe.etch_deposition, recipe.litho.pitch_nm,
                                    variation.systematic_perturbation(d))
         red = device_step(red, recipe.device, wafer.channel_N_A, contamination=wafer.contamination,
-                          thermal_donor_density=recipe.czochralski.thermal_donor_density)
+                          thermal_donor_density=recipe.czochralski.thermal_donor_density,
+                          dislocation_density=recipe.czochralski.interstitial_dislocation_density_at(red.radius_frac))
         red = _verdict_die(red, specs, geometry_reason)
         new_dies.append(red)
 

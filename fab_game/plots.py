@@ -871,6 +871,132 @@ def osf_ring_figure(result):
 
 
 # --------------------------------------------------------------------------- #
+# A1 — the interstitial side: slow pull → grown-in dislocations → junction leakage
+# --------------------------------------------------------------------------- #
+_DISLOC_C = "#2f6db5"      # interstitial dislocation / leakage (the slow-pull cost)
+
+
+def _two_sided_window_panel(ax, result) -> None:
+    """The two-sided Voronkov window: leakage rises below ξ_t (dislocations), the COP void density rises
+    above it (voids) — the defect-free optimum AT ξ_t, a cost on both sides."""
+    xi = np.asarray(result.xi_of_g)
+    ax.plot(xi, result.leak_of_xi, color=_DISLOC_C, lw=2.0, zorder=3, label="junction leakage (nA/cm²)")
+    ax.axhline(result.leak_spec_hi, color=_DISLOC_C, ls="--", lw=1.0, alpha=0.7)
+    ax.text(xi.min(), result.leak_spec_hi * 1.15, f"leakage spec ≤ {result.leak_spec_hi:.0f}",
+            fontsize=7.5, color=_DISLOC_C)
+    ax.axvline(result.xi_t, color="0.35", ls=":", lw=1.3, zorder=2)
+    ax.text(result.xi_t, result.leak_spec_hi * 3.0,
+            f" ξ_t = {result.xi_t:.2f}\n (optimum)", fontsize=7.5, color="0.3")
+    ax.axvspan(xi.min(), result.xi_t, color=_DISLOC_C, alpha=0.08)            # interstitial (leakage)
+    ax.axvspan(result.xi_t, xi.max(), color="#d62728", alpha=0.08)           # vacancy (voids)
+    ax.set_yscale("log")
+    ax.set_xlabel("Voronkov ratio ξ = V/G  (slow pull → low ξ)", fontsize=9)
+    ax.set_ylabel("junction leakage (nA/cm²)", fontsize=9, color=_DISLOC_C)
+    ax.tick_params(axis="y", labelsize=7.5, colors=_DISLOC_C)
+    ax.set_title("The two-sided window: leakage (slow) | voids (fast)\nclean only at the ξ_t optimum",
+                 fontsize=10)
+    ax2 = ax.twinx()
+    ax2.plot(xi, result.void_of_xi, color="#d62728", lw=1.5, ls=":", label="COP void density")
+    ax2.set_ylabel("COP void density (cm⁻²)", fontsize=8.5, color="#d62728")
+    ax2.tick_params(axis="y", labelsize=7.5, colors="#d62728")
+    ax.legend(fontsize=7.5, loc="upper center")
+
+
+def _leakage_ladder_bystander_panel(ax, result) -> None:
+    """The clean-feed pull ladder: leakage climbs on the slow side (out of spec), while V_t (twin axis) is
+    flat across the whole ladder — slow pull leaks the diode, it does not move the threshold."""
+    x = np.arange(len(result.ladder_labels))
+    leak = np.asarray(result.leak_by_step)
+    colors = [("#d62728" if lk > result.leak_spec_hi else _DISLOC_C) for lk in leak]
+    ax.bar(x, leak, width=0.6, color=colors, zorder=2)
+    ax.axhline(result.leak_spec_hi, color="0.3", ls="--", lw=1.0)
+    ax.text(x[0] - 0.4, result.leak_spec_hi * 1.25, f"leakage spec ≤ {result.leak_spec_hi:.0f}",
+            fontsize=7.5, color="0.3")
+    ax.set_yscale("log")
+    ax.set_xticks(x)
+    ax.set_xticklabels(result.ladder_labels, fontsize=8)
+    ax.set_ylabel("junction leakage (nA/cm²)", fontsize=9)
+    ax.set_title("Leakage ladder — V_t is a bystander\nslow pull leaks the diode, not the threshold",
+                 fontsize=10)
+    for xi_, lk in zip(x, leak):
+        ax.text(xi_, lk * 1.25, f"{lk:.2g}", ha="center", fontsize=7.5, color="0.3")
+    # V_t on a twin axis — a flat line across the ladder (the isolation: the same value everywhere).
+    ax2 = ax.twinx()
+    vt = np.asarray(result.vt_by_step)
+    ax2.plot(x, vt, color="#2ca02c", lw=1.8, marker="o", ms=4, zorder=4, label="V_t (flat)")
+    ax2.axhspan(result.v_t_lo, result.v_t_hi, color="#2ca02c", alpha=0.08)
+    ax2.set_ylabel("device V_t (V)", fontsize=8.5, color="#2ca02c")
+    ax2.set_ylim(result.v_t_lo - 0.02, result.v_t_hi + 0.02)
+    ax2.tick_params(axis="y", labelsize=7.5, colors="#2ca02c")
+    ax2.legend(fontsize=7.5, loc="upper left")
+
+
+def _dislocation_wafer_map_panel(ax, result) -> None:
+    """The A2 completion: the radial wafer — a void-prone vacancy core (red), a dislocation-leaky rim
+    (blue, × = a leakage scrap), and the clean OSF-ring annulus between (the one band clean of both)."""
+    import matplotlib.pyplot as plt
+
+    wafer = result.wafer
+    xs, ys = _die_xy(wafer)
+    geom_r = np.hypot(xs, ys)
+    rad_frac = np.array([d.radius_frac for d in wafer.dies])
+    void = np.asarray(result.void_density_of_die)
+    leak = np.asarray(result.leak_of_die)
+    failed = np.array([bool(d.verdict is not None and d.verdict.failed
+                            and any("leakage" in r for r in d.verdict.reasons)) for d in wafer.dies])
+    n = _grid_n(wafer)
+    size = (2.0 / n) * 0.92
+    vmax = max(float(void.max()), 1e-12)
+    lmax = max(float(leak.max()), 1e-12)
+    reds = plt.get_cmap("Reds")
+    blues = plt.get_cmap("Blues")
+    for x, y, vd, lk, fl in zip(xs, ys, void, leak, failed):
+        if vd > 0.0:                                                         # vacancy core → void (red)
+            face = reds(0.18 + 0.82 * vd / vmax)
+        elif lk > result.leak_spec_hi * 0.15:                               # interstitial rim → leakage (blue)
+            face = blues(0.18 + 0.82 * min(lk / lmax, 1.0))
+        else:                                                               # the clean ring annulus
+            face = "#eef3ee"
+        ax.add_patch(plt.Rectangle((x - size / 2, y - size / 2), size, size, facecolor=face,
+                                   edgecolor="black" if fl else "white", linewidth=1.6 if fl else 0.6))
+        if fl:                                                              # a leakage scrap (×)
+            h = size / 2.6
+            ax.plot([x - h, x + h], [y - h, y + h], color="black", lw=1.3)
+            ax.plot([x - h, x + h], [y + h, y - h], color="black", lw=1.3)
+    ax.add_patch(plt.Circle((0, 0), 1.0, fill=False, color="0.4", linewidth=1.2))
+    pos = rad_frac > 0.05
+    edge_excl = float(np.median(geom_r[pos] / rad_frac[pos])) if np.any(pos) else 0.95
+    ax.add_patch(plt.Circle((0, 0), result.ring_radius * edge_excl, fill=False,
+                            color="#1c2530", linewidth=1.6, ls="--"))
+    ax.set_xlim(-1.15, 1.15)
+    ax.set_ylim(-1.15, 1.15)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title(f"Radial map: void core (red) + leaky rim (blue, × = scrap)\n"
+                 f"the OSF ring (dashed, r={result.ring_radius:.2f}) is the one clean annulus  "
+                 f"(rim {result.rim_leak_failed}/{result.rim_dies} scrapped)", fontsize=9.5)
+
+
+def dislocation_figure(result):
+    """Assemble the A1 artifact from a :class:`~fab_game.demo_dislocation.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _two_sided_window_panel(axes[0], result)
+    _leakage_ladder_bystander_panel(axes[1], result)
+    _dislocation_wafer_map_panel(axes[2], result)
+    trail = result.dead_trail.splitlines()[0] if result.dead_trail else ""
+    fig.suptitle("A1 — the interstitial side of Voronkov: too-slow a pull → grown-in dislocations → a "
+                 "leaky diode (V_t can't see it)\n"
+                 "the criterion is now two-sided — fast costs yield (COP), slow costs leakage; the OSF "
+                 "ring is the one clean annulus. A corner (realistic CZ is vacancy-side); the leakage "
+                 "depth is flagged\n" + trail, fontsize=9.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.88))
+    return fig
+
+
+# --------------------------------------------------------------------------- #
 # G7 — the roguelike run down one boule: the Scheil V_t drift + scored strategies
 # --------------------------------------------------------------------------- #
 def _drift_panel(ax, result) -> None:

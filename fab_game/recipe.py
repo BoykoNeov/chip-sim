@@ -102,6 +102,18 @@ class CzochralskiKnobs:
     the seam). The ``G(r)`` profile, the ``boost``, and the ring's on-wafer existence are flagged house
     numbers; only the ring *location* + the topology signs are tight.
 
+    **A1** completes CG-2's symmetry on the other side of ``ξ_t``: a too-slow pull / over-steep ``G``
+    (``ξ < ξ_t``) freezes in **interstitial-rich** silicon → grown-in **dislocations**
+    (:attr:`interstitial_dislocation_density`), which are recombination centres → they raise the junction
+    **leakage** (the G4b :mod:`chip.lifetime` channel, ``1/τ += K·ρ_disl``), **not** the yield map. So
+    too-fast costs yield (COP voids) and too-slow costs leakage (dislocations), with the defect-free
+    optimum **at** ``ξ_t``. There is **no new knob** — A1 reads the *existing* ``(V, G)``: it switches on
+    automatically when a CG-2/CG-3 recipe lands on the interstitial side, and is ``0`` (the seam) for any
+    vacancy/boundary growth or with CG-2 off. With the A2 radial profile on it is **per die**
+    (:meth:`interstitial_dislocation_density_at`) — the dislocation-leaky **rim** complementing the
+    void-killed core (the OSF ring is the one annulus clean of both). Honest magnitude: realistic CZ is
+    vacancy-side, so the dislocation cost is a **corner** (its value is that slow pull is no longer free).
+
     ``oxygen_conc_cm3`` (C1) + ``thermal_donor_anneal_min`` (C1) add the **electrical** crystal-growth
     deepening: a CZ boule dissolves interstitial oxygen ``[O_i]`` from the quartz crucible, and a
     ~450 °C **donor anneal** nucleates **thermal donors** (n-type) that **compensate** the p-substrate —
@@ -295,6 +307,49 @@ class CzochralskiKnobs:
         g_center, v, boost = self._center_gradient_K_per_mm(), self.pull_rate_mm_min, self.radial_gradient_boost
         return (radial_defect_regime(0.0, v, g_center, boost),
                 radial_defect_regime(1.0, v, g_center, boost))
+
+    # --- A1: the interstitial side — grown-in dislocations → junction leakage (the COP mirror) --- #
+    @property
+    def interstitial_dislocation_density(self) -> float:
+        """The A1 grown-in interstitial-side dislocation density (cm⁻²) — **0.0 when CG-2 off or vacancy**.
+
+        The interstitial mirror of :attr:`grown_in_defect_density` (the *uniform* value): ``0.0`` when no
+        interface gradient is set (CG-2/CG-3 off) and for any vacancy/boundary growth (``ξ ≥ ξ_t``);
+        otherwise the flagged :func:`chip.czochralski.dislocation_defect_density` at this ``(V, G)``. It
+        feeds the junction-**leakage** channel (:func:`chip.lifetime.device_leakage`, ``1/τ += K·ρ_disl``),
+        **not** the Poisson yield map — voids → yield, dislocations → leakage are distinct device outputs.
+        With the A2 radial profile on, the dislocations live on the **rim** (large ``r``), not at the
+        centre this scalar's ``G = G_center`` reads — so there use the per-die
+        :meth:`interstitial_dislocation_density_at` (this scalar reads the vacancy core → ``0.0``).
+        """
+        ratio = self.voronkov_ratio
+        if ratio is None:
+            return 0.0
+        from chip.czochralski import dislocation_defect_density
+        return dislocation_defect_density(ratio)
+
+    def interstitial_dislocation_density_at(self, radius_frac: float) -> float:
+        """Per-die A1 grown-in dislocation density (cm⁻²) at this die's ``radius_frac`` — the interstitial rim.
+
+        The leakage-channel companion to :meth:`grown_in_defect_density_at` (the void/yield core). When
+        ``radial_gradient_boost`` is ``None`` → the **uniform** :attr:`interstitial_dislocation_density`
+        (radius-independent — a whole-wafer interstitial growth gives every die the same density). When
+        set → the interstitial-side :func:`chip.czochralski.dislocation_defect_density` at the radial
+        ``G(r)``: the **vacancy core** (small ``r``, high ξ) is dislocation-free (``0.0``) and the
+        **interstitial rim** (large ``r``, low ξ, past the ring) carries the dislocations — the exact
+        complement of the void core, so the OSF ring is the one annulus clean of *both*. Fed to
+        :func:`chip.lifetime.device_leakage` per die (the rim's leakage), **not** the Poisson yield map.
+        """
+        if self.radial_gradient_boost is None:
+            return self.interstitial_dislocation_density
+        from chip.czochralski import (
+            dislocation_defect_density,
+            radial_thermal_gradient,
+            voronkov_ratio,
+        )
+        g_r = radial_thermal_gradient(
+            radius_frac, self._center_gradient_K_per_mm(), boost=self.radial_gradient_boost)
+        return dislocation_defect_density(voronkov_ratio(self.pull_rate_mm_min, g_r))
 
     @property
     def thermal_donor_density(self) -> float:
