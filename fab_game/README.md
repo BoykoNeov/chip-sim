@@ -1,4 +1,4 @@
-# `fab_game` — the fab-line game (G1: the harness · G2: the boule · G3: the physical die map)
+# `fab_game` — the fab-line game (sand → a binned, packaged chip + a scored roguelike shell)
 
 A gamified, full-production-line layer built **on top of** chip-sim: *recipe in → **yield** out, and
 you can see **why** a die died.* Full plan: [`docs/plans/fab-game.md`](../docs/plans/fab-game.md);
@@ -11,7 +11,7 @@ the layering decision: [ADR 0005](../docs/decisions/0005-fab-game-layering.md).
 > `tests/test_import_direction.py`. New *process physics* always lands in the physics layer; this
 > package holds balance, spec limits, and fun.
 
-## G1 — the dramatic win (this slice)
+## G1 — the dramatic win (the harness + the vertical slice)
 
 **All reuse, zero new physics.** G1 wires the *already-validated* diffusion → oxidation →
 lithography → device back end through a state / variation / spec / yield / rework harness and banks
@@ -45,9 +45,9 @@ loop. The axial boule story is per-wafer, so it composes orthogonally with the r
 
 The Scheil maths are validated as cited physics in [`chip/tests/test_czochralski.py`](../chip/tests/test_czochralski.py)
 (`k→1` uniform limit + exact seed; `∫₀¹ C_s = C_0` conservation; cited `k` + Masetti resistivity).
-**Oxygen → thermal donors** (the planned G2 contamination demo) is **deferred** to a fenced
-follow-on / G4 — its `k` is contested and the donor kinetics are calibrated, so it must not borrow
-Scheil's tight anchors.
+**Oxygen → thermal donors** (the planned G2 contamination demo) later landed as the **C1**
+deepening (`czochralski.py §1e`; see *Scope-edge promotions* below) — because its `k` is contested and the
+donor kinetics are calibrated, it runs on its own flagged magnitudes and never borrows Scheil's tight anchors.
 
 ## G3 — wafer prep + particles + the die map made physical
 
@@ -121,7 +121,9 @@ pipeline **after litho, before the device** as one `etch_deposition_step`:
   clear residue deepens the etch → widens the undercut → the transferred gate CD shrinks below the
   printed CD (`bias = 2·(1−A)·h·(1+OE)`). The etched CD **overwrites `cd_nm`**, so the device reads the
   *gate* CD — a shorter channel → `I_Dsat ∝ W/L` over its ceiling, CD out the bottom of its window. A
-  perfectly anisotropic etch (`A = 1`) is the seam (zero bias).
+  perfectly anisotropic etch (`A = 1`) is the seam (zero bias). (The mirror failure — too *little* etch,
+  a residual that bridges the gate lines into a short — landed as the **D1** under-etch promotion below,
+  completing the plan's over/under-etch pair.)
 - **Deposition — step coverage → a keyhole void (the functional failure).** The gap between gate lines
   (`pitch − CD`, aspect ratio `gate-height / gap`, *derived from the inherited gate geometry*) must be
   filled; a poor line-of-sight **PVD** (`SC ≈ 0.3`) pinches off a void where a conformal **CVD**
@@ -144,45 +146,206 @@ byte-identical). **CMP planarization is named and deferred** (no device consumer
 its real consumers, dishing→opens and planarity→focus budget, are unwired; TTV→focus is already a
 `wafer_prep` edge).
 
+## G6 — packaging & final-test binning (the back end; the line now runs sand → a binned chip)
+
+The back end closes the line ([`chip/packaging.py`](../chip/packaging.py), triad-tested): a part must survive
+every assembly op (dice → attach → wire-bond → encapsulate), so the **cumulative (multiplicative)
+assembly-yield funnel** is `Y_assembly = Π yᵢ` (`assembly_yield(*ys)`; `expected_packaged(n, *ys) = n·Y`). The
+one genuinely tight leg is the bit-exact seam (`yᵢ = 1 ⇒ Y = 1`); multiplicativity `Y(A∪B) = Y(A)·Y(B)` is the
+identity, but the **load-bearing non-circular leg is the game-side per-die Bernoulli converging to `Πyᵢ`** (LLN —
+exactly G3's placement → `exp(−D₀·A)`), not the arithmetic. The per-step numbers are flagged house values.
+
+> **Binning is NOT physics — it is a grading policy** (the one trap here): `SpeedBins` / `SpeedBin` live in
+> `spec.py` as a deterministic partition of survivors by `I_Dsat` (the speed proxy), default a **single open
+> `"pass"` bin** = the seam. (A Gaussian "bin-convergence" leg would be near-tautological *and* the realized
+> `I_Dsat` is non-Gaussian, so it would not converge — the convergence story belongs to assembly only.)
+
+The G6 win: binning turns **process spread → a value distribution** — a tight process fills the premium bin, a
+loose one (poor line-width control) spreads the grades and **bins a tail OUT**, and the headline "**works but
+never shipped**": a back-end assembly scrap with a *perfect front end*. The assembly kill is a per-die
+**Bernoulli drawn LAST**, gated on `assembly_yield < 1 ∧ variation.enabled` (the G5 conditional-draw-last
+discipline → default knobs / `NO_VARIATION` ⇒ **G1–G5 byte-for-byte**). The four-way partition {front-end fail /
+assembly scrap / bin-out / binned-good} tiles the map (good + bad = total). **Both rework loops now skip dies
+that reached the back end** (`assembled is not None`) — a cracked die stays scrapped, never resurrected by a
+re-exposure (a latent-bug fix from the done-check). **Rebond is named and deferred** (cracked die = scrap is the
+honest default). Banked [`demo_packaging.py`](demo_packaging.py) → `fab-game-g6.png`.
+
+## G7 — the roguelike game shell (scoring + the session; purely additive game policy)
+
+The game shell over the now-complete line — **no physics / `run_line` / `WaferState` touched**, so it *executes*
+ADR 0005 rather than deciding anew (the prior demos stay green trivially). Two game-layer modules:
+
+- **`scoring.py` — the economics.** `BIN_PRICES` (premium/typical/value/reject → \$, flagged house) + wafer /
+  scrap / rework costs; `score_wafer(wafer) → ScoreCard` (`revenue = Σ price·count` over shipped = `verdict.passed`
+  dies, `profit = revenue − cost`). Mechanics-tested for bookkeeping + **monotonicity** (a better bin mix never
+  earns less — the economic image of "propagation wired").
+- **`game.py` — the session.** Immutable `GameSession` / `GameConfig`, `MARKET_BINS` (a *real* multi-grade
+  `SpeedBins`, not the G6 seam), `process_wafer` / `scrap_wafer` / `play`, an append-only `RunRecord` history, and
+  `ReworkSpec` (folds the tested rework paths into a turn).
+
+The framing is **physics-grounded, not invented: one boule = one run, each wafer a turn, and the G2 Scheil `V_t`
+drift IS the difficulty curve** — boron segregates down the boule (`V_t` walks 0.55 → 0.75, out the ceiling by
+z ≈ 0.8), so early slices are easy and the **tail forces a decision**. The player's lever is to **thin the gate
+oxide** (lower `t_ox` → lower `V_t` *and* higher `I_Dsat`), pulling the tail back into spec and the premium bin.
+
+> **The honest framing (twice-corrected during build — keep it intact): of "adapt"'s +\$366 edge over naive,
+> ~90 % (+\$336) is a premium WINDFALL** — thinning upgrades healthy, never-in-danger wafers to premium (the
+> scaling lever) — and only **~10 % (+\$30) is the actual doomed-tail rescue.** The clean, cost-independent lesson
+> is **scrap-vs-naive** (cut the loss on the tail). Adapt is **double-braked**: the `I_Dsat` ceiling brakes it
+> *in-model* (over-thinning the extreme tail tips it over → a real Goldilocks fumble on the last wafer), and
+> gate-oxide reliability brakes it *unmodeled* (the windfall is "free" only because that cost is off-book). It is
+> **not** "adapt rescues the tail." Banked [`demo_game.py`](demo_game.py) → `fab-game-g7.png` (naive < scrap-the-tail < adapt).
+
+### Playing it — the front-ends (thin drivers over the headless session)
+
+Everything above is headless and tested; the UIs are thin skins (the discipline: the swallow-prone UI surface
+renders pre-tested strings/figures verbatim, so the *renderers* carry the tests, not the UI run):
+
+- **The §9 guided dashboard** — `dashboard.py` (`run_dashboard` / `dashboard_summary`) + `plots.dashboard_figure`,
+  surfaced in the `fab_game.ipynb` "command the whole line" section: `run_line` behind 4 dramatic, legible knobs
+  (defocus → edge ring · `D₀` → scattered kills · `slice_z` → Scheil drift · `t_ox` → the G7 rescue lever).
+  Variation is **ON** (else the map is a binary all-pass/all-fail flip, not a story). The safety net is
+  `tests/test_dashboard.py`, *not* the notebook run (`interact` swallows callback exceptions).
+- **The Textual TUI** — `tui.py`, the **only** `textual` importer and **not** re-exported from `__init__` (so
+  `import fab_game` and the fast lane stay headless; `[tui]` extra). `FabLineApp` drives the dashboard core + the
+  headless `plots.wafer_map_text` ASCII die map; `RoguelikeScreen` drives a `GameSession` down one boule (one
+  oxide-minutes Input = the adapt lever + Process / Scrap / New-run Buttons, disabled once `session.done`). The
+  load-bearing string renderers live in **`session_view.py`** (import-pure, tested *without* textual). The pilot's
+  load-bearing leg is **fidelity, not movement**: a driven Process/adapt/Scrap sequence == headless `play(...)`.
+
+**The tycoon mode is the one remaining front-end** (same harness, different objective) — deferred.
+
+## Crystal-growth deepenings (CG-1/2/3) — follow-ons to G2's boule, not new line stages
+
+Three additive, opt-in, seam-safe sections in [`chip/czochralski.py`](../chip/czochralski.py) (every knob defaults
+off ⇒ G1–G7 byte-for-byte). Each sits in the **flagged-phenomenology tier** — a cited *form* + a tight limit, no
+conservation law:
+
+- **CG-1 — Burton–Prim–Slichter `k_eff(pull rate)`** (§1b): a freezing-interface boundary layer lifts the
+  *effective* segregation toward 1 with pull rate, so *pulling faster flattens the Scheil drift.* **Honest finding:
+  boron barely moves** — `k₀ = 0.80` already sits near 1, so at realistic Si pull `k_eff ≈ 0.81–0.84` (modest; a
+  flat boron boule would need ~10–20 mm/min, beyond realistic Si). One-sided in-model (no brake) → the demo shows
+  the physics consequence only, not a score-war. ([`demo_crystal_growth.py`](demo_crystal_growth.py) → `fab-game-cg1.png`.)
+- **CG-2 — Voronkov `V/G` grown-in defect criterion** (§1c): `ξ = V/G > ξ_t` ⇒ vacancy-rich (voids / COPs →
+  gate-oxide killers), feeding the **same cited G3 Poisson map** — the in-model brake CG-1 lacked. **The finding:
+  CG-1 and CG-2 do NOT trade off** — CG-1's parametric benefit is flat across the decision region, so **CG-2's
+  criterion alone sets the pull** (the plateau location is the cited `ξ_t`; the only edge past it is throughput,
+  unmodeled). ([`demo_voronkov.py`](demo_voronkov.py) → `fab-game-cg2.png`.)
+- **CG-3 — Stefan interface heat balance** (§1d): supplies CG-2's gradient `G` from a quasi-steady front
+  (`G_s = (L·ρ·V + k_l·G_l)/k_s`). **The finding: `ξ = V/G_s` SATURATES at `ξ_max = k_s/(L·ρ) ≈ 0.32`** as
+  `V → ∞` — latent heat steepens `G_s` in lockstep, so fast pull's in-model cost is **bounded, not a cliff**
+  (correcting CG-2's unbounded fixed-`G`). Closed-form, no engine amendment (the only consumer needs the algebraic
+  balance, not the transient front `X(t)`). ([`demo_stefan.py`](demo_stefan.py) → `fab-game-cg3.png`.)
+
+## Scope-edge promotions (C1/D1/A2/A1/E1) — named edges that earned a consumer
+
+[`docs/plans/scope-edge-backlog.md`](../docs/plans/scope-edge-backlog.md) triaged the bag of named-but-unbuilt
+edges *by consumer*; these five had one and were built (additive, opt-in, seam-safe). **The backlog is now
+exhausted — every remaining edge lacks a consumer.**
+
+- **C1 — crucible oxygen → thermal donors** (`czochralski.py §1e`): the cited **Kaiser–Frisch–Reiss fourth-power**
+  initial rate `∝ [O_i]⁴`; the donors compensate the p-substrate (`N_A − N_TD`, exact) → `V_t` **down** via the
+  G4a net-doping chain. Seam by **both** paths (no oxygen *or* no anneal); type inversion is guarded. (This is the
+  G2-deferred oxygen demo, finally landed.) ([`demo_thermal_donors.py`](demo_thermal_donors.py) → `fab-game-c1.png`.)
+- **D1 — under-etch** (`etch_deposition.py §3`): the mirror of G5's over-etch — an incomplete clear leaves
+  `residual = UE·film` that **bridges** adjacent gate lines into a functional **SHORT** (the dual of the deposition
+  void's OPEN). `cd_nm` is untouched (a purely functional kill); mutually exclusive with over-etch (a `__post_init__`
+  guard). The demo is the **etch process window** — a Goldilocks band bracketed by a short (under) and a CD-collapse
+  open (over). ([`demo_under_etch.py`](demo_under_etch.py) → `fab-game-d1.png`.)
+- **A2 — OSF ring = CG-2 made radial** (`czochralski.py §1f`): a radial `G(r) = G_center·(1 + boost·r²)` makes
+  `ξ(r)` fall outward, crossing `ξ_t` at `osf_ring_radius`. **The finding: vacancy density is monotone in ξ, so the
+  kills PEAK at the centre and are ZERO at the ring — a COP-degraded vacancy CORE + a clean rim, NOT a ring of dead
+  dies** (the ring is where kills *stop*; core mortality is modest, not a wipeout). Tight = the ring *location*
+  (coefficient-robust) + the topology signs; the `G(r)` profile and the ring's on-wafer existence are flagged.
+  `boost = None` ⇒ CG-2 byte-for-byte. ([`demo_osf_ring.py`](demo_osf_ring.py) → `fab-game-a2.png`.)
+- **A1 — the interstitial side of Voronkov** (`czochralski.py §1g` + [`chip/lifetime.py`](../chip/lifetime.py)):
+  `ξ < ξ_t` (slow pull) ⇒ grown-in dislocations (the void-density mirror across `ξ_t`) ⇒ a recombination channel
+  (`1/τ += K·ρ_disl`) ⇒ junction **LEAKAGE** (the G4b channel), *not* yield. This closes a **two-sided window**
+  (fast → yield loss, slow → leakage, the optimum AT `ξ_t`) and is also A2's deferred leaky-rim consumer → the
+  **OSF ring is the one annulus clean of both**. **Honest finding: realistic CZ is vacancy-side, so A1 is a
+  CORNER** — its value is the criterion's *symmetry* (slow pull is no longer free) + A2's rim, not a main-line
+  trade. `V_t` / `I_Dsat` never move (the bystander). ([`demo_dislocation.py`](demo_dislocation.py) → `fab-game-a1.png`.)
+- **E1 — spike/RTA thermal budget** (`chip/diffusion_dopant.py §4`): a piecewise-linear `T(t)` drives `D(T(t))`
+  through the engine's callable-`D` path — `ThermalProgram` / `thermal_budget = ∫D dt` / `equivalent_isothermal_time`
+  / `drive_in_program`. **The finding: the Arrhenius budget collapses near the peak** (a 19 s spike deposits ~2.5 s
+  of peak-equivalent budget; the top 50 °C carries ~84 %) → a faster ramp → smaller `∫D dt` → shallower `x_j` (why
+  RTA is shallow). **The verify-at-build verdict: the emergent-`T` "heat-mode" engine is FALSIFIED** —
+  `√(D_dopant/α_thermal) ≈ 1.2e-6`, so `T` is flat over a junction; `D(T(t))` *is* the engine's shipped `D(t)` (the
+  OED `effective_Dt` twin), not a new engine. No chip-side heat-mode consumer exists. ([`demo_thermal_budget.py`](demo_thermal_budget.py) → `fab-game-e1.png`.)
+
 ## Module map
 
 - **`state.py`** — the immutable `WaferState` / `Die` die-map + append-only `DieStepRecord`
   provenance (the "why did this die?" trail). G2 added the substrate fields `slice_z` /
-  `resistivity_ohm_cm`; G3 added per-die **`defects`** / `killed_by_defect`, the wafer-level
-  **`geometry`**, the `DefectEvent` type, and the **single** `die_area_cm2` / cell-geometry helpers;
-  G4 added the wafer-level **`contamination`** vector and the per-die **`tau`** / **`j_leak`** (G4b);
-  G5 added per-die **`gate_height_nm`** + **`voided`** (the etch/depo functional-kill flag).
+  `resistivity_ohm_cm`; G3 added per-die **`defects`** / `killed_by_defect` / `radius_frac`, the
+  wafer-level **`geometry`**, the `DefectEvent` type, and the **single** `die_area_cm2` /
+  cell-geometry helpers; G4 added the wafer-level **`contamination`** vector and the per-die
+  **`tau`** / **`j_leak`** (G4b); G5 added per-die **`gate_height_nm`** + **`voided`**; D1 added
+  **`bridged`** (the under-etch short); G6 added **`assembled`** + **`bin`** (the back-end scrap flag
+  + the speed grade).
 - **`recipe.py`** — the per-step knob dataclasses; `DEFAULT_RECIPE` **is** `chip.demo_device`'s
   coherent n-MOSFET recipe (the seam anchor). G2 added **`CzochralskiKnobs`**; G3 added
-  **`WaferPrepKnobs`** (geometry + the killer-defect density); G4 added **`PurificationKnobs`**
-  (feedstock grade + zone passes, defaulting to a clean feed) + the derived `contamination` /
-  `effective_channel_N_A` recipe properties; G5 added **`EtchDepositionKnobs`** (anisotropy / over-etch
-  / step coverage, defaulting to perfectly anisotropic + conformal = the seam).
+  **`WaferPrepKnobs`**; G4 added **`PurificationKnobs`** + the derived `contamination` /
+  `effective_channel_N_A` properties; G5 added **`EtchDepositionKnobs`** (defaulting to perfectly
+  anisotropic + conformal = the seam); G6 added **`PackagingKnobs`** (4 per-step yields, default
+  1.0 = seam). The crystal-growth deepenings and promotions all hang off `CzochralskiKnobs` as
+  opt-in, default-`None` knobs/properties (CG-1 `pull_rate_mm_min` → `k_eff`; CG-2
+  `thermal_gradient_K_per_mm` → `voronkov_ratio` / `grown_in_defect_density`; CG-3
+  `melt_gradient_K_per_mm` → `interface_gradient_K_per_mm`; A2 `radial_gradient_boost` →
+  `osf_ring_radius`; A1 `interstitial_dislocation_density`; C1 `oxygen_conc_cm3` /
+  `thermal_donor_anneal_min` → `thermal_donor_density`), plus D1's `EtchDepositionKnobs.under_etch_frac`
+  (a `__post_init__` guards the two-`G` and over-vs-under conflicts) and E1's
+  `DiffusionKnobs.drivein_program`.
 - **`variation.py`** — the seeded stochastic spread: a center-to-edge trend routed *through the
   physics* + die-to-die output scatter. `NO_VARIATION` collapses to one physics call (the seam).
   Magnitudes are **flagged house defaults**, not cited. G5 added the **conditional** etch-rate channel
-  (`etch_bias_sigma_frac`, default 0 → no 4th draw → the banked demos stay byte-identical).
+  (default 0 → no 4th draw → the banked demos stay byte-identical).
 - **`defects.py`** (G3) — the seeded **per-die Poisson** killer-particle placement (off without
-  touching the RNG when the stochastic layer is disabled or the line is clean — the seam).
+  touching the RNG when the stochastic layer is disabled or the line is clean — the seam); A2 added
+  the optional **`density_fn`** hook (a per-die radial density; `None` keeps the byte-identical
+  uniform path).
 - **`spec.py`** — spec windows → the per-die verdict (NILS / CD / I_Dsat / V_t); G3 added the
   killer-defect **functional** gate and the wafer-level **`GeometrySpec`** (TTV/bow) scrap gate; G4b
-  added the *optional* **leakage** window (`SpecWindow.optional` — a die not scored on leakage isn't
-  failed "missing"); G5 added the **deposition-void** functional gate.
-- **`steps.py`** — the deterministic step wrappers; G3 added `wafer_prep_step` (geometry + defects);
-  G4 wired the **device step's contamination reads** (Na→`Q_ox`→`V_t`; G4b Fe/Cu→`chip.lifetime`→the
-  leakage field), all *inside* `device_step`; G5 added **`etch_deposition_step`** (the etch overwrites
-  `cd_nm`, the depo sets `voided`; degrades gracefully on an unresolved image / a runaway over-etch).
-- **`pipeline.py`** — `run_line` (the driver, one seeded RNG in fixed die order; the wafer-level
-  purification + wafer-prep run first, the **etch/depo step between litho and the device**),
-  `wafer_yield`, `diagnose` (the failure trail, + killer-defect / `Q_ox` / deep-level-metal leakage /
-  **etch-bias & void** branches), `rework_litho`, G3's **`rework_polish`**, G5's **`rework_deposition`**
-  (re-deposit a void; the etch is irreversible), and G2's **`run_batch`**.
-- **`demo_fab_game.py`** + **`demo_boule.py`** + **`demo_wafer_prep.py`** + **`demo_purification.py`**
-  + **`demo_lifetime.py`** + **`demo_etch.py`** + **`plots.py`** — the banked artifacts
-  (`fab-game-g1.png` defocus; `fab-game-g2.png` boule → V_t; `fab-game-g3.png` particle map + yield law +
-  TTV scrap; `fab-game-g4.png` Na → V_t scrap + rework; `fab-game-g4b.png` metals → leaky diode + rework;
-  `fab-game-g5.png` over-etch CD walk + the void map + the rework contrast).
-- **`fab_game.ipynb`** — the thin notebook skin (not in the correctness path).
+  added the *optional* **leakage** window; G5 added the **deposition-void** functional gate; D1 added
+  the **bridge** (under-etch short) gate; G6 added **`SpeedBins`** / **`SpeedBin`** — the deterministic
+  final-test binning partition (a grading policy, *not* physics; default one open `"pass"` bin = the seam).
+- **`steps.py`** — the deterministic step wrappers; G3 added `wafer_prep_step`; G4 wired the **device
+  step's contamination reads** (Na→`Q_ox`→`V_t`; G4b Fe/Cu→`chip.lifetime`→the leakage field), all
+  *inside* `device_step`; G5 added **`etch_deposition_step`** (etch overwrites `cd_nm`, depo sets
+  `voided`, D1 sets `bridged`); C1/A1 thread the thermal-donor / dislocation reads into `device_step`
+  (both call sites); G6 added **`packaging_step`** (after the front-end `test` step).
+- **`pipeline.py`** — `run_line` (the driver, one seeded RNG in fixed die order; purification +
+  wafer-prep run first, the etch/depo step between litho and the device, **packaging last**),
+  `wafer_yield`, `diagnose` (the failure trail — killer-defect / `Q_ox` / metal-SRH-leakage /
+  dislocation-leakage / etch-bias / void / under-etch-bridge / assembly-scrap / bin-out branches),
+  `rework_litho`, `rework_polish`, `rework_deposition` (**both rework loops now skip dies that reached
+  the back end** — a cracked die stays dead), the A2 radial `density_fn` wiring, `_package_wafer`, and
+  `run_batch`.
+- **`scoring.py`** (G7) — the economics: `BIN_PRICES` + wafer / scrap / rework costs, `score_wafer →
+  ScoreCard` (revenue over shipped dies, profit).
+- **`game.py`** (G7) — the roguelike session: immutable `GameSession` / `GameConfig`, `MARKET_BINS`,
+  `new_session` / `process_wafer` / `scrap_wafer` / `play`, the append-only `RunRecord`, and
+  `ReworkSpec`. One boule = one run, each wafer a turn.
+- **`dashboard.py`** + **`session_view.py`** — the headless UI cores: `run_dashboard` /
+  `dashboard_summary` (the §9 guided 4-knob slice over `run_line`) and the `GameSession` string
+  renderers (`turn_recipe` / `projected_vt` / `inspect_line` / `session_header` / `turn_line` /
+  `history_trail` / `session_summary`). Import-pure and tested directly — the swallow-prone UIs render
+  them verbatim.
+- **`tui.py`** — the Textual front-end (`FabLineApp` + `RoguelikeScreen`), the **only** `textual`
+  importer and **not** re-exported from `__init__` (the fast lane stays headless; `[tui]` extra). A
+  thin driver of the cores above.
+- **`plots.py`** — the figure builders (not in the correctness path), incl. `dashboard_figure` (§9)
+  and the headless `wafer_map_text` ASCII die map (the TUI's map).
+- **`gallery.py`** — the game-layer gallery (`docs/fab-game.html` + `fab-game.local.html`), surfacing
+  the `fab-game-*.png` artifacts; reuses chip's gallery primitives, lives in `fab_game/` for the ADR
+  0005 boundary.
+- **the `demo_*.py` modules** — one banked artifact per milestone: `demo_fab_game` (g1) ·
+  `demo_boule` (g2) · `demo_wafer_prep` (g3) · `demo_purification` (g4) · `demo_lifetime` (g4b) ·
+  `demo_etch` (g5) · `demo_packaging` (g6) · `demo_game` (g7) · `demo_crystal_growth` (cg1) ·
+  `demo_voronkov` (cg2) · `demo_stefan` (cg3) · `demo_thermal_donors` (c1) · `demo_under_etch` (d1) ·
+  `demo_osf_ring` (a2) · `demo_dislocation` (a1) · `demo_thermal_budget` (e1).
+- **`fab_game.ipynb`** — the thin notebook skin (the §9 dashboard section + the interactive skin; not
+  in the correctness path).
 
 ## Test discipline (ADR 0005 §5) — mechanics invariants, not cited magnitudes
 
@@ -213,16 +376,46 @@ its real consumers, dishing→opens and planarity→focus budget, are unwired; T
   degrade gracefully, and the etch-rate channel is deterministic *and* draws no RNG when off.
 - **`test_demo_etch.py`** (G5) — the banked artifact's thesis (the over-etch CD walk out of window, the
   PVD-voids/CVD-fills contrast, the reworkable-void / irreversible-etch rework).
+- **`test_packaging.py`** / **`test_demo_packaging.py`** (G6) — the assembly funnel + the Bernoulli →
+  `Πyᵢ` convergence, the binning partition, and the **rework-guard** (a back-end scrap is never
+  resurrected by a re-exposure).
+- **`test_scoring.py`** / **`test_game.py`** / **`test_demo_game.py`** (G7) — the economics (bookkeeping +
+  monotonicity) and the session (determinism, the budget closes, sandbox-vs-roguelike, the drift arc;
+  the demo's naive < scrap < adapt thesis).
+- **`test_crystal_growth.py`** / **`test_voronkov.py`** / **`test_stefan.py`** (+ their `test_demo_*`,
+  CG-1/2/3) — each deepening wired through the boule + each default-off seam byte-for-byte.
+- **`test_thermal_donors.py`** (C1) · `test_etch.py` (D1's wiring) · **`test_osf_ring.py`** (A2) ·
+  **`test_dislocation.py`** (A1) (+ their `test_demo_*`, incl. `test_demo_under_etch.py` /
+  `test_demo_thermal_budget.py`) — the scope-edge promotions: each consequence wired, each seam
+  reproduces the prior demos byte-for-byte.
+- **`test_dashboard.py`** / **`test_session_view.py`** / **`test_tui.py`** — the headless UI cores (the
+  real safety net) + the `importorskip` Textual pilots (**fidelity, not movement**: a driven session ==
+  headless `play(...)`; no notebook-style xdist flake).
+- **`test_gallery.py`** — the gallery manifest is complete (every `fab-game-*.png` is surfaced) + the
+  golden HTML.
 
 ## Run it
 
 ```sh
-python -m fab_game.demo_fab_game          # prints the story, banks docs/figures/fab-game-g1.png
-python -m fab_game.demo_boule             # the G2 boule → V_t spread, banks docs/figures/fab-game-g2.png
-python -m fab_game.demo_wafer_prep        # the G3 particle map + yield law + TTV scrap, banks fab-game-g3.png
-python -m fab_game.demo_purification      # the G4a Na → V_t scrap + rework, banks fab-game-g4.png
-python -m fab_game.demo_lifetime          # the G4b metals → leaky diode + rework, banks fab-game-g4b.png
-python -m fab_game.demo_etch              # the G5 over-etch CD walk + void map + rework, banks fab-game-g5.png
+python -m fab_game.demo_fab_game          # G1 defocus → dead-edge ring, banks docs/figures/fab-game-g1.png
+python -m fab_game.demo_boule             # G2 boule → V_t spread, banks fab-game-g2.png
+python -m fab_game.demo_wafer_prep        # G3 particle map + yield law + TTV scrap, banks fab-game-g3.png
+python -m fab_game.demo_purification      # G4a Na → V_t scrap + rework, banks fab-game-g4.png
+python -m fab_game.demo_lifetime          # G4b metals → leaky diode + rework, banks fab-game-g4b.png
+python -m fab_game.demo_etch              # G5 over-etch CD walk + void map + rework, banks fab-game-g5.png
+python -m fab_game.demo_packaging         # G6 assembly funnel + bin histogram + outcome map, banks fab-game-g6.png
+python -m fab_game.demo_game              # G7 three strategies down one boule, banks fab-game-g7.png
+python -m fab_game.demo_crystal_growth    # CG-1 BPS k_eff flattens the drift, banks fab-game-cg1.png
+python -m fab_game.demo_voronkov          # CG-2 V/G COP brake, banks fab-game-cg2.png
+python -m fab_game.demo_stefan            # CG-3 ξ saturation, banks fab-game-cg3.png
+python -m fab_game.demo_thermal_donors    # C1 oxygen → donors → V_t down, banks fab-game-c1.png
+python -m fab_game.demo_under_etch        # D1 under-etch short + the etch process window, banks fab-game-d1.png
+python -m fab_game.demo_osf_ring          # A2 OSF ring: vacancy core + clean rim, banks fab-game-a2.png
+python -m fab_game.demo_dislocation       # A1 two-sided window: slow pull → leakage, banks fab-game-a1.png
+python -m fab_game.demo_thermal_budget    # E1 spike/RTA budget collapse → shallow x_j, banks fab-game-e1.png
+
+python -m fab_game.tui                    # the Textual TUI (dashboard + roguelike screen; needs the [tui] extra)
+python -m fab_game.gallery                # regenerate docs/fab-game.html (+ fab-game.local.html)
 pytest fab_game/ -q                       # the mechanics suite (rides the fast lane)
-jupyter lab fab_game/fab_game.ipynb       # the interactive skin (needs the [viz,notebook] extras)
+jupyter lab fab_game/fab_game.ipynb       # the interactive skin + the §9 dashboard (needs the [viz,notebook] extras)
 ```
