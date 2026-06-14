@@ -341,6 +341,66 @@ def purification_figure(result):
 
 
 # --------------------------------------------------------------------------- #
+# The journey (phase 1) — refine a feed step by step: the scrub, the consequence arc, the graded ring
+# --------------------------------------------------------------------------- #
+def _journey_trajectory_panel(ax, result) -> None:
+    """Impurity vector vs refining effort (log) — Na/Fe fall fast, boron barely moves (the contrast)."""
+    efforts = [e for e, _ in result.trajectory]
+    na = [c.Na for _, c in result.trajectory]
+    fe = [c.Fe for _, c in result.trajectory]
+    b = [c.B for _, c in result.trajectory]
+    ax.set_yscale("log")
+    ax.plot(efforts, na, color="#d62728", lw=1.8, marker="o", ms=4, label="Na (mobile ion → V_t)")
+    ax.plot(efforts, fe, color="#7f7f7f", lw=1.4, marker="s", ms=3, label="Fe (metal → leakage)")
+    ax.plot(efforts, b, color="#2f6db5", lw=1.4, marker="^", ms=3, label="B (dopant, k≈0.8)")
+    ax.set_xlabel("refining effort (zone passes)", fontsize=9)
+    ax.set_ylabel("impurity concentration (cm⁻³)", fontsize=9)
+    ax.set_title("Refine step by step: Na/Fe fall fast,\nboron barely (segregation can't purify dopants)",
+                 fontsize=10)
+    ax.legend(fontsize=8, loc="upper right")
+
+
+def _journey_arc_panel(ax, result) -> None:
+    """Forecast yield vs effort, banded — the ok→rework→fail spectrum you refine across (dead→ring→clean)."""
+    e = list(result.efforts)
+    y = [100.0 * v for v in result.yields]
+    ax.axhspan(0, 5, color="#d62728", alpha=0.10)
+    ax.axhspan(5, 95, color="#ff7f0e", alpha=0.10)
+    ax.axhspan(95, 100, color="#2ca02c", alpha=0.10)
+    ax.plot(e, y, color="0.2", lw=1.7, marker="o", ms=5, zorder=3)
+    ax.axvline(result.ring_effort, color="#ff7f0e", ls="--", lw=1.1,
+               label=f"the ring ({result.ring_forecast.yield_:.0%}) at effort {result.ring_effort:g}")
+    ax.set_xlabel("refining effort (zone passes)", fontsize=9)
+    ax.set_ylabel("forecast yield (%)", fontsize=9)
+    ax.set_ylim(-3, 103)
+    ax.set_title("The consequence forecast: dead → ring → clean\n(the band the player refines across)",
+                 fontsize=10)
+    ax.text(e[-1], 2, "dead", color="#d62728", fontsize=8, ha="right", va="bottom")
+    ax.text(e[-1], 50, "ring (rework)", color="#cc6600", fontsize=8, ha="right", va="center")
+    ax.text(e[-1], 98, "clean", color="#2ca02c", fontsize=8, ha="right", va="top")
+    ax.legend(fontsize=8, loc="center left")
+
+
+def journey_figure(result):
+    """Assemble the journey artifact from a :class:`~fab_game.demo_journey.JourneyDemoResult` (3 panels).
+
+    The refining trajectory (the scrub), the consequence arc (dead→ring→clean), and the wafer map at the
+    graded ring effort — the purification stage of the staged sand→chip journey, end to end.
+    """
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _journey_trajectory_panel(axes[0], result)
+    _journey_arc_panel(axes[1], result)
+    _wafer_map(axes[2], result.ring_forecast.result.wafer,
+               f"the graded ring — refine ×{result.ring_effort:g}")
+    fig.suptitle(f"The journey, stage 1 — purify a {result.grade} feed: refine until the consequence "
+                 "forecast clears (dead → ring → clean)", fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    return fig
+
+
+# --------------------------------------------------------------------------- #
 # G4b — deep-level metals → killed lifetime → a leaky diode (scaling + isolated kill + rework)
 # --------------------------------------------------------------------------- #
 def _lifetime_scaling_panel(ax, result) -> None:

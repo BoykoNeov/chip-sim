@@ -79,6 +79,9 @@ LINE = [
     Demo("demo_game", "G7",
          "A roguelike run down one boule: thin the gate oxide against the rising Scheil V_t drift — a "
          "Goldilocks lever (over-thinning hits the I_Dsat ceiling)."),
+    Demo("demo_journey", "J1",
+         "The staged sand→chip journey (phase 1): play the purification stage — refine a dirty feed step "
+         "by step, watch the consequence forecast walk dead → ring → clean, then commit and finish."),
 ]
 
 # The deepenings — the crystal-growth triad + the scope-edge promotions, each promoting a named edge
