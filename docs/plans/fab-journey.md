@@ -257,19 +257,45 @@ cut + lean predep) has a *tighter* window, which is the coupling/margins-compoun
 in `test_journey.py`/`test_demo_journey.py` pin the two-sided window, the opposite-radii signature, the
 full-journey channel discriminator, the coupling, and the nominal-oxide seam.
 
+## Phase 6 — the cost side (the Goldilocks half) (BUILT 2026-06-15)
+
+The economics **cost side** — the #1 open item — that turns a *one-sided* stage (yield only punishes
+*under*-doing it) into a two-sided Goldilocks (a cost punishes *over*-doing it). `fab_game.scoring` gains
+`process_cost(recipe) → ProcessCost` (a flagged-house-number cost model, the economics home) and
+`score_wafer` gains a `process_cost=0.0` add-on (mirrors `rework_cost`); the journey's `finish` is the
+**consumer** (it threads `process_cost(recipe).total` in), the **roguelike is byte-for-byte unchanged**
+(it passes nothing → the default-0 seam). Two stages are priced:
+
+- **Refining** — a per-pass cost ∝ `zone_passes` (`REFINE_COST_PER_PASS`). Yield saturates at clean (~1
+  pass), so past it each pass is pure cost → an interior optimum: *stop at clean, not "refine until clean".*
+- **The S/D predep** — a thermal-budget cost ∝ the predep's real diffusion budget `∫D dt` (E1's quantity,
+  via `chip.diffusion_dopant.diffusivity`; `DIFFUSION_BUDGET_COST_PER_CM2`), **gated** on the stage being
+  engaged (`sd_contact_squares > 0` — cost and the `I_Dsat` consumer co-engage). Tied to `∫D dt` (not an
+  ad-hoc `T·t`) so it prices a *hotter* predep too (no "raise T for free dose" loophole) and rises with the
+  same dose the yield responds to → an interior optimum: *use the least dose still in spec.* (The lesson it
+  reveals: the recipe-default 950 °C/10 min predep is ~9× over-dosed for the `I_Dsat` floor — ≈ $220 — which
+  is why the journey/demo operate the cooler ~900 °C regime.)
+
+**The load-bearing proof** (advisor: a cost *field* on the forecast is display, not proof) is that **net
+profit is non-monotone in the lever with an interior maximum** — `profit(under) < profit(opt) > profit(over)`
+— the economic image of two-sidedness (the analogue of the growth window). `StageForecast` also carries the
+`ProcessCost` so the player sees both halves before committing; `demo_journey` adds a net-profit-vs-lever
+Goldilocks readout (refining peaks at effort 1.0; the predep at ~5 min @ 900 °C).
+
+**The slice/cut's cost side is DEFERRED (advisor — falsified-then-deferred, not fudged).** Its missing
+incentive (cut deeper = more wafers per boule = throughput) is inherently **multi-wafer**: per-wafer boule
+amortization depends on how many *in-spec* wafers the boule yields, which is set by the **pull rate** (the
+CG-1 Scheil flattening), **not** by where a *single* wafer is cut. Crediting one wafer with boule-level
+throughput would attribute to the cut an economics actually driven by the pull (the "inflate an unrelated
+variable" shape the repo refuses) — and that multi-wafer model **already exists** as the roguelike
+(`fab_game.game`, `n_wafers` down one boule). So the cut stays one-sided in single-wafer `finish` by design;
+`process_cost` lives in `scoring.py` so the roguelike can adopt the cost side later without a fork.
+
 ## Deferred (explicit)
 
-- **The economics — the cost side of the decision (the #1 open item, now shared by THREE stages).** Today
-  `finish` charges only the wafer cost, so three stages are *one-sided absent a price*: **purification**
-  (refining is free + every grade is the same price → "refine until clean"), **the slice/cut** (cutting
-  at the seed is always safest → "camp at the seed"; the value of cutting deeper = **more wafers per boule**
-  = throughput), and **the S/D diffusion** (more dose only lowers `R_s` → "predep forever"; the cost of
-  more dose = thermal budget / cycle time). A **per-pass / per-wafer-vs-throughput / per-budget** cost is
-  the same missing half across all three: the ring/Scheil-drift/`R_s` penalizes under-doing it, cost
-  penalizes over-doing it (the two-sided Goldilocks shape the G7 oxide lever already has). The consequence
-  spectrum (the forecast bands) is built for all; the cost side is its other half — the natural next
-  increment. (Crystal growth **and oxidation** are the exceptions — their two-sidedness needs no economics;
-  the radial hot zone / the `t_ox` two-way read supply it.)
+- **The slice/cut's throughput cost** — a multi-wafer/roguelike concept, not a single wafer's `finish`
+  (see Phase 6). (Crystal growth **and oxidation** never needed economics — their two-sidedness comes from
+  the radial hot zone / the `t_ox` two-way read.)
 - **The polish/flatness + killer-defect half of wafer-prep** — phase 3 ships the *cut*; TTV/bow/CMP +
   the defect map run at defaults (flatness is a binary scrap, and TTV→focus-budget is a named scope edge =
   new physics). Built when graded.

@@ -50,7 +50,7 @@ from chip.purification import Contamination, FEEDSTOCK_GRADES, zone_refine
 from .game import GameConfig
 from .pipeline import LineResult, run_line
 from .recipe import DEFAULT_RECIPE, Recipe
-from .scoring import ScoreCard, score_wafer
+from .scoring import ProcessCost, ScoreCard, process_cost, score_wafer
 from .spec import DEFAULT_SPECS
 from .variation import NO_VARIATION, Variation
 
@@ -162,7 +162,10 @@ class StageForecast:
     ``band`` the ok→rework→fail spectrum (:func:`consequence_band`); ``channel`` the dominant failure
     mechanism the trail names (``V_t`` mobile-ion / leakage metal / drive current), or ``None`` when clean;
     ``yield_``/``mean_vt`` the readout; ``result`` the wafer (for the map/trail); ``contamination`` the
-    current impurity vector (cm⁻³); ``headline`` the one-line human summary.
+    current impurity vector (cm⁻³); ``cost`` the recipe-so-far's :class:`~fab_game.scoring.ProcessCost`
+    (the **cost side** — the Goldilocks half: the yield band penalizes *under*-doing a stage, ``cost``
+    prices *over*-doing it, so the player sees both halves of the decision before committing);
+    ``headline`` the one-line human summary.
     """
 
     band: str
@@ -170,6 +173,7 @@ class StageForecast:
     yield_: float
     mean_vt: float | None
     contamination: dict
+    cost: ProcessCost
     result: LineResult
     headline: str
 
@@ -283,14 +287,16 @@ def forecast(state: "JourneyState") -> StageForecast:
     y = result.yield_
     band = consequence_band(y)
     channel = _dominant_channel(result, recipe) if band != "clean" else None
+    cost = process_cost(recipe)                            # the cost side — priced even when the band is clean
     if band == "clean":
-        headline = f"clean — {y:.0%} yield, no meaningful consequence"
+        headline = f"clean — {y:.0%} yield, no meaningful consequence (cost ${cost.total:.0f})"
     elif band == "dead":
         headline = f"DEAD — {y:.0%} yield, scrapped on {channel}"
     else:
         headline = f"ring — {y:.0%} yield, part of the wafer fails on {channel}"
     return StageForecast(band=band, channel=channel, yield_=y, mean_vt=_mean_vt(result),
-                         contamination=state.contamination.as_dict(), result=result, headline=headline)
+                         contamination=state.contamination.as_dict(), cost=cost, result=result,
+                         headline=headline)
 
 
 def refining_trajectory(grade: str, *, max_effort: float = 2.0, step: float = DEFAULT_STEP):
@@ -582,14 +588,22 @@ def new_journey(grade: str = DEFAULT_GRADE, *, seed: int = 0, grid_n: int = DEFA
 
 def finish(state: JourneyState, *, config: GameConfig | None = None) -> tuple[LineResult, ScoreCard]:
     """Run the full accumulated recipe end-to-end and score the wafer — reusing the :mod:`fab_game.game`
-    economics (market bins, prices, wafer cost) rather than forking a parallel scoring path.
+    **revenue** economics (market bins, prices, wafer cost) and adding the recipe's :func:`process_cost`.
 
     Returns the scored :class:`~fab_game.pipeline.LineResult` and its :class:`~fab_game.scoring.ScoreCard`.
     Even with only purification interactive (every later stage at its default), the journey is playable
-    start-to-finish: raw feed → committed recipe → binned, packaged, scored wafer."""
+    start-to-finish: raw feed → committed recipe → binned, packaged, scored wafer.
+
+    The revenue side reuses the ``GameConfig`` economics unchanged; the **cost side** adds the
+    :func:`process_cost` of the committed recipe (per-pass refining + the predep thermal budget — the
+    Goldilocks half that makes over-doing a one-sided stage cost money). This is the one place the journey
+    *diverges* from the roguelike's economics (the roguelike charges only ``wafer_cost``/rework — its
+    difficulty is the Scheil drift, not these stages); the divergence is consumer-driven and named in
+    :mod:`fab_game.scoring`."""
     cfg = config if config is not None else GameConfig()
     recipe = state.current_recipe
     wafer = run_line(recipe, seed=state.seed, variation=cfg.variation, specs=cfg.specs, grid_n=state.grid_n)
     result = LineResult.of(f"journey finish: {state.grade} × {state.effort:g}", wafer)
-    sc = score_wafer(wafer, prices=cfg.prices, wafer_cost=cfg.wafer_cost, rework_cost=0.0)
+    sc = score_wafer(wafer, prices=cfg.prices, wafer_cost=cfg.wafer_cost, rework_cost=0.0,
+                     process_cost=process_cost(recipe).total)
     return result, sc

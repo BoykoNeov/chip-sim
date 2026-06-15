@@ -54,6 +54,18 @@ def test_rework_cost_adds_to_the_cost():
     assert reworked.profit == base.profit - 12.0
 
 
+def test_process_cost_adds_to_the_cost_and_defaults_to_zero():
+    # The process-cost side (recipe-decision cost) raises the cost like rework, never the revenue — and
+    # defaults to 0 so the roguelike (which passes nothing) is byte-for-byte unchanged (the seam).
+    w = _wafer([("typical", True)] * 3)
+    base = score_wafer(w, wafer_cost=50.0)
+    assert score_wafer(w, wafer_cost=50.0, process_cost=0.0).cost == base.cost   # default-0 seam
+    charged = score_wafer(w, wafer_cost=50.0, process_cost=30.0)
+    assert charged.cost == base.cost + 30.0
+    assert charged.revenue == base.revenue
+    assert charged.profit == base.profit - 30.0
+
+
 # --------------------------------------------------------------------------- #
 # Monotonicity — a better bin mix never earns less (the propagation analogue)
 # --------------------------------------------------------------------------- #

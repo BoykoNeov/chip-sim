@@ -51,6 +51,13 @@ the only stage whose two sides fail at **opposite radii**, both graded by the ox
 ``t_ox`` non-uniformity (the spread stages 3–4 borrowed, finally grading its home). How much oxide you can grow
 is set by the **cut** (a deeper cut → higher ``V_t`` → less room to the ceiling — the V_t-budget coupling).
 
+**The cost side — the Goldilocks half.** The yield arcs above punish *under*-doing a one-sided stage; the
+**process cost** (:func:`fab_game.scoring.process_cost`) punishes *over*-doing it, so net profit is
+non-monotone with an **interior** optimum. Two stages are priced: **refining** (a per-pass cost — stop
+*at* clean, not "refine until clean") and the **S/D predep** (a thermal-budget cost ∝ ``∫D dt`` — use the
+*least* dose still in spec). The **slice/cut**'s cost (deeper cut = more wafers per boule = throughput) is
+**deferred**: it is inherently *multi-wafer* (the roguelike's domain), not a single wafer's ``finish``.
+
 Stages 1–3 + 5 add *no new physics* (they re-sequence existing chains; stage 5 restores that framing). Stage 4
 is the **exception**: the diffusion's ``x_j``/``R_s`` fed nothing scored, so making the dose a real decision
 needed a genuine device term — an additive S/D series resistance on :func:`chip.device.saturation_current`
@@ -161,6 +168,13 @@ class JourneyDemoResult:
     oxide_ring_min: float                   # the under-oxidized EDGE-ring oxide time — the map (echoes the Na ring)
     oxide_ring_forecast: StageForecast
     oxide_commit_min: float                 # the clean gate oxide committed on the fully-accumulated wafer
+    # The cost side — the Goldilocks half (net profit vs the lever; the fab-journey's #1 open item):
+    #   the yield band penalizes UNDER-doing a one-sided stage; the process cost penalizes OVER-doing it,
+    #   so net profit is non-monotone with an INTERIOR optimum (the economic image of two-sidedness).
+    refine_profit_sweep: tuple              # (effort, net_profit) — purification's per-pass cost side
+    refine_opt_effort: float               # the interior profit optimum (stop refining HERE, not "until clean")
+    diffusion_profit_sweep: tuple          # (predep_min, net_profit) — the predep thermal-budget cost side
+    diffusion_opt_time: float              # the interior optimum: the LEAST dose that stays in spec
     # End to end:
     finish_result: LineResult
     finish_score: ScoreCard
@@ -263,6 +277,21 @@ def compute() -> JourneyDemoResult:
     oxidized = played.oxidize(oxide_commit_min).commit()
     finish_result, finish_score = finish(oxidized)
 
+    # --- The cost side: net profit vs the lever (the Goldilocks half — the #1 open item) ---
+    # The yield arcs above penalize UNDER-doing each stage; the process cost penalizes OVER-doing it, so
+    # net profit (what finish scores) has an INTERIOR optimum. Refining: net profit vs effort (on the raw
+    # solar feed) — peaks where the feed just goes clean, then declines (each further pass is pure cost).
+    refine_profit_sweep = tuple(
+        (e, finish(JourneyState(grade=GRADE, effort=e, seed=SEED))[1].profit) for e in efforts)
+    refine_opt_effort = max(refine_profit_sweep, key=lambda ep: ep[1])[0]
+    # The predep: net profit vs predep time (on the committed cut wafer) — peaks near the LEAST dose still
+    # in spec (shorter → less thermal budget = cheaper; too short → I_Dsat starved = lost yield). The sweep
+    # extends the over-dosed side past the yield-arc tuple so both flanks of the Goldilocks are sampled.
+    diffusion_cost_times = (10.0, 8.0) + DIFFUSION_TIMES                  # over-dosed flank + the yield-arc times
+    diffusion_profit_sweep = tuple(
+        (t, finish(cut_committed.diffuse(DEMO_PREDEP_C, t))[1].profit) for t in diffusion_cost_times)
+    diffusion_opt_time = max(diffusion_profit_sweep, key=lambda tp: tp[1])[0]
+
     metal_forecast = forecast(new_journey("metal", seed=SEED))
 
     return JourneyDemoResult(
@@ -290,6 +319,8 @@ def compute() -> JourneyDemoResult:
         oxide_yields=oxide_yields, oxide_bands=oxide_bands, oxide_channels=oxide_channels,
         oxide_arc=tuple(o_arc), oxide_ring_min=OXIDE_MINUTES[thin_ring_oi],
         oxide_ring_forecast=o_arc[thin_ring_oi], oxide_commit_min=oxide_commit_min,
+        refine_profit_sweep=refine_profit_sweep, refine_opt_effort=refine_opt_effort,
+        diffusion_profit_sweep=diffusion_profit_sweep, diffusion_opt_time=diffusion_opt_time,
         finish_result=finish_result, finish_score=finish_score,
         metal_forecast=metal_forecast, log=oxidized.log,
     )
@@ -358,6 +389,25 @@ def print_summary(r: JourneyDemoResult) -> None:
     print(f"    failing the thickest **centre** first → a CENTRE CORE (cf. the slice/diffusion cores). The two")
     print(f"    sides fail at OPPOSITE radii — the only stage that does — both GRADED by the radial t_ox spread.")
     print(f"    How much oxide you can grow is set by the cut (a deeper cut → higher V_t → less ceiling room).\n")
+
+    print("  THE COST SIDE — the Goldilocks half (the journey's #1 open item). The yield arcs above punish")
+    print("  UNDER-doing a one-sided stage; the process cost (per refining pass; per unit predep thermal")
+    print("  budget ∫D dt) punishes OVER-doing it — so net profit is non-monotone with an INTERIOR optimum:\n")
+    print(f"     refining — net profit vs effort (stop AT clean, not 'until clean'):")
+    print(f"     {'effort':>6}  {'net profit':>10}")
+    for e, p in r.refine_profit_sweep:
+        mark = "  ← optimum" if e == r.refine_opt_effort else ""
+        print(f"     {e:6.2f}  {p:+10.0f}{mark}")
+    print(f"     → past effort {r.refine_opt_effort:g} every pass is pure cost (the feed is already clean).\n")
+    print(f"     S/D predep — net profit vs predep time at {r.diffusion_predep_C:g}°C (use the LEAST dose in spec):")
+    print(f"     {'predep':>6}  {'net profit':>10}")
+    for t, p in r.diffusion_profit_sweep:
+        mark = "  ← optimum" if t == r.diffusion_opt_time else ""
+        print(f"     {t:5.1f}m  {p:+10.0f}{mark}")
+    print(f"     → a longer predep is pure thermal-budget cost; too short starves I_Dsat. Optimum "
+          f"{r.diffusion_opt_time:g} min.")
+    print(f"    (The slice/cut's cost side — deeper cut = more wafers/boule = throughput — is DEFERRED: it is")
+    print(f"     inherently multi-wafer, the roguelike's domain, not a single wafer's finish.)\n")
 
     print("  Commit all five decisions and finish — run the whole line and score the wafer:")
     sc = r.finish_score

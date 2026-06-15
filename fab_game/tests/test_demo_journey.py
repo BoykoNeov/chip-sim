@@ -142,6 +142,29 @@ def test_demo_oxidation_edge_ring_map_is_a_partial_wafer(result):
 
 
 # --------------------------------------------------------------------------- #
+# The cost side — the Goldilocks half (net profit has an interior optimum)
+# --------------------------------------------------------------------------- #
+def test_demo_refining_cost_side_has_an_interior_profit_optimum(result):
+    """Refining's cost side: net profit vs effort peaks at an **interior** effort (stop AT clean) — under
+    it the Na ring eats yield, past it each pass is pure cost. The optimum is neither the least nor the most
+    refining swept."""
+    efforts = [e for e, _ in result.refine_profit_sweep]
+    assert efforts[0] < result.refine_opt_effort < efforts[-1]      # strictly interior
+    profits = {e: p for e, p in result.refine_profit_sweep}
+    assert profits[result.refine_opt_effort] == max(profits.values())
+
+
+def test_demo_predep_cost_side_has_an_interior_profit_optimum(result):
+    """The S/D predep's cost side: net profit vs predep time peaks at an **interior** time — a longer predep
+    is pure thermal-budget cost, a shorter one starves I_Dsat. The optimum is neither the longest nor the
+    shortest dose swept (the over-dosed flank is sampled past the yield-arc tuple)."""
+    times = [t for t, _ in result.diffusion_profit_sweep]
+    assert min(times) < result.diffusion_opt_time < max(times)      # strictly interior (both flanks present)
+    profits = {t: p for t, p in result.diffusion_profit_sweep}
+    assert profits[result.diffusion_opt_time] == max(profits.values())
+
+
+# --------------------------------------------------------------------------- #
 # End to end + the purification channel contrast
 # --------------------------------------------------------------------------- #
 def test_demo_finish_runs_and_scores_the_grown_wafer(result):

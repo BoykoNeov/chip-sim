@@ -1,6 +1,6 @@
 ---
 name: fab-journey
-description: the staged sand→chip journey front-end — phases 1-5 (purification + crystal growth + slice/cut + S/D diffusion + oxidation) BUILT; the cost-side decision + difficulty + live UI deferred
+description: the staged sand→chip journey front-end — phases 1-5 (purify+grow+cut+diffuse+oxidize) BUILT + phase 6 the COST SIDE (purify+diffuse Goldilocks) BUILT; cut-throughput cost (multi-wafer/roguelike) + difficulty + live UI deferred
 metadata: 
   node_type: memory
   type: project
@@ -136,6 +136,27 @@ tighter window = the margins-compound coupling, not a bug. **Same discriminator 
 too** (advisor nudge — repo closes rather than carries): over-oxide I_Dsat-low names the oxide not series-R, before
 that fingerprint (2 boundary cases stay deferred-latent: fully-dead-thick worst-die on the thinner rim → Scheil;
 thick I_Dsat-high → impossible w/o CD-collapse). **#1 open item still 3 stages** (purify/slice/diffuse — oxidation is the no-economics exception, like growth).
+
+**Phase 6 (the COST SIDE — the Goldilocks half, the #1 open item) BUILT 2026-06-15** — `fab_game.scoring`
+gains `process_cost(recipe)→ProcessCost` (flagged house numbers, economics home) + `score_wafer(process_cost=0.0)`
+add-on (mirrors `rework_cost`); the journey's `finish` is the CONSUMER (threads `.total` in), the **roguelike is
+byte-for-byte unchanged** (passes nothing → default-0 seam). **Turns a one-sided stage (yield only punishes
+UNDER-doing) into a two-sided Goldilocks (cost punishes OVER-doing).** Two stages priced: **refining** ∝
+`zone_passes` (`REFINE_COST_PER_PASS=30`; yield saturates at clean ~1 pass → *stop AT clean, not "until clean"*)
+and **the S/D predep** ∝ the real predep `∫D dt` (E1's quantity via `diffusivity`; `DIFFUSION_BUDGET_COST_PER_CM2=1.14e14`),
+**gated** on `sd_contact_squares>0` (cost + the I_Dsat consumer co-engage). ∫D dt (NOT ad-hoc T·t) so it also
+prices a *hotter* predep (no "raise T for free dose" loophole). Finding: the recipe-default 950°C/10min predep is
+~9× over-dosed for the I_Dsat floor (≈$220) → the cost side REVEALS the textbook default over-diffuses → journey/demo
+operate the cooler ~900°C regime. **THE load-bearing proof (advisor: a cost FIELD on the forecast = display, not
+proof) = net profit non-monotone with an INTERIOR max** `profit(under)<profit(opt)>profit(over)` (refining peaks
+effort 1.0; predep ~5min@900°C) — the economic image of two-sidedness (growth-window analogue). `StageForecast`
+carries `ProcessCost`; `demo_journey` adds the net-profit-vs-lever Goldilocks readout. **THE cut's throughput cost
+DEFERRED (advisor — falsified-then-deferred, NOT fudged):** per-wafer boule amortization depends on how many IN-SPEC
+wafers the boule yields = set by the PULL RATE (CG-1 flattening), NOT where one wafer is cut → inherently MULTI-WAFER
+= the roguelike's domain (`game.py`, n_wafers down one boule); crediting one wafer with boule throughput = the
+"inflate an unrelated variable" shape the repo refuses. `process_cost` lives in `scoring.py` so the roguelike can
+adopt it later without a fork (named divergence from "reuse GameConfig economics": the revenue side IS reused, the
+cost side is journey-only by consumer). Calibration not fragile (yield saturates → any +marginal cost ⇒ interior opt).
 
 **Deferred:** the remaining stages' interactive logic (stages 6–8 + wafer-prep's polish half run at recipe
 defaults today — see the plan's stage table), all difficulty mechanics ("start easy, difficulty later"),

@@ -544,3 +544,76 @@ def test_finish_a_dead_feed_is_a_loss():
     result, sc = finish(JourneyState(grade="solar", effort=0.0))
     assert result.yield_ == 0.0
     assert sc.n_good == 0 and sc.profit < 0.0
+
+
+# --------------------------------------------------------------------------- #
+# The cost side — the Goldilocks half (the fab-journey's #1 open item)
+# --------------------------------------------------------------------------- #
+# Mechanics, not magnitudes (ADR 0005 §5): these assert the *shape* (an interior profit maximum — the
+# yield band penalizes under-doing a stage, the cost penalizes over-doing it) and the seam (the cost is
+# 0 by default / when a stage is not engaged), never the dollar amounts. The interior-maximum tests are
+# the load-bearing analogue of the growth window's two-sidedness — they are what proves the Goldilocks
+# half is actually wired (a cost *field* on the forecast would be display, not proof).
+def _net_profit(state: JourneyState) -> float:
+    """The net profit of the finished journey — revenue − (wafer + process) cost, the Goldilocks payoff."""
+    return finish(state)[1].profit
+
+
+def test_refining_has_an_interior_profit_maximum():
+    """THE policy check (purification's cost side): refining yield SATURATES (the Na ring clears ~1 pass),
+    so past saturation the marginal pass is pure cost → net profit is non-monotone in effort with an
+    **interior** maximum. profit(under) < profit(opt) > profit(over): under-refine → an Na ring eats yield,
+    over-refine → pay for passes that buy no more yield. (The yield-only forecast would call everything
+    from ~1 pass up equally 'clean'; the cost side is what picks the *stopping* point.)"""
+    under = _net_profit(JourneyState(grade="solar", effort=0.75))   # an Na ring — yield not yet saturated
+    opt = _net_profit(JourneyState(grade="solar", effort=1.0))      # just clean — the saturation knee
+    over = _net_profit(JourneyState(grade="solar", effort=2.0))     # clean but over-refined — pure cost
+    assert under < opt > over
+    # The over side is pure cost (yield is saturated, so revenue is identical) — it declines monotonically.
+    assert _net_profit(JourneyState(grade="solar", effort=3.0)) < over
+
+
+def test_predep_dose_has_an_interior_profit_maximum():
+    """THE policy check (the S/D predep's cost side): the dose lowers R_s → lifts I_Dsat until it clears
+    the floor (yield saturates), past which more thermal budget (∫D dt) is pure cost → an **interior**
+    profit maximum in the predep time. profit(under) < profit(opt) > profit(over): under-dose → a high-R_s
+    I_Dsat starve eats yield, over-dose → pay budget for drive the part already has. Swept at the cooler
+    operating regime (900 °C), where the under-dose ring is graded (the recipe-default 950 °C is already
+    over-dosed for the floor — the cost side's lesson)."""
+    base = JourneyState(grade="solar", effort=1.5)                  # a clean feed, so diffusion is the lever
+    under = _net_profit(base.diffuse(predep_C=900.0, predep_min=3.0))   # I_Dsat starved — yield not saturated
+    opt = _net_profit(base.diffuse(predep_C=900.0, predep_min=5.0))     # just clears the floor — the knee
+    over = _net_profit(base.diffuse(predep_C=900.0, predep_min=10.0))   # saturated but over-dosed — pure cost
+    assert under < opt > over
+    assert _net_profit(base.diffuse(predep_C=900.0, predep_min=15.0)) < over   # the over side keeps declining
+
+
+def test_forecast_surfaces_the_cost_side():
+    """The forecast carries the :class:`~fab_game.scoring.ProcessCost` so the player sees *both* halves of
+    the decision before committing — the yield band (under-doing) and the cost (over-doing). The refine
+    cost rises with effort; the diffusion cost is 0 until the stage is engaged (it co-engages with the
+    I_Dsat consumer)."""
+    from fab_game.scoring import ProcessCost
+    f_low = forecast(JourneyState(grade="solar", effort=1.0))
+    f_high = forecast(JourneyState(grade="solar", effort=2.0))
+    assert isinstance(f_low.cost, ProcessCost)
+    assert f_high.cost.refine > f_low.cost.refine                   # more passes cost more
+    assert f_low.cost.diffusion == 0.0                             # diffusion not engaged → no cost yet
+    engaged = forecast(JourneyState(grade="solar", effort=1.0).diffuse(predep_C=900.0, predep_min=5.0))
+    assert engaged.cost.diffusion > 0.0                            # engaging the predep turns its cost on
+
+
+def test_process_cost_is_gated_and_zero_at_the_seam():
+    """The cost model's seam: a recipe that engages no decision pays no process cost (so :func:`score_wafer`
+    with its ``process_cost=0`` default — what the roguelike passes — is the byte-identical baseline)."""
+    from fab_game.recipe import DEFAULT_RECIPE
+    from fab_game.scoring import REFINE_COST_PER_PASS, process_cost
+    # The default recipe has no S/D series-R consumer engaged → diffusion cost is exactly 0 (not the
+    # over-dosed nominal predep's budget — that bites only when the stage is an engaged decision).
+    pc = process_cost(DEFAULT_RECIPE)
+    assert pc.diffusion == 0.0
+    assert pc.refine == REFINE_COST_PER_PASS * DEFAULT_RECIPE.purification.zone_passes
+    assert pc.total == pc.refine + pc.diffusion                    # the breakdown closes
+    # A fresh journey (effort 0, no diffusion) pays nothing — only the passes/dose it chooses cost.
+    fresh = JourneyState(grade="solar", effort=0.0)
+    assert process_cost(fresh.current_recipe).total == 0.0
