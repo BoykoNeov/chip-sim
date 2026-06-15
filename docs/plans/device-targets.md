@@ -117,6 +117,18 @@ Before building any mechanic on top, prove these two — they are what make the 
 **Slice 1 is the zero-new-physics spine** and the only one fully specified here; later slices are
 fill-in-the-blanks once the spine lands and the user reacts to the whole loop.
 
+**Build status (2026-06-15):** Slices **1 and 2 BUILT.** Slice 2 (HV-I/O + cited junction avalanche `BV`,
+`chip/breakdown.py`) landed with a structural correction worth recording: in this **long-channel** device
+model the junction-depth axis does **not** cross fast-logic (a deeper junction is fast-logic-neutral-to-good
+*and* HV-good — the table's "shallow = logic" rationale is the short-channel effect `device.py` omits). The
+reframe (advisor): **`x_j` is not the crossing axis — it is the axis that *decouples* `BV` from `V_t`** (the
+curvature term lets two wafers with identical `V_t` have different `BV`). So the fast-logic↔HV cross rides
+the V_t/oxide axis (HV is the highest-`V_t` flavor, crossing low-power from above), and `BV` is an
+*orthogonal* acceptance floor gated by the diffusion drive-in. `BV` was **derived from first principles**
+(the cited ionization integral over the cylindrical field), not an empirical curvature fit — see
+`memory: avalanche-breakdown-source`. **Slice 3 next** = the substrate-resistivity inversion (turns `BV`'s
+*other* knob, `N_A`, for a genuine high-voltage part).
+
 ### Slice 1 — the spine (zero new physics)
 
 - **`DeviceTarget`** (new, `fab_game/targets.py` or extend `spec.py`): a named target = a `SpecSet` + a
@@ -136,10 +148,10 @@ fill-in-the-blanks once the spine lands and the user reacts to the whole loop.
 
 ## Deferred / open (explicit)
 
-- **Slices 2–5** — specified only at the table granularity above; each built when the spine has landed and
-  the loop has been reacted to (the repo's one-slice-at-a-time discipline).
-- **Cited-source memories** for the new outputs (avalanche BV, reverse recovery, internal gettering) — write
-  them when each slice lands, alongside the model (the repo's `*-source` memory pattern).
+- **Slices 3–5** — specified only at the table granularity above; each built when the spine has landed and
+  the loop has been reacted to (the repo's one-slice-at-a-time discipline). (Slices 1–2 built.)
+- **Cited-source memories** for the new outputs — avalanche BV **written** (`avalanche-breakdown-source`,
+  slice 2); reverse recovery / internal gettering to come with their slices (the repo's `*-source` pattern).
 - **The economics overlap** — `docs/plans/fab-journey.md`'s #1 open item (the per-pass / throughput cost
   side) intersects here: per-target price curves are part of the cost side. Coordinate so the two don't
   diverge.

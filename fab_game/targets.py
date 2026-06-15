@@ -6,20 +6,35 @@ tight low-ish ``V_t``, high drive, thin oxide). This module adds the central DTC
 is a *feature* for another. A high ``V_t`` is slow logic (reject) but a low-leakage low-power part
 (premium); the *same* drifted wafer can be the wrong SKU for one target and the right SKU for its sibling.
 
-This is the **zero-new-physics spine** (slice 1). It adds no device output and no new window *kind* — it
-re-uses the existing :class:`~fab_game.spec.SpecSet` / :class:`~fab_game.spec.SpeedBins` machinery — and the
-only "physics" it touches is **grading**: a finished wafer's already-computed dies are re-scored against a
-different :class:`DeviceTarget`'s windows + bins (:func:`regrade`), never re-fabricated.
+Slice 1 was the **zero-new-physics spine** (``fast-logic`` ↔ ``low-power``): it added no device output, only
+**grading** — a finished wafer's already-computed dies re-scored against a different :class:`DeviceTarget`'s
+windows + bins (:func:`regrade`), never re-fabricated. **Slice 2 adds the ``hv-io`` flavor** and, with it,
+the slice's *one* cited device output — the drain–body junction **avalanche breakdown** ``BV``
+(:mod:`chip.breakdown`, computed in the device step, scored by the new optional ``bv`` spec window). The
+grading machinery here is unchanged; what is new is that one target (HV-I/O) now reads an axis the logic
+flavors leave open.
+
+Why HV-I/O is its own slice (the junction-DEPTH axis — advisor 2026-06-15)
+--------------------------------------------------------------------------
+``BV`` depends on the junction **depth** ``x_j`` (cylindrical-edge field crowding — a shallow junction breaks
+down early) as well as the body doping. Depth is set by the diffusion **drive-in**, and — crucially — it is
+**independent of ``V_t``** (which reads N_A + t_ox, never x_j): two wafers with identical ``V_t`` but
+different drive-in have different ``BV``. So HV-I/O is *not* a relabel of the thick-oxide low-power corner —
+it adds a genuinely orthogonal acceptance axis (the BV floor), gated by a process knob the logic flavors
+never had to care about. (Slice 3 will turn the *other* BV knob — a high-resistivity substrate, ``BV ∝
+N_A^(−3/4)`` — for a genuine high-voltage part; here the BV floor is calibrated to the depth-reachable band
+at the nominal substrate.)
 
 The two-level declaration (the design's backbone, ``docs/plans/device-targets.md`` §"the real-world line")
 ----------------------------------------------------------------------------------------------------------
 1. **Device family** — the mask / structure, **committed up front, never salvaged across.** A logic wafer is
    not a power rectifier; the mask set commits the device from lithography on. (The power-device family is a
    later slice — its own declared run, never a harvest of a logic wafer.)
-2. **Flavor within a family** — ``fast-logic`` ↔ ``low-power`` share a base flow and differ only by where
-   their windows sit. An off-target lot **can** be dispositioned to a sibling flavor (real *engineering
-   disposition* / material-review-board: "use-as-is or re-grade rather than scrap"). This is where
-   "harvest the tail" honestly lives, and it is what :func:`disposition` surfaces.
+2. **Flavor within a family** — ``fast-logic`` ↔ ``low-power`` ↔ ``hv-io`` share a base flow and differ only
+   by where their windows sit (oxide / junction depth — *not* the mask). An off-target lot **can** be
+   dispositioned to a sibling flavor (real *engineering disposition* / material-review-board: "use-as-is or
+   re-grade rather than scrap"). This is where "harvest the tail" honestly lives, and it is what
+   :func:`disposition` surfaces.
 
 :data:`MOSFET_FLAVORS` is that one family's flavor set; re-grading **across** families is *not* offered (it
 is not real). The dollar amounts and the window bands are **flagged house numbers** (ADR 0005 §5) — the
@@ -113,10 +128,56 @@ LOW_POWER = DeviceTarget(
     optimum_hint="thick gate oxide + deeper cut → high V_t, low leakage (the fast-logic reject corner)",
 )
 
+# --------------------------------------------------------------------------- #
+# The HV-I/O flavor (device-targets slice 2) — the junction-DEPTH axis, gated on avalanche breakdown.
+# The third MOSFET flavor: an I/O-tolerant part that must survive a high reverse voltage on its drain–body
+# junction, so it carries a **BV floor** (:func:`chip.breakdown.junction_breakdown`) the logic flavors do
+# not. The slice-2 point (advisor): BV depends on the junction **depth** ``x_j`` (curvature crowding) — a
+# *separate* axis from ``V_t`` (which reads N_A + t_ox, never x_j) — so two wafers with identical ``V_t``
+# (same substrate + oxide) but different drive-in have different BV. That decoupling is why HV-I/O earns its
+# own slice: the diffusion **drive-in** (deeper junction → higher BV), inert for the logic flavors, becomes
+# the lever that makes a part HV-sellable. HV-I/O is the **highest-V_t** flavor (thickest I/O gate oxide),
+# its V_t window crossing low-power's from *above* (un-nesting — advisor): a V_t over low-power's ceiling is
+# HV-good / low-power-reject, a thinner-oxide low-power part is low-power-good / HV-reject (V_t too low),
+# and — the new axis — a shallow-junction part is HV-reject on BV whatever its V_t. The BV floor (6 V) sits
+# in the drive-in-reachable band at the nominal ~1e17 substrate (a shallow junction ≈ 5 V, a deep one ≈ 7 V);
+# a genuine high-voltage part needs the lighter substrate of slice 3 (BV ∝ N_A^(−3/4)). All bands/prices
+# FLAGGED — only the crossing + the BV-decoupling carry meaning.
+# --------------------------------------------------------------------------- #
+HV_IO_BV_FLOOR_V = 6.0              # FLAGGED house BV floor: above a shallow-junction part (~5 V at 1e17),
+#                                    below a deep-junction one (~7 V) → a deliberate deep drive-in clears it
+HV_IO_BINS = SpeedBins(bins=(       # HV runs at low drive (thick oxide); binned by I_Dsat like the others,
+    SpeedBin("premium", lo_mA=2.35),                # positioned at the thick-oxide HV operating current
+    SpeedBin("typical", lo_mA=2.10, hi_mA=2.35),
+    SpeedBin("value", lo_mA=1.50, hi_mA=2.10),      # slow but sellable (down to the HV I_Dsat floor)
+))
+HV_IO_PRICES: dict[str, float] = {  # FLAGGED — STRICTLY ABOVE low-power at every bin: an I/O-tolerant part
+    "premium": 14.0,                # commands a premium, so when a deep junction makes HV *available* it
+    "typical": 10.0,               # out-revenues low-power on the SAME wafer → the gate-2 optimum flips to HV
+    "value": 5.0,
+    "reject": 0.0,
+}
+HV_IO = DeviceTarget(
+    name="hv-io",
+    specs=replace(
+        DEFAULT_SPECS,
+        v_t=SpecWindow("V_t (V)", lo=0.72, hi=1.10),         # highest-V_t flavor; crosses low-power [0.60,0.85]
+        #                                                      from above (overlap [0.72,0.85]; disjoint from
+        #                                                      fast-logic's [0.45,0.68])
+        i_dsat_mA=SpecWindow("I_Dsat (mA)", lo=1.5, hi=4.2),  # low drive is fine (an I/O part, not a fast one)
+        bv=SpecWindow("BV (V)", lo=HV_IO_BV_FLOOR_V, optional=True),  # THE new axis: the avalanche-breakdown
+        #                                                              floor (optional → a die never scored
+        #                                                              for BV is skipped, like leakage)
+        speed_bins=HV_IO_BINS,
+    ),
+    prices=HV_IO_PRICES,
+    optimum_hint="thick I/O gate oxide (high V_t) + DEEP S/D junction (long drive-in → high breakdown voltage)",
+)
+
 # The MOSFET family's dispositionable flavor set (fast-logic declared by default, the incumbent first). A
 # lot may re-grade between these (same mask); it may NOT re-grade to a different *family* (a power
 # rectifier) — that is a later slice's own declared run, never a harvest of a logic wafer.
-MOSFET_FLAVORS: tuple[DeviceTarget, ...] = (FAST_LOGIC, LOW_POWER)
+MOSFET_FLAVORS: tuple[DeviceTarget, ...] = (FAST_LOGIC, LOW_POWER, HV_IO)
 
 
 # --------------------------------------------------------------------------- #

@@ -1,6 +1,6 @@
 ---
 name: device-targets-plan
-description: "\"good is relative\" multi-target specs — SLICE 1 BUILT (fab_game/targets.py: DeviceTarget + FAST_LOGIC/LOW_POWER + regrade/disposition); 2-level declaration; 5-slice staging, S2–S5 still planned"
+description: "\"good is relative\" multi-target specs — SLICES 1+2 BUILT (targets.py: DeviceTarget + FAST_LOGIC/LOW_POWER/HV_IO + regrade/disposition; S2 adds cited junction avalanche BV in chip/breakdown.py); 2-level declaration; 5-slice staging, S3–S5 planned"
 metadata: 
   node_type: memory
   type: project
@@ -33,6 +33,27 @@ not an argmax — argmax ties on the overlap); deep-cut z=0.85 → V_t 0.71 (FL-
 band against `DEFAULT_SPECS` (coarse "did it bite" guide, not a SKU verdict) — a target-aware forecast is a
 later UI slice; `finish` already scores the real wafer against the declared target. 331 fab_game tests green
 (2 PRE-EXISTING gallery-HTML staleness failures from the phase-5 commit, NOT mine).
+
+**SLICE 2 (HV-I/O flavor + cited avalanche BV) BUILT 2026-06-15 — `chip/breakdown.py` +
+`fab_game/targets.py` (`HV_IO`) + `tests/test_breakdown.py`, `tests/test_targets_hv.py`.** The cited
+device output `x_j` finally feeds: drain–body junction **avalanche breakdown** `BV` — see
+[[avalanche-breakdown-source]]. **THE structural finding (advisor):** the long-channel model makes the
+junction-depth axis *align*, NOT cross fast-logic (deeper x_j is fast-logic-neutral-to-good AND HV-good —
+the plan's "shallow=logic" reason is the short-channel effect `device.py` omits). The reframe that
+dissolves it: **`x_j` is not the crossing axis — it's the axis that DECOUPLES BV from `V_t`** (the curvature
+term lets two wafers with identical `V_t` have different BV). So the fast-logic↔HV cross rides V_t/oxide
+(HV = the highest-V_t flavor, `V_t∈[0.72,1.10]` crossing low-power's `[0.60,0.85]` from ABOVE → un-nested),
+and BV is an orthogonal floor (`6.0V`, FLAGGED) gated by the diffusion **drive-in**. **Physics built from
+first principles** (NOT a remembered fit — the advisor's exact trap): a remembered Baliga ln-form fit the
+Sze anchor but DIVERGED unphysically at large r_j/W, so BV is DERIVED from the cited ionization integral
+`∫α dr=1` (`α=1.8e-35·E^7`) over the cylindrical depletion field → reproduces Sze's 0.24 curvature ratio to
+~1% AND Baliga's `BV_pp=5.34e13·N^-3/4` — zero remembered-exponent risk. BV is **uniform per wafer** (x_j/N_A
+wafer-level → no ring/core, a clean whole-wafer axis). Seam: BV output + `bv` spec window are OPTIONAL+OPEN
+for the logic flavors → byte-for-byte (mirrors `leakage`); HV prices STRICTLY > low-power so a deep junction
+flips the best SKU LP→HV (physics gates availability, price ranks). The 2 gates re-proven on the drive-in
+axis (BV decouples from V_t at fixed oxide; deep drive-in flips the optimum). Full suite green (the chip
+notebook is the known [[chip-notebook-flake]], unrelated). **S3 next** = substrate-resistivity inversion at
+growth (turns BV's OTHER knob, `N_A`, for a genuine HV part).
 
 **Already graded (don't reinvent):** yield is continuous, and **speed binning** (`SpeedBins` in
 `spec.py`, priced in `scoring.py`) already IS "functional-but-suboptimal" (the bin-out = a working

@@ -141,9 +141,11 @@ class SpecSet:
     gate — it fails every die. Otherwise the parametric chain: the defocus chain rides **NILS** (the
     printability floor) and **CD/I_Dsat** (the channel-length chain); ``V_t`` rides the
     ``t_ox``/``N_A`` channel (the device's own scope edge keeps ``V_t`` off the channel-length chain);
-    and (G4b) **leakage** rides the deep-level-metal channel — the junction reverse-leakage that a
+    (G4b) **leakage** rides the deep-level-metal channel — the junction reverse-leakage that a
     metal contaminant raises (the device output net doping cannot carry), an *optional* window so a
-    die not scored for leakage is simply not binned on it.
+    die not scored for leakage is simply not binned on it; and (slice 2) **BV** the junction avalanche
+    **breakdown** — set by the body doping and the S/D junction **depth** (a shallow junction crowds the
+    field → low BV), another *optional* window so only a target with a BV floor (HV-I/O) bins on it.
     """
 
     cd_nm: SpecWindow
@@ -152,6 +154,12 @@ class SpecSet:
     nils: SpecWindow
     leakage: SpecWindow = field(
         default_factory=lambda: SpecWindow("leakage (nA/cm²)", hi=10.0, optional=True))
+    bv: SpecWindow = field(
+        default_factory=lambda: SpecWindow("BV (V)", optional=True))   # slice-2 junction breakdown — OPEN
+    #                                                                    by default (no floor) → only the
+    #                                                                    HV-I/O target dials in a BV floor;
+    #                                                                    fast-logic/low-power leave it open
+    #                                                                    so a die not scored on BV is unbinned
     geometry: GeometrySpec = field(default_factory=GeometrySpec)
     speed_bins: SpeedBins = field(default_factory=SpeedBins)   # G6 final-test binning (default: one open bin)
     require_resolved: bool = True
@@ -182,6 +190,7 @@ class SpecSet:
                 self.i_dsat_mA.check(die.i_dsat_mA),
                 self.v_t.check(die.V_t),
                 self.leakage.check(die.j_leak_nA_cm2),     # G4b — deep-level-metal junction leakage (optional)
+                self.bv.check(die.bv_V),                   # slice 2 — junction avalanche breakdown (optional)
             ) if r is not None
         ]
         return Verdict(passed=not reasons, reasons=tuple(reasons))

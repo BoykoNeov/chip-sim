@@ -111,6 +111,7 @@ class Die:
     i_dsat: float | None = None
     tau: float | None = None                    # minority-carrier SRH lifetime (s) — deep-level metals (G4b)
     j_leak: float | None = None                 # junction reverse-leakage density (A/cm²) — the metal killer (G4b)
+    bv_V: float | None = None                   # drain–body junction avalanche breakdown (V) — set by the device step (slice 2)
     defects: tuple[DefectEvent, ...] = ()       # killer particles caught at wafer prep (G3)
     killed_by_defect: bool | None = None        # set by wafer prep; True ⇒ a functional fail
     voided: bool | None = None                  # set by etch/depo (G5); True ⇒ a depo void → functional fail

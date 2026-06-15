@@ -17,6 +17,9 @@ The seam: at the nominal recipe with the identity perturbation, every call reduc
 """
 from __future__ import annotations
 
+import math
+
+from chip import breakdown as bd
 from chip import diffusion_dopant as dd
 from chip import etch_deposition as ed
 from chip import oxidation as ox
@@ -265,7 +268,17 @@ def device_step(
     It **never** touches ``V_t`` (series resistance degrades drive, not threshold). Defaults to ``0.0`` →
     ``R_series = 0`` → the ideal-contact closed form, byte-for-byte the prior ``I_Dsat`` (the seam; the
     ``R_series_ohm`` record key is added only when engaged, so a clean device record is unchanged).
-    """
+
+    **Junction avalanche breakdown (slice 2)** — the drain–body junction's reverse breakdown ``BV``
+    (:func:`chip.breakdown.junction_breakdown`), read off the body doping ``channel_N_A`` (the lighter-doped
+    side) and the **inherited** S/D junction depth ``die.x_j_um`` (the curvature radius). It is the consumer
+    that finally makes the diffusion **depth** a device number (``x_j`` fed nothing scored before): a shallow
+    junction crowds the field at its cylindrical edge → a **low** ``BV``, a deeper one relaxes toward the
+    plane-parallel ceiling. ``BV`` is a *purely additive* output — like the leakage it **never moves**
+    ``V_t``/``I_Dsat``, and it is scored only by the HV-I/O target's optional ``bv`` window (fast-logic /
+    low-power leave it open), so the seam and the G1–G7 banked demos are byte-for-byte unchanged (the
+    ``bv_V`` field/record key is set only when the junction was resolved upstream; a die with no ``x_j`` —
+    a bare/hand-built die — carries ``bv_V = None`` and no key)."""
     if die.t_ox_um is None or die.cd_um is None or die.resolved is False:
         reason = ("litho image not resolved" if die.resolved is False
                   else "missing upstream t_ox/CD")
@@ -288,6 +301,13 @@ def device_step(
     # deep-level metals (G4b) and a slow-pull grown-in dislocation population (A1, ξ < ξ_t) — both add to
     # 1/τ; clean feed grown on the vacancy side ⇒ τ_bulk + baseline (the seam, dislocation_density = 0).
     leak = life.device_leakage(contamination, channel_N_A, dislocation_density=dislocation_density)
+    # Junction avalanche breakdown (slice 2): the drain–body BV off the body doping + the inherited S/D
+    # junction depth. Only when the junction was **resolved** upstream — a bare die (x_j None) OR an
+    # unresolved junction (x_j nan, when the profile never crosses N_B) carries bv_V = None (the gap-vs-zero
+    # distinction; nan must be screened too — it slips past breakdown's r_j>0 guard). Purely additive: never
+    # moves V_t/I_Dsat.
+    bv_V = (bd.junction_breakdown(channel_N_A, die.x_j_um).bv
+            if die.x_j_um is not None and math.isfinite(die.x_j_um) else None)
     knobs_in = {"gate": knobs.gate, "width_um": knobs.width_um, "overdrive_V": knobs.overdrive_V,
                 "Q_ox": Q_ox, "N_A": channel_N_A}
     if thermal_donor_density > 0.0:                          # C1 fingerprint — only when donors are present
@@ -296,12 +316,15 @@ def device_step(
         knobs_in["rho_disl"] = dislocation_density           # (so a vacancy/clean device record is byte-unchanged)
     if R_series_ohm > 0.0:                                   # diffusion fingerprint — only when the consumer is on
         knobs_in["R_series_ohm"] = R_series_ohm              # (so an ideal-contact device record is byte-unchanged)
+    outputs = {"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox,
+               "tau_us": leak.tau_us, "j_leak_nA_cm2": leak.j_leak_nA_cm2}
+    if bv_V is not None:                                     # slice-2 BV — only when the junction was resolved
+        outputs["bv_V"] = bv_V                              # (so a no-x_j device record is byte-unchanged)
     return die.record(
         "device",
         knobs_in=knobs_in,
-        outputs={"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox,
-                 "tau_us": leak.tau_us, "j_leak_nA_cm2": leak.j_leak_nA_cm2},
-        V_t=mos.V_t, i_dsat=i_dsat, tau=leak.tau, j_leak=leak.j_leak,
+        outputs=outputs,
+        V_t=mos.V_t, i_dsat=i_dsat, tau=leak.tau, j_leak=leak.j_leak, bv_V=bv_V,
     )
 
 
