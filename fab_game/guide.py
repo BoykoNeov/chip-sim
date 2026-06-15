@@ -123,7 +123,10 @@ _READOUTS: tuple[Term, ...] = (
         "the reverse current the off transistor's diode leaks",
         "Deep-level metal contamination (Fe/Cu) drops the carrier lifetime τ (Shockley–Read–Hall) and "
         "lifts the generation leakage J ∝ N_metal/τ — a failure V_t CANNOT see (a clean-V_t part can "
-        "still be scrapped on a leaky diode). The device consequence net doping can't carry.",
+        "still be scrapped on a leaky diode). The device consequence net doping can't carry. Two cures: "
+        "purify harder (more zone passes), or INTERNAL GETTERING — crucible oxygen precipitates trap the "
+        "metals out of the device region. But that same oxygen makes thermal donors that pull V_t DOWN, "
+        "so gettering a leaky feed is a trade-off, not a free win (one knob, two opposite faces).",
     ),
     Term(
         "bins", "Speed bins (premium / typical / value)",

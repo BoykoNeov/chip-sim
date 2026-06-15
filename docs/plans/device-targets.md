@@ -111,7 +111,7 @@ Before building any mechanic on top, prove these two — they are what make the 
 | **1** | `DeviceTarget` abstraction + up-front declaration + disposition readout | **none** | the spine — built on the *proven* logic↔low-power `V_t`/`t_ox` crossing |
 | **2** | HV-I/O flavor + cited junction **avalanche breakdown** output | one cited output | the junction-depth axis (diffusion step) |
 | **3** ✅ | substrate-**resistivity** inversion at the growth step | **none** (reads existing `N_A` + BV) | the high-res **native** part (low V_t = feature, high BV) |
-| **4** | the oxygen **dual-use** trade-off (donors-bad vs gettering-good) | a gettering / lifetime-robustness output | the *process-trade-off* lesson, kept distinct from segmentation |
+| **4** ✅ | the oxygen **dual-use** trade-off (donors-bad vs gettering-good) | one cited output (internal-gettering efficiency) | the *process-trade-off* lesson, kept distinct from segmentation |
 | **5** | the **power-rectifier family** — own declared run, lifetime-killer-as-feature | cited `t_rr ∝ τ` reverse-recovery | the richest inversion, last |
 
 **Slice 1 is the zero-new-physics spine** and the only one fully specified here; later slices are
@@ -158,8 +158,40 @@ implant (LDMOS) — in the as-built model an implant lifts `V_t` but never `I_Ds
 window is **required** (not optional like HV-I/O's): breakdown is the SKU's defining property and the native
 low-`V_t` window does not independently reject a die with no `BV` reading (advisor's catch — the mirror of
 S2's nan-guard). 353 fab_game tests green.
-**Slice 4 next** = the oxygen dual-use (donors-bad vs internal-gettering-good *within one device* — the
-process-trade-off lesson, kept distinct from segmentation).
+**Slice 4 (the oxygen dual-use) BUILT 2026-06-15 — `chip/czochralski.py §1h`
+(`internal_gettering_efficiency`) + `chip/purification.py` (`getter_metals` + the `trace-metal` feed
+grade) + `fab_game` wiring (`CzochralskiKnobs.forming_gas_anneal_min` / `.internal_gettering_efficiency`;
+`device_step` `gettering_efficiency`) + `demo_internal_gettering.py` (`fab-game-s4.png`) + tests.** The
+*process-trade-off* slice (NOT segmentation — no new SKU, no `targets.py` change). The same crucible
+oxygen has **two opposite faces on one device**: its liability (C1 thermal donors → `V_t` down) and its
+asset (bulk oxygen **precipitates getter** the deep-level metals Fe/Cu out of the device region →
+leakage down — internal gettering, **cited Tan–Gardner–Tice PRL 64, 196, 1990**, see
+[[internal-gettering-source]]). **The gate (advisor: BLOCKS — run the `[O_i]` sweep before any module):
+an interior optimum exists on `[O_i]`** — a `trace-metal` feed (moderate Fe/Cu, base leak 36 nA/cm²)
+swept against the leakage (≤10) and `V_t` (≥0.45) windows gives a clean **two-sided Goldilocks**: low O
+→ un-gettered metals → leakage-fail; high O → donors → `V_t`-fail; **9e17–1.1e18 passes both**
+(leak-fail *just below*, `V_t`-fail *just above*, verified). **Two advisor structural calls, both
+honored:** (1) **B over A** — IG is the tool for *moderate* contamination (a 10× feed is one IG can't
+save → that's a purification pass, a different lesson), so the demo feed is the nameable `0.4×metal`
+vector and `O_crit` stays at the **cited** ~12 ppma ≈ 6e17 cm⁻³ (ppma↔cm⁻³ = 5e16/ppma atomic
+fraction), efficiency magnitude **flagged**; (2) **the trade-off lives on the `[O_i]` LEVEL, not the
+anneal** (high-T precipitation consumes the O that forms donors → on the anneal axis the effects move
+*together*, win-win, skippable) — so the donor cost is anchored to the **universal final
+forming-gas/sinter (~450 °C, <550 °C TD window, web-verified)** via a new `forming_gas_anneal_min` field
+(**defaults 0 → the C1 seam byte-for-byte**, summed into the effective donor anneal), making the donor
+budget **non-skippable** without touching `chip.czochralski.thermal_donor_density`. **Orthogonal
+channels (advisor double-count guard):** gettering touches **Fe/Cu only** (`getter_metals`, never
+Na/`Q_ox`/`V_t`), applied **once** in `device_step`'s leak read → `V_t` byte-for-byte under pure
+gettering (proven: leak 36.4→1.83 with `V_t` bit-identical). **EMERGENT FINDING (kept, named, not a
+fudge):** wiring leakage honestly off `effective_channel_N_A` surfaces a real **donor→N_A→depletion-width
+coupling** (`W∝1/√N_A` → `J∝W`) — so below the gettering threshold oxygen makes the diode marginally
+leakier, and past the cap leakage U-turns up; **both lie deep in already-failed territory** (the
+verdict-relevant leakage is monotone), so the window/lesson are untouched — it is *not* the deferred
+over-precipitation U-shape. **Master seam: no `[O_i]` ⇒ no gettering AND no donors ⇒ G1–G7 byte-for-byte.**
+**DEFERRED named edges:** residual-`[O_i]` partitioning (precipitation consumes the donor oxygen — full
+`[O_i]` to both faces overstates each at high O, direction holding), per-metal selectivity (Fe vs Cu),
+the over-precipitation / denuded-zone-collapse U-shape. Full chip + fab_game suites green.
+**Slice 5 next** = the power-rectifier family (own declared run, cited reverse-recovery `t_rr ∝ τ`).
 
 ### Slice 1 — the spine (zero new physics)
 
@@ -180,8 +212,8 @@ process-trade-off lesson, kept distinct from segmentation).
 
 ## Deferred / open (explicit)
 
-- **Slices 4–5** — specified only at the table granularity above; each built when the spine has landed and
-  the loop has been reacted to (the repo's one-slice-at-a-time discipline). (Slices 1–3 built.)
+- **Slice 5** — specified only at the table granularity above; built when the loop has been reacted to
+  (the repo's one-slice-at-a-time discipline). (Slices 1–4 built.)
 - **High-V_t HV on a light substrate via a channel/drift threshold-adjust implant (LDMOS)** — the
   ambitious S3 alternative, **deferred** (a named edge). In the as-built single-doping model an implant
   lifts `V_t` but not `I_Dsat`, so high-res+implant would *strictly dominate* logic and the "good is
@@ -189,7 +221,8 @@ process-trade-off lesson, kept distinct from segmentation).
   to restore a trade S3's *native* part gets for free) — past a slice's natural size. Filed with the repo's
   other build-the-honest-smaller-thing deferrals (A2 Robin-G, E1 heat-mode, CG-3 transient).
 - **Cited-source memories** for the new outputs — avalanche BV **written** (`avalanche-breakdown-source`,
-  slice 2); reverse recovery / internal gettering to come with their slices (the repo's `*-source` pattern).
+  slice 2); internal gettering **written** (`internal-gettering-source`, slice 4); reverse recovery to
+  come with slice 5 (the repo's `*-source` pattern).
 - **The economics overlap** — `docs/plans/fab-journey.md`'s #1 open item (the per-pass / throughput cost
   side) intersects here: per-target price curves are part of the cost side. Coordinate so the two don't
   diverge.

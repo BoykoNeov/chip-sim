@@ -27,7 +27,7 @@ from chip import litho
 from chip import device as dev
 from chip import lifetime as life
 from chip.junction import analyze_junction
-from chip.purification import Contamination, sodium_oxide_charge
+from chip.purification import Contamination, getter_metals, sodium_oxide_charge
 from chip.wafer_prep import WaferGeometry
 
 from .recipe import (
@@ -227,7 +227,7 @@ def etch_deposition_step(
 def device_step(
     die: Die, knobs: DeviceKnobs, channel_N_A: float, contamination: Contamination | None = None,
     thermal_donor_density: float = 0.0, dislocation_density: float = 0.0,
-    sd_contact_squares: float = 0.0,
+    sd_contact_squares: float = 0.0, gettering_efficiency: float = 0.0,
 ) -> Die:
     """Device extraction → ``V_t``, ``I_Dsat`` *and* lifetime/leakage, *reading the inherited* ``t_ox``, ``cd``, *contamination*.
 
@@ -259,6 +259,15 @@ def device_step(
     them, **never moves** ``V_t``/``I_Dsat`` — slow pull makes the diode leaky, not the threshold wrong.
     Defaults to ``0.0`` (vacancy/boundary growth or CG-2 off → the seam; the ``rho_disl`` record key is
     added only when dislocations are present, so a vacancy/clean device record is byte-for-byte unchanged).
+
+    ``gettering_efficiency`` (S4) is the fraction of the wafer's deep-level metals (Fe/Cu) trapped onto
+    bulk **oxygen precipitates** out of the device region (:attr:`CzochralskiKnobs.internal_gettering_efficiency`
+    from the incorporated ``[O_i]``). It is applied — via :func:`chip.purification.getter_metals` — **only**
+    to the contamination the *leakage* read sees, never to the ``Na``/``Q_ox``/``V_t`` path, so engaging
+    oxygen lowers leakage while its thermal-donor twin (``thermal_donor_density``, the *same* ``[O_i]``)
+    lowers ``V_t`` — the dual-use trade-off on orthogonal channels. Defaults to ``0.0`` (oxygen off or
+    below the precipitation threshold → the metals are unchanged → the G4b leakage is byte-for-byte; the
+    ``getter_eff`` record key is added only when engaged, so a no-oxygen device record is unchanged).
 
     ``sd_contact_squares`` (the diffusion-journey consumer) is the S/D series-resistance geometry
     ``n_□ = L_access/W``: combined with the **inherited** junction sheet resistance ``die.R_s`` (set by the
@@ -300,7 +309,12 @@ def device_step(
     # G4b/A1: the SRH lifetime → junction reverse leakage. Two contributors on the same channel — the
     # deep-level metals (G4b) and a slow-pull grown-in dislocation population (A1, ξ < ξ_t) — both add to
     # 1/τ; clean feed grown on the vacancy side ⇒ τ_bulk + baseline (the seam, dislocation_density = 0).
-    leak = life.device_leakage(contamination, channel_N_A, dislocation_density=dislocation_density)
+    # S4 internal gettering: crucible-oxygen precipitates trap the deep-level metals (Fe/Cu) out of the
+    # device region BEFORE the leakage read — applied only here (never to the Na→Q_ox→V_t chain above), so
+    # oxygen lowers leakage WITHOUT moving V_t. efficiency=0 (oxygen off / below the precipitation
+    # threshold) returns the metals unchanged → the G4b leakage is byte-for-byte.
+    gettered = getter_metals(contamination, gettering_efficiency) if contamination is not None else None
+    leak = life.device_leakage(gettered, channel_N_A, dislocation_density=dislocation_density)
     # Junction avalanche breakdown (slice 2): the drain–body BV off the body doping + the inherited S/D
     # junction depth. Only when the junction was **resolved** upstream — a bare die (x_j None) OR an
     # unresolved junction (x_j nan, when the profile never crosses N_B) carries bv_V = None (the gap-vs-zero
@@ -314,6 +328,8 @@ def device_step(
         knobs_in["N_TD"] = thermal_donor_density            # (so a clean device record is byte-unchanged)
     if dislocation_density > 0.0:                            # A1 fingerprint — only on the interstitial side
         knobs_in["rho_disl"] = dislocation_density           # (so a vacancy/clean device record is byte-unchanged)
+    if gettering_efficiency > 0.0:                           # S4 fingerprint — only when oxygen getters the metals
+        knobs_in["getter_eff"] = gettering_efficiency        # (so a no-oxygen device record is byte-unchanged)
     if R_series_ohm > 0.0:                                   # diffusion fingerprint — only when the consumer is on
         knobs_in["R_series_ohm"] = R_series_ohm              # (so an ideal-contact device record is byte-unchanged)
     outputs = {"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox,

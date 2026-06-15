@@ -132,6 +132,16 @@ class CzochralskiKnobs:
     Subtracted from the net doping by :attr:`Recipe.effective_channel_N_A`; over-compensation
     (``N_TD ≥ N_A`` → type inversion) is a guarded named edge (it raises — keep the oxygen/anneal in the
     p-type range).
+
+    ``forming_gas_anneal_min`` (S4) is the **dual-use** counterpart: the same incorporated ``[O_i]`` that
+    costs ``V_t`` (donors) also **getters** the deep-level metals (:attr:`internal_gettering_efficiency`
+    → :func:`chip.purification.getter_metals`, the leakage channel), so more oxygen is *good for the
+    diode, bad for the threshold*. To keep the donor cost non-skippable (you cannot getter for free), the
+    universal final ~450 °C **forming-gas/sinter** — which sits in the thermal-donor window — adds its
+    time to the donor budget: the effective donor anneal is ``thermal_donor_anneal_min +
+    forming_gas_anneal_min``. It defaults to ``0`` so every pre-S4 recipe is byte-for-byte (the C1 seam
+    untouched); the gettering wiring sets it (~30 min) when oxygen is engaged. Gettering itself touches
+    **Fe/Cu only** — never the Na→``Q_ox``→``V_t`` chain — so the two oxygen channels stay orthogonal.
     """
 
     dopant: str = "B"                  # p-type boron substrate
@@ -143,6 +153,7 @@ class CzochralskiKnobs:
     radial_gradient_boost: float | None = None      # A2 OSF ring: G(r)=G_center·(1+boost·r²); None = uniform (CG-2 seam)
     oxygen_conc_cm3: float | None = None   # C1 incorporated [O_i] (cm⁻³); None = oxygen-free (the seam)
     thermal_donor_anneal_min: float = 0.0  # C1 ~450 °C donor-anneal time (min); 0 = no anneal (the seam)
+    forming_gas_anneal_min: float = 0.0    # S4 universal final ~450 °C sinter (min); 0 = off (C1 seam, by default)
     length_mm: float = 200.0           # boule length (narrative geometry only)
     diameter_mm: float = 200.0         # boule diameter (narrative geometry only)
 
@@ -359,16 +370,36 @@ class CzochralskiKnobs:
     def thermal_donor_density(self) -> float:
         """The C1 active thermal-donor density (cm⁻³) compensating the substrate — **0.0 off (the seam)**.
 
-        ``0.0`` when ``oxygen_conc_cm3`` is ``None`` (no incorporated oxygen) **or**
-        ``thermal_donor_anneal_min`` is ``0`` (no ~450 °C anneal) — donors form at the anneal, not during
-        growth, so a boule with oxygen but no donor anneal is the unchanged substrate. Otherwise the
-        cited-fourth-power / flagged-saturation :func:`chip.czochralski.thermal_donor_density` at this
-        ``([O_i], t)`` — subtracted from the net doping by :attr:`Recipe.effective_channel_N_A`.
+        ``0.0`` when ``oxygen_conc_cm3`` is ``None`` (no incorporated oxygen) **or** the **effective
+        donor anneal** ``thermal_donor_anneal_min + forming_gas_anneal_min`` is ``0`` (no ~450 °C
+        excursion) — donors form at the anneal, not during growth, so a boule with oxygen but no anneal
+        of either kind is the unchanged substrate (both default to ``0`` → the C1 seam byte-for-byte).
+        Otherwise the cited-fourth-power / flagged-saturation :func:`chip.czochralski.thermal_donor_density`
+        at this ``([O_i], t_eff)`` — the S4 forming-gas/sinter adds its time so engaging oxygen carries an
+        unavoidable donor budget — subtracted from the net doping by :attr:`Recipe.effective_channel_N_A`.
         """
         if self.oxygen_conc_cm3 is None:
             return 0.0
         from chip.czochralski import thermal_donor_density
-        return thermal_donor_density(self.oxygen_conc_cm3, self.thermal_donor_anneal_min)
+        return thermal_donor_density(
+            self.oxygen_conc_cm3, self.thermal_donor_anneal_min + self.forming_gas_anneal_min)
+
+    @property
+    def internal_gettering_efficiency(self) -> float:
+        """The S4 oxygen-precipitate internal-gettering efficiency — fraction of Fe/Cu removed, **0.0 off**.
+
+        ``0.0`` when ``oxygen_conc_cm3`` is ``None`` (no oxygen) **or** the ``[O_i]`` is below the cited
+        precipitation threshold (~12 ppma ≈ 6e17 cm⁻³) — the wafer does not precipitate enough to getter
+        (the seam: :func:`chip.purification.getter_metals` then leaves the Fe/Cu untouched → the G4b
+        leakage is byte-for-byte). Otherwise the flagged-magnitude
+        :func:`chip.czochralski.internal_gettering_efficiency` at this ``[O_i]`` — consumed in the device
+        step by gettering the wafer's deep-level metals before the leakage read (Fe/Cu only, never
+        ``Na``/``V_t``). The dual-use mirror of :attr:`thermal_donor_density`.
+        """
+        if self.oxygen_conc_cm3 is None:
+            return 0.0
+        from chip.czochralski import internal_gettering_efficiency
+        return internal_gettering_efficiency(self.oxygen_conc_cm3)
 
 
 @dataclass(frozen=True)

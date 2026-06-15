@@ -136,7 +136,22 @@ Named scope edge (the honest ceiling)
   trade-off. Tight = the ``ξ_t`` flip (by-construction guard, not an anchor); flagged = the density
   coefficient here **and** the lifetime ``K`` (only their product sets the leakage depth). **No engine,
   no conservation law** (CG-2's tier). Off by default (``ξ ≥ ξ_t`` or CG-2 off ⇒ ``ρ_disl = 0`` ⇒ the
-  seam). **Still deferred:** the dislocation→``τ`` *magnitude* (flagged), high-injection, gettering.
+  seam). **Still deferred:** the dislocation→``τ`` *magnitude* (flagged), high-injection.
+* **Internal gettering — oxygen's BENEFICIAL face — now BUILT (S4, opt-in), the dual-use deepening.**
+  §1e gave crucible oxygen its liability face (donors → ``V_t`` drift); §1h gives it its asset face
+  (:func:`internal_gettering_efficiency`): bulk oxygen **precipitates** trap fast-diffusing transition
+  metals (Fe/Cu) out of the device region — internal gettering (Tan–Gardner–Tice, **Phys. Rev. Lett.
+  64, 196, 1990**) — so the same ``[O_i]`` that costs threshold *buys back* lifetime/leakage. The one
+  cited claim is the **precipitation threshold** (gettering needs ``[O_i]`` above ~12 ppma ≈ 6e17 cm⁻³,
+  the IG window's lower edge); the removed-fraction ramp and its <1 ceiling are flagged house numbers.
+  Consumed by reducing the wafer Fe/Cu (:func:`chip.purification.getter_metals`, Fe/Cu only — never the
+  Na/``Q_ox``/``V_t`` chain) before the :mod:`chip.lifetime` leakage read, so the donor and gettering
+  channels stay **orthogonal** (oxygen up ⇒ ``V_t`` down via §1e *and* leakage down via §1h — the
+  trade-off, not one optimum). Off by default (no ``[O_i]`` or below the threshold ⇒ efficiency ``0``
+  exact ⇒ G4b bit-for-bit). **Still deferred:** the residual-``[O_i]`` partitioning (precipitation
+  consumes the oxygen that would form donors — feeding the full ``[O_i]`` to both faces overstates each
+  at high oxygen, the direction holding), per-metal selectivity (Fe vs Cu), and the over-precipitation
+  / denuded-zone-collapse U-shape at very high ``[O_i]``.
 * **Full dopant activation at 300 K** (inherited from the Masetti/junction resistivity model): the
   electrically-active concentration is taken equal to the chemical one — fine at the substrate
   ``~1e15–1e17`` here; the active-vs-chemical edge is the repo's standing ceiling.
@@ -806,6 +821,77 @@ def dislocation_defect_density(
         raise ValueError(f"coefficient must be ≥ 0, got {coefficient}")
     deficit = critical_ratio - ratio
     return coefficient * deficit if deficit > 0.0 else 0.0
+
+
+# --------------------------------------------------------------------------- #
+# 1h. Internal gettering — crucible oxygen's BENEFICIAL face: precipitates trap deep-level metals (S4)
+# --------------------------------------------------------------------------- #
+# §1e gave crucible oxygen its *liability* face: the ~450 °C thermal donors that compensate the
+# substrate (a V_t drift). This is its *asset* face — the **dual-use** of the same incorporated [O_i].
+# At the flow's high-T steps oxygen precipitates (SiO_x platelets/clusters) nucleate in the bulk, and
+# those precipitates + their punched-out dislocations are **sinks for fast-diffusing transition metals**
+# (Fe, Cu): the metals segregate to the bulk precipitate band and out of the near-surface device region
+# — **internal (intrinsic) gettering** (Tan–Gardner–Tice; the mechanism, Phys. Rev. Lett. 64, 196,
+# 1990). So the SAME oxygen that costs V_t (donors) *buys* lifetime/leakage back (gettering): more [O_i]
+# is good for the diode and bad for the threshold — the lesson is the trade-off, not a single optimum.
+#
+# THE ONE CITED DIRECTION (load-bearing, web-verified — flag the magnitude, like §1e's KFR):
+# gettering REQUIRES oxygen precipitation, and precipitation switches on only **above a critical
+# supersaturation** — a wafer below ~12 ppma of interstitial oxygen does not precipitate enough to
+# getter (the well-known IG [O_i] window; below it the denuded layer never forms a bulk sink). The
+# threshold is the citation; the removed-fraction-vs-[O_i] curve and its cap are FLAGGED house numbers.
+# ppma↔cm⁻³: by atomic fraction (Si = 5.0e22 cm⁻³) **1 ppma = 5.0e16 cm⁻³**, so ~12 ppma ≈ 6.0e17 cm⁻³
+# (the new-ASTM-consistent figure; older ASTM IR calibrations read ~25 % higher).
+#
+# COHERENCE (not modelled, named): precipitation is strong in **vacancy-rich** material and absent in
+# interstitial-rich — i.e. it needs ξ > ξ_t, the realistic CZ regime (§1c, ξ ≈ 0.29). So the gettering
+# face and the COP-void face (§1c) are the same vacancy population read two ways; we do not couple them
+# (the criterion already gates voids), only note the regimes agree.
+#
+# FIDELITY (the §1e flagged-phenomenology tier — NO conservation law, NO engine). Tight = the SEAM:
+# below the threshold (and at [O_i] = 0) the efficiency is **0 exactly** → the gettered metals equal the
+# feed (:func:`chip.purification.getter_metals` returns the vector unchanged) → the G4b leakage is
+# bit-for-bit. Monotone non-decreasing in [O_i] is true *by construction* (a guard, not an anchor).
+# Cited = the precipitation threshold (the on/off). Flagged = the ramp ``IG_OXYGEN_SCALE_CM3``, the
+# ceiling ``IG_MAX_EFFICIENCY`` (gettering is never perfect — a residual metal level always survives),
+# and the whole removed-fraction magnitude. DEFERRED named edges: the residual-[O_i] **partitioning**
+# (real precipitation *consumes* the interstitial oxygen that would form donors, so feeding the full
+# [O_i] to BOTH §1e and §1h slightly overstates each at high oxygen — the direction holds, both rise
+# with incorporated O); **per-metal selectivity** (Fe getters more readily than Cu — here one efficiency
+# scrubs both); and the **over-precipitation / denuded-zone collapse** at very high [O_i] (precipitates
+# in the device region → a leakage *rise*, the U-shape) — none built, the teaching model is the single
+# monotone trade-off against the donors.
+IG_CRITICAL_OXYGEN_CM3: float = 6.0e17     # cm⁻³ — CITED precipitation threshold ≈ 12 ppma (1 ppma = 5e16 cm⁻³)
+IG_OXYGEN_SCALE_CM3: float = 2.0e17        # cm⁻³ — FLAGGED precipitate-density ramp above the threshold
+IG_MAX_EFFICIENCY: float = 0.95            # FLAGGED ceiling — gettering never perfect (a residual metal survives)
+
+
+def internal_gettering_efficiency(
+    oxygen_cm3: float,
+    *,
+    critical_oxygen: float = IG_CRITICAL_OXYGEN_CM3,
+    scale: float = IG_OXYGEN_SCALE_CM3,
+    cap: float = IG_MAX_EFFICIENCY,
+) -> float:
+    """Fraction of deep-level metals (Fe/Cu) removed by oxygen-precipitate **internal gettering** (S4).
+
+    The **asset** face of crucible oxygen (§1e is the liability face): bulk oxygen precipitates trap
+    fast-diffusing transition metals out of the device region (Tan–Gardner–Tice, Phys. Rev. Lett. 64,
+    196, 1990). Returns ``0.0`` **exactly** at ``[O_i] = 0`` and at any ``[O_i] ≤ critical_oxygen`` — the
+    cited precipitation threshold (~12 ppma ≈ 6e17 cm⁻³): below it the wafer does not precipitate enough
+    to getter (the seam — :func:`chip.purification.getter_metals` then leaves the metals untouched and
+    the G4b leakage is bit-for-bit). Above it the removed fraction rises as ``1 − e^{−([O_i] −
+    O_crit)/scale}`` toward the (flagged) ceiling ``cap < 1`` — monotone non-decreasing in ``[O_i]`` (a
+    by-construction guard, not an anchor). The threshold (the on/off) is the citation; the ``scale`` and
+    ``cap`` are FLAGGED house magnitudes (ADR 0005 §5). Consumed by reducing the wafer's Fe/Cu before the
+    :func:`chip.lifetime.device_leakage` read — never touches Na/B/P (gettering traps metals, not mobile
+    ions or shallow dopants).
+    """
+    if oxygen_cm3 < 0.0:
+        raise ValueError(f"oxygen concentration must be ≥ 0, got {oxygen_cm3}")
+    if oxygen_cm3 <= critical_oxygen:
+        return 0.0                                            # the seam: below the precipitation threshold
+    return min(cap, 1.0 - math.exp(-(oxygen_cm3 - critical_oxygen) / scale))
 
 
 # --------------------------------------------------------------------------- #

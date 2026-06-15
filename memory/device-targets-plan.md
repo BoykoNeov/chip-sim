@@ -1,6 +1,6 @@
 ---
 name: device-targets-plan
-description: "\"good is relative\" multi-target specs — SLICES 1+2+3 BUILT (targets.py: DeviceTarget + FAST_LOGIC/LOW_POWER/HV_IO + regrade/disposition; S2 cited junction avalanche BV in chip/breakdown.py; S3 high-res NATIVE part on the substrate axis, zero new physics); 2-level declaration + substrate commit; 5-slice staging, S4–S5 planned"
+description: "\"good is relative\" multi-target specs — SLICES 1+2+3+4 BUILT (targets.py: DeviceTarget + FAST_LOGIC/LOW_POWER/HV_IO + regrade/disposition; S2 cited junction avalanche BV in chip/breakdown.py; S3 high-res NATIVE part on the substrate axis; S4 oxygen DUAL-USE internal gettering in czochralski.py §1h + purification.getter_metals, the process-trade-off NOT segmentation); 2-level declaration + substrate commit; 5-slice staging, S5 (power rectifier) planned"
 metadata: 
   node_type: memory
   type: project
@@ -78,8 +78,34 @@ V_t but not I_Dsat → high-res+implant would *strictly dominate* logic → cros
 added mobility degradation = more physics, past slice size (filed w/ A2 Robin-G / E1 heat-mode / CG-3
 transient). Native `bv` window is **REQUIRED** (not optional like HV-I/O — BV is the SKU's defining property
 & the native low-V_t window won't reject a no-BV die; advisor catch, mirror of S2 nan-guard). 353 fab_game
-tests green. **S4 next** = the oxygen DUAL-USE (donors-bad vs gettering-good
-*within one device* — process-trade-off, distinct from segmentation).
+tests green.
+
+**SLICE 4 (oxygen DUAL-USE = internal gettering) BUILT 2026-06-15 — `chip/czochralski.py §1h`
+`internal_gettering_efficiency` + `chip/purification.py` `getter_metals`+`"trace-metal"` grade + fab_game
+wiring (`CzochralskiKnobs.forming_gas_anneal_min`/`.internal_gettering_efficiency`; `device_step`
+`gettering_efficiency`; diagnose dual-use line) + `demo_internal_gettering.py`/`fab-game-s4.png` + tests.**
+The **process-trade-off** slice (NOT segmentation — no new SKU, `targets.py` untouched). Crucible oxygen's
+TWO faces on ONE device: liability (C1 thermal donors → V_t↓) + asset (oxygen precipitates **getter**
+Fe/Cu out of the device region → leakage↓; cited Tan–Gardner–Tice PRL 64:196 1990 [[internal-gettering-source]]).
+**Gate (advisor: BLOCKS — sweep `[O_i]` BEFORE any module): interior optimum exists** — `trace-metal`
+feed (base leak 36 nA/cm²) gives a clean **two-sided Goldilocks** (low O→leak-fail, high O→V_t-fail, **9e17–1.1e18
+passes both**, leak-fail *just below* / V_t-fail *just above*). **Two advisor structural calls honored:**
+(1) **Option B over A** — IG is for MODERATE contamination (10× feed = a purification pass, a *different*
+lesson) → demo feed = nameable `0.4×metal`, `O_crit` stays **cited** ~12 ppma≈6e17 (ppma↔cm⁻³=5e16/ppma
+atomic frac), efficiency magnitude FLAGGED; (2) **trade-off lives on the `[O_i]` LEVEL not the anneal**
+(precipitation consumes the donor O → on the anneal axis effects move *together*, skippable) → donor cost
+anchored to the **universal forming-gas/sinter ~450 °C** (<550 °C TD window, web-verified) via new
+`forming_gas_anneal_min` (**defaults 0 → C1 seam byte-for-byte**, summed into the effective donor anneal;
+`chip.czochralski.thermal_donor_density` untouched) → donors **non-skippable**. **Orthogonal channels
+(double-count guard):** gettering touches **Fe/Cu ONLY** (`getter_metals`, never Na/Q_ox/V_t), applied
+ONCE in the leak read → V_t byte-for-byte under pure gettering (leak 36.4→1.83, V_t bit-identical).
+**EMERGENT FINDING (kept+named, not a fudge):** honest leak off `effective_channel_N_A` surfaces a real
+**donor→N_A→depletion-width coupling** (`W∝1/√N_A`→`J∝W`) → below-threshold O makes the diode marginally
+leakier + a past-the-cap U-turn, **both deep in already-failed territory** (verdict-relevant leak monotone)
+→ window/lesson untouched, NOT the deferred over-precipitation U-shape. **Master seam: no `[O_i]` ⇒ no
+gettering AND no donors ⇒ G1–G7 byte-for-byte.** DEFERRED: residual-`[O_i]` partitioning, per-metal
+selectivity (Fe vs Cu), over-precipitation/denuded-zone U-shape. Full chip+fab_game suites green.
+**S5 next** = power-rectifier family (own declared run, cited reverse-recovery `t_rr∝τ`).
 
 **Already graded (don't reinvent):** yield is continuous, and **speed binning** (`SpeedBins` in
 `spec.py`, priced in `scoring.py`) already IS "functional-but-suboptimal" (the bin-out = a working

@@ -237,7 +237,8 @@ def run_line(
                     contamination=_die_contamination(recipe.contamination, variation.na_factor(d.radius_frac)),
                     thermal_donor_density=recipe.czochralski.thermal_donor_density,
                     dislocation_density=recipe.czochralski.interstitial_dislocation_density_at(d.radius_frac),
-                    sd_contact_squares=recipe.diffusion.sd_contact_squares)
+                    sd_contact_squares=recipe.diffusion.sd_contact_squares,
+                    gettering_efficiency=recipe.czochralski.internal_gettering_efficiency)
         for d in wafer.dies
     )
     wafer = wafer.with_step(
@@ -494,9 +495,17 @@ def diagnose(die: Die) -> str:
                              f"slow a pull / over-steep hot zone) → SRH recombination shortens τ "
                              f"({tau_us:.2g} µs) → a leaky diode (pull faster / lower G toward the ξ_t window)")
             else:
-                lines.append(f"    ↳ purification: junction leakage from deep-level-metal SRH recombination "
-                             f"(minority-carrier lifetime τ {tau_us:.2g} µs) "
-                             f"→ a leaky diode (purify harder — zone refining scrubs the metals fast, tiny k)")
+                getter_eff = device.knobs_in.get("getter_eff")
+                if getter_eff:
+                    # S4 dual-use: oxygen IS gettering, but the [O_i] is too low to scrub the metals enough.
+                    lines.append(f"    ↳ gettering: junction leakage — the deep-level metals are only "
+                                 f"{getter_eff:.0%} gettered by the oxygen precipitates (τ {tau_us:.2g} µs); "
+                                 f"raise [O_i] to getter more — but the same oxygen makes thermal donors that "
+                                 f"pull V_t down, so this is a trade-off (or purify harder instead)")
+                else:
+                    lines.append(f"    ↳ purification: junction leakage from deep-level-metal SRH recombination "
+                                 f"(minority-carrier lifetime τ {tau_us:.2g} µs) "
+                                 f"→ a leaky diode (purify harder — zone refining scrubs the metals fast, tiny k)")
         # The oxidation fingerprint (phase-5 journey): a V_t/I_Dsat parametric death with the die's gate
         # oxide off the nominal thickness is an over/under-oxidation root — checked BEFORE the series-R
         # fingerprint because an over-oxidized I_Dsat-LOW death (thick oxide → low C_ox) otherwise reads as
@@ -606,7 +615,8 @@ def rework_litho(
                           contamination=_die_contamination(wafer.contamination, variation.na_factor(red.radius_frac)),
                           thermal_donor_density=recipe.czochralski.thermal_donor_density,
                           dislocation_density=recipe.czochralski.interstitial_dislocation_density_at(red.radius_frac),
-                          sd_contact_squares=recipe.diffusion.sd_contact_squares)
+                          sd_contact_squares=recipe.diffusion.sd_contact_squares,
+                          gettering_efficiency=recipe.czochralski.internal_gettering_efficiency)
         red = _verdict_die(red, specs, geometry_reason)
         new_dies.append(red)
 

@@ -162,6 +162,46 @@ def test_sodium_oxide_charge_is_positive_and_zero_when_clean():
 
 
 # --------------------------------------------------------------------------- #
+# Internal gettering (S4) — getter_metals removes Fe/Cu only, never the mobile-ion / dopant channels
+# --------------------------------------------------------------------------- #
+def test_getter_metals_seam_is_the_unchanged_vector_exact():
+    # The seam (tight, EXACT): efficiency 0 ([O_i] below the precipitation threshold) returns the SAME
+    # object — the gettered metals equal the feed, so the G4b leakage read is bit-for-bit.
+    c = pur.Contamination(Na=3.0e16, B=1.0e15, Fe=6.0e12, Cu=1.6e13)
+    assert pur.getter_metals(c, 0.0) is c
+
+
+def test_getter_metals_scrubs_fe_cu_only_never_na_b_p():
+    # Gettering traps the deep-level TRANSITION METALS (Fe/Cu) onto bulk oxygen precipitates; it does NOT
+    # touch the mobile ion (Na) or the shallow dopants (B/P) — so it lowers leakage WITHOUT moving the
+    # Na→Q_ox→V_t chain (the dual-use channels stay orthogonal).
+    c = pur.Contamination(Na=3.0e16, B=1.0e15, P=2.0e15, Fe=6.0e12, Cu=1.6e13)
+    g = pur.getter_metals(c, 0.75)
+    assert g.Fe == pytest.approx(c.Fe * 0.25)            # Fe scrubbed by (1 − efficiency)
+    assert g.Cu == pytest.approx(c.Cu * 0.25)            # Cu scrubbed by the same fraction
+    assert g.Na == c.Na and g.B == c.B and g.P == c.P    # mobile ion + shallow dopants untouched (exact)
+
+
+def test_getter_metals_monotone_and_full_removal_bounds():
+    # The removed fraction rises monotonically with efficiency; at efficiency 1 the metals go to zero.
+    c = pur.Contamination(Fe=6.0e12, Cu=1.6e13)
+    fes = [pur.getter_metals(c, e).Fe for e in (0.0, 0.3, 0.6, 0.9, 1.0)]
+    assert fes == sorted(fes, reverse=True)              # monotone non-increasing as efficiency rises
+    assert pur.getter_metals(c, 1.0).Fe == 0.0 and pur.getter_metals(c, 1.0).Cu == 0.0
+
+
+def test_trace_metal_grade_is_the_moderate_ig_case():
+    # The S4 feed: 0.4× the metal grade, Na/dopant-clean (the leakage is the isolated story), only
+    # MODERATELY metal-laden — internal gettering's actual regime (a few× over the window, not 10×).
+    trace = pur.FEEDSTOCK_GRADES["trace-metal"]
+    metal = pur.FEEDSTOCK_GRADES["metal"]
+    assert trace.Na == 0.0 and trace.B == 0.0 and trace.P == 0.0      # isolation: only the metals
+    assert trace.Fe == pytest.approx(0.4 * metal.Fe)                  # a nameable vector: 0.4× metal
+    assert trace.Cu == pytest.approx(0.4 * metal.Cu)
+    assert 0.0 < trace.Fe < metal.Fe and 0.0 < trace.Cu < metal.Cu   # dirtier than clean, milder than metal
+
+
+# --------------------------------------------------------------------------- #
 # Input validation
 # --------------------------------------------------------------------------- #
 def test_invalid_inputs_raise():
@@ -171,3 +211,5 @@ def test_invalid_inputs_raise():
         pur.zone_refine(pur.FEEDSTOCK_GRADES["MGS"], n_passes=-1)
     with pytest.raises(ValueError):
         pur.front_purity(0.35, n_passes=-1)
+    with pytest.raises(ValueError):
+        pur.getter_metals(pur.FEEDSTOCK_GRADES["trace-metal"], 1.5)   # efficiency ∈ [0, 1]

@@ -280,6 +280,15 @@ exhausted — every remaining edge lacks a consumer.**
   RTA is shallow). **The verify-at-build verdict: the emergent-`T` "heat-mode" engine is FALSIFIED** —
   `√(D_dopant/α_thermal) ≈ 1.2e-6`, so `T` is flat over a junction; `D(T(t))` *is* the engine's shipped `D(t)` (the
   OED `effective_Dt` twin), not a new engine. No chip-side heat-mode consumer exists. ([`demo_thermal_budget.py`](demo_thermal_budget.py) → `fab-game-e1.png`.)
+- **S4 — crucible oxygen's DUAL-USE** (`czochralski.py §1h` `internal_gettering_efficiency` + [`chip/purification.py`](../chip/purification.py)
+  `getter_metals`): the asset face of C1's oxygen. Bulk oxygen **precipitates** trap the deep-level metals (Fe/Cu)
+  out of the device region — **internal gettering** (Tan–Gardner–Tice, *Phys. Rev. Lett. 64, 196, 1990*) — so the
+  *same* `[O_i]` that costs `V_t` (donors, C1) **buys back** junction leakage. A *process-trade-off within one
+  device* (distinct from the S1–S3 market segmentation — no second SKU): too little oxygen leaks (un-gettered
+  metals), too much craters `V_t` (donors at the non-skippable forming-gas sinter), a **Goldilocks** in between.
+  Cited = the precipitation threshold (~12 ppma ≈ 6e17 cm⁻³); flagged = the efficiency magnitude. Gettering touches
+  **Fe/Cu only** (never the Na→`Q_ox`→`V_t` chain) → the two oxygen channels stay orthogonal. Off by default (no
+  `[O_i]` ⇒ the seam). ([`demo_internal_gettering.py`](demo_internal_gettering.py) → `fab-game-s4.png`.)
 
 ## Module map
 
@@ -355,7 +364,8 @@ exhausted — every remaining edge lacks a consumer.**
   `demo_boule` (g2) · `demo_wafer_prep` (g3) · `demo_purification` (g4) · `demo_lifetime` (g4b) ·
   `demo_etch` (g5) · `demo_packaging` (g6) · `demo_game` (g7) · `demo_crystal_growth` (cg1) ·
   `demo_voronkov` (cg2) · `demo_stefan` (cg3) · `demo_thermal_donors` (c1) · `demo_under_etch` (d1) ·
-  `demo_osf_ring` (a2) · `demo_dislocation` (a1) · `demo_thermal_budget` (e1).
+  `demo_osf_ring` (a2) · `demo_dislocation` (a1) · `demo_thermal_budget` (e1) ·
+  `demo_internal_gettering` (s4).
 - **`fab_game.ipynb`** — the thin notebook skin (the §9 dashboard section + the interactive skin; not
   in the correctness path).
 

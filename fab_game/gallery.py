@@ -115,6 +115,9 @@ DEEPENINGS = [
     Demo("demo_thermal_budget", "E1",
          "A spike/RTA anneal's thermal budget ∫D(T(t))dt → a faster ramp → a smaller budget → a "
          "shallower x_j (why RTA, the OED effective_Dt twin)."),
+    Demo("demo_internal_gettering", "S4",
+         "Crucible oxygen's dual-use: internal gettering traps the deep-level metals (leakage down) while "
+         "the same oxygen makes donors (V_t down) — a Goldilocks within one device."),
 ]
 
 ALL_DEMOS = LINE + DEEPENINGS

@@ -1497,6 +1497,99 @@ def thermal_donor_figure(result):
 
 
 # --------------------------------------------------------------------------- #
+# S4 — crucible oxygen's dual-use: donors (V_t down) vs internal gettering (leakage down)
+# --------------------------------------------------------------------------- #
+def _ig_two_faces_panel(ax, result) -> None:
+    """The two faces of the SAME oxygen: the gettering efficiency η([O_i]) (the asset) and the
+    thermal-donor density N_TD([O_i]) (the liability), both switched on by more oxygen."""
+    o = np.asarray(result.oxygen_fine)
+    eff = np.asarray(result.efficiency_fine)
+    ntd = np.asarray(result.donor_fine)
+    ax.plot(o, eff, color="#2ca02c", lw=2.1, label="gettering η([O_i]) — asset")
+    ax.axvline(result.critical_oxygen, color="0.45", ls=":", lw=1.2)
+    ax.text(result.critical_oxygen, 0.04, "  precip.\n  threshold\n  ~12 ppma", fontsize=7.5, color="0.35",
+            va="bottom", ha="left")
+    ax.set_xlabel("incorporated oxygen [O_i] (cm⁻³)", fontsize=9)
+    ax.set_ylabel("internal-gettering efficiency η", fontsize=9, color="#2ca02c")
+    ax.tick_params(axis="y", labelcolor="#2ca02c")
+    ax.set_ylim(-0.03, 1.03)
+    ax2 = ax.twinx()
+    ax2.plot(o, ntd, color="#d62728", lw=2.0, label="donors N_TD([O_i]) — liability")
+    ax2.set_ylabel("thermal-donor density N_TD (cm⁻³)", fontsize=9, color="#d62728")
+    ax2.tick_params(axis="y", labelcolor="#d62728")
+    ax.set_title("The two faces of the same oxygen:\ngettering switches on at the threshold; donors keep "
+                 "rising", fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+    ax2.legend(fontsize=8, loc="lower right")
+
+
+def _ig_goldilocks_panel(ax, result) -> None:
+    """The headline: leakage([O_i]) falls (gettering) while V_t([O_i]) falls (donors); the band where
+    BOTH pass their spec is the dual-use sweet spot."""
+    o = np.asarray(result.oxygen_pipe)
+    leak = np.asarray(result.leak_pipe)
+    vt = np.asarray(result.vt_pipe)
+    ax.plot(o, leak, color="#2f6db5", lw=2.1, marker="o", ms=3.5, label="leakage (gettering)")
+    ax.axhline(result.leak_hi, color="#2f6db5", ls="--", lw=1.1, alpha=0.8)
+    ax.text(o[0], result.leak_hi * 1.1, f"  leakage spec ≤ {result.leak_hi:.0f}", fontsize=7.5,
+            color="#2f6db5", va="bottom")
+    ax.set_yscale("log")
+    ax.set_xlabel("incorporated oxygen [O_i] (cm⁻³)", fontsize=9)
+    ax.set_ylabel("junction leakage (nA/cm²)", fontsize=9, color="#2f6db5")
+    ax.tick_params(axis="y", labelcolor="#2f6db5")
+    ax2 = ax.twinx()
+    ax2.plot(o, vt, color="#e08a1e", lw=2.1, marker="s", ms=3.5, label="V_t (donors)")
+    ax2.axhline(result.v_t_lo, color="#e08a1e", ls="--", lw=1.1, alpha=0.8)
+    ax2.text(o[-1], result.v_t_lo, f"V_t floor {result.v_t_lo:.2f}  ", fontsize=7.5, color="#e08a1e",
+             va="bottom", ha="right")
+    ax2.set_ylabel("threshold V_t (V)", fontsize=9, color="#e08a1e")
+    ax2.tick_params(axis="y", labelcolor="#e08a1e")
+    if result.pass_lo is not None:
+        ax.axvspan(result.pass_lo, result.pass_hi, color="#2ca02c", alpha=0.12)
+        mid = (result.pass_lo + result.pass_hi) / 2
+        ax.text(mid, ax.get_ylim()[1], "Goldilocks\n(both pass)", fontsize=8, color="#1a7a1a",
+                ha="center", va="top")
+    ax.set_title("The Goldilocks: too little O leaks, too much craters V_t\n(one knob, two opposite "
+                 "consequences — a trade-off, not one optimum)", fontsize=10)
+    ax.legend(fontsize=8, loc="upper right")
+    ax2.legend(fontsize=8, loc="lower left")
+
+
+def _ig_yield_panel(ax, result) -> None:
+    """The two-sided window as a single yield hump: 0 on the low-O (leakage) side, 0 on the high-O
+    (V_t) side, the dual-use window in between."""
+    o = np.asarray(result.oxygen_pipe)
+    y = np.asarray(result.yield_pipe)
+    ax.plot(o, y * 100, color="#6a3d9a", lw=2.2, marker="o", ms=3.5)
+    if result.pass_lo is not None:
+        ax.axvspan(result.pass_lo, result.pass_hi, color="#2ca02c", alpha=0.12)
+    ax.annotate("leakage\nscraps", xy=(o[0], 2), fontsize=8, color="#2f6db5", va="bottom")
+    ax.annotate("V_t\nscraps", xy=(o[-1], 2), fontsize=8, color="#e08a1e", va="bottom", ha="right")
+    ax.set_xlabel("incorporated oxygen [O_i] (cm⁻³)", fontsize=9)
+    ax.set_ylabel("wafer yield (%)", fontsize=9)
+    ax.set_ylim(-4, 108)
+    ax.set_title(f"The two-sided window (a {result.feed_grade} feed,\nbase leakage "
+                 f"{result.base_leak:.0f} nA/cm² un-gettered)", fontsize=10)
+
+
+def internal_gettering_figure(result):
+    """Assemble the S4 artifact from a :class:`~fab_game.demo_internal_gettering.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _ig_two_faces_panel(axes[0], result)
+    _ig_goldilocks_panel(axes[1], result)
+    _ig_yield_panel(axes[2], result)
+    fig.suptitle("S4 — crucible oxygen's DUAL-USE: internal gettering (Tan–Gardner–Tice, Phys. Rev. Lett. "
+                 "64, 196, 1990) traps the deep-level metals (leakage down)\n"
+                 "while the SAME oxygen makes thermal donors (C1) that pull V_t down — a process-trade-off "
+                 "within ONE device; the precipitation threshold is cited, the efficiency magnitude flagged",
+                 fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    return fig
+
+
+# --------------------------------------------------------------------------- #
 # E1 — spike/RTA thermal budget: the budget accrues near the peak → shallower x_j
 # --------------------------------------------------------------------------- #
 def _budget_accrual_panel(ax, result) -> None:

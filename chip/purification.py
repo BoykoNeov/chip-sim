@@ -104,7 +104,7 @@ the flagged grade contrast (benchmark). The ``k`` values are reused from the cit
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 
 import numpy as np
 
@@ -228,6 +228,27 @@ def zone_refine(feed: Contamination, n_passes: float = 1) -> Contamination:
     })
 
 
+def getter_metals(contamination: Contamination, efficiency: float) -> Contamination:
+    """Remove a fraction ``efficiency`` of the **deep-level metals** (Fe/Cu) — internal gettering (S4).
+
+    The device-stage companion to :func:`zone_refine`: where refining scrubs the *feedstock* by
+    segregation, internal gettering moves the surviving Fe/Cu out of the active region during the flow's
+    high-T steps, onto bulk **oxygen precipitates** (:func:`chip.czochralski.internal_gettering_efficiency`
+    supplies ``efficiency`` from the wafer's incorporated ``[O_i]``). It scales **Fe and Cu only** by
+    ``1 − efficiency`` and leaves ``Na``/``B``/``P`` untouched — gettering traps transition metals, not
+    mobile ions or shallow dopants, so it lowers the :mod:`chip.lifetime` leakage **without** moving the
+    Na→``Q_ox``→``V_t`` chain (the dual-use channels stay orthogonal). ``efficiency = 0`` (the seam:
+    ``[O_i]`` below the precipitation threshold) returns the **same** vector unchanged → the G4b leakage
+    is bit-for-bit. ``efficiency`` must lie in ``[0, 1]``.
+    """
+    if not 0.0 <= efficiency <= 1.0:
+        raise ValueError(f"gettering efficiency must be in [0, 1], got {efficiency}")
+    if efficiency == 0.0:
+        return contamination                                  # the seam (exact): no precipitation, no gettering
+    keep = 1.0 - efficiency
+    return replace(contamination, Fe=contamination.Fe * keep, Cu=contamination.Cu * keep)
+
+
 # Feedstock grades → starting impurity vectors (cm⁻³) — FLAGGED illustrative house numbers, NOT cited
 # fab data (ADR 0005 §5). The contrast is the teachable bit: a metallurgical-grade (MGS) feed is orders
 # dirtier than electronic-grade (EGS); zone refining then scrubs the tiny-k metals superbly but leaves
@@ -244,12 +265,19 @@ def zone_refine(feed: Contamination, n_passes: float = 1) -> Contamination:
 # threshold reads fine — yet poisons minority-carrier lifetime → raises junction reverse leakage
 # (:mod:`chip.lifetime`): the consequence net doping cannot carry, the metals' device effect in
 # isolation. Its tiny-k metals scrub fast, so one extra zone pass recovers it.
+#
+# "trace-metal" is the **S4 internal-gettering scenario**: the metal grade scaled to 0.4× — a feed only
+# *moderately* metal-laden (a ~3–4× over-window leakage at one zone pass, the regime internal gettering
+# is actually for; a 10× feed would need a purification pass, not gettering). Like "metal" it is Na- and
+# dopant-clean so the leakage is the isolated story, and it is recoverable two ways — an extra zone pass
+# OR oxygen-precipitate gettering (the dual-use lesson, paid for in a thermal-donor V_t drift).
 FEEDSTOCK_GRADES: dict[str, Contamination] = {
     "clean": Contamination(),                                              # idealized — the seam baseline
     "EGS":   Contamination(Na=1.0e13, B=1.0e13, P=1.0e13, Fe=1.0e12, Cu=1.0e12),   # electronic-grade (clean)
     "solar": Contamination(Na=5.0e16, B=1.0e15, P=1.0e15, Fe=5.0e15, Cu=5.0e15),   # solar-grade (intermediate)
     "MGS":   Contamination(Na=1.0e18, B=1.0e16, P=5.0e15, Fe=1.0e18, Cu=5.0e17),   # metallurgical-grade (dirty)
     "metal": Contamination(Fe=2.0e18, Cu=1.0e17),                          # G4b: metal-laden, Na/dopant-clean
+    "trace-metal": Contamination(Fe=8.0e17, Cu=4.0e16),                    # S4: 0.4× metal — IG's moderate case
 }
 
 

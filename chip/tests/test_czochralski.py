@@ -664,3 +664,42 @@ def test_thermal_donor_realistic_magnitude_shifts_vt_down():
     vt_typ = threshold_voltage(eff_typ, 0.014).V_t
     vt_hi = threshold_voltage(eff_hi, 0.014).V_t
     assert vt_hi < vt_typ < vt_clean                            # donors push V_t monotonically DOWN
+
+
+# --------------------------------------------------------------------------- #
+# §1h — internal gettering (S4): oxygen's BENEFICIAL face (the dual-use mirror of the §1e donors)
+# --------------------------------------------------------------------------- #
+def test_internal_gettering_seam_zero_at_and_below_the_threshold_exact():
+    # The seam (tight, EXACT): below the cited precipitation threshold the wafer does not precipitate
+    # enough to getter, so the efficiency is 0 bit-for-bit (and at [O_i]=0). This zero is the seam lever
+    # — getter_metals then leaves the Fe/Cu untouched and the G4b leakage is byte-for-byte.
+    OC = cz.IG_CRITICAL_OXYGEN_CM3
+    assert cz.internal_gettering_efficiency(0.0) == 0.0
+    assert cz.internal_gettering_efficiency(OC) == 0.0           # at the threshold: still nothing (exact)
+    assert cz.internal_gettering_efficiency(OC * 0.5) == 0.0     # below it: nothing
+
+
+def test_internal_gettering_rises_monotonically_above_the_threshold_capped():
+    # Above the threshold the removed fraction rises monotonically with [O_i] (more precipitate density)
+    # toward the flagged <1 ceiling. The DIRECTION (switches on at the threshold, monotone, never perfect)
+    # is the content; the ramp/cap magnitudes are flagged.
+    OC = cz.IG_CRITICAL_OXYGEN_CM3
+    grid = [OC, OC + 1e17, OC + 3e17, OC + 6e17, 2.0e18, 1.0e19]
+    eff = [cz.internal_gettering_efficiency(o) for o in grid]
+    assert eff == sorted(eff)                                    # monotone non-decreasing in [O_i]
+    assert eff[0] == 0.0 and eff[1] > 0.0                        # switches on just above the threshold
+    assert all(0.0 <= e < 1.0 for e in eff)                     # a fraction, never perfect
+    assert cz.internal_gettering_efficiency(1.0e19) == pytest.approx(cz.IG_MAX_EFFICIENCY)  # saturates at the cap
+
+
+def test_internal_gettering_cited_threshold_is_the_ig_window_edge():
+    # The benchmark/cited leg: the precipitation threshold is the ~12 ppma IG-window lower edge. By atomic
+    # fraction (Si = 5e22 cm⁻³) 1 ppma = 5e16 cm⁻³, so ~12 ppma ≈ 6e17 cm⁻³ — pinned (not from memory).
+    assert cz.IG_CRITICAL_OXYGEN_CM3 == pytest.approx(6.0e17)
+    assert cz.IG_CRITICAL_OXYGEN_CM3 / 5.0e16 == pytest.approx(12.0)   # ≈ 12 ppma at 1 ppma = 5e16 cm⁻³
+    assert 0.0 < cz.IG_MAX_EFFICIENCY < 1.0                            # never-perfect ceiling
+
+
+def test_internal_gettering_invalid_input_raises():
+    with pytest.raises(ValueError):
+        cz.internal_gettering_efficiency(-1.0)                   # oxygen ≥ 0
