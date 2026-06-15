@@ -26,6 +26,7 @@ from chip import oxidation as ox
 from chip import litho
 from chip import device as dev
 from chip import lifetime as life
+from chip import reverse_recovery as rr
 from chip.junction import analyze_junction
 from chip.purification import Contamination, getter_metals, sodium_oxide_charge
 from chip.wafer_prep import WaferGeometry
@@ -287,7 +288,19 @@ def device_step(
     ``V_t``/``I_Dsat``, and it is scored only by the HV-I/O target's optional ``bv`` window (fast-logic /
     low-power leave it open), so the seam and the G1–G7 banked demos are byte-for-byte unchanged (the
     ``bv_V`` field/record key is set only when the junction was resolved upstream; a die with no ``x_j`` —
-    a bare/hand-built die — carries ``bv_V = None`` and no key)."""
+    a bare/hand-built die — carries ``bv_V = None`` and no key).
+
+    **Diode reverse recovery (slice 5)** — the diode reverse-recovery (storage) time ``t_rr ∝ τ``
+    (:func:`chip.reverse_recovery.reverse_recovery_time`), read off the **same** minority-carrier lifetime
+    ``leak.tau`` the junction leakage reads, in the *opposite* direction: a **short** ``τ`` (a lifetime-killed
+    / metal-laden feed — a logic leakage **reject**) gives a **fast** rectifier, a clean long-``τ`` wafer a
+    slow one. It is the consumer that turns G4b's lifetime into a *power-device feature* (the lifetime killer
+    is the asset). Because it reads the *gettered* ``τ``, engaging S4 oxygen gettering — which lowers leakage
+    — correctly **slows** the rectifier (raises ``τ``): the dual-use trade-off from the rectifier's side.
+    Like ``BV`` it is **purely additive** — it never moves ``V_t``/``I_Dsat`` and is scored only by the
+    power-rectifier target's optional ``t_rr`` window (the MOSFET flavors leave it open), so the seam and the
+    G1–G7 banked demos are byte-for-byte unchanged (``t_rr`` is set whenever the device resolves, like
+    ``τ``/leakage; a refused/bare die carries ``t_rr = None``)."""
     if die.t_ox_um is None or die.cd_um is None or die.resolved is False:
         reason = ("litho image not resolved" if die.resolved is False
                   else "missing upstream t_ox/CD")
@@ -315,6 +328,12 @@ def device_step(
     # threshold) returns the metals unchanged → the G4b leakage is byte-for-byte.
     gettered = getter_metals(contamination, gettering_efficiency) if contamination is not None else None
     leak = life.device_leakage(gettered, channel_N_A, dislocation_density=dislocation_density)
+    # Reverse recovery (slice 5): the SAME minority-carrier τ the leakage reads, in the opposite direction.
+    # t_rr ∝ τ (charge-control storage time) — a short τ (a leaky logic reject) is a FAST rectifier. Purely
+    # additive like BV: never moves V_t/I_Dsat, scored only by the power-rectifier target's optional t_rr
+    # window. Reads leak.tau (the gettered τ), so engaging oxygen gettering — good for leakage — correctly
+    # SLOWS the rectifier (raising τ), the dual-use trade-off seen from the rectifier's side.
+    t_rr = rr.reverse_recovery_time(leak.tau)
     # Junction avalanche breakdown (slice 2): the drain–body BV off the body doping + the inherited S/D
     # junction depth. Only when the junction was **resolved** upstream — a bare die (x_j None) OR an
     # unresolved junction (x_j nan, when the profile never crosses N_B) carries bv_V = None (the gap-vs-zero
@@ -333,14 +352,15 @@ def device_step(
     if R_series_ohm > 0.0:                                   # diffusion fingerprint — only when the consumer is on
         knobs_in["R_series_ohm"] = R_series_ohm              # (so an ideal-contact device record is byte-unchanged)
     outputs = {"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox,
-               "tau_us": leak.tau_us, "j_leak_nA_cm2": leak.j_leak_nA_cm2}
+               "tau_us": leak.tau_us, "j_leak_nA_cm2": leak.j_leak_nA_cm2,
+               "t_rr_ns": t_rr * 1.0e9}                      # slice-5 reverse recovery (∝ τ; additive)
     if bv_V is not None:                                     # slice-2 BV — only when the junction was resolved
         outputs["bv_V"] = bv_V                              # (so a no-x_j device record is byte-unchanged)
     return die.record(
         "device",
         knobs_in=knobs_in,
         outputs=outputs,
-        V_t=mos.V_t, i_dsat=i_dsat, tau=leak.tau, j_leak=leak.j_leak, bv_V=bv_V,
+        V_t=mos.V_t, i_dsat=i_dsat, tau=leak.tau, j_leak=leak.j_leak, bv_V=bv_V, t_rr=t_rr,
     )
 
 

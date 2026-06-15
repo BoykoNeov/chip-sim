@@ -1,6 +1,6 @@
 ---
 name: device-targets-plan
-description: "\"good is relative\" multi-target specs — SLICES 1+2+3+4 BUILT (targets.py: DeviceTarget + FAST_LOGIC/LOW_POWER/HV_IO + regrade/disposition; S2 cited junction avalanche BV in chip/breakdown.py; S3 high-res NATIVE part on the substrate axis; S4 oxygen DUAL-USE internal gettering in czochralski.py §1h + purification.getter_metals, the process-trade-off NOT segmentation); 2-level declaration + substrate commit; 5-slice staging, S5 (power rectifier) planned"
+description: "\"good is relative\" multi-target specs — ALL 5 SLICES BUILT, plan COMPLETE (targets.py: DeviceTarget + FAST_LOGIC/LOW_POWER/HV_IO + regrade/disposition; S2 cited junction avalanche BV chip/breakdown.py; S3 high-res NATIVE part on the substrate axis; S4 oxygen DUAL-USE internal gettering czochralski.py §1h; S5 POWER_RECTIFIER family on the LIFETIME axis — cited t_rr∝τ chip/reverse_recovery.py, the structure/device-family field + family guard); 2-level declaration (family+substrate commits)"
 metadata: 
   node_type: memory
   type: project
@@ -105,7 +105,35 @@ leakier + a past-the-cap U-turn, **both deep in already-failed territory** (verd
 → window/lesson untouched, NOT the deferred over-precipitation U-shape. **Master seam: no `[O_i]` ⇒ no
 gettering AND no donors ⇒ G1–G7 byte-for-byte.** DEFERRED: residual-`[O_i]` partitioning, per-metal
 selectivity (Fe vs Cu), over-precipitation/denuded-zone U-shape. Full chip+fab_game suites green.
-**S5 next** = power-rectifier family (own declared run, cited reverse-recovery `t_rr∝τ`).
+
+**SLICE 5 (power-rectifier family = the LIFETIME axis) BUILT 2026-06-15 — `chip/reverse_recovery.py` (cited
+`t_rr∝τ`) + `fab_game/targets.py` (`POWER_RECTIFIER` + new `DeviceTarget.structure` device-family field +
+`POWER_FAMILY` + `disposition` family guard) + `t_rr` wired through `Die`/`spec`/`device_step` +
+`tests/test_reverse_recovery.py`, `tests/test_targets_power.py` + `demo_reverse_recovery.py`/`fab-game-s5.png`.**
+The richest, LAST inversion → **plan COMPLETE**. G4b's deep-level metals kill `τ` → leakage `J_gen∝1/τ` (logic
+killer); the rectifier reads the **SAME `τ` the OPPOSITE way** — reverse recovery `t_rr∝τ` (charge-control
+storage time), so a **short `τ`** (a leaky logic reject) is a **FAST rectifier**: **the lifetime killer is
+the feature**. **One cited output, ZERO new lifetime physics** (`τ` IS the G4b reading) — and **DERIVED not a
+remembered fit** (S2 discipline): solving `dQ/dt=−Q/τ−I_R`, `Q(0)=I_F·τ` → `t_s=τ·ln(1+I_F/I_R)` (op-point
+`K=ln(1+I_F/I_R)` + non-`τ` fall time `t_f` flagged/named); [[reverse-recovery-source]]. **2-level declaration
+COMPLETED:** rectifier = a **different DEVICE FAMILY** (diode≠MOSFET, committed at the mask, never a
+disposition of a logic wafer) → new **`structure`** tag (`"mosfet"`/`"rectifier"`, the FIRST level) + a
+`disposition` **family guard**. Honest subtlety (advisor-grade): rectifier **SHARES the light high-res
+substrate** with the S3 native MOSFET (needs the light boule for BV; floor `10V` = the same hard substrate
+gate) → the **family guard, NOT the substrate one, is the binding** separator — they cross on the **lifetime**
+axis while sharing a substrate. Honesty ceiling NAMED: the line scores the *shared* silicon physics (junction
+BV + carrier `τ`) a diode & MOSFET both have, NOT a distinct vertical-diode structure (a declared-run scoring
+lens, not a re-fab). **Leakage INVERSION made literal:** rectifier leakage window **OPEN** (the leakage that
+fails logic is not its axis) — only gates are `t_rr` (REQUIRED ceiling) + `BV` (REQUIRED floor; both nan-guarded
+like S3), `V_t`/`I_Dsat`/CD/NILS open, single `"pass"` bin. **Both gates on the lifetime axis (verified):**
+G1 = mutual rejection on the SAME high-res substrate (clean→native-good/rect-reject `t_rr≈6.9e5ns≫500`;
+metal→rect-good `t_rr≈69ns`/native-reject leak≈288≫10; metals Na-clean→move `τ` NOT `V_t`/`BV`; bands DISJOINT
+`τ`: rect≲0.72µs, logic≳2.88µs, dead-zone between) + a low-R metal wafer is STILL rect-reject on BV (~5V) →
+"good-is-relative needs BOTH commits" (lifetime=cross, substrate=gate); G2 = declaring moves the purification
+optimum clean↔metal. **Seam:** `t_rr` purely additive (never moves `V_t`/`I_Dsat`; MOSFET targets leave its
+window open) → G1–G7 byte-for-byte. **DEFERRED:** `t_f` (not `τ`-scaling), constant-`I_R` idealization,
+finite rectifier leakage rating + `t_rr`/current performance grade, distinct vertical-diode structure. 803
+chip+fab_game tests green. **ALL 5 SLICES BUILT — plan complete.**
 
 **Already graded (don't reinvent):** yield is continuous, and **speed binning** (`SpeedBins` in
 `spec.py`, priced in `scoring.py`) already IS "functional-but-suboptimal" (the bin-out = a working

@@ -85,14 +85,23 @@ class DeviceTarget:
     knob direction this target rewards) for the educational guide / disposition readout; it is **not** read
     by any scoring path (the optimum is proven empirically, not declared — see the slice-1 gates).
 
+    :attr:`structure` (slice 5) names the **device family** — the mask / structure, the *first* level of the
+    two-level declaration (``"mosfet"`` / ``"rectifier"``). It is committed up front at lithography and is
+    **never salvaged across**: a MOSFET wafer is not a power diode, so :func:`disposition` is *within one
+    device family* (a different family is its own declared run, never a harvest). The MOSFET flavors and the
+    high-res native part are all ``"mosfet"``; the slice-5 power rectifier (:data:`POWER_RECTIFIER`) is the
+    ``"rectifier"`` family. Defaults to ``"mosfet"`` (the incumbent), so the slice-1/2/3 targets are unchanged.
+
     :attr:`substrate` (slice 3) names the **substrate-resistivity class** the target is grown on
     (``"low-res"`` / ``"high-res"``). Unlike a flavor (oxide / junction depth — set *after* the substrate),
     the substrate resistivity is **committed at growth** (the boule): you cannot re-grade a finished wafer
     across substrate classes (a low-R logic wafer is not a high-res part), so it is a **second up-front
     commitment** alongside the device family — :func:`disposition` is *within one substrate class*. The
-    low-R class is the dispositionable MOSFET family (:data:`MOSFET_FLAVORS`); the high-res class is its
-    own declared run (:data:`HIGH_RES`, the slice-3 native part). Defaults to ``"low-res"`` (the incumbent),
-    so the slice-1/2 flavors are unchanged.
+    low-R class is the dispositionable MOSFET family (:data:`MOSFET_FLAVORS`); the high-res class holds two
+    *different-family* declared runs that share the light boule — the high-res native MOSFET
+    (:data:`HIGH_RES`, slice 3) and the power rectifier (:data:`POWER_RECTIFIER`, slice 5) — so the
+    :attr:`structure` guard, not the substrate one, is what keeps *those* two apart. Defaults to
+    ``"low-res"`` (the incumbent), so the slice-1/2 flavors are unchanged.
 
     All numbers are flagged house values (ADR 0005 §5): only the *relationships* between targets (the
     windows cross; the optimum moves) carry meaning, never the bands or the dollars.
@@ -103,6 +112,7 @@ class DeviceTarget:
     prices: dict[str, float]
     optimum_hint: str = ""
     substrate: str = "low-res"   # slice-3 substrate-resistivity class — committed at growth (see above)
+    structure: str = "mosfet"    # slice-5 device family — mask/structure, committed up front (see above)
 
 
 # --------------------------------------------------------------------------- #
@@ -285,6 +295,89 @@ HIGH_RES_FAMILY: tuple[DeviceTarget, ...] = (HIGH_RES,)
 
 
 # --------------------------------------------------------------------------- #
+# The power-rectifier family (device-targets slice 5) — the LIFETIME axis: short τ = fast switching.
+# --------------------------------------------------------------------------- #
+# The richest, last inversion. G4b's deep-level metals (Fe/Cu) destroy minority-carrier lifetime ``τ`` and,
+# through it, the junction reverse **leakage** ``J_gen ∝ 1/τ`` — *the* device killer for a logic part. The
+# power rectifier reads the **same ``τ`` in the opposite direction**: its reverse-recovery time ``t_rr ∝ τ``
+# (:func:`chip.reverse_recovery.reverse_recovery_time`, the charge-control storage time), so a **short** ``τ``
+# — a leaky, low-lifetime wafer that ruins logic — is exactly what makes a **fast** rectifier. The lifetime
+# killer is the feature. (Real fast/soft-recovery rectifiers are made this way: gold/platinum doping or
+# electron irradiation *deliberately* kills lifetime to speed switching — Sze, Baliga.)
+#
+# THE two-level declaration (the slice-5 backbone). The rectifier is a **different DEVICE FAMILY** — a
+# vertical p-n diode, not a MOSFET — so it is committed up front at the mask and is **never** a disposition
+# of a logic wafer (``docs/plans/device-targets.md`` §"the real-world line": reassigning a finished MOSFET
+# wafer to a power rectifier is NOT real). It is its **own declared run** (like the high-res native part), and
+# the new :attr:`DeviceTarget.structure` tag + the :func:`disposition` family guard enforce it: even though
+# the rectifier *shares the light high-res substrate* with the native MOSFET (a power device needs the lighter
+# boule for blocking voltage — its ``BV`` floor sits above the low-R ceiling, the same hard substrate gate
+# slice 3 proved), the two are different families and cannot be re-graded across.
+#
+# THE inversion axis is LIFETIME, not the substrate (advisor discipline — keep slices' axes distinct). On the
+# *same* high-res substrate the native MOSFET wants a **long** ``τ`` (clean feed, low leakage) and the
+# rectifier a **short** ``τ`` (a metal-laden feed, fast ``t_rr``) — so a single feed-grade sweep flips the
+# best SKU (gate 1, the τ cross), and declaring the rectifier moves the **purification** optimum dirty where
+# the native part wants it clean (gate 2). The metals are Na-/dopant-clean, so they move ``τ`` (→ leakage,
+# → ``t_rr``) **without** touching ``V_t``/``BV`` — a clean single-axis cross.
+#
+# THE leakage inversion (the lesson, made literal). The rectifier's leakage window is **OPEN**: the very
+# reverse leakage that a short ``τ`` forces — and that *fails* a logic part — is **not an acceptance axis**
+# for the rectifier. Its only parametric gates are ``t_rr`` (REQUIRED ceiling: fast enough) and ``BV``
+# (REQUIRED floor: blocks enough); ``V_t``/``I_Dsat``/CD/NILS are open (a diode has no gate channel). The
+# functional gates (resolve / void / bridge / defect / geometry) still apply — the wafer must physically fab.
+# (A real rectifier still carries a finite, much-higher leakage rating, and a current/t_rr performance grade
+# — both named scope edges; here the defining cross is ``t_rr``, so leakage is simply not its gate and the
+# part takes a single ``"pass"`` bin.)
+#
+# All bands/prices FLAGGED (ADR 0005 §5) — only the relationships carry meaning: the τ windows cross (the
+# rectifier's t_rr ceiling demands a τ a logic leakage spec forbids, and vice-versa) and the declaration
+# moves the purification optimum.
+POWER_T_RR_CEILING_NS = 500.0       # FLAGGED house t_rr ceiling: above a lifetime-killed (metal-feed) wafer
+#                                     (~100 ns) and far below a clean float-zone diode (~7e5 ns at τ_bulk) →
+#                                     only a short-τ (dirty / un-gettered) feed clears it — the τ gate
+POWER_PRICES: dict[str, float] = {  # FLAGGED house $ — a specialty power-rectifier part (single "pass" bin)
+    "pass": 12.0,
+    "reject": 0.0,
+}
+POWER_RECTIFIER = DeviceTarget(
+    name="power-rectifier",
+    specs=SpecSet(
+        # The MOSFET parametrics are OPEN — a diode has no gate channel (V_t/I_Dsat) and is not gated on the
+        # gate-line printability margin (CD/NILS); the functional resolve gate still requires a printed wafer.
+        cd_nm=SpecWindow("CD (nm)", optional=True),
+        i_dsat_mA=SpecWindow("I_Dsat (mA)", optional=True),
+        v_t=SpecWindow("V_t (V)", optional=True),
+        nils=SpecWindow("NILS", optional=True),
+        # The leakage INVERSION: open. The reverse leakage a short τ forces is tolerated, not a reject axis.
+        leakage=SpecWindow("leakage (nA/cm²)", optional=True),
+        # BV REQUIRED — the blocking-voltage floor (same light-substrate gate as the high-res native part:
+        # above the low-R plane-parallel ceiling, so unreachable on a logic wafer → the rectifier needs the
+        # light boule). REQUIRED, like the native part's BV: breakdown is a defining property of a power part.
+        bv=SpecWindow("BV (V)", lo=HIGH_RES_BV_FLOOR_V, optional=False),
+        # t_rr REQUIRED — the defining axis: fast enough reverse recovery (short τ). REQUIRED, so a die with
+        # no t_rr reading (an unresolved junction → no τ) fails rather than ships unrated (the advisor's S3
+        # pattern, the mirror of S2's nan-guard) — not reachable on the line today (the device always sets τ
+        # when it resolves), a guard.
+        t_rr_ns=SpecWindow("t_rr (ns)", hi=POWER_T_RR_CEILING_NS, optional=False),
+        speed_bins=SpeedBins(),     # single open "pass" bin — no t_rr/current performance grade (a named edge)
+    ),
+    prices=POWER_PRICES,
+    optimum_hint="grow a LIGHT (high-res) substrate for blocking voltage + run a lifetime-KILLED (metal-laden / "
+                 "un-gettered) feed for a SHORT carrier lifetime → fast reverse recovery — its own declared "
+                 "run, never a disposition of a logic wafer (the lifetime killer is the feature)",
+    substrate="high-res",       # shares the light boule with the native MOSFET (for BV) — structure tells them apart
+    structure="rectifier",      # the DIFFERENT device family — committed at the mask, never salvaged across
+)
+
+# The power-device family — its own declared run (one rectifier), a different FAMILY from every MOSFET. Like
+# HIGH_RES_FAMILY it is a menu of one (declared up front, not harvested); re-grading to/from any MOSFET is
+# blocked by the :func:`disposition` family guard (different :attr:`DeviceTarget.structure`), even though the
+# rectifier shares the high-res *substrate* with the native MOSFET (the family guard, not the substrate one).
+POWER_FAMILY: tuple[DeviceTarget, ...] = (POWER_RECTIFIER,)
+
+
+# --------------------------------------------------------------------------- #
 # Re-grading — score a FINISHED wafer against a different target (zero new physics)
 # --------------------------------------------------------------------------- #
 def _regrade_die(die: Die, target: DeviceTarget, geometry_reason: str | None) -> Die:
@@ -390,11 +483,21 @@ def disposition(
     the live lever); ties keep the input order (the declared flavor listed first, so an on-target lot reads
     naturally). Returns one :class:`TargetGrade` per target — ``result[0]`` is the best SKU for this wafer.
 
-    **Substrate-class guard (slice 3).** Disposition is **within one substrate-resistivity class**: the
-    substrate is committed at growth (the boule), so a finished wafer cannot be re-graded across substrate
-    classes (a low-R logic wafer is not a high-res native part — see :attr:`DeviceTarget.substrate`). A menu
-    mixing classes is a misconfiguration → raises (like the recipe's two-``G`` / over-and-under-etch guards).
+    **Family guard (slice 5) + substrate-class guard (slice 3).** Disposition is **within one device family
+    *and* one substrate class** — the two up-front commitments the two-level declaration makes. The
+    **family** (:attr:`DeviceTarget.structure`) is the mask/structure, committed at lithography: a MOSFET
+    wafer is not a power rectifier, so they are never re-graded across (the rectifier is its own declared run,
+    not a harvest). The **substrate** (:attr:`DeviceTarget.substrate`) is committed at growth: a low-R logic
+    wafer is not a high-res part. A menu mixing either is a misconfiguration → raises (like the recipe's
+    two-``G`` / over-and-under-etch guards). The family guard is the binding one for the high-res native
+    MOSFET vs the power rectifier — they *share* the light substrate but are different families.
     """
+    structures = {t.structure for t in targets}
+    if len(structures) > 1:
+        raise ValueError(
+            "disposition is within ONE device family — the structure/mask is committed up front at "
+            f"lithography, so a finished wafer cannot be re-graded across device families (got {sorted(structures)}). "
+            "A power rectifier is its own declared run, not a disposition of a MOSFET wafer.")
     substrates = {t.substrate for t in targets}
     if len(substrates) > 1:
         raise ValueError(

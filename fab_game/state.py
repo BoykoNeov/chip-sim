@@ -112,6 +112,7 @@ class Die:
     tau: float | None = None                    # minority-carrier SRH lifetime (s) — deep-level metals (G4b)
     j_leak: float | None = None                 # junction reverse-leakage density (A/cm²) — the metal killer (G4b)
     bv_V: float | None = None                   # drain–body junction avalanche breakdown (V) — set by the device step (slice 2)
+    t_rr: float | None = None                   # diode reverse-recovery (storage) time (s) ∝ τ — set by the device step (slice 5)
     defects: tuple[DefectEvent, ...] = ()       # killer particles caught at wafer prep (G3)
     killed_by_defect: bool | None = None        # set by wafer prep; True ⇒ a functional fail
     voided: bool | None = None                  # set by etch/depo (G5); True ⇒ a depo void → functional fail
@@ -140,6 +141,11 @@ class Die:
     def j_leak_nA_cm2(self) -> float | None:
         """Junction reverse-leakage density in **nA/cm²** (the leakage spec-window unit, G4b)."""
         return None if self.j_leak is None else self.j_leak * 1.0e9
+
+    @property
+    def t_rr_ns(self) -> float | None:
+        """Diode reverse-recovery time in **ns** (the power-rectifier spec-window / readout unit, slice 5)."""
+        return None if self.t_rr is None else self.t_rr * 1.0e9
 
     def record(self, step: str, knobs_in: dict, outputs: dict, **updates) -> "Die":
         """Return a new die with ``updates`` applied and a :class:`DieStepRecord` appended (append-only)."""

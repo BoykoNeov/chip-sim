@@ -1590,6 +1590,102 @@ def internal_gettering_figure(result):
 
 
 # --------------------------------------------------------------------------- #
+# S5 — the lifetime inversion: one τ read two ways (leakage killer ↔ recovery feature)
+# --------------------------------------------------------------------------- #
+def _rr_two_faces_panel(ax, result) -> None:
+    """The two faces of one τ: leakage J_gen(τ) ∝ 1/τ (the logic killer) + t_rr(τ) ∝ τ (the rectifier
+    feature), with the two ceilings carving out DISJOINT pass bands on the same lifetime axis."""
+    tau_us = np.asarray(result.tau_fine_s) * 1e6
+    leak = np.asarray(result.leak_fine)
+    t_rr = np.asarray(result.t_rr_fine_ns)
+    ax.plot(tau_us, leak, color="#d62728", lw=2.0, label="leakage J_gen ∝ 1/τ (logic killer)")
+    ax.axhline(result.leak_ceil, color="#d62728", ls=":", lw=1.1, alpha=0.7)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("minority-carrier lifetime τ (µs)", fontsize=9)
+    ax.set_ylabel("junction leakage (nA/cm²)", fontsize=9, color="#d62728")
+    ax.tick_params(axis="y", labelcolor="#d62728")
+    ax2 = ax.twinx()
+    ax2.plot(tau_us, t_rr, color="#2f6db5", lw=2.0, label="reverse recovery t_rr ∝ τ (rectifier)")
+    ax2.axhline(result.t_rr_ceil, color="#2f6db5", ls=":", lw=1.1, alpha=0.7)
+    ax2.set_yscale("log")
+    ax2.set_ylabel("reverse recovery t_rr (ns)", fontsize=9, color="#2f6db5")
+    ax2.tick_params(axis="y", labelcolor="#2f6db5")
+    # The two DISJOINT pass bands (the cross): rectifier ships at short τ, logic at long τ.
+    trr_edge, leak_edge = result.tau_trr_edge_s * 1e6, result.tau_leak_edge_s * 1e6
+    ax.axvspan(tau_us[0], trr_edge, color="#2f6db5", alpha=0.10)
+    ax.axvspan(leak_edge, tau_us[-1], color="#2ca02c", alpha=0.10)
+    ax.axvline(trr_edge, color="#2f6db5", ls="--", lw=1.0, alpha=0.7)
+    ax.axvline(leak_edge, color="#2ca02c", ls="--", lw=1.0, alpha=0.7)
+    ax.text(trr_edge * 0.55, leak[0] * 0.25, "rectifier\nτ short", color="#2f6db5", fontsize=8,
+            ha="center", va="center")
+    ax.text(leak_edge * 2.2, leak[0] * 0.25, "logic\nτ long", color="#2ca02c", fontsize=8,
+            ha="center", va="center")
+    ax.set_title("One τ, two faces: a SHORT lifetime is a leaky logic reject\nbut a FAST rectifier "
+                 "— the pass bands are disjoint", fontsize=10)
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, fontsize=7.5, loc="upper center")
+
+
+def _rr_optimum_panel(ax, result) -> None:
+    """The declaration moves the optimum: sweeping the feed cleanliness (zone passes → longer τ), the
+    native-MOSFET revenue rises while the power-rectifier revenue falls — the best SKU flips."""
+    passes = np.asarray(result.zone_passes)
+    ax.plot(passes, result.native_rev, color="#2ca02c", lw=2.0, marker="o", ms=3.5,
+            label="high-res native MOSFET (wants clean)")
+    ax.plot(passes, result.rectifier_rev, color="#2f6db5", lw=2.0, marker="s", ms=3.5,
+            label="power rectifier (wants killed τ)")
+    ax.set_xlabel("zone-refining passes (→ cleaner feed → longer τ)", fontsize=9)
+    ax.set_ylabel("wafer revenue ($, flagged)", fontsize=9)
+    ax2 = ax.twinx()
+    ax2.plot(passes, result.tau_pipe_us, color="0.55", ls="--", lw=1.3, label="τ (µs)")
+    ax2.set_yscale("log")
+    ax2.set_ylabel("lifetime τ (µs)", fontsize=9, color="0.45")
+    ax2.tick_params(axis="y", labelcolor="0.45")
+    ax.set_title("The declaration moves the optimum: clean feed → native part,\n"
+                 "lifetime-killed feed → rectifier (the best SKU flips)", fontsize=10)
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, fontsize=8, loc="center right")
+
+
+def _rr_substrate_panel(ax, result) -> None:
+    """The rectifier needs the light boule too: BV(N_substrate) crosses the blocking-voltage floor only at
+    the lighter (high-res) substrate — a short τ is necessary but not sufficient (the substrate commit)."""
+    n = np.asarray(result.n_seed_sweep)
+    ax.plot(n, result.bv_sweep, color="#7b3fbf", lw=2.0, marker="o", ms=3.5, label="BV(N_substrate)")
+    ax.axhline(result.bv_floor, color="#d62728", ls="--", lw=1.2, label=f"rectifier BV floor ({result.bv_floor:.0f} V)")
+    ax.axvspan(n[0], result.n_seed_bv_edge, color="#7b3fbf", alpha=0.10)
+    ax.axvline(result.n_seed_bv_edge, color="#7b3fbf", ls=":", lw=1.0, alpha=0.7)
+    ax.set_xscale("log")
+    ax.set_xlabel("substrate doping N_A (cm⁻³)", fontsize=9)
+    ax.set_ylabel("junction breakdown BV (V)", fontsize=9)
+    ax.text(result.n_seed_bv_edge * 0.45, result.bv_floor * 1.25, "light boule\n(BV clears)",
+            color="#7b3fbf", fontsize=8, ha="center", va="bottom")
+    ax.set_title("A short τ is not enough: the rectifier needs the LIGHT boule\nfor blocking voltage "
+                 "(its own declared run, not a logic harvest)", fontsize=10)
+    ax.legend(fontsize=8, loc="upper right")
+
+
+def reverse_recovery_figure(result):
+    """Assemble the S5 artifact from a :class:`~fab_game.demo_reverse_recovery.DemoResult` (3 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.7))
+    _rr_two_faces_panel(axes[0], result)
+    _rr_optimum_panel(axes[1], result)
+    _rr_substrate_panel(axes[2], result)
+    fig.suptitle("S5 — the LIFETIME inversion: reverse recovery t_rr ∝ τ (charge-control, Sze) reads the "
+                 "SAME minority-carrier lifetime the junction leakage does, in the opposite direction\n"
+                 "the lifetime killer (Fe/Cu / short τ) is the rectifier's FEATURE — a power rectifier is its "
+                 "own declared run (light boule + killed τ); the form is cited, the operating point flagged",
+                 fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    return fig
+
+
+# --------------------------------------------------------------------------- #
 # E1 — spike/RTA thermal budget: the budget accrues near the peak → shallower x_j
 # --------------------------------------------------------------------------- #
 def _budget_accrual_panel(ax, result) -> None:

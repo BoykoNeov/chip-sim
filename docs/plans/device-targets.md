@@ -112,7 +112,7 @@ Before building any mechanic on top, prove these two — they are what make the 
 | **2** | HV-I/O flavor + cited junction **avalanche breakdown** output | one cited output | the junction-depth axis (diffusion step) |
 | **3** ✅ | substrate-**resistivity** inversion at the growth step | **none** (reads existing `N_A` + BV) | the high-res **native** part (low V_t = feature, high BV) |
 | **4** ✅ | the oxygen **dual-use** trade-off (donors-bad vs gettering-good) | one cited output (internal-gettering efficiency) | the *process-trade-off* lesson, kept distinct from segmentation |
-| **5** | the **power-rectifier family** — own declared run, lifetime-killer-as-feature | cited `t_rr ∝ τ` reverse-recovery | the richest inversion, last |
+| **5** ✅ | the **power-rectifier family** — own declared run, lifetime-killer-as-feature | one cited output (`t_rr ∝ τ` reverse-recovery) | the richest inversion, last |
 
 **Slice 1 is the zero-new-physics spine** and the only one fully specified here; later slices are
 fill-in-the-blanks once the spine lands and the user reacts to the whole loop.
@@ -191,7 +191,55 @@ over-precipitation U-shape. **Master seam: no `[O_i]` ⇒ no gettering AND no do
 **DEFERRED named edges:** residual-`[O_i]` partitioning (precipitation consumes the donor oxygen — full
 `[O_i]` to both faces overstates each at high O, direction holding), per-metal selectivity (Fe vs Cu),
 the over-precipitation / denuded-zone-collapse U-shape. Full chip + fab_game suites green.
-**Slice 5 next** = the power-rectifier family (own declared run, cited reverse-recovery `t_rr ∝ τ`).
+**Slice 5 (the power-rectifier family) BUILT 2026-06-15 — `chip/reverse_recovery.py` (cited `t_rr ∝ τ`) +
+`fab_game/targets.py` (`POWER_RECTIFIER` + the `structure`/device-family field + `POWER_FAMILY` + the
+`disposition` family guard) + `t_rr` wired through `Die`/`spec`/`device_step` + `tests/test_reverse_recovery.py`,
+`tests/test_targets_power.py` + `demo_reverse_recovery.py`/`fab-game-s5.png`.** The richest, last inversion
+— the **lifetime axis**. G4b's deep-level metals (Fe/Cu) destroy the minority-carrier lifetime `τ` and,
+through it, raise the junction **leakage** `J_gen ∝ 1/τ` (the logic killer). A power rectifier reads the
+**same `τ` in the opposite direction**: its reverse-recovery time `t_rr ∝ τ` (the charge-control storage
+time), so a **short `τ`** — a leaky, low-lifetime wafer that ruins a logic part — is exactly what makes a
+**fast** rectifier. **The lifetime killer is the feature.** **One cited output, zero new lifetime physics:**
+`t_rr` is the only addition (`τ` is the G4b reading) — and it is **derived, not a remembered fit** (the
+advisor's S2 discipline): solving the cited charge-control ODE `dQ/dt = −Q/τ − I_R` with `Q(0) = I_F·τ`
+gives `t_s = τ·ln(1 + I_F/I_R)` (the operating-point factor `K = ln(1+I_F/I_R)` and the non-`τ`-scaling
+fall time `t_f` are flagged/named edges), the analogue of breakdown's `∫α dr = 1`. See
+[[reverse-recovery-source]].
+
+**The two-level declaration, completed (the slice-5 structural point).** The rectifier is a **different
+DEVICE FAMILY** — a vertical p-n diode, not a MOSFET — so it is committed up front at the mask and is
+**never** a disposition of a logic wafer (the plan's "reassign a finished wafer to a power rectifier: NOT
+real"). A new **`DeviceTarget.structure`** tag (`"mosfet"`/`"rectifier"`, the *first* declaration level) +
+a `disposition` **family guard** enforce it. The honest subtlety (verified on the line): the rectifier
+**shares the light high-res substrate** with the slice-3 native MOSFET (a power part needs the lighter boule
+for blocking voltage — its `BV` floor `10 V` is the same hard substrate gate, above the low-R ceiling), so
+the **family guard, not the substrate one, is the binding** separator for those two — they cross on the
+**lifetime** axis while sharing a substrate. (Honesty ceiling, named: the line models the *shared* silicon
+physics — junction `BV` + carrier `τ` — that a diode and a MOSFET both have; the rectifier scores only those,
+not a distinct vertical diode structure / forward drop / current rating — a declared-run scoring lens, not a
+re-fab.) **The leakage INVERSION, made literal:** the rectifier's leakage window is **OPEN** — the very
+reverse leakage a short `τ` forces, and that *fails* a logic part, is simply *not its acceptance axis*; its
+only parametric gates are `t_rr` (REQUIRED ceiling) and `BV` (REQUIRED floor), with `V_t`/`I_Dsat`/CD/NILS
+open (a diode has no gate channel) and a single `"pass"` bin (a `t_rr`/current performance grade is a named
+edge). Both REQUIRED guards mirror the S3 nan-guard (a die with no `t_rr`/`BV` reading FAILS, not ships
+unrated).
+
+**Both gates re-proven on the lifetime axis (verified on the line).** Gate 1 (**windows cross**): on the
+*same* high-res substrate, a **clean** feed is native-MOSFET-good / rectifier-reject (`t_rr ≈ 6.9e5 ns ≫`
+the 500 ns ceiling) and a **metal** (lifetime-killed) feed is rectifier-good (`t_rr ≈ 69 ns`) / native-reject
+(leak ≈ 288 nA/cm² ≫ 10) — **mutual rejection**, and the metals are Na-/dopant-clean so they move `τ`
+(→ leakage, → `t_rr`) **without** touching `V_t`/`BV` (a clean single axis). The bands are **disjoint**
+on `τ` (rectifier `τ ≲ 0.72 µs`, logic `τ ≳ 2.88 µs`, a dead zone between — a mediocre lifetime serves
+neither). And — the "good is relative needs BOTH commits" point — a **low-R** metal wafer (short `τ`, fast
+`t_rr`) is *still* a rectifier-reject on `BV` (~5 V, under the floor): the lifetime is the cross, the
+substrate is the gate. Gate 2 (**optimum moves**): declaring the native part wants a CLEAN feed, the
+rectifier a METAL one — the best SKU flips on the purification axis. **Seam:** `t_rr` is a purely additive
+device output (never moves `V_t`/`I_Dsat`; the MOSFET targets leave its window open), so G1–G7 are
+byte-for-byte. **DEFERRED named edges:** the depletion/transit fall time `t_f` (not `τ`-scaling), the
+constant-`I_R` switching idealization, the rectifier's finite (much-higher) leakage rating + a `t_rr`/current
+performance grade, and the distinct vertical-diode structure (the line scores the shared junction/lifetime
+physics). 803 fab_game + chip tests green (the chip notebook is the known [[chip-notebook-flake]],
+unrelated). **The device-targets plan is now complete (all five slices built).**
 
 ### Slice 1 — the spine (zero new physics)
 
@@ -212,8 +260,9 @@ the over-precipitation / denuded-zone-collapse U-shape. Full chip + fab_game sui
 
 ## Deferred / open (explicit)
 
-- **Slice 5** — specified only at the table granularity above; built when the loop has been reacted to
-  (the repo's one-slice-at-a-time discipline). (Slices 1–4 built.)
+- **Slice 5** — BUILT (see the build-status block above). **All five slices are now built; the plan is
+  complete.** The remaining open items (the economics overlap, on-die multi-V_t libraries) are *cross-cutting*,
+  not further slices.
 - **High-V_t HV on a light substrate via a channel/drift threshold-adjust implant (LDMOS)** — the
   ambitious S3 alternative, **deferred** (a named edge). In the as-built single-doping model an implant
   lifts `V_t` but not `I_Dsat`, so high-res+implant would *strictly dominate* logic and the "good is
@@ -221,8 +270,8 @@ the over-precipitation / denuded-zone-collapse U-shape. Full chip + fab_game sui
   to restore a trade S3's *native* part gets for free) — past a slice's natural size. Filed with the repo's
   other build-the-honest-smaller-thing deferrals (A2 Robin-G, E1 heat-mode, CG-3 transient).
 - **Cited-source memories** for the new outputs — avalanche BV **written** (`avalanche-breakdown-source`,
-  slice 2); internal gettering **written** (`internal-gettering-source`, slice 4); reverse recovery to
-  come with slice 5 (the repo's `*-source` pattern).
+  slice 2); internal gettering **written** (`internal-gettering-source`, slice 4); reverse recovery
+  **written** (`reverse-recovery-source`, slice 5). (All written — the repo's `*-source` pattern complete.)
 - **The economics overlap** — `docs/plans/fab-journey.md`'s #1 open item (the per-pass / throughput cost
   side) intersects here: per-target price curves are part of the cost side. Coordinate so the two don't
   diverge.

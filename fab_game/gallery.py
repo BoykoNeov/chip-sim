@@ -118,6 +118,9 @@ DEEPENINGS = [
     Demo("demo_internal_gettering", "S4",
          "Crucible oxygen's dual-use: internal gettering traps the deep-level metals (leakage down) while "
          "the same oxygen makes donors (V_t down) — a Goldilocks within one device."),
+    Demo("demo_reverse_recovery", "S5",
+         "The lifetime inversion: reverse recovery t_rr ∝ τ reads the SAME lifetime the leakage does, "
+         "opposite way — a short τ is a leaky logic reject but a fast power rectifier (the killer is the feature)."),
 ]
 
 ALL_DEMOS = LINE + DEEPENINGS
