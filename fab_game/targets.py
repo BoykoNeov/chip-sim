@@ -14,6 +14,17 @@ the slice's *one* cited device output — the drain–body junction **avalanche 
 grading machinery here is unchanged; what is new is that one target (HV-I/O) now reads an axis the logic
 flavors leave open.
 
+**Slice 3 adds the high-resistivity ``high-res`` native part** (see :ref:`the slice-3 section <slice 3>`)
+— and, again, **zero new physics**: it turns ``BV``'s *other* knob, the **substrate doping** itself
+(``BV ∝ N_B^(−3/4)``, set at growth), where slice 2 turned the junction depth. The finding that shapes it
+(verified on the line, mirroring slice 2's): in this single-doping model the substrate doping moves ``BV``
+and ``V_t`` with **opposite signs, coupled** — so a light enough substrate to give a real high ``BV``
+craters ``V_t`` below every logic window. The resolution is that the high-``BV`` part is the **native**
+low-``V_t`` device (the MOSFET *without* a threshold implant) — the coupling *is* the inversion, a crossing
+on **both** axes at once. Because the substrate is **committed at growth**, the high-res part is its own
+declared run (a second up-front commitment alongside the device family — :attr:`DeviceTarget.substrate`),
+**not** a same-wafer disposition sibling of the low-R flavors.
+
 Why HV-I/O is its own slice (the junction-DEPTH axis — advisor 2026-06-15)
 --------------------------------------------------------------------------
 ``BV`` depends on the junction **depth** ``x_j`` (cylindrical-edge field crowding — a shallow junction breaks
@@ -74,6 +85,15 @@ class DeviceTarget:
     knob direction this target rewards) for the educational guide / disposition readout; it is **not** read
     by any scoring path (the optimum is proven empirically, not declared — see the slice-1 gates).
 
+    :attr:`substrate` (slice 3) names the **substrate-resistivity class** the target is grown on
+    (``"low-res"`` / ``"high-res"``). Unlike a flavor (oxide / junction depth — set *after* the substrate),
+    the substrate resistivity is **committed at growth** (the boule): you cannot re-grade a finished wafer
+    across substrate classes (a low-R logic wafer is not a high-res part), so it is a **second up-front
+    commitment** alongside the device family — :func:`disposition` is *within one substrate class*. The
+    low-R class is the dispositionable MOSFET family (:data:`MOSFET_FLAVORS`); the high-res class is its
+    own declared run (:data:`HIGH_RES`, the slice-3 :ref:`native part <slice 3>`). Defaults to
+    ``"low-res"`` (the incumbent), so the slice-1/2 flavors are unchanged.
+
     All numbers are flagged house values (ADR 0005 §5): only the *relationships* between targets (the
     windows cross; the optimum moves) carry meaning, never the bands or the dollars.
     """
@@ -82,6 +102,7 @@ class DeviceTarget:
     specs: SpecSet
     prices: dict[str, float]
     optimum_hint: str = ""
+    substrate: str = "low-res"   # slice-3 substrate-resistivity class — committed at growth (see above)
 
 
 # --------------------------------------------------------------------------- #
@@ -99,6 +120,7 @@ FAST_LOGIC = DeviceTarget(
     #                                                          reproduces the pre-targets game bit-for-bit)
     prices=BIN_PRICES,
     optimum_hint="thin gate oxide + shallow cut → low V_t, high drive (fast switching)",
+    substrate="low-res",     # the incumbent low-resistivity (~1e17) logic substrate
 )
 
 # Low-power speed bins — positioned BELOW the fast-logic market: a low-power part trades drive for a high,
@@ -126,6 +148,7 @@ LOW_POWER = DeviceTarget(
     ),
     prices=LOW_POWER_PRICES,
     optimum_hint="thick gate oxide + deeper cut → high V_t, low leakage (the fast-logic reject corner)",
+    substrate="low-res",     # same low-R logic substrate as fast-logic (dispositionable sibling)
 )
 
 # --------------------------------------------------------------------------- #
@@ -172,12 +195,90 @@ HV_IO = DeviceTarget(
     ),
     prices=HV_IO_PRICES,
     optimum_hint="thick I/O gate oxide (high V_t) + DEEP S/D junction (long drive-in → high breakdown voltage)",
+    substrate="low-res",     # still the low-R substrate: S2's BV comes from the DEEP junction, not the substrate
 )
 
 # The MOSFET family's dispositionable flavor set (fast-logic declared by default, the incumbent first). A
-# lot may re-grade between these (same mask); it may NOT re-grade to a different *family* (a power
-# rectifier) — that is a later slice's own declared run, never a harvest of a logic wafer.
+# lot may re-grade between these (same mask, same low-R substrate); it may NOT re-grade to a different
+# *family* (a power rectifier) — that is a later slice's own declared run, never a harvest of a logic
+# wafer — NOR across the substrate-resistivity class (the high-res native part below, slice 3, is grown
+# on a different boule). All three share ``substrate="low-res"`` (the disposition substrate-class guard).
 MOSFET_FLAVORS: tuple[DeviceTarget, ...] = (FAST_LOGIC, LOW_POWER, HV_IO)
+
+
+# --------------------------------------------------------------------------- #
+# .. _slice 3:
+# The high-resistivity NATIVE part (device-targets slice 3) — the SUBSTRATE-resistivity axis.
+# --------------------------------------------------------------------------- #
+# Slice 3 turns ``BV``'s *other* knob — the body doping ``N_B`` itself (``BV ∝ N_B^(−3/4)``, the lighter
+# substrate) — for a genuinely high-breakdown part, where slice 2 turned the junction **depth** ``x_j`` on
+# the fixed ~1e17 substrate (a modest ~5–9 V). THE structural finding (advisor, verified on the line —
+# mirrors slice 2's "x_j decouples BV from V_t"): in this single-doping compact model the substrate doping
+# sets **both** ``BV`` *and* ``V_t``, and it moves them with **opposite signs, coupled** — lowering ``N_A``
+# raises ``BV`` (good) and *craters* ``V_t`` together (1e17→1e16: BV ~5→12 V, V_t +0.55→+0.01 V; I_Dsat is
+# ``N_A``-independent, so V_t and BV are the *only* axes that move). So a light enough substrate to give a
+# real high ``BV`` puts ``V_t`` far below **every** logic-family window — substrate resistivity **cannot**
+# give slice 2's high-``V_t`` hv-io its breakdown (that is exactly why x_j was slice 2's lever: it raises
+# ``BV`` *without* touching ``V_t``).
+#
+# THE RESOLUTION (zero new physics — the coupling *is* the inversion): the high-``BV`` part does not have to
+# be high-``V_t``. A high-resistivity substrate naturally runs a **native** device — the MOSFET *without* a
+# threshold-adjust implant — at a low / near-zero ``V_t`` and a high junction breakdown (the real RF / analog
+# / high-voltage-I/O use of high-res substrates). That native low-``V_t`` part is the *simpler, more
+# physical* object, not a workaround: its low ``V_t`` (a logic **reject**) is the **feature**, and its high
+# ``BV`` is unreachable on the logic substrate — a genuine "good is relative" crossing on **both** axes at
+# once, with **no** physics added. (The ambitious alternative — a high-``V_t`` HV part on a light substrate
+# via a channel/drift threshold-adjust implant, i.e. LDMOS — is a **named deferred edge**: in the as-built
+# model an implant lifts ``V_t`` but never ``I_Dsat``, so high-res+implant would *strictly dominate* logic
+# and the crossing would dissolve; rescuing it needs added mobility degradation = more physics, past this
+# slice's size. Deferred like the 2-D / heat-mode edges — A2 Robin-G, E1 heat-mode, CG-3 transient.)
+#
+# THE SUBSTRATE COMMIT (advisor): resistivity is committed at **growth** (the boule), so this is **not** a
+# same-wafer disposition sibling of the low-R flavors — it is its **own declared run** (you grow the light
+# substrate up front), closer to slice 5's power rectifier than to slice 1/2's disposition menu. The physics
+# enforces it: a low-R wafer re-graded to high-res yields ~0 % (V_t too high *and* BV unreachable) and a
+# high-res wafer re-graded to logic yields ~0 % (V_t too low) — mutual rejection. The ``substrate`` tag +
+# the :func:`disposition` substrate-class guard make that boundary explicit (you cannot mix substrate
+# classes in one disposition menu).
+#
+# All bands/prices FLAGGED (ADR 0005 §5) — only the relationships carry meaning: the V_t windows are
+# **disjoint** (logic [0.45,0.68] vs native [−0.15,0.35]) and the BV floor sits **above the low-R plane-
+# parallel ceiling** (BV_pp(1e17) ≈ 9.3 V), so it is **physically unreachable** on the logic substrate by
+# *any* drive-in and only the lighter boule (BV ≈ 12 V at 1e16) clears it.
+HIGH_RES_BV_FLOOR_V = 10.0          # FLAGGED house BV floor: ABOVE the low-R ceiling BV_pp(1e17)≈9.3 V (so a
+#                                     logic-substrate part can NEVER clear it) and below the high-res BV (≈12 V
+#                                     at ~1e16) → the floor is a hard SUBSTRATE gate, not a tunable drive-in one
+# The native part runs at the same thin gate oxide as logic, and ``I_Dsat`` is ``N_A``-independent (it reads
+# C_ox·W/L·V_ov, never N_A), so its drive current is identical to fast-logic's — it bins on the *same*
+# MARKET_BINS thresholds (the same drive-current grade), differing only in price (a specialty high-res part).
+HIGH_RES_PRICES: dict[str, float] = {   # FLAGGED house $ — a specialty high-resistivity-substrate part
+    "premium": 16.0,
+    "typical": 11.0,
+    "value": 6.0,
+    "reject": 0.0,
+}
+HIGH_RES = DeviceTarget(
+    name="high-res",
+    specs=replace(
+        DEFAULT_SPECS,
+        v_t=SpecWindow("V_t (V)", lo=-0.15, hi=0.35),        # the NATIVE low-V_t band — DISJOINT from logic's
+        #                                                      [0.45,0.68] (the low V_t is the feature, not a fail)
+        i_dsat_mA=SpecWindow("I_Dsat (mA)", lo=2.0, hi=4.2),  # same thin-oxide drive as logic (N_A-independent)
+        bv=SpecWindow("BV (V)", lo=HIGH_RES_BV_FLOOR_V, optional=True),  # the floor unreachable on the low-R
+        #                                                                 substrate → only the light boule clears it
+        speed_bins=MARKET_BINS,                              # same drive-current grade as logic (see above)
+    ),
+    prices=HIGH_RES_PRICES,
+    optimum_hint="grow a HIGH-resistivity (light) substrate → low native V_t (no threshold implant) + a high "
+                 "junction breakdown — its own declared run, not a disposition of a low-R logic wafer",
+    substrate="high-res",
+)
+
+# The high-resistivity substrate class — its own declared run (one native part), NOT a disposition sibling of
+# the low-R MOSFET family. A menu of one (unlike MOSFET_FLAVORS) reinforces that high-res is *declared up
+# front*, not harvested off a finished low-R lot. Re-grading across the two families is blocked by the
+# :func:`disposition` substrate-class guard (and the physics already yields ~0 % across substrates).
+HIGH_RES_FAMILY: tuple[DeviceTarget, ...] = (HIGH_RES,)
 
 
 # --------------------------------------------------------------------------- #
@@ -285,6 +386,17 @@ def disposition(
     picks the SKU. Ranked by **revenue** (the fab cost is sunk and identical across targets, so revenue is
     the live lever); ties keep the input order (the declared flavor listed first, so an on-target lot reads
     naturally). Returns one :class:`TargetGrade` per target — ``result[0]`` is the best SKU for this wafer.
+
+    **Substrate-class guard (slice 3).** Disposition is **within one substrate-resistivity class**: the
+    substrate is committed at growth (the boule), so a finished wafer cannot be re-graded across substrate
+    classes (a low-R logic wafer is not a high-res native part — see :attr:`DeviceTarget.substrate`). A menu
+    mixing classes is a misconfiguration → raises (like the recipe's two-``G`` / over-and-under-etch guards).
     """
+    substrates = {t.substrate for t in targets}
+    if len(substrates) > 1:
+        raise ValueError(
+            "disposition is within ONE substrate-resistivity class — the substrate is committed at growth "
+            f"(the boule), so a finished wafer cannot be re-graded across substrates (got {sorted(substrates)}). "
+            "A high-res native part is its own declared run, not a disposition of a low-R logic wafer.")
     grades = tuple(TargetGrade(t, grade_for(wafer, t, wafer_cost=wafer_cost)) for t in targets)
     return tuple(sorted(grades, key=lambda g: g.revenue, reverse=True))

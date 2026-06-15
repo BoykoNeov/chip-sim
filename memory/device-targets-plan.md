@@ -1,6 +1,6 @@
 ---
 name: device-targets-plan
-description: "\"good is relative\" multi-target specs — SLICES 1+2 BUILT (targets.py: DeviceTarget + FAST_LOGIC/LOW_POWER/HV_IO + regrade/disposition; S2 adds cited junction avalanche BV in chip/breakdown.py); 2-level declaration; 5-slice staging, S3–S5 planned"
+description: "\"good is relative\" multi-target specs — SLICES 1+2+3 BUILT (targets.py: DeviceTarget + FAST_LOGIC/LOW_POWER/HV_IO + regrade/disposition; S2 cited junction avalanche BV in chip/breakdown.py; S3 high-res NATIVE part on the substrate axis, zero new physics); 2-level declaration + substrate commit; 5-slice staging, S4–S5 planned"
 metadata: 
   node_type: memory
   type: project
@@ -54,6 +54,30 @@ flips the best SKU LP→HV (physics gates availability, price ranks). The 2 gate
 axis (BV decouples from V_t at fixed oxide; deep drive-in flips the optimum). Full suite green (the chip
 notebook is the known [[chip-notebook-flake]], unrelated). **S3 next** = substrate-resistivity inversion at
 growth (turns BV's OTHER knob, `N_A`, for a genuine HV part).
+
+**SLICE 3 (substrate-resistivity axis) BUILT 2026-06-15 — `fab_game/targets.py` (`HIGH_RES` + `substrate`
+field + `disposition` substrate-class guard + `HIGH_RES_FAMILY`) + `tests/test_targets_highres.py`. ZERO
+new physics** (Option B, advisor-steered — Option A rejected). Turns BV's OTHER knob = the substrate doping
+`N_A` itself (`BV∝N_A^−3/4`, set at growth), where S2 turned `x_j`. **THE structural finding (advisor,
+verified on the line — the S2 pattern AGAIN):** single-doping model → substrate doping sets **both** BV AND
+V_t and moves them **opposite-sign, COUPLED** (1e17→1e16: BV ~5→12V, V_t +0.55→+0.01V *together*; I_Dsat is
+`N_A`-independent → V_t/BV the only axes). So resistivity CANNOT give S2's *high-V_t* hv-io its BV (x_j was
+S2's lever precisely because it lifts BV *without* touching V_t). **Resolution = the coupling IS the
+inversion:** the high-BV part needn't be high-V_t → a high-res substrate runs a **NATIVE** device (MOSFET
+*without* a threshold implant) at low/~0 V_t (a logic **REJECT** — *that's* the feature) + high BV. Native
+V_t window `[−0.15,0.35]` **DISJOINT** from logic; BV floor `10V` sits **ABOVE the low-R plane-parallel
+ceiling** `BV_pp(1e17)≈9.3V` → **physically unreachable** on the logic substrate by ANY drive-in, cleared
+only by the lighter boule (`BV≈12V` at 1e16) = a hard **SUBSTRATE** gate. **Substrate COMMIT (advisor):**
+resistivity committed at GROWTH → the native part is its **own declared run** (2nd up-front commitment
+alongside the device family — new `DeviceTarget.substrate` tag), NOT a same-wafer disposition sibling
+(closer to S5 than S1/S2). Both gates re-proven on the substrate axis (two declared runs cross as **mutual
+rejection**; declaring moves the growth `N_seed` optimum heavy↔light); `disposition` guard raises on a
+mixed-class menu + physics independently makes cross-substrate re-grade ~0%. **DEFERRED named edge:**
+high-V_t HV on a light substrate via a channel/drift threshold-adjust implant (**LDMOS**) — implant lifts
+V_t but not I_Dsat → high-res+implant would *strictly dominate* logic → crossing dissolves; rescue needs
+added mobility degradation = more physics, past slice size (filed w/ A2 Robin-G / E1 heat-mode / CG-3
+transient). 352 fab_game tests green. **S4 next** = the oxygen DUAL-USE (donors-bad vs gettering-good
+*within one device* — process-trade-off, distinct from segmentation).
 
 **Already graded (don't reinvent):** yield is continuous, and **speed binning** (`SpeedBins` in
 `spec.py`, priced in `scoring.py`) already IS "functional-but-suboptimal" (the bin-out = a working

@@ -110,7 +110,7 @@ Before building any mechanic on top, prove these two — they are what make the 
 |-------|------|--------------|----------|
 | **1** | `DeviceTarget` abstraction + up-front declaration + disposition readout | **none** | the spine — built on the *proven* logic↔low-power `V_t`/`t_ox` crossing |
 | **2** | HV-I/O flavor + cited junction **avalanche breakdown** output | one cited output | the junction-depth axis (diffusion step) |
-| **3** | substrate-**resistivity** inversion at the growth step | reads existing `N_A` (+ BV) | high-res for HV / RF |
+| **3** ✅ | substrate-**resistivity** inversion at the growth step | **none** (reads existing `N_A` + BV) | the high-res **native** part (low V_t = feature, high BV) |
 | **4** | the oxygen **dual-use** trade-off (donors-bad vs gettering-good) | a gettering / lifetime-robustness output | the *process-trade-off* lesson, kept distinct from segmentation |
 | **5** | the **power-rectifier family** — own declared run, lifetime-killer-as-feature | cited `t_rr ∝ τ` reverse-recovery | the richest inversion, last |
 
@@ -126,8 +126,37 @@ curvature term lets two wafers with identical `V_t` have different `BV`). So the
 the V_t/oxide axis (HV is the highest-`V_t` flavor, crossing low-power from above), and `BV` is an
 *orthogonal* acceptance floor gated by the diffusion drive-in. `BV` was **derived from first principles**
 (the cited ionization integral over the cylindrical field), not an empirical curvature fit — see
-`memory: avalanche-breakdown-source`. **Slice 3 next** = the substrate-resistivity inversion (turns `BV`'s
-*other* knob, `N_A`, for a genuine high-voltage part).
+`memory: avalanche-breakdown-source`.
+
+**Slice 3 (the substrate-resistivity axis) BUILT 2026-06-15 — `fab_game/targets.py` (`HIGH_RES` +
+`substrate` field + `disposition` guard) + `tests/test_targets_highres.py`. Zero new physics** (Option B,
+advisor-steered). S3 turns `BV`'s *other* knob — the substrate doping `N_A` itself (`BV ∝ N_A^(−3/4)`, set
+at growth) — where S2 turned the junction depth `x_j`. **The structural finding (advisor, verified on the
+line — the S2 pattern again):** in this single-doping compact model the substrate doping sets **both** `BV`
+*and* `V_t`, and moves them with **opposite signs, coupled** — lowering `N_A` (1e17→1e16) raises `BV`
+(~5→12 V) and *craters* `V_t` (+0.55→+0.01 V) **together** (`I_Dsat` is `N_A`-independent → `V_t`/`BV` are
+the only axes that move). So substrate resistivity **cannot** give S2's *high-V_t* hv-io its breakdown
+(that is exactly why `x_j` was S2's lever — it raises `BV` *without* touching `V_t`). **The resolution
+(the coupling IS the inversion, no physics added):** the high-`BV` part does not have to be high-`V_t` — a
+high-resistivity substrate naturally runs a **native** device (the MOSFET *without* a threshold-adjust
+implant) at a low / near-zero `V_t` (a logic **reject** — and *that* is the feature) and a high junction
+breakdown. The native part's `V_t` window (`[−0.15, 0.35]`) is **disjoint** from the logic family's, and
+its `BV` floor (`10 V`, FLAGGED) sits **above the low-R plane-parallel ceiling** (`BV_pp(1e17) ≈ 9.3 V`) →
+**physically unreachable** on the logic substrate by *any* drive-in, cleared only by the lighter boule
+(`BV ≈ 12 V` at 1e16) — a hard **substrate** gate. **The substrate commit (advisor):** resistivity is
+committed at **growth**, so the native part is its **own declared run** (a second up-front commitment
+alongside the device family — the new `DeviceTarget.substrate` tag), **not** a same-wafer disposition
+sibling of the low-R flavors (closer to S5's power rectifier than S1/S2's disposition menu). Both gates
+re-proven on the **substrate axis** (two declared runs cross as **mutual rejection**: low-R wafer
+logic-good/high-res-reject, high-res wafer high-res-good/logic-reject; declaring the target moves the
+growth `N_seed` optimum heavy↔light); a `disposition` **substrate-class guard** raises on a mixed-class
+menu, and the physics independently makes cross-substrate re-grade worth ~0 %. **The ambitious alternative
+DEFERRED (named edge):** a *high-V_t* HV part on a light substrate via a channel/drift threshold-adjust
+implant (LDMOS) — in the as-built model an implant lifts `V_t` but never `I_Dsat`, so high-res+implant would
+*strictly dominate* logic and the crossing would **dissolve**; rescuing it needs added mobility degradation
+= more physics, past the slice's size (deferred like the 2-D / heat-mode edges). 352 fab_game tests green.
+**Slice 4 next** = the oxygen dual-use (donors-bad vs internal-gettering-good *within one device* — the
+process-trade-off lesson, kept distinct from segmentation).
 
 ### Slice 1 — the spine (zero new physics)
 
@@ -148,8 +177,14 @@ the V_t/oxide axis (HV is the highest-`V_t` flavor, crossing low-power from abov
 
 ## Deferred / open (explicit)
 
-- **Slices 3–5** — specified only at the table granularity above; each built when the spine has landed and
-  the loop has been reacted to (the repo's one-slice-at-a-time discipline). (Slices 1–2 built.)
+- **Slices 4–5** — specified only at the table granularity above; each built when the spine has landed and
+  the loop has been reacted to (the repo's one-slice-at-a-time discipline). (Slices 1–3 built.)
+- **High-V_t HV on a light substrate via a channel/drift threshold-adjust implant (LDMOS)** — the
+  ambitious S3 alternative, **deferred** (a named edge). In the as-built single-doping model an implant
+  lifts `V_t` but not `I_Dsat`, so high-res+implant would *strictly dominate* logic and the "good is
+  relative" crossing would dissolve; rescuing it needs a mobility-degradation term (more physics layered on
+  to restore a trade S3's *native* part gets for free) — past a slice's natural size. Filed with the repo's
+  other build-the-honest-smaller-thing deferrals (A2 Robin-G, E1 heat-mode, CG-3 transient).
 - **Cited-source memories** for the new outputs — avalanche BV **written** (`avalanche-breakdown-source`,
   slice 2); reverse recovery / internal gettering to come with their slices (the repo's `*-source` pattern).
 - **The economics overlap** — `docs/plans/fab-journey.md`'s #1 open item (the per-pass / throughput cost
