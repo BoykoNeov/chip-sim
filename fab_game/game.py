@@ -35,23 +35,11 @@ from dataclasses import dataclass, field, replace
 
 from .pipeline import rework_deposition, rework_litho, rework_polish, run_line
 from .recipe import DEFAULT_RECIPE, Recipe
-from .scoring import BIN_PRICES, REWORK_COSTS, SCRAP_COST, WAFER_COST, ScoreCard, score_wafer
-from .spec import DEFAULT_SPECS, SpecSet, SpeedBin, SpeedBins
+from .scoring import REWORK_COSTS, SCRAP_COST, WAFER_COST, ScoreCard, score_wafer
+from .spec import SpecSet
 from .state import WaferState
+from .targets import FAST_LOGIC, DeviceTarget
 from .variation import Variation
-
-# --------------------------------------------------------------------------- #
-# The market — the multi-grade speed bins the game grades parts into (FLAGGED house numbers).
-# Positioned around the nominal I_Dsat (~3.30 mA → typical); a thinned-oxide (adaptive) wafer drives
-# I_Dsat up into premium, a slow part down into value. The value floor sits at the front-end I_Dsat
-# spec floor (2.8 mA), so a working part is always sellable — losses come from the V_t/CD/NILS spec and
-# assembly, not bin-out (the bin labels match scoring.BIN_PRICES). NOT the seam default (one open bin).
-# --------------------------------------------------------------------------- #
-MARKET_BINS = SpeedBins(bins=(
-    SpeedBin("premium", lo_mA=3.55),               # fast parts (a thinned-oxide / short-channel wafer)
-    SpeedBin("typical", lo_mA=3.15, hi_mA=3.55),   # the nominal grade
-    SpeedBin("value", lo_mA=2.80, hi_mA=3.15),     # slow but sellable (down to the I_Dsat spec floor)
-))
 
 
 @dataclass(frozen=True)
@@ -66,10 +54,12 @@ class ReworkSpec:
 
 @dataclass(frozen=True)
 class GameConfig:
-    """The run's fixed setup: the boule recipe, the market, the line costs, the budget, and the mode.
+    """The run's fixed setup: the declared target, the boule recipe, the line costs, the budget, and the mode.
 
-    ``base_recipe`` the default process (the player overrides per turn); ``market`` the speed bins parts
-    are graded into; ``prices``/``wafer_cost``/``scrap_cost`` the economics (:mod:`fab_game.scoring`,
+    ``target`` the **declared device target** (the up-front flavor declaration — its windows + speed bins +
+    price curve are what every wafer is scored against; defaults to :data:`~fab_game.targets.FAST_LOGIC`, the
+    incumbent, so the pre-targets game is reproduced bit-for-bit); ``base_recipe`` the default process (the
+    player overrides per turn); ``wafer_cost``/``scrap_cost`` the line economics (:mod:`fab_game.scoring`,
     flagged house numbers); ``starting_budget`` the bank; ``n_wafers`` the slices down the boule and
     ``z_max`` the deepest axial fraction (the difficulty curve); ``variation`` the within-wafer spread;
     ``sandbox`` removes the bankrupt gate (explore freely). The per-turn slice position is the session's,
@@ -77,8 +67,7 @@ class GameConfig:
     """
 
     base_recipe: Recipe = DEFAULT_RECIPE
-    market: SpeedBins = MARKET_BINS
-    prices: dict[str, float] = field(default_factory=lambda: dict(BIN_PRICES))
+    target: DeviceTarget = FAST_LOGIC
     wafer_cost: float = WAFER_COST
     scrap_cost: float = SCRAP_COST
     starting_budget: float = 200.0
@@ -90,8 +79,13 @@ class GameConfig:
 
     @property
     def specs(self) -> SpecSet:
-        """The acceptance test with the game's market bins (the front-end windows + the speed grades)."""
-        return replace(DEFAULT_SPECS, speed_bins=self.market)
+        """The declared target's acceptance test (the front-end windows + its speed grades)."""
+        return self.target.specs
+
+    @property
+    def prices(self) -> dict[str, float]:
+        """The declared target's per-bin price curve (the revenue side of the economics)."""
+        return self.target.prices
 
     def slice_z(self, wafer_index: int) -> float:
         """The axial fraction-solidified for the ``wafer_index``-th turn (0 → ``z_max`` across the boule)."""

@@ -273,6 +273,11 @@ def forecast(state: "JourneyState") -> StageForecast:
     ``ring`` ⇒ a marginal recipe kills **part** of the wafer (spatially an edge ring or a centre core,
     depending on the stage — rework territory); ``dead`` ⇒ scrapped."""
     recipe = state.current_recipe
+    # NOTE (device-targets slice 1): the forecast bands against DEFAULT_SPECS — the **fast-logic** baseline
+    # — deliberately, not the declared target. The band is a coarse "did the recipe bite?" yield guide, not
+    # a SKU verdict; a target-aware forecast (and the disposition readout that re-scores the *finished* wafer
+    # against the sibling flavors, :func:`fab_game.targets.disposition`) is wired at the UI slice. ``finish``
+    # already scores the real wafer against the declared target's windows/prices (its ``config``).
     wafer = run_line(recipe, seed=state.seed, variation=Variation(), specs=DEFAULT_SPECS, grid_n=state.grid_n)
     result = LineResult.of(state.label, wafer)
     y = result.yield_

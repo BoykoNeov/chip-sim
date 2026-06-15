@@ -60,6 +60,17 @@ from .pipeline import (
     wafer_yield,
 )
 from .scoring import BIN_PRICES, REWORK_COSTS, SCRAP_COST, WAFER_COST, ScoreCard, score_wafer
+from .targets import (
+    FAST_LOGIC,
+    LOW_POWER,
+    MARKET_BINS,
+    MOSFET_FLAVORS,
+    DeviceTarget,
+    TargetGrade,
+    disposition,
+    grade_for,
+    regrade,
+)
 from .dashboard import (
     dashboard_recipe,
     dashboard_summary,
@@ -68,7 +79,6 @@ from .dashboard import (
     run_dashboard,
 )
 from .game import (
-    MARKET_BINS,
     GameConfig,
     GameSession,
     ReworkSpec,
@@ -118,6 +128,9 @@ __all__ = [
     "rework_polish", "rework_deposition", "LineResult", "BatchResult", "ReworkRecord",
     # scoring (G7)
     "score_wafer", "ScoreCard", "BIN_PRICES", "WAFER_COST", "SCRAP_COST", "REWORK_COSTS",
+    # targets ("good is relative" — multi-target specs + disposition, device-targets slice 1)
+    "DeviceTarget", "FAST_LOGIC", "LOW_POWER", "MOSFET_FLAVORS", "MARKET_BINS",
+    "TargetGrade", "regrade", "grade_for", "disposition",
     # dashboard (the guided slider-driven slice — §9 UX)
     "dashboard_recipe", "run_dashboard", "dashboard_summary", "knob_errors", "oxide_minutes_error",
     # game / roguelike session (G7)

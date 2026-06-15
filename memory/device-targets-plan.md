@@ -1,16 +1,38 @@
 ---
 name: device-targets-plan
-description: "PLAN written (not built) — \"good is relative\" multi-target specs + disposition/salvage; the 2-level declaration honesty correction; 5-slice staging, slice 1 = zero-new-physics spine"
+description: "\"good is relative\" multi-target specs — SLICE 1 BUILT (fab_game/targets.py: DeviceTarget + FAST_LOGIC/LOW_POWER + regrade/disposition); 2-level declaration; 5-slice staging, S2–S5 still planned"
 metadata: 
   node_type: memory
   type: project
   originSessionId: ed2a8058-2e3f-4914-86c8-d4b78172b743
 ---
 
-**`docs/plans/device-targets.md` — PLAN WRITTEN 2026-06-15, NOT yet built.** The next front-end
+**`docs/plans/device-targets.md` — PLAN WRITTEN 2026-06-15; SLICE 1 BUILT 2026-06-15.** The next front-end
 direction after the journey (user-initiated): the *same* physical property is good for one product,
 bad for another — "**good is application-relative**" (the DTCO lesson). A **declare-a-target** strategy
 layer + a **disposition/salvage** mechanic re-scoring the same wafer against sibling specs.
+
+**SLICE 1 (the zero-new-physics spine) BUILT — `fab_game/targets.py` + `tests/test_targets.py`:**
+`DeviceTarget(name, specs, prices, optimum_hint)` (specs EMBEDS the speed bins — DRY with `SpecSet.speed_bins`,
+NOT a separate field). `FAST_LOGIC` = `replace(DEFAULT_SPECS, speed_bins=MARKET_BINS)` + `BIN_PRICES` (the
+incumbent; declaring it == the pre-targets game **bit-for-bit**, value-equality seam). `LOW_POWER` = crossing
+`V_t∈[0.60,0.85]` (overlaps logic's `[0.45,0.68]` only on `[0.60,0.68]`) + lower-FLOOR-only `I_Dsat∈[2.0,4.2]`
+(low drive = a FEATURE) + own lower bins (premium≥2.7) + own prices. `MOSFET_FLAVORS=(FAST_LOGIC,LOW_POWER)`
+(one family, dispositionable; cross-FAMILY re-grade NOT offered). **`regrade(wafer,target)`** re-scores a
+FINISHED wafer's dies against a sibling's windows+bins — **zero new physics, never re-fabs** (advisor's
+load-bearing call: re-running the line would shift the assembly-RNG order → physics-irrelevant drift);
+preserves physical functional kills + the irreversible `assembled is False` scrap; `assembled is None`
+(declared-target front-end-fail, now passes sibling) → SHIPS, **exact at the lossless default back-end**
+(only a lossy back-end opens the gap — deferred, no RNG re-draw). **`disposition(wafer, targets)`** = the
+"which SKU?" menu, best-revenue-first (wafer cost sunk). **Wiring:** `MARKET_BINS` MOVED game.py→targets.py
+(broke the game↔targets cycle); `GameConfig.market`/`prices` fields REPLACED by one `target: DeviceTarget =
+FAST_LOGIC` (no caller passed market/prices); `specs`/`prices` now derive from it. **Calibrated against the
+real line FIRST** (advisor): oxide sweep 18min→FL strictly wins, 26min→LP strictly wins (the **crossing**,
+not an argmax — argmax ties on the overlap); deep-cut z=0.85 → V_t 0.71 (FL-reject) ships LP at 100%/premium
+= the harvest headline. **Blind spot left noted (non-blocking):** `journey.forecast`/`boule_profile` still
+band against `DEFAULT_SPECS` (coarse "did it bite" guide, not a SKU verdict) — a target-aware forecast is a
+later UI slice; `finish` already scores the real wafer against the declared target. 331 fab_game tests green
+(2 PRE-EXISTING gallery-HTML staleness failures from the phase-5 commit, NOT mine).
 
 **Already graded (don't reinvent):** yield is continuous, and **speed binning** (`SpeedBins` in
 `spec.py`, priced in `scoring.py`) already IS "functional-but-suboptimal" (the bin-out = a working
