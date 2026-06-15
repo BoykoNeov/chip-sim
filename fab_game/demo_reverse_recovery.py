@@ -159,7 +159,13 @@ def print_summary(r: DemoResult) -> None:
     print(f"  On the light (high-res, N_A={r.substrate_N_A:.0e}) substrate the two pass bands are DISJOINT on τ:")
     print(f"    logic  ships at τ ≳ {r.tau_leak_edge_s * 1e6:.2f} µs  (leakage ≤ {r.leak_ceil:.0f} nA/cm²)")
     print(f"    rectifier ships at τ ≲ {r.tau_trr_edge_s * 1e6:.2f} µs  (t_rr ≤ {r.t_rr_ceil:.0f} ns)")
-    print(f"    → mutual rejection: a clean wafer is logic-good / rectifier-reject, a metal feed the reverse.\n")
+    print(f"    → mutual rejection: a clean wafer is logic-good / rectifier-reject, a metal feed the reverse.")
+    print(f"  The capstone of the whole device-targets plan — the τ axis partitions THREE ways, with NO wafer "
+          f"good as both:")
+    print(f"    τ ≲ {r.tau_trr_edge_s * 1e6:.2f} µs  → good as RECTIFIER (fast t_rr)")
+    print(f"    {r.tau_trr_edge_s * 1e6:.2f} – {r.tau_leak_edge_s * 1e6:.2f} µs → the DEAD ZONE: good as "
+          f"NEITHER (too leaky for logic, too slow for a rectifier)")
+    print(f"    τ ≳ {r.tau_leak_edge_s * 1e6:.2f} µs  → good as LOGIC (low leakage)\n")
 
     print(f"  Declaring the target moves the purification optimum (high-res, '{r.feed_grade}' feed):")
     print(f"     {'passes':>6}  {'τ (µs)':>9}  {'native $':>9}  {'rect $':>7}   best")
