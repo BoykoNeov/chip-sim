@@ -14,7 +14,7 @@ the slice's *one* cited device output — the drain–body junction **avalanche 
 grading machinery here is unchanged; what is new is that one target (HV-I/O) now reads an axis the logic
 flavors leave open.
 
-**Slice 3 adds the high-resistivity ``high-res`` native part** (see :ref:`the slice-3 section <slice 3>`)
+**Slice 3 adds the high-resistivity ``high-res`` native part** (:data:`HIGH_RES`, the slice-3 section below)
 — and, again, **zero new physics**: it turns ``BV``'s *other* knob, the **substrate doping** itself
 (``BV ∝ N_B^(−3/4)``, set at growth), where slice 2 turned the junction depth. The finding that shapes it
 (verified on the line, mirroring slice 2's): in this single-doping model the substrate doping moves ``BV``
@@ -91,8 +91,8 @@ class DeviceTarget:
     across substrate classes (a low-R logic wafer is not a high-res part), so it is a **second up-front
     commitment** alongside the device family — :func:`disposition` is *within one substrate class*. The
     low-R class is the dispositionable MOSFET family (:data:`MOSFET_FLAVORS`); the high-res class is its
-    own declared run (:data:`HIGH_RES`, the slice-3 :ref:`native part <slice 3>`). Defaults to
-    ``"low-res"`` (the incumbent), so the slice-1/2 flavors are unchanged.
+    own declared run (:data:`HIGH_RES`, the slice-3 native part). Defaults to ``"low-res"`` (the incumbent),
+    so the slice-1/2 flavors are unchanged.
 
     All numbers are flagged house values (ADR 0005 §5): only the *relationships* between targets (the
     windows cross; the optimum moves) carry meaning, never the bands or the dollars.
@@ -207,7 +207,6 @@ MOSFET_FLAVORS: tuple[DeviceTarget, ...] = (FAST_LOGIC, LOW_POWER, HV_IO)
 
 
 # --------------------------------------------------------------------------- #
-# .. _slice 3:
 # The high-resistivity NATIVE part (device-targets slice 3) — the SUBSTRATE-resistivity axis.
 # --------------------------------------------------------------------------- #
 # Slice 3 turns ``BV``'s *other* knob — the body doping ``N_B`` itself (``BV ∝ N_B^(−3/4)``, the lighter
@@ -264,8 +263,12 @@ HIGH_RES = DeviceTarget(
         v_t=SpecWindow("V_t (V)", lo=-0.15, hi=0.35),        # the NATIVE low-V_t band — DISJOINT from logic's
         #                                                      [0.45,0.68] (the low V_t is the feature, not a fail)
         i_dsat_mA=SpecWindow("I_Dsat (mA)", lo=2.0, hi=4.2),  # same thin-oxide drive as logic (N_A-independent)
-        bv=SpecWindow("BV (V)", lo=HIGH_RES_BV_FLOOR_V, optional=True),  # the floor unreachable on the low-R
-        #                                                                 substrate → only the light boule clears it
+        bv=SpecWindow("BV (V)", lo=HIGH_RES_BV_FLOOR_V, optional=False),  # the floor unreachable on the low-R
+        #   substrate → only the light boule clears it. REQUIRED (not optional, unlike HV-I/O): breakdown is
+        #   this SKU's *defining* property, and — unlike HV-I/O, whose high V_t window independently rejects a
+        #   stray die — the native low-V_t window does NOT protect it, so a die with NO breakdown reading
+        #   (bv_V=None, an unresolved junction) must FAIL high-res, not ship unrated (the advisor's S3 catch;
+        #   the mirror of S2's nan-guard). Not reachable on the line today (the S/D always resolves), a guard.
         speed_bins=MARKET_BINS,                              # same drive-current grade as logic (see above)
     ),
     prices=HIGH_RES_PRICES,

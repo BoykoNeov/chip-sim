@@ -76,7 +76,9 @@ mixed-class menu + physics independently makes cross-substrate re-grade ~0%. **D
 high-V_t HV on a light substrate via a channel/drift threshold-adjust implant (**LDMOS**) — implant lifts
 V_t but not I_Dsat → high-res+implant would *strictly dominate* logic → crossing dissolves; rescue needs
 added mobility degradation = more physics, past slice size (filed w/ A2 Robin-G / E1 heat-mode / CG-3
-transient). 352 fab_game tests green. **S4 next** = the oxygen DUAL-USE (donors-bad vs gettering-good
+transient). Native `bv` window is **REQUIRED** (not optional like HV-I/O — BV is the SKU's defining property
+& the native low-V_t window won't reject a no-BV die; advisor catch, mirror of S2 nan-guard). 353 fab_game
+tests green. **S4 next** = the oxygen DUAL-USE (donors-bad vs gettering-good
 *within one device* — process-trade-off, distinct from segmentation).
 
 **Already graded (don't reinvent):** yield is continuous, and **speed binning** (`SpeedBins` in

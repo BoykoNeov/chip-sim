@@ -154,7 +154,10 @@ menu, and the physics independently makes cross-substrate re-grade worth ~0 %. *
 DEFERRED (named edge):** a *high-V_t* HV part on a light substrate via a channel/drift threshold-adjust
 implant (LDMOS) — in the as-built model an implant lifts `V_t` but never `I_Dsat`, so high-res+implant would
 *strictly dominate* logic and the crossing would **dissolve**; rescuing it needs added mobility degradation
-= more physics, past the slice's size (deferred like the 2-D / heat-mode edges). 352 fab_game tests green.
+= more physics, past the slice's size (deferred like the 2-D / heat-mode edges). The native part's `bv`
+window is **required** (not optional like HV-I/O's): breakdown is the SKU's defining property and the native
+low-`V_t` window does not independently reject a die with no `BV` reading (advisor's catch — the mirror of
+S2's nan-guard). 353 fab_game tests green.
 **Slice 4 next** = the oxygen dual-use (donors-bad vs internal-gettering-good *within one device* — the
 process-trade-off lesson, kept distinct from segmentation).
 

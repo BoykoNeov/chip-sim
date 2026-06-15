@@ -88,9 +88,29 @@ def test_gate1_bv_floor_is_unreachable_on_the_low_R_substrate():
     assert HIGH_RES_BV_FLOOR_V < plane_parallel_breakdown(HIGH_RES_N_SEED), \
         "the light substrate's ceiling must clear the floor (the part is reachable on high-res)"
     # Only the native part carries the floor — the logic flavors leave BV open (the slice-2 seam holds).
-    assert HIGH_RES.specs.bv.lo == HIGH_RES_BV_FLOOR_V and HIGH_RES.specs.bv.optional
+    # And for high-res BV is REQUIRED (not optional, unlike HV-I/O): breakdown is the SKU's defining property,
+    # and the native low-V_t window does not independently reject a no-BV die — see the unit test below.
+    assert HIGH_RES.specs.bv.lo == HIGH_RES_BV_FLOOR_V and not HIGH_RES.specs.bv.optional
     for flavor in (FAST_LOGIC, LOW_POWER):
         assert flavor.specs.bv.lo is None
+
+
+def test_a_die_fails_high_res_on_breakdown_alone_or_a_missing_bv():
+    # The focused unit (mirror of S2's test_a_shallow_junction_die_fails_hv_only_on_breakdown): a die parked
+    # INSIDE high-res's native V_t/I_Dsat windows but with a LOW breakdown (BV under the floor) fails high-res
+    # on BV ALONE — the reason names breakdown, not the (in-window) threshold.
+    in_window = dict(site=(0, 0), radius_frac=0.0, V_t=0.0, i_dsat=3.3e-3, cd_nm=167.0, nils=4.6, resolved=True)
+    low_bv = Die(**in_window, bv_V=HIGH_RES_BV_FLOOR_V - 1.0)
+    v = HIGH_RES.specs.verdict(low_bv, None)
+    assert v.failed and len(v.reasons) == 1 and "BV" in v.reasons[0]   # BV is the SOLE failing reason
+    # A high-enough breakdown ships the same die (BV over the floor).
+    assert HIGH_RES.specs.verdict(replace(low_bv, bv_V=HIGH_RES_BV_FLOOR_V + 1.0), None).passed
+    # THE advisor's S3 catch: BV is REQUIRED, so a die with NO breakdown reading (bv_V=None — an unresolved
+    # junction) must FAIL high-res — it cannot ship as the breakdown-rated SKU even though its native V_t≈0
+    # sits inside the window (unlike HV-I/O, whose high V_t window would independently reject such a die, so
+    # an OPTIONAL BV there is safe; here it is not — see test_gate1_bv_floor...).
+    no_bv = HIGH_RES.specs.verdict(Die(**in_window, bv_V=None), None)
+    assert no_bv.failed and any("BV" in r for r in no_bv.reasons)
 
 
 def test_gate1_lighter_substrate_raises_bv_and_craters_v_t_together():
