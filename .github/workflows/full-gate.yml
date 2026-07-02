@@ -48,17 +48,19 @@ jobs:
       - name: Install chip-sim with every optional stack
         # viz (matplotlib figures) + notebook (nbclient/nbformat/ipykernel/ipywidgets — plus
         # jupyterlab, which rides along but is editor-only: no test imports it, so it is
-        # intentionally absent from the import-presence guard below).
+        # intentionally absent from the import-presence guard below) + tui (textual — the
+        # Textual front-end; test_tui.py's App pilots importorskip it, so without this extra
+        # those pilots SILENTLY skip, exactly the failure mode this gate exists to catch).
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[test,viz,notebook]"
+          pip install -e ".[test,viz,notebook,tui]"
 
       - name: Fail loudly if any optional stack is missing
         # Guards against a silently-incomplete install: importorskip would otherwise
         # turn a missing extra into a green skip, not a red failure.
         run: >
           python -c "import importlib.util as u;
-          mods=['numpy','scipy','pytest','matplotlib','nbformat','nbclient','ipykernel','ipywidgets'];
+          mods=['numpy','scipy','pytest','matplotlib','nbformat','nbclient','ipykernel','ipywidgets','textual'];
           miss=[m for m in mods if u.find_spec(m) is None];
           assert not miss, f'missing optional stacks: {miss}';
           print('all optional stacks present:', mods)"
@@ -72,7 +74,7 @@ jobs:
       - name: Full gate — the whole suite
         # The canonical full gate. -rs prints every skip reason so a silent-skip regression is
         # visible in this log (the chip.ipynb CI-skip shows here). -n auto (pytest-xdist) runs
-        # the 188 CPU-bound tests in parallel — safe here because the slow notebook test
+        # the ~850 CPU-bound tests in parallel — safe here because the slow notebook test
         # self-skips under CI, so it is never co-scheduled with them (THE PIN, ADR 0003
         # amendment). If you ever set CHIP_NOTEBOOK_FORCE_CI=1 to actually exercise the notebook
         # on the runner, run that test SERIALLY (`-m slow -n0`) in a separate step — parallel

@@ -10,7 +10,7 @@ semiconductor-process references.
 It is built on a **separately-validated diffusion/heat solver engine**
 (`engines/diffusion`): the dopant-profile physics *is* a 1-D diffusion solve in **mass
 mode**, so the simulator adds no new numerical core — it proves the engine reuses. The
-engine carries its own contract (`engines/diffusion/CONTRACT.md`) and its own test suite.
+engine has its own reference doc (`engines/diffusion/CONTRACT.md`) and its own test suite.
 
 ## Layout
 
@@ -40,11 +40,11 @@ python -m fab_game.tui                  # …or play the fab-line game (TUI; nee
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow" -n auto     # routine fast lane — 423 tests, PARALLEL (~22 s vs ~78 s serial)
-./run_tests.ps1                           # full gate — 424 tests, SERIAL (adds the slow notebook smoke-test)
+./run_tests.ps1 -m "not slow" -n auto     # routine fast lane (~850 tests), PARALLEL
+./run_tests.ps1                           # full gate, SERIAL (adds the slow notebook smoke-test)
 ```
 
-`-n auto` (pytest-xdist) fans the 423 CPU-bound tests across cores — **capped at half the logical
+`-n auto` (pytest-xdist) fans the CPU-bound tests across cores — **capped at half the logical
 cores** (`conftest.py`: the suite floors on one module, so the back half buys ~nothing; the cap is
 an Amdahl throughput knob, not notebook headroom), and **only on the fast lane.**
 The one `slow` test executes `chip.ipynb` in a fresh kernel over a zmq/asyncio comms layer that
@@ -53,13 +53,13 @@ and CI — where it self-skips). The full gate stays **serial**, so the notebook
 xdist (the pin is structural, not a convention). It also self-skips under CI (a known infra hang
 on the GitHub runner — the kernel goes idle but `nbclient` never returns, not a content failure).
 `-n auto` is the blessed *command*, not baked into config, so single-test `-s`/pdb stays serial.
-The suite is **424 tests** (423 fast + 1 slow), all green; optional stacks are importorskip-gated,
-so a headless checkout skips rather than errors.
+The suite is **~850 tests** (the fast lane + 1 slow notebook smoke-test), all green; optional
+stacks are importorskip-gated, so a headless checkout skips rather than errors.
 
 ## Demonstrations
 
 Every fab step ships a **self-contained demo**: run it and it prints a cited validation table and
-banks its figure to `docs/figures/`. The twelve figures are already committed there, so you can
+banks its figure to `docs/figures/`. The figures are already committed there, so you can
 browse the gallery on GitHub without running anything; the table below maps each one to the demo
 that produced it. Run from the repo root after `pip install -e ".[viz]"`:
 
@@ -70,7 +70,7 @@ python -m chip.demo_junction            # → prints the table, saves docs/figur
 > Use the `python -m chip.demo_*` form, **not** `python chip/demo_*.py` — the demos are package
 > modules (relative imports), so the bare-path form fails with *"attempted relative import."*
 
-**Prefer to click?** A self-contained **interactive gallery** of all twelve — thumbnails linking to
+**Prefer to click?** A self-contained **interactive gallery** — thumbnails linking to
 the full figures, each with its run command and source — is generated to
 [`docs/index.html`](docs/index.html) by `python -m chip.gallery`. Enable GitHub Pages (*Settings →
 Pages → `main` / `/docs`*) to serve it at `https://boikoneov.github.io/chip-sim/`. The page is

@@ -1,22 +1,29 @@
-"""The fab-line game — G1: the harness + the vertical slice (the dramatic win).
+"""The fab-line game — a gamified full-production-line layer built **on top of** chip-sim.
 
-A gamified, full-production-line layer built **on top of** chip-sim (ADR 0005,
-``docs/plans/fab-game.md``). This package owns everything the validated physics layer must
-not — the wafer state, the pipeline driver, spec windows, the stochastic spread + yield, and
-the rework mechanic — and consumes the *already-validated* ``chip/`` + ``engines/`` physics in
-**one direction only** (``fab_game → chip/engines``, never the reverse; an import-direction
-guard enforces it).
+Layered per ADR 0005 (``docs/plans/fab-game.md``). This package owns everything the validated
+physics layer must not — the wafer state, the pipeline driver, spec windows, the stochastic
+spread + yield, and the rework mechanic — and consumes the *already-validated* ``chip/`` +
+``engines/`` physics in **one direction only** (``fab_game → chip/engines``, never the reverse;
+an import-direction guard enforces it). New *process physics* always lands in the physics layer;
+this package holds balance, spec limits, and fun.
 
-G1 is **all reuse, zero new physics.** It wires the existing diffusion → oxidation →
-lithography → device back end through a state/variation/spec/yield/rework harness and banks
-the artifact: *one bad knob → a dead die, with the failure trail.* The chain the demo drives
-is **defocus → printed CD → channel length → I_Dsat** (never ``V_t`` — the device model's own
-scope edge: ``V_t`` carries no channel-length term, only ``saturation_current`` reads the CD).
+What it now spans (see ``fab_game/README.md`` for the full milestone log):
 
-Build order (slice-first *within* G1): the deterministic single-die path is pinned
-**bit-for-bit** against :func:`chip.demo_device.compute` (the seam test) before a die map,
-the stochastic layer, yield, or rework exists — so "the harness does not change the physics"
-is proven first.
+* **The line** — sand → a binned, packaged chip: Czochralski boule, wafer prep, purification,
+  the validated diffusion/oxidation/litho/device back end, etch & deposition, packaging (G1–G7),
+  plus the crystal-growth deepenings (CG-1/2/3) and the scope-edge promotions (C1/D1/A2/A1/E1/S4).
+* **The play modes** — the G7 roguelike session (:mod:`~fab_game.game`), the guided 4-knob
+  dashboard (:mod:`~fab_game.dashboard`), the staged sand→chip **journey**
+  (:mod:`~fab_game.journey`), and the Textual TUI (:mod:`~fab_game.tui`, the ``[tui]`` extra,
+  the *only* ``textual`` importer and not re-exported here so the fast lane stays headless).
+* **Device targets** (:mod:`~fab_game.targets`) — "good is application-relative": re-score the
+  *same* wafer against partially-inverted specs (fast-logic / low-power / HV-I/O / high-res /
+  power-rectifier), reading the cited device outputs :mod:`chip.breakdown` (avalanche ``BV``) and
+  :mod:`chip.reverse_recovery` (``t_rr ∝ τ``).
+
+The load-bearing discipline (ADR 0005 §5): the deterministic single-die path is pinned
+**bit-for-bit** against :func:`chip.demo_device.compute` (the seam test), and the game layer is
+tested for *mechanics invariants*, not cited magnitudes.
 """
 from __future__ import annotations
 
@@ -133,8 +140,8 @@ __all__ = [
     "TargetGrade", "regrade", "grade_for", "disposition",
     # dashboard (the guided slider-driven slice — §9 UX)
     "dashboard_recipe", "run_dashboard", "dashboard_summary", "knob_errors", "oxide_minutes_error",
-    # game / roguelike session (G7)
-    "GameConfig", "GameSession", "RunRecord", "ReworkSpec", "MARKET_BINS",
+    # game / roguelike session (G7)  — MARKET_BINS moved to targets.py; exported in the targets group above
+    "GameConfig", "GameSession", "RunRecord", "ReworkSpec",
     "new_session", "process_wafer", "scrap_wafer", "play",
     # session_view (the headless renderers the TUI v2 roguelike screen drives)
     "turn_recipe", "oxide_recipe", "projected_vt", "inspect_line", "session_header",

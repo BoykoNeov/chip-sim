@@ -187,8 +187,9 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   `pip install -e .[viz,notebook]`. **Why the direct cells, not interact callbacks:** `interact`
   captures exceptions in an `Output` widget, so a break in an interact callback never reaches the test
   — the validated calls must live in plain cells (the same rule as Steel's `steel.ipynb`).
-- **To use the diffusion/heat spine:** load `engines/diffusion/CONTRACT.md` only — never Steel's
-  or chip's internals. Chip instantiates the same contract Steel's `carburize.py` did (mass mode).
+- **To use the diffusion/heat spine:** read `engines/diffusion/CONTRACT.md` (the engine's reference
+  doc) only — never Steel's or chip's internals. Chip instantiates the same engine interface Steel's
+  `carburize.py` did (mass mode).
 
 ## Status
 
@@ -450,6 +451,39 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   `D(N)` path), and the 1-D vertical device / ideal self-aligned mask. Cited: `L_eff = L_drawn −
   2·L_{D,lateral}` (Sze / Plummer / Taur–Ning) + v1.8's `[[lateral-diffusion-source]]`. Whole-repo fast
   lane **273→286**. **No engine edit, no new ADR** (chip-local composition of two validated modules).
+- **Device-targets slice 2 — junction avalanche breakdown `BV`: BUILT** (2026-06-15). `breakdown.py` —
+  a *new device output* consumed by the `fab_game/targets.py` HV-I/O target ("good is application-relative",
+  `docs/plans/device-targets.md`): Phase-4 S/D drive-in already produced a junction depth `x_j`, but the
+  long-channel `V_t`/`I_Dsat` reads never looked at it — this makes `x_j` a device number. `BV` depends on
+  **two** knobs, which is why it earns its own slice: the lighter-doped body `N_B` through the cited
+  one-sided-abrupt Baliga law `BV_pp ≈ 5.34e13·N_B^(−3/4) V`, and the junction **depth** `x_j` through
+  cylindrical-edge **field crowding** (a shallow junction crowds the field and breaks down early). The model
+  is **not an empirical fit**: `cylindrical_breakdown` root-finds the depletion edge where the cited
+  ionization integral `∫α dr = 1` (`α = a·E^7`, Si `a≈1.8e-35`, `m=7`) closes over the cylindrical Gauss
+  field, then integrates `BV = ∫E dr` — the curvature reduction *emerges* from the electrostatics (the same
+  computation Sze/Baliga do), so `BV` is a genuinely independent axis from `V_t` (two wafers with identical
+  `V_t` but different drive-in have different `BV`). **10-test triad:** *analytic (tight)* = the
+  `r_j → ∞` plane-parallel reduction + the cited `N_B^(−3/4)` law + the two by-construction monotonic
+  directions; *benchmark (loose)* = the cited Sze point (Si abrupt junction `N_B=1e15`, `r_j=1 µm` → ~80 V
+  vs ~330 V planar, curvature ratio ≈ 0.24) — the model independently lands the **ratio** at ≈ 0.24, planar
+  magnitude ~10 % low (the flagged spread). Ionization `a`/`m` are flagged literature values; graded/spherical
+  corners, oxide-edge field plates, and **gate-oxide dielectric breakdown** (a *different* ~10 MV/cm
+  mechanism — the plan's tripwire) are named scope edges. Cited: `[[avalanche-breakdown-source]]`.
+- **Device-targets slice 5 — diode reverse recovery `t_rr ∝ τ`: BUILT** (2026-06-15). `reverse_recovery.py`
+  — the *new device output* the power-rectifier target needs, and the richest inversion in the device-targets
+  table: G4b's `chip.lifetime` already turned deep-level metals (Fe/Cu) into a minority-carrier lifetime `τ`
+  and, through it, the junction reverse **leakage** `J_gen ∝ 1/τ` — *the* logic-part killer. This module reads
+  the **same `τ` the opposite way**: a rectifier cannot turn off until its stored minority charge recombines,
+  so its reverse-recovery time `t_rr ∝ τ`. **The lifetime killer is the feature** — the short-τ wafer that is
+  logic-reject (leaky) is rectifier-good (fast), a genuine "good is relative" crossing on the lifetime axis
+  with **zero new lifetime physics**. `t_s` is **derived** from the charge-control ODE `dQ/dt = −Q/τ − I_R`
+  with `Q(0) = I_F·τ` → `t_s = τ·ln(1 + I_F/I_R)` (Kingston 1954 / Sze §2.5 / Baliga; not a remembered fit).
+  **8-test triad:** *analytic (tight)* = the exact ODE solution + the `t_rr ∝ τ` proportionality and the
+  `I_R → ∞` / `I_F/I_R → 0` zero limits, all by construction; *monotonicity* = `t_rr` rises with `τ` (the cited
+  lifetime-killing direction — why Au/Pt or e-irradiation speed rectifiers) and with `I_F/I_R`; *benchmark
+  (loose)* = the O(1) operating-point factor `ln(1+I_F/I_R)`, flagged. The transit-limited **fall time** `t_f`
+  (does not scale with `τ`), constant-`I_R` switching, and high-injection ambipolar effects are named scope
+  edges. Reads the same `τ` the G4b leakage does, opposite way. Cited: `[[reverse-recovery-source]]`.
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated

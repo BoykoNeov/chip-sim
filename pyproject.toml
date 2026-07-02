@@ -13,7 +13,8 @@ include = ["engines*", "chip*", "fab_game*"]
 [project]
 name = "chip-sim"
 version = "0.1.0"
-description = "Educational microchip-fabrication simulator on a frozen, separately-validated diffusion solver engine."
+description = "Educational microchip-fabrication simulator on a separately-validated diffusion solver engine."
+license = {file = "LICENSE"}
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24",
@@ -49,7 +50,7 @@ tui = ["textual>=8"]
 # `chip...`) without an install step.
 #
 # Tiered gate (ADR 0003): the routine local gate is the fast lane
-#   `pytest -m "not slow" -n auto`   — the always-on suite (423 tests, ~22 s parallel / ~78 s serial)
+#   `pytest -m "not slow" -n auto`   — the always-on suite (~850 tests, parallel)
 #   `pytest`                         — the full gate, SERIAL (adds the slow notebook smoke-test)
 # `slow` marks the handful of tests that drive a live kernel / subprocess (the notebook execution).
 #

@@ -290,6 +290,75 @@ exhausted — every remaining edge lacks a consumer.**
   **Fe/Cu only** (never the Na→`Q_ox`→`V_t` chain) → the two oxygen channels stay orthogonal. Off by default (no
   `[O_i]` ⇒ the seam). ([`demo_internal_gettering.py`](demo_internal_gettering.py) → `fab-game-s4.png`.)
 
+## The staged sand→chip journey (a third play mode)
+
+Where the roguelike (`game.py`) runs one wafer down a boule and the dashboard (`dashboard.py`) exposes
+four live sliders, the **journey** ([`journey.py`](journey.py)) builds **one wafer's recipe stage by
+stage** — a real decision at each fab stage, watched as it propagates downstream: from no-effect,
+through a graded yield ring, to an outright scrap. Each stage runs a **four-beat loop — decide →
+observe → forecast → commit**: `forecast(state)` runs the line at the recipe-so-far and returns the
+consequence **band** (`clean → ring → dead`, the ok→rework→fail spectrum) *and the channel it fails on*,
+then `commit()` folds the decision into the accumulating `Recipe`. The scaffold is deliberately thin (an
+immutable frozen `JourneyState` + a few idempotent overlay fields, **not** a nine-stage state machine —
+per the repo's anti-over-build rule: a stage is built when it has a consumer).
+
+Six stages are built (`refine` → `grow` → `cut` → `diffuse` → `oxidize`, then a cost-scored `finish`):
+
+- **Purify (`refine`)** — the showcase for the **gradual-failure policy**: you start with a dirty
+  feedstock and refine it step by step (`k^n` zone-refining, smooth in the continuous effort lever), and
+  the forecast shows the marginal band where the edge-loaded **Na ring** lives (a `V_t` ring from
+  mobile-ion Na, or junction leakage from deep-level metal — a feed that *looks* fine on threshold can
+  still die on leakage).
+- **Grow (`grow`)** — the pull-rate decision rides a fixed **radial** hot zone so both grown-in
+  consequences are graded: a vacancy void **core** (pull too fast) + an interstitial dislocation/leakage
+  **rim** (pull too slow) + a clean OSF ring between, with pull rate moving the ring.
+- **Cut (`cut`)** — the first stage that **reads a prior committed decision**: a faster phase-2 pull
+  flattens the boule's axial Scheil drift (CG-1), so you can slice *deeper* down the boule and still land
+  in the `V_t` window — the "watch it propagate" payoff.
+- **Diffuse (`diffuse`)** — the **honesty exception**: phases 1–3 add *zero new physics* (they
+  re-sequence propagation chains the line already had), but the diffusion `x_j`/`R_s` fed nothing scored,
+  so this stage adds one genuine device term — an additive S/D **series resistance** on
+  `chip.device.saturation_current` (source degeneration, default-0 seam) wiring `R_s → I_Dsat`. The
+  "adds no physics" claim is formally false here; the term is justified because this stage is its consumer,
+  and it lands on the *existing* `I_Dsat` spec (no new window).
+- **Oxidize (`oxidize`)** — the gate-oxide time; on its own a one-sided lever (thinner is always better),
+  turned **two-sided** only by the cost side below.
+- **`finish`** — runs the whole line and scores the wafer, reusing the `game.py` economics **plus** the
+  process-cost side ([`scoring.py`](scoring.py) `process_cost` / `score_wafer(process_cost=…)`): refining
+  is priced ∝ passes and S/D predep ∝ the real `∫D dt`, so net profit has an **interior** maximum
+  (`under < opt < over`) — the one-sided stages become a **Goldilocks**. (The 950 °C predep default is
+  revealed to be ~9× over-dosed; cut throughput cost is deferred — a multi-wafer / roguelike concern.)
+
+Everything is headless and tested (deterministic in `(seed, grade, actions)`, immutable state,
+append-only log); the live UI (a notebook `interact` / a Textual journey screen) is the deferred next
+increment. [`demo_journey.py`](demo_journey.py) is a *watch-a-playthrough* artifact over it.
+
+## Device targets — "good is application-relative"
+
+The DTCO lesson ([`targets.py`](targets.py), [`docs/plans/device-targets.md`](../docs/plans/device-targets.md)):
+the *same* physical property that ruins a part for one product is a *feature* for another, so a finished
+wafer is **re-scored against multiple specs** — `regrade` / `disposition` grade the already-computed dies
+against a different `DeviceTarget`'s windows + bins, **never re-fabricating**. Two guards come first: the
+target windows genuinely **cross**, and a declaration **moves** the recipe optimum. Five slices are built:
+
+- **S1 — the zero-new-physics spine** (`FAST_LOGIC` ↔ `LOW_POWER`): pure grading on the `V_t` axis — a
+  high `V_t` is slow logic (reject) but a low-leakage low-power part (premium).
+- **S2 — `HV_IO` + avalanche `BV`** (`chip.breakdown`, [[avalanche-breakdown-source]]): the one cited new
+  device output, scored by an optional `bv` window; `x_j` **decouples** `BV` from `V_t` (the junction-depth
+  axis), so HV-I/O is a genuinely orthogonal acceptance axis, not a relabel of thick-oxide low-power.
+- **S3 — the high-resistivity `HIGH_RES` native part** (the substrate axis, again zero new physics): turns
+  `BV`'s *other* knob, the substrate doping (`BV ∝ N_B^(−3/4)`, set at growth). Because `N_A` moves `BV`↑
+  and `V_t`↓ coupled, the high-`BV` part is the **native** low-`V_t` device (no threshold implant); the
+  substrate is committed at growth, so it is its own declared run, not a same-wafer disposition sibling.
+- **S5 — the `POWER_RECTIFIER` family on the lifetime axis** (`chip.reverse_recovery`,
+  [[reverse-recovery-source]]): cited `t_rr ∝ τ` — a short `τ` is a leaky logic **reject** but a **fast**
+  rectifier (the killer *is* the feature). It introduces a new `structure` device-family field + a family
+  guard: the rectifier **shares** the S3 high-res substrate, so the *family* guard (not the substrate one)
+  is what keeps them apart — a mask/structure is committed up front and never salvaged across families.
+
+(**S4** — crucible oxygen's dual-use internal gettering — is a *process trade-off within one device*, not
+a market-segmentation slice, so it lives in the scope-edge promotions above, not here.)
+
 ## Module map
 
 - **`state.py`** — the immutable `WaferState` / `Die` die-map + append-only `DieStepRecord`
@@ -339,10 +408,20 @@ exhausted — every remaining edge lacks a consumer.**
   the back end** — a cracked die stays dead), the A2 radial `density_fn` wiring, `_package_wafer`, and
   `run_batch`.
 - **`scoring.py`** (G7) — the economics: `BIN_PRICES` + wafer / scrap / rework costs, `score_wafer →
-  ScoreCard` (revenue over shipped dies, profit).
-- **`game.py`** (G7) — the roguelike session: immutable `GameSession` / `GameConfig`, `MARKET_BINS`,
+  ScoreCard` (revenue over shipped dies, profit). The journey's cost side added `process_cost(recipe) →
+  ProcessCost` + the `score_wafer(process_cost=…)` add-on (a byte-identical roguelike seam).
+- **`game.py`** (G7) — the roguelike session: immutable `GameSession` / `GameConfig`,
   `new_session` / `process_wafer` / `scrap_wafer` / `play`, the append-only `RunRecord`, and
   `ReworkSpec`. One boule = one run, each wafer a turn.
+- **`targets.py`** — device targets ("good is application-relative"): the `DeviceTarget` spec/bin
+  bundles (`FAST_LOGIC` / `LOW_POWER` / `HV_IO` / `HIGH_RES` / `POWER_RECTIFIER`), `MOSFET_FLAVORS` /
+  `POWER_FAMILY`, and `regrade` / `grade_for` / `disposition` (re-score a finished wafer, never re-fab;
+  a `structure` family guard + a substrate-class guard). **`MARKET_BINS` lives here** (moved out of
+  `game.py` so a `DeviceTarget` can own its bins without a `game ↔ targets` import cycle).
+- **`journey.py`** — the staged sand→chip journey (the third play mode): the immutable `JourneyState`
+  with the `refine` / `grow` / `cut` / `diffuse` / `oxidize` / `commit` stage methods, `forecast` (the
+  consequence band), and `finish` (run + cost-scored). Headless and deterministic; composes `run_line`
+  + `score_wafer`, zero new physics except the phase-4 S/D `R_series` device term.
 - **`dashboard.py`** + **`session_view.py`** — the headless UI cores: `run_dashboard` /
   `dashboard_summary` (the §9 guided 4-knob slice over `run_line`) and the `GameSession` string
   renderers (`turn_recipe` / `projected_vt` / `inspect_line` / `session_header` / `turn_line` /
@@ -365,7 +444,8 @@ exhausted — every remaining edge lacks a consumer.**
   `demo_etch` (g5) · `demo_packaging` (g6) · `demo_game` (g7) · `demo_crystal_growth` (cg1) ·
   `demo_voronkov` (cg2) · `demo_stefan` (cg3) · `demo_thermal_donors` (c1) · `demo_under_etch` (d1) ·
   `demo_osf_ring` (a2) · `demo_dislocation` (a1) · `demo_thermal_budget` (e1) ·
-  `demo_internal_gettering` (s4).
+  `demo_internal_gettering` (s4) · `demo_reverse_recovery` (device-targets s5) · `demo_journey` (the
+  staged-journey playthrough).
 - **`fab_game.ipynb`** — the thin notebook skin (the §9 dashboard section + the interactive skin; not
   in the correctness path).
 
@@ -410,6 +490,14 @@ exhausted — every remaining edge lacks a consumer.**
   **`test_dislocation.py`** (A1) (+ their `test_demo_*`, incl. `test_demo_under_etch.py` /
   `test_demo_thermal_budget.py`) — the scope-edge promotions: each consequence wired, each seam
   reproduces the prior demos byte-for-byte.
+- **`test_targets.py`** / **`test_targets_hv.py`** / **`test_targets_highres.py`** /
+  **`test_targets_power.py`** (device targets S1/S2/S3/S5) — the grading mechanics, not magnitudes: the
+  windows genuinely **cross**, a declaration **moves** the recipe optimum, `regrade` never re-fabs, and the
+  `structure` family guard + substrate-class guard hold (the power rectifier shares the high-res substrate
+  but stays a different family).
+- **`test_journey.py`** — the staged journey: immutable state + append-only log, `(seed, grade, actions)`
+  determinism, the `cut`-reads-`grow` propagation, the phase-4 `R_series` device term, and the cost-scored
+  `finish` interior optimum (`under < opt < over`).
 - **`test_dashboard.py`** / **`test_session_view.py`** / **`test_tui.py`** — the headless UI cores (the
   real safety net) + the `importorskip` Textual pilots (**fidelity, not movement**: a driven session ==
   headless `play(...)`; no notebook-style xdist flake).
@@ -435,6 +523,9 @@ python -m fab_game.demo_under_etch        # D1 under-etch short + the etch proce
 python -m fab_game.demo_osf_ring          # A2 OSF ring: vacancy core + clean rim, banks fab-game-a2.png
 python -m fab_game.demo_dislocation       # A1 two-sided window: slow pull → leakage, banks fab-game-a1.png
 python -m fab_game.demo_thermal_budget    # E1 spike/RTA budget collapse → shallow x_j, banks fab-game-e1.png
+python -m fab_game.demo_internal_gettering # S4 oxygen dual-use: Goldilocks [O_i], banks fab-game-s4.png
+python -m fab_game.demo_reverse_recovery  # device-targets S5 t_rr ∝ τ (lifetime killer is the feature), banks fab-game-s5.png
+python -m fab_game.demo_journey           # the staged sand→chip journey playthrough (decide → observe → commit), banks fab-game-journey.png
 
 python -m fab_game.tui                    # the Textual TUI (dashboard + roguelike screen; needs the [tui] extra)
 python -m fab_game.gallery                # regenerate docs/fab-game.html (+ fab-game.local.html)
