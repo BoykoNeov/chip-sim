@@ -66,4 +66,4 @@ knee** (the genuine cross-check); *conservation* = the two by-construction **gua
 `plots.device_2d_figure` → `docs/figures/chip-device-2d.png` (the n⁺ S/D **curving under the gate**, the
 half-cell mirrored, beside `L_eff`-vs-`L_drawn` with `V_t` flat). Cited: `L_eff = L_drawn − 2·L_{D,lateral}`
 (Sze / Plummer / Taur–Ning) + [[lateral-diffusion-source]] (the lateral ratio) + [[mos-threshold-voltage-source]]
-(the Phase-4 `V_t`). Plan = `docs/plans/peppy-chasing-conway.md`.
+(the Phase-4 `V_t`). Plan = `docs/plans/device-2d-cross-section-v111.md`.
