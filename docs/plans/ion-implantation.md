@@ -85,8 +85,18 @@ existing suite is byte-identical (the established seam discipline — cf. `drive
 ## Phasing (one slice at a time, anti-over-build)
 
 1. **Slice 1 — buried Gaussian IC + seam + dose conservation + the buried-peak discriminator.** The core
-   observable and the byte-identical default. Wire the game stage + `device.py` V_t-adjust consumer.
-2. **Slice 2 — Pearson-IV skew** (the tightened profile form; B surface-skew).
+   observable and the byte-identical default. Wire the game stage + `device.py` V_t-adjust consumer. ✅ BUILT.
+2. **Slice 2 — Pearson-IV skew** (the tightened profile form; B surface-skew). ✅ BUILT (2026-07-03).
+   `Implant.shape="pearson"` opt-in (default `"gaussian"` = slice-1 seam, bit-for-bit); the four-moment
+   Pearson-IV closed form (`pearson4_profile`, `skew_kurtosis`, `range_moments`) reproduces mean=R_p and
+   variance=ΔR_p² **exactly** (tight legs), with γ, β by design. Cited SIGN/TREND: boron backscatters to a
+   **negative** skew (Plummer §8 "light ions backscatter to skew the profile up") → **peak DEEPER than R_p**
+   (mode at R_p+b1), surface tail; grows more negative with energy. Flagged: γ(E)/β magnitudes
+   (house-calibrated into the **type-IV band** — β≈3 Gaussian is out-of-region, so β pinned ≳4; guarded,
+   raises outside it), and the now **two-sided** ∫=Q truncation (power-law tail). Tight dose leg stays
+   structural (no-flux drive-in conserves the grid-dose). Consumer = the existing drive-in consumes the
+   skewed IC (no new consumer; V_t is dose-only to first order — the x_j-shift at matched Q,R_p is a scope
+   note, not forced). Demo = `chip-implant-pearson.png` (Gaussian vs Pearson-IV at 120 keV B).
 3. **Slice 3 — channeling tail** as a failure mode (deep-tail → junction-too-deep), tilt/screen-oxide
    suppression.
 4. **Slice 4 — damage → leakage** via `lifetime.py` (residual-after-anneal).

@@ -570,8 +570,10 @@ def drive_in_program(
 # The model is LSS range theory reduced to its **first two moments** — projected range ``R_p(E)`` and
 # straggle ``ΔR_p(E)`` — tabulated in Gibbons–Johnson–Mylroie *Projected Range Statistics* (the
 # range-statistics-source memory note; the µm anchors are web-corroborated, flagged ~10%). The as-
-# implanted profile is the **symmetric Gaussian** ``N(x) = (Q/√(2π)ΔR_p)·exp(−(x−R_p)²/2ΔR_p²)``; the
-# skew (Pearson-IV) is slice 2, the channeling tail slice 3, damage→leakage slice 4. **No new solver:**
+# implanted profile is the **symmetric Gaussian** ``N(x) = (Q/√(2π)ΔR_p)·exp(−(x−R_p)²/2ΔR_p²)`` — the
+# slice-1 default (``shape="gaussian"``); the **Pearson-IV skew is built in §5b (slice 2)** as the opt-in
+# ``shape="pearson"``, while the channeling tail (slice 3) and damage→leakage (slice 4) remain named
+# scope edges. **No new solver:**
 # implant produces the *initial condition*, and the **identical** sealed-surface :func:`drive_in`
 # redistributes and (slice-1 assumption) activates it — the implant slots in as an alternative IC where
 # the predep ``erfc`` would go.
@@ -629,17 +631,24 @@ class Implant:
 
     The alternative initial condition to a thermal predep: instead of a surface-peaked ``erfc``, ions
     embed at the projected range ``R_p(energy)`` with straggle ``ΔR_p`` (:func:`range_statistics`),
-    giving a **buried** Gaussian peak — the observable predep physically cannot make. ``species`` is a
+    giving a **buried** peak — the observable predep physically cannot make. ``species`` is a
     :data:`DOPANTS` key (B is the canonical V_t-adjust / retrograde implant; P a donor implant). The
     **same** sealed-surface :func:`drive_in` then redistributes and (slice-1 assumption: full)
-    activates it — *no new solver*. Slice-1 first cut: the **symmetric two-moment** Gaussian; the
-    Pearson-IV skew, the channeling tail (and its ``tilt`` suppression), and damage→leakage are named
-    scope edges (slices 2–4), deliberately absent here rather than half-built.
+    activates it — *no new solver*.
+
+    ``shape`` (slice 2, opt-in) picks the profile family. ``"gaussian"`` (default) is the slice-1
+    **symmetric two-moment** Gaussian — the seam: the whole existing suite is byte-identical.
+    ``"pearson"`` is the **four-moment Pearson-IV** (skewness γ, kurtosis β via :func:`skew_kurtosis`) —
+    the real, *skewed* as-implanted profile (boron backscatters to a surface tail, its peak deeper than
+    R_p). Pearson skew is tabulated for boron only (the cited light-ion case); ``"pearson"`` for a
+    species without skew data raises here. The channeling tail (and its ``tilt`` suppression) and
+    damage→leakage remain named scope edges (slices 3–4), deliberately absent rather than half-built.
     """
 
     dose: float          # cm⁻² — implanted areal dose Q (∫N dx of the as-implanted profile)
     energy_keV: float    # keV — sets R_p, ΔR_p via LSS range statistics (deeper at higher energy)
     species: str = "B"   # dopant (a DOPANTS key); B = the canonical V_t-adjust implant
+    shape: str = "gaussian"   # "gaussian" (slice-1 seam) | "pearson" (slice-2 Pearson-IV skew)
 
     def __post_init__(self) -> None:
         if self.dose <= 0.0:
@@ -648,37 +657,54 @@ class Implant:
             raise ValueError(f"implant energy must be > 0 keV, got {self.energy_keV}")
         if self.species not in DOPANTS:
             raise ValueError(f"unknown implant species {self.species!r} (have {sorted(DOPANTS)})")
+        if self.shape not in ("gaussian", "pearson"):
+            raise ValueError(f"implant shape must be 'gaussian' or 'pearson', got {self.shape!r}")
+        if self.shape == "pearson" and self.species not in _SKEW_KURTOSIS:
+            raise ValueError(f"no Pearson-IV skew data for {self.species!r} "
+                             f"(have {sorted(_SKEW_KURTOSIS)}); use shape='gaussian'")
 
     def range_statistics(self) -> tuple[float, float]:
         """This implant's ``(R_p, ΔR_p)`` in **cm** (:func:`range_statistics` at its species/energy)."""
         return range_statistics(self.species, self.energy_keV)
 
+    def moments(self) -> tuple[float, float, float, float]:
+        """This implant's four Pearson moments ``(R_p, ΔR_p, γ, β)`` (:func:`range_moments`; needs skew data)."""
+        return range_moments(self.species, self.energy_keV)
+
 
 def implant_profile(x: np.ndarray, implant: Implant) -> np.ndarray:
-    """As-implanted **buried-Gaussian** IC ``N(x) = (Q/√(2π)ΔR_p)·exp(−(x−R_p)²/2ΔR_p²)`` (cm⁻³).
+    """As-implanted **buried** IC ``N(x)`` (cm⁻³) — a Gaussian (``shape="gaussian"``) or Pearson-IV (``"pearson"``).
 
-    The symmetric two-moment (LSS) profile: peak ``Q/(√(2π)·ΔR_p)`` **at the projected range** ``R_p``,
-    1σ half-width ``ΔR_p`` (:func:`range_statistics`). ``x`` (cm) from the surface. **Not** renormalized
-    on the grid — this is the *analytic* form, so ``∫₀^∞ N dx = Q`` only to the **surface-truncation**
-    error (the part of the Gaussian at ``x<0`` is lost); negligible for a **deep** implant
-    (``R_p ≳ 4·ΔR_p``), flagged for a shallow one (the reflected-dose scope edge). The **buried-peak
-    topology** — maximum at ``x = R_p > 0``, ``dN/dx > 0`` for ``x < R_p`` — is the sign-robust
-    discriminator vs the surface-peaked predep ``erfc`` (max at ``x = 0``). This is the field
-    :func:`drive_in` consumes in place of the predep.
+    ``shape="gaussian"`` (slice-1 default, the seam) is the symmetric two-moment (LSS) profile
+    ``N(x) = (Q/√(2π)ΔR_p)·exp(−(x−R_p)²/2ΔR_p²)``: peak ``Q/(√(2π)·ΔR_p)`` **at the projected range**
+    ``R_p``, 1σ half-width ``ΔR_p`` (:func:`range_statistics`). ``shape="pearson"`` (slice 2) is the
+    four-moment **skewed** :func:`pearson4_profile` (adds skewness γ, kurtosis β via
+    :func:`skew_kurtosis`) — boron's peak then sits *deeper* than R_p with a surface tail.
+
+    ``x`` (cm) from the surface. **Not** renormalized on the grid — this is the *analytic* form, so
+    ``∫₀^∞ N dx = Q`` only to truncation: for the Gaussian just the **surface** ``x<0`` tail (negligible
+    when ``R_p ≳ 4·ΔR_p``, flagged shallow), for Pearson-IV **both** tails (the power law is heavier —
+    the two-sided flagged leg). The **buried-peak topology** (maximum at ``x > 0``, ``dN/dx > 0``
+    shallower) is the sign-robust discriminator vs the surface-peaked predep ``erfc`` (max at ``x = 0``).
+    This is the field :func:`drive_in` consumes in place of the predep.
     """
     x = np.asarray(x, dtype=float)
     R_p, dRp = range_statistics(implant.species, implant.energy_keV)
-    return (implant.dose / (math.sqrt(2.0 * math.pi) * dRp)) * np.exp(-((x - R_p) ** 2) / (2.0 * dRp ** 2))
+    if implant.shape == "gaussian":
+        return (implant.dose / (math.sqrt(2.0 * math.pi) * dRp)) * np.exp(-((x - R_p) ** 2) / (2.0 * dRp ** 2))
+    gamma, beta = skew_kurtosis(implant.species, implant.energy_keV)
+    return pearson4_profile(x, implant.dose, R_p, dRp, gamma, beta)
 
 
 def implant_ic(grid: Grid, implant: Implant) -> DopantProfile:
     """Place an :class:`Implant` on ``grid`` → the athermal as-implanted :class:`DopantProfile` (stage ``"implant"``).
 
-    The buried-Gaussian IC (:func:`implant_profile`) as a profile object, its ``dose`` the **grid
-    integral** ``Σ N·Δx`` (the engine's :meth:`~engines.diffusion.Diffusion1D.total` convention, so it is
-    directly comparable to the drive-in's conserved dose). ``t``/``D`` are ``0`` — the implant is athermal
-    (the placement, before any anneal); the subsequent :func:`drive_in` supplies the thermal step. This is
-    the profile that slots into :func:`two_step` where the predep ``erfc`` would be.
+    The buried IC (:func:`implant_profile` — Gaussian or Pearson-IV per ``implant.shape``) as a profile
+    object, its ``dose`` the **grid integral** ``Σ N·Δx`` (the engine's
+    :meth:`~engines.diffusion.Diffusion1D.total` convention, so it is directly comparable to the
+    drive-in's conserved dose). ``t``/``D`` are ``0`` — the implant is athermal (the placement, before any
+    anneal); the subsequent :func:`drive_in` supplies the thermal step. This is the profile that slots
+    into :func:`two_step` where the predep ``erfc`` would be.
     """
     N = implant_profile(grid.centers, implant)
     dose = float(np.sum(N * grid.widths))
@@ -687,3 +713,122 @@ def implant_ic(grid: Grid, implant: Implant) -> DopantProfile:
         N_surface=float(N[0]), dose=dose, surface_flux_dose=0.0,
         length=grid.length, method="implant",
     )
+
+
+# --------------------------------------------------------------------------- #
+# 5b. Pearson-IV skew — the tightened (asymmetric) as-implanted profile (slice 2)
+# --------------------------------------------------------------------------- #
+# The slice-1 profile is the SYMMETRIC two-moment Gaussian (peak exactly at R_p, mirror-image tails).
+# Real as-implanted profiles are SKEWED: a light ion like boron **backscatters toward the surface**
+# (Plummer, Deal & Griffin, *Silicon VLSI Technology* §8: "light ions backscatter to skew the profile
+# up; heavy ions scatter deeper"), so boron carries a **longer tail toward the surface** and its **peak
+# sits DEEPER than R_p** — a NEGATIVE skewness γ (sign convention: a *positive* γ puts the peak *closer*
+# to the surface than R_p, so boron's surface-tail is the negative branch), growing more negative with
+# energy. The four-moment (R_p, ΔR_p, skewness γ, kurtosis β) **Pearson-IV** distribution is the
+# workhorse branch for this asymmetry in implanted dopants (the Pearson-IV-for-implant-profiles
+# literature, e.g. *Radiation Effects* 46 (1980) 3-4).
+#
+# Pearson-IV is the CLOSED-FORM solution of the Pearson ODE  d(ln p)/ds = (s − a)/(b0 + b1 s + b2 s²)
+# (s = x − R_p, a = b1), whose coefficients are fixed by the four moments (σ ≡ ΔR_p):
+#     D  = 10β − 12γ² − 18
+#     b0 = −σ²(4β − 3γ²)/D,    b1 = a = −γσ(β + 3)/D,    b2 = −(2β − 3γ² − 6)/D
+# integrating to  p(s) = |b0 + b1 s + b2 s²|^(1/2b2) · exp[(2c/W)·arctan((2 b2 s + b1)/W)]  with
+# c = −b1(2 b2 + 1)/(2 b2) and W = √(4 b0 b2 − b1²). The construction reproduces the first two moments
+# **exactly** (mean = R_p, variance = σ² — the tight test legs), and γ, β by design; the **mode** sits at
+# s = b1 (deeper than R_p for boron's γ < 0). The **type-IV** branch requires complex denominator roots
+# (b2 < 0 AND 4 b0 b2 − b1² > 0); :func:`pearson4_profile` raises outside it rather than take a
+# negative-base power. That is the honest cost of the clean branch: real boron kurtosis sits near the
+# Gaussian β ≈ 3, but staying in type IV pins β into the ≳ 4 band, so β (and the γ magnitude) are
+# **house-calibrated, FLAGGED** — the SIGN and energy TREND are cited, the numbers are not table anchors
+# like R_p. Two truncation edges now (vs the Gaussian's one): the power-law |s|^(1/b2) tail loses dose at
+# BOTH ends, so the analytic ``∫N dx = Q`` is a flagged, two-sided leg — the TIGHT dose leg is structural
+# and shape-independent (the sealed no-flux :func:`drive_in` conserves whatever grid-dose it is handed).
+
+# Boron skew/kurtosis — house-calibrated, FLAGGED magnitudes (NOT tabulated anchors like R_p/ΔR_p). The
+# CITED content is the SIGN and TREND: boron γ < 0 at device energies, more negative with energy (Plummer
+# §8; the profile "skewed up" toward the surface). β is a constant pinned into the type-IV band. Only
+# boron is tabulated — the well-documented light-ion case the plan/demo name; other species raise rather
+# than carry a fabricated skew. γ_B(E) = γ0 + γ1·log10(E/E0) (small negative near 10 keV → ≈ −0.44 by
+# 200 keV, staying safely inside type IV for β = 4.5).
+_SKEW_KURTOSIS: dict[str, dict[str, float]] = {
+    "B": {"gamma0": -0.05, "gamma1": -0.30, "E0_keV": 10.0, "beta": 4.5},
+}
+
+
+def skew_kurtosis(species: str, energy_keV: float) -> tuple[float, float]:
+    """Flagged Pearson-IV 3rd/4th moments ``(γ, β)`` for ``species`` at ``energy_keV`` (skewness, kurtosis).
+
+    Boron only (the cited light-ion case): γ < 0 (surface tail, peak *deeper* than R_p), growing more
+    negative with energy; β pinned into the type-IV band (≳ 4). **House-calibrated magnitudes** — the
+    SIGN and energy TREND are cited (Plummer §8, "light ions backscatter to skew the profile up"); the
+    numbers are not table anchors (unlike :func:`range_statistics`). Raises for a species without skew
+    data rather than fabricating one, and for a non-positive energy.
+    """
+    if energy_keV <= 0.0:
+        raise ValueError(f"implant energy must be > 0 keV, got {energy_keV}")
+    if species not in _SKEW_KURTOSIS:
+        raise ValueError(f"no Pearson-IV skew data for {species!r} (have {sorted(_SKEW_KURTOSIS)})")
+    p = _SKEW_KURTOSIS[species]
+    gamma = p["gamma0"] + p["gamma1"] * math.log10(energy_keV / p["E0_keV"])
+    return gamma, p["beta"]
+
+
+def range_moments(species: str, energy_keV: float) -> tuple[float, float, float, float]:
+    """The four moments ``(R_p, ΔR_p, γ, β)`` — :func:`range_statistics` (2, cited) + :func:`skew_kurtosis` (2, flagged)."""
+    R_p, dRp = range_statistics(species, energy_keV)
+    gamma, beta = skew_kurtosis(species, energy_keV)
+    return R_p, dRp, gamma, beta
+
+
+# Grid-independent auxiliary axis (in units of σ) for the full-line normalization ∫p ds = Q. The
+# power-law tail |s|^(1/b2) (1/b2 ≈ −9 for the boron band) decays fast, so ±60σ over-covers both tails.
+_PEARSON_NORM_HALF_WIDTH_SIGMA = 60.0
+_PEARSON_NORM_POINTS = 240001
+
+
+def _pearson4_coeffs(sigma: float, gamma: float, beta: float) -> tuple[float, float, float]:
+    """The Pearson coefficients ``(b0, b1, b2)`` from the moments (σ, γ, β) — ``b1`` is the mode offset ``a``."""
+    D = 10.0 * beta - 12.0 * gamma ** 2 - 18.0
+    if D == 0.0:
+        raise ValueError(f"degenerate Pearson denominator (10β−12γ²−18 = 0) at γ={gamma}, β={beta}")
+    b0 = -sigma ** 2 * (4.0 * beta - 3.0 * gamma ** 2) / D
+    b1 = -gamma * sigma * (beta + 3.0) / D
+    b2 = -(2.0 * beta - 3.0 * gamma ** 2 - 6.0) / D
+    return b0, b1, b2
+
+
+def _pearson4_logshape(s: np.ndarray, b0: float, b1: float, b2: float, W: float, c: float) -> np.ndarray:
+    """Un-normalized log-density ``ln p(s)`` of the Pearson-IV shape (``s`` centred at R_p)."""
+    denom = b0 + b1 * s + b2 * s ** 2                 # < 0 everywhere for type IV (complex roots)
+    return (1.0 / (2.0 * b2)) * np.log(np.abs(denom)) + (2.0 * c / W) * np.arctan((2.0 * b2 * s + b1) / W)
+
+
+def pearson4_profile(x: np.ndarray, dose: float, R_p: float, sigma: float,
+                     gamma: float, beta: float) -> np.ndarray:
+    """As-implanted **Pearson-IV** (four-moment, skewed) IC ``N(x)`` (cm⁻³), normalized to ``dose`` over the full line.
+
+    The skewed generalisation of the Gaussian branch of :func:`implant_profile`: the profile's mean is
+    ``R_p`` and variance ``σ² = ΔR_p²`` **exactly** (by construction — the tight legs), with skewness γ
+    and kurtosis β by design, and its **mode** at ``x = R_p + b1`` (deeper than R_p when γ < 0, boron).
+    Requires the **type-IV** region — ``b2 < 0`` and ``4 b0 b2 − b1² > 0`` (complex denominator roots) —
+    and **raises** otherwise (no negative-base power taken silently). Normalized so
+    ``∫_{−∞}^{∞} N dx = dose`` on a grid-independent σ-scaled axis; evaluated on ``x`` (cm, from the
+    surface) it loses dose to BOTH surface and deep-tail truncation (the two-sided flagged leg — the
+    power-law tail is heavier than the Gaussian's).
+    """
+    b0, b1, b2 = _pearson4_coeffs(sigma, gamma, beta)
+    disc = 4.0 * b0 * b2 - b1 ** 2
+    if not (b2 < 0.0 and disc > 0.0):
+        raise ValueError(f"(γ={gamma:.4g}, β={beta:.4g}) is outside the Pearson-IV region "
+                         f"(need b2 < 0 and 4·b0·b2 − b1² > 0; got b2={b2:.4g}, disc={disc:.4g})")
+    W = math.sqrt(disc)
+    c = -b1 * (2.0 * b2 + 1.0) / (2.0 * b2)
+    # full-line normalization ∫shape ds on the auxiliary axis (max-subtracted for numerical stability)
+    s_norm = np.linspace(-_PEARSON_NORM_HALF_WIDTH_SIGMA * sigma,
+                         _PEARSON_NORM_HALF_WIDTH_SIGMA * sigma, _PEARSON_NORM_POINTS)
+    ln_norm = _pearson4_logshape(s_norm, b0, b1, b2, W, c)
+    ln_max = float(ln_norm.max())
+    Z = float(np.trapezoid(np.exp(ln_norm - ln_max), s_norm))    # ∫shape ds = Z · e^{ln_max}
+    x = np.asarray(x, dtype=float)
+    ln_x = _pearson4_logshape(x - R_p, b0, b1, b2, W, c)
+    return (dose / Z) * np.exp(ln_x - ln_max)

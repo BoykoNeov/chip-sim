@@ -198,3 +198,133 @@ def test_implant_replaces_the_predep_source():
     # Changing the (bypassed) predep knobs does not move the implant result.
     ic2, drivein2 = dd.two_step("P", implant=imp, T_predep=1200.0, t_predep_min=99.0)
     assert np.array_equal(drivein.N, drivein2.N)
+
+
+# --------------------------------------------------------------------------- #
+# Slice 2 — Pearson-IV skew (the tightened, asymmetric as-implanted profile)
+# --------------------------------------------------------------------------- #
+# Physics: a light ion (boron) backscatters toward the surface → a NEGATIVE skewness γ (surface tail,
+# peak DEEPER than R_p), growing more negative with energy (Plummer §8, "light ions backscatter to skew
+# the profile up"). The four-moment Pearson-IV distribution is the workhorse branch; slice-1's symmetric
+# Gaussian is the seam (shape="gaussian", default). Triad:
+#   * Tight/exact: (a) the SEAM — default shape="gaussian" is the slice-1 Gaussian bit-for-bit; (b) the
+#     construction reproduces the four moments (mean=R_p, var=σ² exact; γ, β by design); (c) the mode
+#     sits at the analytic R_p+b1, DEEPER than R_p for boron — the sign-robust skew discriminator;
+#     (d) dose conservation through the drive-in is STRUCTURAL (shape-independent, machine precision).
+#   * Flagged: the γ(E)/β magnitudes (house-calibrated into the type-IV band — SIGN/TREND cited, numbers
+#     not table anchors); the two-sided (surface AND heavy deep-tail) analytic-∫=Q truncation.
+def test_pearson_default_shape_is_gaussian_seam():
+    # The seam: shape defaults to "gaussian" and reproduces the slice-1 symmetric Gaussian bit-for-bit,
+    # so the entire slice-1 suite is byte-identical (the opt-in discipline, cf. implant=None).
+    imp = dd.Implant(dose=1e13, energy_keV=100.0, species="B")
+    assert imp.shape == "gaussian"
+    x = dd.uniform_grid(2.0 * UM, 600).centers
+    Rp, dRp = imp.range_statistics()
+    gaussian = (imp.dose / (math.sqrt(2.0 * math.pi) * dRp)) * np.exp(-((x - Rp) ** 2) / (2.0 * dRp ** 2))
+    assert np.array_equal(dd.implant_profile(x, imp), gaussian)
+
+
+def test_pearson4_reproduces_the_four_moments():
+    # THE tight leg (validates the whole closed-form construction incl. the skew SIGN): integrated over
+    # its full support, the Pearson-IV density has mean=R_p and variance=σ² EXACTLY, and skewness=γ,
+    # kurtosis=β by design. A quadrature check (any sign error in the coefficients fails here).
+    Rp, dRp, gamma, beta = dd.range_moments("B", 100.0)
+    assert gamma < 0.0                                          # boron: negative skew (cited)
+    s = np.linspace(-40.0 * dRp, 40.0 * dRp, 400001)           # full support, symmetric about R_p
+    N = dd.pearson4_profile(Rp + s, 1e13, Rp, dRp, gamma, beta)
+    Q = np.trapezoid(N, s)
+    m1 = np.trapezoid(s * N, s) / Q
+    m2 = np.trapezoid((s - m1) ** 2 * N, s) / Q
+    m3 = np.trapezoid((s - m1) ** 3 * N, s) / Q
+    m4 = np.trapezoid((s - m1) ** 4 * N, s) / Q
+    assert Q == pytest.approx(1e13, rel=1e-4)                   # normalized to the dose over the full line
+    assert m1 == pytest.approx(0.0, abs=1e-3 * dRp)            # mean = R_p (exact by construction)
+    assert m2 == pytest.approx(dRp ** 2, rel=1e-3)            # variance = σ² (exact by construction)
+    assert m3 / m2 ** 1.5 == pytest.approx(gamma, abs=3e-3)   # skewness = γ
+    assert m4 / m2 ** 2 == pytest.approx(beta, rel=3e-3)      # kurtosis = β
+
+
+def test_boron_pearson_peak_is_deeper_than_Rp():
+    # The slice-2 discriminator (sign-robust), stacking on slice-1's buried peak: boron's NEGATIVE skew
+    # displaces the mode DEEPER than R_p (mode = R_p + b1, b1 > 0), where slice-1's symmetric Gaussian
+    # peaks exactly at R_p. The profile is still buried (rises from the surface) — an ASYMMETRIC bury.
+    imp = dd.Implant(dose=1e13, energy_keV=100.0, species="B", shape="pearson")
+    Rp, dRp, gamma, beta = imp.moments()
+    b0, b1, b2 = dd._pearson4_coeffs(dRp, gamma, beta)
+    assert b1 > 0.0                                             # mode offset deeper (γ < 0)
+    grid = dd.uniform_grid(2.0 * UM, 4000)                      # fine grid to resolve the ~0.1σ shift
+    N = dd.implant_profile(grid.centers, imp)
+    i_peak = int(np.argmax(N))
+    assert grid.centers[i_peak] == pytest.approx(Rp + b1, abs=2.0 * grid.widths[0])  # mode at R_p+b1
+    assert grid.centers[i_peak] > Rp                            # DEEPER than the projected range
+    assert np.all(np.diff(N[: i_peak + 1]) > 0.0)              # still rises from the surface (buried)
+
+
+def test_boron_pearson_tail_is_heavier_toward_the_surface():
+    # "Skewed up" (Plummer): the negative-skew boron profile carries a HEAVIER tail toward the SURFACE —
+    # at matched distances k·σ either side of R_p the surface side exceeds the deep side (the physical
+    # content of γ < 0, independent of the exact magnitude).
+    Rp, dRp, gamma, beta = dd.range_moments("B", 100.0)
+    for k in (2.0, 3.0, 4.0):
+        surface = dd.pearson4_profile(np.array([Rp - k * dRp]), 1e13, Rp, dRp, gamma, beta)[0]
+        deep = dd.pearson4_profile(np.array([Rp + k * dRp]), 1e13, Rp, dRp, gamma, beta)[0]
+        assert surface > deep, k
+
+
+def test_pearson4_type_iv_guard():
+    # The honest guard: (γ, β) outside the type-IV region (real denominator roots, or the b2=0 Gaussian
+    # limit) RAISES rather than silently take a negative-base power. β near the Gaussian 3 is out of
+    # region — the reason β is pinned into the ≳4 band (the flagged house calibration).
+    Rp, dRp = dd.range_statistics("B", 100.0)
+    for gamma, beta in ((0.0, 3.0), (-0.4, 3.3), (0.9, 3.2)):
+        with pytest.raises(ValueError):
+            dd.pearson4_profile(np.array([Rp]), 1e13, Rp, dRp, gamma, beta)
+
+
+def test_skew_kurtosis_boron_sign_trend_and_guards():
+    # The CITED content: boron skew is negative at device energies and grows MORE negative with energy
+    # (β constant, > the Gaussian 3). Magnitudes are flagged; the sign and trend are the assertions.
+    g50, b50 = dd.skew_kurtosis("B", 50.0)
+    g200, b200 = dd.skew_kurtosis("B", 200.0)
+    assert g50 < 0.0 and g200 < 0.0                            # negative at device energies (cited)
+    assert g200 < g50                                          # more negative with energy (cited trend)
+    assert b50 == b200 > 3.0                                   # kurtosis pinned into the type-IV band
+    with pytest.raises(ValueError):
+        dd.skew_kurtosis("P", 100.0)                           # no fabricated skew for un-tabulated species
+    with pytest.raises(ValueError):
+        dd.skew_kurtosis("B", 0.0)
+
+
+def test_implant_pearson_requires_skew_data_and_valid_shape():
+    # Fail early at construction: shape="pearson" for a species without skew data (P), or an unknown
+    # shape, raises — we never silently produce a garbage or fabricated profile.
+    with pytest.raises(ValueError):
+        dd.Implant(dose=1e13, energy_keV=100.0, species="P", shape="pearson")
+    with pytest.raises(ValueError):
+        dd.Implant(dose=1e13, energy_keV=100.0, species="B", shape="bogus")
+
+
+def test_pearson_ic_two_sided_truncation_and_structural_conservation():
+    # Flagged: the Pearson-IV IC loses dose to BOTH the surface and the (heavier, power-law) deep tail,
+    # so its grid-dose sits below Q even for a mid-depth implant. Tight: the sealed drive-in nonetheless
+    # conserves whatever grid-dose it is HANDED to machine precision (structural, shape-independent).
+    imp = dd.Implant(dose=1e14, energy_keV=100.0, species="B", shape="pearson")
+    grid = dd.uniform_grid(3.0 * UM, 900)
+    ic = dd.implant_ic(grid, imp)
+    assert ic.stage == "implant"
+    assert ic.dose < imp.dose                                  # two-sided truncation (< Q, flagged)
+    ic2, drivein = dd.two_step("B", implant=imp, length_um=3.0)
+    assert drivein.dose == pytest.approx(ic2.dose, rel=1e-10)  # structural conservation (machine precision)
+
+
+def test_two_step_pearson_vs_gaussian_ic_differ_by_the_skew():
+    # The observable through the SAME pipeline (no new solver): a Pearson-IV implant and a Gaussian
+    # implant of identical dose/energy give different ICs — the Pearson peak buried deeper (the skew) —
+    # while a shape="gaussian" implant is bit-for-bit the slice-1 path.
+    g = dd.Implant(dose=1e13, energy_keV=100.0, species="B")               # gaussian (default)
+    p = dd.Implant(dose=1e13, energy_keV=100.0, species="B", shape="pearson")
+    grid = dd.uniform_grid(2.0 * UM, 4000)
+    Ng = dd.implant_profile(grid.centers, g)
+    Np = dd.implant_profile(grid.centers, p)
+    assert not np.allclose(Ng, Np)                             # the skew is a real, visible difference
+    assert grid.centers[int(np.argmax(Np))] > grid.centers[int(np.argmax(Ng))]  # Pearson peak deeper

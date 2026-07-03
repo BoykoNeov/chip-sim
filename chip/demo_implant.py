@@ -53,9 +53,15 @@ CHANNEL_N_A = 1.0e17           # cm⁻³ — p-type channel
 T_OX_UM = 0.015                # µm — 15 nm gate oxide (the MIT worked-example device)
 GATE = "n+poly"
 
+PEARSON_ENERGY_KEV = 120.0     # keV — a device energy clearly in boron's NEGATIVE-skew regime (slice 2):
+                               # the sub-keV crossover to positive skew is far below, so the surface tail
+                               # and deeper-than-R_p peak read cleanly.
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-implant.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-implant.png"
+DOCS_FIGURE_PEARSON = _REPO_ROOT / "docs" / "figures" / "chip-implant-pearson.png"
+OUTPUT_FIGURE_PEARSON = _REPO_ROOT / "outputs" / "chip-implant-pearson.png"
 
 
 @dataclass(frozen=True)
@@ -134,6 +140,78 @@ def print_summary(r: ContrastResult) -> None:
           f"→ the dose sits WITHIN the depletion region (the shallow-sheet regime the shift assumes).\n")
 
 
+# --------------------------------------------------------------------------- #
+# Slice 2 — the Pearson-IV skew: the SAME implant, symmetric Gaussian vs the real skewed profile
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class PearsonResult:
+    """The Gaussian-vs-Pearson-IV skew bundle (slice 2)."""
+
+    x_um: np.ndarray
+    gaussian: np.ndarray           # slice-1 symmetric two-moment profile (peak at R_p)
+    pearson: np.ndarray            # slice-2 four-moment Pearson-IV (skewed: peak deeper, surface tail)
+    R_p_um: float
+    mode_um: float                 # the Pearson-IV mode R_p + b1 (deeper than R_p for boron)
+    gamma: float                   # skewness (negative for boron)
+    beta: float                    # kurtosis
+
+
+def pearson_compute() -> PearsonResult:
+    """The same boron implant as a symmetric Gaussian vs the real skewed Pearson-IV → :class:`PearsonResult`."""
+    grid = dd.uniform_grid(LENGTH_UM * dd.CM_PER_UM, 4000)     # fine: the mode shift is ~0.1·ΔR_p
+    gauss = dd.Implant(dose=DOSE, energy_keV=PEARSON_ENERGY_KEV, species=SPECIES)                    # gaussian
+    skew = dd.Implant(dose=DOSE, energy_keV=PEARSON_ENERGY_KEV, species=SPECIES, shape="pearson")   # Pearson-IV
+    R_p, dRp, gamma, beta = skew.moments()
+    b0, b1, b2 = dd._pearson4_coeffs(dRp, gamma, beta)
+    return PearsonResult(
+        x_um=grid.centers / dd.CM_PER_UM,
+        gaussian=dd.implant_profile(grid.centers, gauss),
+        pearson=dd.implant_profile(grid.centers, skew),
+        R_p_um=R_p / dd.CM_PER_UM, mode_um=(R_p + b1) / dd.CM_PER_UM,
+        gamma=gamma, beta=beta,
+    )
+
+
+def print_pearson_summary(p: PearsonResult) -> None:
+    """Print the slice-2 skew story — the asymmetry the symmetric Gaussian misses."""
+    print("Ion implantation §5 (slice 2): the Pearson-IV skew — boron's real asymmetric profile\n")
+    print(f"  same implant ({SPECIES}, {PEARSON_ENERGY_KEV:.0f} keV, Q = {DOSE:.1e} cm⁻²), two shapes:")
+    print(f"  gaussian (slice 1): symmetric, peak AT R_p = {p.R_p_um:.4f} µm")
+    print(f"  pearson  (slice 2): skewness γ = {p.gamma:+.3f} (< 0), kurtosis β = {p.beta:.2f}  →  peak "
+          f"DEEPER at {p.mode_um:.4f} µm, with a longer tail toward the surface")
+    print(f"  → light-ion boron backscatters to 'skew the profile up' (Plummer §8): the mode shifts "
+          f"{(p.mode_um - p.R_p_um) * 1e3:+.1f} nm past R_p — the asymmetry a symmetric Gaussian cannot carry.\n")
+
+
+def save_pearson_figure(p: PearsonResult) -> Path:
+    """Render and save the slice-2 Gaussian-vs-Pearson-IV skew artifact (needs the ``viz`` extra)."""
+    import matplotlib
+    matplotlib.use("Agg")                            # headless
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(1, 1, figsize=(7.5, 4.6))
+    ax.plot(p.x_um, p.gaussian, color="tab:blue", lw=2, ls="--", label="Gaussian (slice 1, symmetric)")
+    ax.plot(p.x_um, p.pearson, color="tab:red", lw=2, label=f"Pearson-IV (slice 2, γ = {p.gamma:+.2f})")
+    ax.axvline(p.R_p_um, color="0.5", ls=":", lw=1, label=f"$R_p$ = {p.R_p_um:.3f} µm")
+    ax.axvline(p.mode_um, color="tab:red", ls=":", lw=1, label=f"Pearson mode = {p.mode_um:.3f} µm (deeper)")
+    ax.set_xlabel("depth  x  (µm)")
+    ax.set_ylabel("concentration  N(x)  (cm⁻³)")
+    ax.set_xlim(0.0, min(0.9, p.x_um[-1]))
+    ax.set_title(f"§5 slice 2 — boron {PEARSON_ENERGY_KEV:.0f} keV: the Pearson-IV skew "
+                 f"(surface tail, peak past $R_p$)", fontsize=10)
+    ax.legend(fontsize=8)
+    # Honesty caption: the CITED content is the skew SIGN (γ<0 → deeper mode + surface tail); the taller
+    # peak is the kurtosis β = 4.5, a house-calibrated value PINNED into the type-IV branch (real boron
+    # β ≈ 3 is out of region) — a flagged magnitude, not a measured one.
+    ax.text(0.98, 0.60, f"γ, β flagged (β={p.beta:.1f} pinned\ninto the type-IV branch);\nthe SIGN of γ is the cited part",
+            transform=ax.transAxes, ha="right", va="top", fontsize=7.5, color="0.35")
+    fig.tight_layout()
+    for target in (DOCS_FIGURE_PEARSON, OUTPUT_FIGURE_PEARSON):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(target, dpi=130)
+    return DOCS_FIGURE_PEARSON
+
+
 def save_figure(r: ContrastResult) -> Path:
     """Render and save the predep-vs-implant contrast artifact (needs the optional ``viz`` extra)."""
     import matplotlib
@@ -179,11 +257,15 @@ def main() -> None:
 
     r = compute()
     print_summary(r)
+    p = pearson_compute()
+    print_pearson_summary(p)
     try:
         saved = save_figure(r)
         print(f"Figure saved → {saved.relative_to(_REPO_ROOT)}")
+        saved_p = save_pearson_figure(p)
+        print(f"Figure saved → {saved_p.relative_to(_REPO_ROOT)}")
     except ImportError:
-        print("(matplotlib not installed — install the viz extra to render the figure: "
+        print("(matplotlib not installed — install the viz extra to render the figures: "
               "pip install -e .[viz])")
 
 
