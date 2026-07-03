@@ -99,6 +99,8 @@ DEEPENINGS = [
          "Zernike aberrations (coma / astigmatism / spherical) — a pupil phase."),
     Demo("demo_device_2d", "v1.11",
          "2-D MOSFET cross-section — lateral S/D diffusion shortens the channel (L_eff), not V_t."),
+    Demo("demo_implant", "§5",
+         "Ion implantation — the buried peak a predep cannot make; the honest V_t-adjust implant."),
 ]
 
 ALL_DEMOS = SPINE + DEEPENINGS

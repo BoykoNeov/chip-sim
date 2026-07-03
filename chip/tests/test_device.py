@@ -107,6 +107,52 @@ def test_oxide_charge_shift_is_only_the_flatband_term():
     assert (m.V_t - m0.V_t) == pytest.approx(m.V_FB - m0.V_FB, rel=1e-12)
 
 
+# --------------------------------------------------------------------------- #
+# The V_t-adjust implant (§5): the honest de-fake of the faked uniform offset
+# --------------------------------------------------------------------------- #
+def test_zero_implant_dose_is_byte_for_byte_the_no_adjust_device():
+    # The seam: implant_dose = 0 (the default) reproduces the prior V_t exactly — the ΔV_t term is
+    # skipped, so every existing caller (demo_device, the MIT example, the whole game) is untouched.
+    base = dev.threshold_voltage(1e17, 0.015, gate="n+poly")
+    explicit_zero = dev.threshold_voltage(1e17, 0.015, gate="n+poly", implant_dose=0.0)
+    assert explicit_zero.V_t == base.V_t
+    assert base.vt_adjust == 0.0 and base.implant_dose == 0.0 and base.implant_kind is None
+
+
+def test_acceptor_implant_raises_and_donor_lowers_vt_by_q_dose_over_cox():
+    # The honest V_t-adjust the device previously FAKED with a uniform substrate offset: a shallow implanted
+    # sheet shifts V_t by exactly ±q·Q/C_ox (Plummer/Sze). ACCEPTOR (p, boron) RAISES V_t; DONOR (n) LOWERS
+    # it. The dose comes from a buried Implant the erfc predep cannot make — but the shift needs only dose+type.
+    base = dev.threshold_voltage(1e17, 0.015)
+    dose = 5.0e11                                              # cm⁻² (a modest adjust implant)
+    acc = dev.threshold_voltage(1e17, 0.015, implant_dose=dose, implant_kind="p")
+    don = dev.threshold_voltage(1e17, 0.015, implant_dose=dose, implant_kind="n")
+    shift = dev.Q_ELEMENTARY * dose / base.C_ox
+    assert acc.V_t == pytest.approx(base.V_t + shift, rel=1e-12)   # acceptor raises
+    assert don.V_t == pytest.approx(base.V_t - shift, rel=1e-12)   # donor lowers
+    assert acc.vt_adjust == pytest.approx(+shift) and don.vt_adjust == pytest.approx(-shift)
+
+
+def test_vt_adjust_is_placement_independent_only_dose_and_type():
+    # The scope edge, asserted: the shallow-sheet shift depends ONLY on dose and type — NOT on where the
+    # implant peak sits. So two implants of equal dose/type but different energy (different R_p) give the
+    # SAME ΔV_t. (The buried PROFILE discriminates predep-vs-implant; the V_t NUMBER does not — that is why
+    # the demo, not this wire, is the buried-peak consumer. Deep/retrograde effective-N_A is deferred.)
+    C_ox = dev.oxide_capacitance(0.015)
+    assert dev.vt_adjust_shift(5e11, "p", C_ox) == dev.vt_adjust_shift(5e11, "p", C_ox)
+    assert dev.vt_adjust_shift(5e11, "p", C_ox) == pytest.approx(dev.Q_ELEMENTARY * 5e11 / C_ox)
+
+
+def test_vt_adjust_shift_validates_inputs():
+    C_ox = dev.oxide_capacitance(0.015)
+    with pytest.raises(ValueError):
+        dev.vt_adjust_shift(5e11, "x", C_ox)                  # kind must be "p" or "n"
+    with pytest.raises(ValueError):
+        dev.vt_adjust_shift(-1.0, "p", C_ox)                  # dose ≥ 0
+    with pytest.raises(ValueError):
+        dev.vt_adjust_shift(5e11, "p", 0.0)                   # C_ox > 0
+
+
 def test_nonzero_oxide_charge_without_c_ox_raises():
     # A non-zero Q_ox needs the oxide capacitance (ΔV_FB = −Q_ox/C_ox); calling flatband_voltage with
     # Q_ox≠0 and no C_ox is a programming error, not a silent no-op.

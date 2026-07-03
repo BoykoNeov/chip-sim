@@ -333,6 +333,7 @@ def two_step(
     T_drivein: float = 1100.0,
     t_drivein_min: float = 30.0,
     drivein_program: "ThermalProgram | None" = None,
+    implant: "Implant | None" = None,
     N_surface: float | None = None,
     length_um: float = 3.0,
     n_cells: int = 600,
@@ -356,10 +357,22 @@ def two_step(
     ``T_drivein``/``t_drivein_min`` are **bypassed** — the program governs both the temperature
     schedule *and* the duration (``program.duration``). ``None`` (default) is the isothermal step,
     bit-for-bit unchanged (the seam).
+
+    ``implant`` (§5, optional) swaps the **initial condition**: instead of the surface-peaked predep
+    ``erfc``, the drive-in starts from a **buried Gaussian** :func:`implant_ic` at the projected range
+    (the observable predep cannot make). When set, ``T_predep``/``t_predep_min``/``N_surface`` are
+    **bypassed** (there is no predep — the implant *is* the source), and the returned first element is
+    the athermal as-implanted IC (``stage="implant"``) rather than a predep. ``None`` (default) runs the
+    predep path **bit-for-bit** — the entire existing suite is byte-identical (the seam, cf.
+    ``drivein_program``/``Q_ox=0``/``boost=None``). The same sealed drive-in redistributes either IC.
     """
     grid = uniform_grid(length_um * CM_PER_UM, n_cells)
-    predep = predeposit(grid, dopant, T_predep, t_predep_min * 60.0,
-                        N_surface=N_surface, n_steps=n_steps)
+    if implant is None:
+        source = predeposit(grid, dopant, T_predep, t_predep_min * 60.0,
+                            N_surface=N_surface, n_steps=n_steps)
+    else:
+        source = implant_ic(grid, implant)
+    predep = source
     if drivein_program is None:
         drivein = drive_in(grid, predep.N, dopant, T_drivein, t_drivein_min * 60.0,
                            n_steps=n_steps)
@@ -540,4 +553,137 @@ def drive_in_program(
         x=grid.centers, N=N, t=t_seconds, D=D_avg, stage="drive-in",
         N_surface=float(N[0]), dose=dose, surface_flux_dose=surf_flux,
         length=grid.length, method=method, effective_Dt=budget,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# 5. Ion implantation — the buried initial condition (the peak predep cannot make)
+# --------------------------------------------------------------------------- #
+# The thermal predep of §2/§3 lays a **surface-peaked** ``erfc`` — its maximum is *at* the surface, and
+# it is physically incapable of putting the dopant peak below it. Ion implantation embeds ions at a
+# **controlled depth** ``R_p`` (the projected range), producing a **buried** Gaussian peak (zero-slope-
+# then-rising concentration near the surface). That buried peak is the observable predep cannot produce
+# at all — the discriminator that licenses this regime (a real V_t-adjust implant, a retrograde well),
+# *not* a redundant second route to the same junction. Historically it is the step (production Si, early
+# 1970s) that modernised the ~1968 planar predep line this simulator otherwise is.
+#
+# The model is LSS range theory reduced to its **first two moments** — projected range ``R_p(E)`` and
+# straggle ``ΔR_p(E)`` — tabulated in Gibbons–Johnson–Mylroie *Projected Range Statistics* (the
+# range-statistics-source memory note; the µm anchors are web-corroborated, flagged ~10%). The as-
+# implanted profile is the **symmetric Gaussian** ``N(x) = (Q/√(2π)ΔR_p)·exp(−(x−R_p)²/2ΔR_p²)``; the
+# skew (Pearson-IV) is slice 2, the channeling tail slice 3, damage→leakage slice 4. **No new solver:**
+# implant produces the *initial condition*, and the **identical** sealed-surface :func:`drive_in`
+# redistributes and (slice-1 assumption) activates it — the implant slots in as an alternative IC where
+# the predep ``erfc`` would go.
+
+# Cited Gibbons–Johnson–Mylroie projected-range anchors (µm) — B & P into Si, web-corroborated across
+# independent sources (gtuttle range/straggle table, TRIM/SRIM, textbook worked examples). The FLAGGED
+# benchmark leg: a log-log power law ``R_p = C·E^m`` is least-squares fit to these, reproducing them to
+# ~10% over 10→200 keV. The tight/sign content is monotone ``R_p(E)`` (energy→depth) and the species
+# ordering — B (lighter) penetrates DEEPER than P at equal energy — not the absolute µm.
+_RP_ANCHORS_UM: dict[str, tuple[tuple[float, float], ...]] = {
+    "B": ((10.0, 0.0333), (30.0, 0.10), (80.0, 0.24), (100.0, 0.30)),
+    "P": ((10.0, 0.0139), (100.0, 0.12), (200.0, 0.255)),
+}
+_DRP_ANCHORS_UM: dict[str, tuple[tuple[float, float], ...]] = {
+    "B": ((10.0, 0.0171), (80.0, 0.063), (100.0, 0.067)),
+    "P": ((10.0, 0.0069), (200.0, 0.0837)),
+}
+
+
+def _fit_power_law(anchors: tuple[tuple[float, float], ...]) -> tuple[float, float]:
+    """Least-squares ``y = C·E^m`` fit in log-space → ``(C, m)`` (``E`` keV, ``y`` µm)."""
+    E = np.array([a[0] for a in anchors], dtype=float)
+    y = np.array([a[1] for a in anchors], dtype=float)
+    m, log_C = np.polyfit(np.log(E), np.log(y), 1)
+    return float(math.exp(log_C)), float(m)
+
+
+_RP_FIT: dict[str, tuple[float, float]] = {s: _fit_power_law(a) for s, a in _RP_ANCHORS_UM.items()}
+_DRP_FIT: dict[str, tuple[float, float]] = {s: _fit_power_law(a) for s, a in _DRP_ANCHORS_UM.items()}
+
+
+def range_statistics(species: str, energy_keV: float) -> tuple[float, float]:
+    """LSS first two moments ``(R_p, ΔR_p)`` in **cm** for ``species`` at ``energy_keV`` (the Gibbons fit).
+
+    ``R_p`` (projected range) and ``ΔR_p`` (straggle) from the flagged log-log power law over the cited
+    Gibbons anchors (:data:`_RP_ANCHORS_UM` / :data:`_DRP_ANCHORS_UM`). Monotone in energy (deeper implant
+    at higher energy — the game's teaching lever) and species-ordered (B deeper than P at equal energy).
+    Returned in **cm** (the module's length unit; report as ``/CM_PER_UM`` for µm). Absolute values are
+    coefficient-flagged (~10% vs the tables); the trends/signs are cited.
+    """
+    if energy_keV <= 0.0:
+        raise ValueError(f"implant energy must be > 0 keV, got {energy_keV}")
+    if species not in _RP_FIT:
+        raise ValueError(f"no range-statistics data for {species!r} (have {sorted(_RP_FIT)})")
+    C_rp, m_rp = _RP_FIT[species]
+    C_dr, m_dr = _DRP_FIT[species]
+    R_p_um = C_rp * energy_keV ** m_rp
+    dRp_um = C_dr * energy_keV ** m_dr
+    return R_p_um * CM_PER_UM, dRp_um * CM_PER_UM
+
+
+@dataclass(frozen=True)
+class Implant:
+    """An ion-implant step: dose ``Q`` (cm⁻²) of ``species`` at ``energy_keV`` → a **buried Gaussian** IC.
+
+    The alternative initial condition to a thermal predep: instead of a surface-peaked ``erfc``, ions
+    embed at the projected range ``R_p(energy)`` with straggle ``ΔR_p`` (:func:`range_statistics`),
+    giving a **buried** Gaussian peak — the observable predep physically cannot make. ``species`` is a
+    :data:`DOPANTS` key (B is the canonical V_t-adjust / retrograde implant; P a donor implant). The
+    **same** sealed-surface :func:`drive_in` then redistributes and (slice-1 assumption: full)
+    activates it — *no new solver*. Slice-1 first cut: the **symmetric two-moment** Gaussian; the
+    Pearson-IV skew, the channeling tail (and its ``tilt`` suppression), and damage→leakage are named
+    scope edges (slices 2–4), deliberately absent here rather than half-built.
+    """
+
+    dose: float          # cm⁻² — implanted areal dose Q (∫N dx of the as-implanted profile)
+    energy_keV: float    # keV — sets R_p, ΔR_p via LSS range statistics (deeper at higher energy)
+    species: str = "B"   # dopant (a DOPANTS key); B = the canonical V_t-adjust implant
+
+    def __post_init__(self) -> None:
+        if self.dose <= 0.0:
+            raise ValueError(f"implant dose must be > 0 cm⁻², got {self.dose}")
+        if self.energy_keV <= 0.0:
+            raise ValueError(f"implant energy must be > 0 keV, got {self.energy_keV}")
+        if self.species not in DOPANTS:
+            raise ValueError(f"unknown implant species {self.species!r} (have {sorted(DOPANTS)})")
+
+    def range_statistics(self) -> tuple[float, float]:
+        """This implant's ``(R_p, ΔR_p)`` in **cm** (:func:`range_statistics` at its species/energy)."""
+        return range_statistics(self.species, self.energy_keV)
+
+
+def implant_profile(x: np.ndarray, implant: Implant) -> np.ndarray:
+    """As-implanted **buried-Gaussian** IC ``N(x) = (Q/√(2π)ΔR_p)·exp(−(x−R_p)²/2ΔR_p²)`` (cm⁻³).
+
+    The symmetric two-moment (LSS) profile: peak ``Q/(√(2π)·ΔR_p)`` **at the projected range** ``R_p``,
+    1σ half-width ``ΔR_p`` (:func:`range_statistics`). ``x`` (cm) from the surface. **Not** renormalized
+    on the grid — this is the *analytic* form, so ``∫₀^∞ N dx = Q`` only to the **surface-truncation**
+    error (the part of the Gaussian at ``x<0`` is lost); negligible for a **deep** implant
+    (``R_p ≳ 4·ΔR_p``), flagged for a shallow one (the reflected-dose scope edge). The **buried-peak
+    topology** — maximum at ``x = R_p > 0``, ``dN/dx > 0`` for ``x < R_p`` — is the sign-robust
+    discriminator vs the surface-peaked predep ``erfc`` (max at ``x = 0``). This is the field
+    :func:`drive_in` consumes in place of the predep.
+    """
+    x = np.asarray(x, dtype=float)
+    R_p, dRp = range_statistics(implant.species, implant.energy_keV)
+    return (implant.dose / (math.sqrt(2.0 * math.pi) * dRp)) * np.exp(-((x - R_p) ** 2) / (2.0 * dRp ** 2))
+
+
+def implant_ic(grid: Grid, implant: Implant) -> DopantProfile:
+    """Place an :class:`Implant` on ``grid`` → the athermal as-implanted :class:`DopantProfile` (stage ``"implant"``).
+
+    The buried-Gaussian IC (:func:`implant_profile`) as a profile object, its ``dose`` the **grid
+    integral** ``Σ N·Δx`` (the engine's :meth:`~engines.diffusion.Diffusion1D.total` convention, so it is
+    directly comparable to the drive-in's conserved dose). ``t``/``D`` are ``0`` — the implant is athermal
+    (the placement, before any anneal); the subsequent :func:`drive_in` supplies the thermal step. This is
+    the profile that slots into :func:`two_step` where the predep ``erfc`` would be.
+    """
+    N = implant_profile(grid.centers, implant)
+    dose = float(np.sum(N * grid.widths))
+    return DopantProfile(
+        x=grid.centers, N=N, t=0.0, D=0.0, stage="implant",
+        N_surface=float(N[0]), dose=dose, surface_flux_dose=0.0,
+        length=grid.length, method="implant",
     )

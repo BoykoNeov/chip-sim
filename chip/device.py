@@ -75,10 +75,16 @@ Named scope edge (the honest ceiling)
 * **Ideal oxide by default / uniform channel.** ``Q_ox`` (fixed/mobile oxide charge) defaults to ``0``
   → the ideal oxide; it is now an **optional** input (``ΔV_FB = −Q_ox/C_ox``) that the G4 purification
   module drives with mobile-ion (Na) contamination — but **interface traps** ``D_it`` remain out (a
-  separate, capacitance-dispersion effect). A **uniform** substrate doping (a real V_t-adjust implant is
-  non-uniform — the formula then takes an effective ``N_A``), full dopant activation, and
-  ``n_i = 1.0e10 cm⁻³`` at 300 K (the value that
-  reproduces the MIT example; ``1.45e10`` shifts ``φ_F`` ~10 mV — a small calibration choice, named).
+  separate, capacitance-dispersion effect). The channel is a **uniform** substrate doping ``N_A`` —
+  **but** a real **V_t-adjust implant** is now an honest, optional input (``implant_dose``/``implant_kind``
+  → :func:`vt_adjust_shift`, ``ΔV_t = ±q·Q/C_ox``): a shallow ion-implanted sheet (the buried
+  :class:`~chip.diffusion_dopant.Implant` an ``erfc`` predep cannot make) shifts the threshold, replacing
+  the old **faked** uniform offset. Its **shallow-sheet** approximation (dose within the depletion region,
+  peak-depth-independent) is the scope edge: a **deep / retrograde** implant, where the profile centroid
+  matters and the formula takes an effective ``N_A`` integrated over the depletion width, is the deferred
+  refinement (the retrograde-well slice). Full dopant activation, and ``n_i = 1.0e10 cm⁻³`` at 300 K (the
+  value that reproduces the MIT example; ``1.45e10`` shifts ``φ_F`` ~10 mV — a small calibration choice,
+  named).
 * **Degenerate poly gate** pinned at the band edge (``φ_gate = ±0.55 V``); a metal gate would need a
   work-function table (out of v1).
 * **Forward coupling only.** As Phase 2 noted, oxidation's back-reaction on the profile (segregation /
@@ -288,6 +294,9 @@ class MOSDevice:
     gamma: float
     channel_length_um: float | None = None
     Q_ox: float = 0.0                 # oxide charge per area (C/cm²); 0 = ideal oxide (the default seam)
+    implant_dose: float = 0.0         # V_t-adjust implant areal dose (cm⁻²); 0 = no adjust implant (the seam)
+    implant_kind: str | None = None   # "p" (acceptor, raises V_t) | "n" (donor, lowers V_t) | None
+    vt_adjust: float = 0.0            # ΔV_t from the adjust implant (V); +for acceptor, −for donor (n-MOS)
 
     @property
     def two_phi_F(self) -> float:
@@ -300,6 +309,33 @@ class MOSDevice:
         return self.Q_dep / self.C_ox
 
 
+# Sign of the V_t-adjust implant shift for an n-MOS (p-substrate): an **acceptor** (p-type, e.g. boron)
+# sheet raises V_t (more negative depletion charge to invert); a **donor** (n-type) sheet lowers it.
+_IMPLANT_VT_SIGN: dict[str, float] = {"p": +1.0, "n": -1.0}
+
+
+def vt_adjust_shift(dose: float, kind: str, C_ox: float) -> float:
+    """Shallow V_t-adjust implant threshold shift ``ΔV_t = ±q·Q/C_ox`` (V) for an n-MOS (p-substrate).
+
+    The honest, first-order source of the threshold adjust the ``device.py`` model previously **faked**
+    with a uniform substrate offset: a shallow implanted sheet of areal dose ``Q`` (cm⁻²) sitting inside
+    the surface depletion region acts as an extra fixed charge, shifting ``V_t`` by ``±q·Q/C_ox`` — the
+    textbook ``V_t``-adjust formula (Plummer/Sze). **``+``** for an **acceptor** (p-type, e.g. a boron
+    :class:`~chip.diffusion_dopant.Implant`) — it raises ``V_t``; **``−``** for a **donor** (n-type) — it
+    lowers it. The buried :class:`~chip.diffusion_dopant.Implant` profile is the physical *source* of the
+    dose (the observable predep cannot make), but this shift depends **only on dose and type**, not on the
+    peak depth — see the named scope edge (deep/retrograde implants, where the centroid depth matters,
+    are the deferred effective-``N_A`` refinement). ``C_ox`` (F/cm²) is the gate-oxide capacitance.
+    """
+    if dose < 0.0:
+        raise ValueError(f"implant dose must be ≥ 0 cm⁻², got {dose}")
+    if kind not in _IMPLANT_VT_SIGN:
+        raise ValueError(f"implant kind must be one of {sorted(_IMPLANT_VT_SIGN)}, got {kind!r}")
+    if C_ox <= 0.0:
+        raise ValueError(f"C_ox must be positive, got {C_ox}")
+    return _IMPLANT_VT_SIGN[kind] * Q_ELEMENTARY * dose / C_ox
+
+
 def threshold_voltage(
     N_A: float,
     t_ox_um: float,
@@ -309,6 +345,8 @@ def threshold_voltage(
     T_celsius: float = ROOM_T_CELSIUS,
     n_i: float = NI_300K,
     Q_ox: float = 0.0,
+    implant_dose: float = 0.0,
+    implant_kind: str | None = None,
 ) -> MOSDevice:
     """Compute the MOS threshold voltage from the process knobs → :class:`MOSDevice`.
 
@@ -319,19 +357,29 @@ def threshold_voltage(
     the named scope edge). ``Q_ox`` (C/cm², the fixed/mobile **oxide charge** — e.g. mobile-ion
     contamination from imperfect purification, :mod:`chip.purification`) enters through the flat-band
     voltage (``ΔV_FB = −Q_ox/C_ox``); it defaults to ``0`` → the ideal oxide, byte-for-byte the prior
-    ``V_t``. *Process in, device parameter out* — the chip's structure→properties map.
+    ``V_t``.
+
+    **V_t-adjust implant (§5, the honest de-fake).** ``implant_dose`` (cm⁻²) + ``implant_kind`` (``"p"``
+    acceptor / ``"n"`` donor) apply a shallow ion-implant threshold shift ``ΔV_t = ±q·Q/C_ox``
+    (:func:`vt_adjust_shift`) — the real, dose-controlled source of the adjust the old comment flagged as
+    faked by a uniform substrate offset. The physical dose comes from a buried
+    :class:`~chip.diffusion_dopant.Implant` (an observable predep cannot make); the *shift* needs only
+    dose+type. Defaults ``0`` / ``None`` ⇒ no adjust implant, byte-for-byte the prior ``V_t`` (the seam).
+    *Process in, device parameter out* — the chip's structure→properties map.
     """
     phi_F = fermi_potential(N_A, T_celsius, n_i)
     C_ox = oxide_capacitance(t_ox_um)
     V_FB = flatband_voltage(N_A, gate, T_celsius, n_i, Q_ox=Q_ox, C_ox=C_ox)
     gamma = math.sqrt(2.0 * Q_ELEMENTARY * EPS_SI * N_A) / C_ox
     Q_dep = depletion_charge(N_A, phi_F, V_SB)
-    V_t = V_FB + 2.0 * phi_F + Q_dep / C_ox
-    V_t0 = V_FB + 2.0 * phi_F + depletion_charge(N_A, phi_F, 0.0) / C_ox
+    dV_t = vt_adjust_shift(implant_dose, implant_kind, C_ox) if implant_dose > 0.0 else 0.0
+    V_t = V_FB + 2.0 * phi_F + Q_dep / C_ox + dV_t
+    V_t0 = V_FB + 2.0 * phi_F + depletion_charge(N_A, phi_F, 0.0) / C_ox + dV_t
     return MOSDevice(
         N_A=N_A, t_ox_um=t_ox_um, gate=gate, V_SB=V_SB, V_t=V_t, V_t0=V_t0,
         V_FB=V_FB, phi_F=phi_F, C_ox=C_ox, Q_dep=Q_dep, gamma=gamma,
         channel_length_um=channel_length_um, Q_ox=Q_ox,
+        implant_dose=implant_dose, implant_kind=implant_kind, vt_adjust=dV_t,
     )
 
 

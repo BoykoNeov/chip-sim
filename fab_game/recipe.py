@@ -533,11 +533,25 @@ class EtchDepositionKnobs:
 
 @dataclass(frozen=True)
 class DeviceKnobs:
-    """Device-read knobs → :func:`chip.device.threshold_voltage` / :func:`chip.device.saturation_current`."""
+    """Device-read knobs → :func:`chip.device.threshold_voltage` / :func:`chip.device.saturation_current`.
+
+    ``vt_adjust_dose`` (§5, the ion-implant consumer) is the areal dose (cm⁻²) of a shallow **V_t-adjust
+    implant** — the honest, dose-controlled source of the threshold adjust the device model previously
+    *faked* with a uniform substrate offset. It shifts ``V_t`` by ``±q·Q/C_ox`` (:func:`chip.device.vt_adjust_shift`)
+    via :func:`chip.device.threshold_voltage`: ``vt_adjust_kind = "p"`` (acceptor, e.g. boron) **raises**
+    ``V_t``, ``"n"`` (donor) **lowers** it. The dose is physically that of a buried
+    :class:`chip.diffusion_dopant.Implant` (the observable a surface-peaked predep cannot make — see
+    :mod:`chip.demo_implant`); the *shift* needs only dose+type (the shallow-sheet approximation, peak-depth
+    independent — the deep/retrograde effective-``N_A`` case is a deferred slice). Defaults to ``0.0`` /
+    ``None`` → **no adjust implant**, byte-for-byte the prior ``V_t`` (the seam; the G1–G7 banked demos and
+    the journey are untouched), and the ``vt_adjust`` record key is added only when engaged.
+    """
 
     gate: str = "n+poly"               # n⁺-poly gate (φ_gate = +0.55 V)
     width_um: float = 10.0             # device width W for the I_Dsat readout
     overdrive_V: float = 1.0           # V_GS − V_t for I_Dsat
+    vt_adjust_dose: float = 0.0        # §5 V_t-adjust implant dose (cm⁻²); 0 = no adjust implant (the seam)
+    vt_adjust_kind: str | None = None  # "p" acceptor (raises V_t) | "n" donor (lowers) | None
 
 
 @dataclass(frozen=True)

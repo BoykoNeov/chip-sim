@@ -310,8 +310,11 @@ def device_step(
             outputs={"refused": reason},
         )
     Q_ox = 0.0 if contamination is None else sodium_oxide_charge(contamination.Na)
+    # §5 V_t-adjust implant (the honest de-fake): a shallow implanted sheet shifts V_t by ±q·Q/C_ox
+    # (acceptor raises, donor lowers). dose 0 (the default) skips the term → byte-for-byte the prior V_t.
     mos = dev.threshold_voltage(
         channel_N_A, die.t_ox_um, gate=knobs.gate, channel_length_um=die.cd_um, Q_ox=Q_ox,
+        implant_dose=knobs.vt_adjust_dose, implant_kind=knobs.vt_adjust_kind,
     )
     # S/D series resistance (the diffusion-dose consumer): R_series = inherited R_s × the contact-square
     # count. 0 when off (n_□ = 0 the seam) or before the junction is read (die.R_s is None) → the ideal
@@ -351,6 +354,8 @@ def device_step(
         knobs_in["getter_eff"] = gettering_efficiency        # (so a no-oxygen device record is byte-unchanged)
     if R_series_ohm > 0.0:                                   # diffusion fingerprint — only when the consumer is on
         knobs_in["R_series_ohm"] = R_series_ohm              # (so an ideal-contact device record is byte-unchanged)
+    if mos.vt_adjust != 0.0:                                 # §5 fingerprint — only when a V_t-adjust implant is set
+        knobs_in["vt_adjust"] = mos.vt_adjust                # (so a no-implant device record is byte-unchanged)
     outputs = {"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox,
                "tau_us": leak.tau_us, "j_leak_nA_cm2": leak.j_leak_nA_cm2,
                "t_rr_ns": t_rr * 1.0e9}                      # slice-5 reverse recovery (∝ τ; additive)
