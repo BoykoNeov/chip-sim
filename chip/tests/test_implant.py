@@ -24,6 +24,7 @@ import numpy as np
 import pytest
 
 from chip import diffusion_dopant as dd
+from chip import junction as jn
 
 
 UM = dd.CM_PER_UM
@@ -328,3 +329,150 @@ def test_two_step_pearson_vs_gaussian_ic_differ_by_the_skew():
     Np = dd.implant_profile(grid.centers, p)
     assert not np.allclose(Ng, Np)                             # the skew is a real, visible difference
     assert grid.centers[int(np.argmax(Np))] > grid.centers[int(np.argmax(Ng))]  # Pearson peak deeper
+
+
+# --------------------------------------------------------------------------- #
+# Slice 3 — the channeling tail (the deep exponential → deeper junction → punchthrough)
+# --------------------------------------------------------------------------- #
+# Physics: in a single-crystal target a fraction of the dose steers down the open low-index channels and
+# stops in a DEEP exponential tail past R_p (Plummer §8; Campbell §5). It is a FAILURE MODE — the tail
+# drags the annealed junction x_j DEEPER → source/drain punchthrough — suppressed by tilting off-axis (the
+# 7° convention). Modelled as a two-population partition N = (1−f)·primary + f·Q·tail (dose-conserving),
+# f = f0·e^(−tilt/τ). Triad:
+#   * Tight/sign-robust: (a) the SEAM — channel=None is the exact slice-1/2 primary, bit-for-bit; (b) dose
+#     — the partition ∫N dx = Q analytically, and the sealed drive-in conserves the grid-dose (structural);
+#     (c) the deeper-junction discriminator — a long tail (λ ≫ ΔR_p) deepens the ANNEALED x_j (asserted
+#     through two_step, the punchthrough consumer); (d) tilt monotonicity — more tilt ⇒ shallower x_j.
+#   * Flagged: the f0/λ/τ magnitudes (house-calibrated; the SIGN — channeling deepens, tilt suppresses —
+#     is the cited part). The two-sided (surface + deep-tail) grid-dose truncation, as for Pearson.
+def test_channel_none_is_bit_for_bit_seam():
+    # The seam: channel defaults to None and the profile is the exact slice-1/2 primary, bit-for-bit, for
+    # BOTH shapes — the whole slice-1/2 suite is byte-identical (the opt-in discipline, cf. implant=None).
+    x = dd.uniform_grid(2.0 * UM, 800).centers
+    for imp in (dd.Implant(dose=1e14, energy_keV=100.0, species="B"),
+                dd.Implant(dose=1e14, energy_keV=100.0, species="B", shape="pearson")):
+        assert imp.channel is None
+        Rp, dRp = imp.range_statistics()
+        if imp.shape == "gaussian":
+            primary = (imp.dose / (math.sqrt(2.0 * math.pi) * dRp)) * np.exp(-((x - Rp) ** 2) / (2.0 * dRp ** 2))
+        else:
+            gamma, beta = dd.skew_kurtosis("B", 100.0)
+            primary = dd.pearson4_profile(x, imp.dose, Rp, dRp, gamma, beta)
+        assert np.array_equal(dd.implant_profile(x, imp), primary)
+
+
+def test_channeled_fraction_sign_trend_and_guards():
+    # The cited content: f = f0 at 0° (on-axis, full channeling), strictly DECREASING with tilt (the 7°
+    # convention suppresses it), always a valid partition weight (< f0 < 1). Magnitudes flagged.
+    f0 = 0.1
+    assert dd.channeled_fraction(f0, 0.0) == pytest.approx(f0)          # on-axis = the full fraction
+    tilts = [0.0, 3.5, 7.0, 10.0]
+    fs = [dd.channeled_fraction(f0, t) for t in tilts]
+    assert all(b < a for a, b in zip(fs, fs[1:]))                       # strictly decreasing in tilt
+    assert 0.0 < fs[-1] < f0 < 1.0                                      # a valid partition weight
+    with pytest.raises(ValueError):
+        dd.channeled_fraction(1.5, 0.0)                                 # fraction out of (0,1)
+    with pytest.raises(ValueError):
+        dd.channeled_fraction(0.1, -1.0)                               # negative tilt
+
+
+def test_channeling_validates_inputs():
+    with pytest.raises(ValueError):
+        dd.Channeling(fraction=0.0, length_um=0.2)                      # f0 must be in (0,1)
+    with pytest.raises(ValueError):
+        dd.Channeling(fraction=1.0, length_um=0.2)
+    with pytest.raises(ValueError):
+        dd.Channeling(fraction=0.1, length_um=0.0)                      # positive tail length
+    with pytest.raises(ValueError):
+        dd.Channeling(fraction=0.1, length_um=0.2, tilt_deg=-1.0)       # tilt ≥ 0
+    with pytest.raises(ValueError):
+        dd.Implant(dose=1e13, energy_keV=100.0, channel="not-a-channeling")  # wrong type
+
+
+def test_channeling_tail_is_unit_area_deep_side_only():
+    # The tail is a UNIT-AREA deep-side exponential: zero shallower than R_p (a Heaviside deep side),
+    # positive beyond, and ∫_{R_p}^∞ tail dx = 1 (so scaling by Q puts exactly Q under the tail).
+    Rp = 0.3 * UM
+    lam = 0.25 * UM
+    x = np.linspace(0.0, 60.0 * lam, 3_000_001)
+    tail = dd.channeling_tail(x, Rp, lam)
+    assert np.all(tail[x < Rp] == 0.0)                                 # nothing on the surface side
+    assert np.all(tail[x > Rp] > 0.0)                                  # positive deep side
+    assert np.trapezoid(tail, x) == pytest.approx(1.0, rel=1e-4)       # unit area
+
+
+def test_channeling_partitions_dose_analytically():
+    # Dose (tight, analytic): the two-population split N = (1−f)·primary + f·Q·tail conserves ∫N dx = Q
+    # exactly — the channeled ions come OUT of the primary, not on top (adding-on-top would violate dose).
+    ch = dd.Channeling(fraction=0.15, length_um=0.25, tilt_deg=0.0)
+    imp = dd.Implant(dose=1e14, energy_keV=100.0, species="B", channel=ch)
+    Rp, dRp = imp.range_statistics()
+    s = np.linspace(-40.0 * dRp, 220.0 * dRp, 2_000_001)               # full support (covers the long tail)
+    Q = np.trapezoid(dd.implant_profile(Rp + s, imp), s)
+    assert Q == pytest.approx(imp.dose, rel=1e-4)                       # partition conserves Q analytically
+
+
+def test_channeling_deepens_the_annealed_junction():
+    # THE slice-3 discriminator (sign-robust): a long channeling tail (λ ≫ ΔR_p) dominates the super-
+    # exponential Gaussian in the DEEP-TAIL region where the junction lives, so the ANNEALED x_j (through
+    # the constant-D drive-in — the punchthrough consumer) sits DEEPER than the no-channel implant. N_B is
+    # taken in the tail (the z≈3 region junction_depth assumes); at a high N_B near R_p channeling can push
+    # x_j shallower (the flagged trap) — this asserts only the deep-junction sign.
+    base = dd.Implant(dose=1e14, energy_keV=100.0, species="B")                          # no channel
+    ch = dd.Channeling(fraction=0.15, length_um=0.25, tilt_deg=0.0)
+    imp = dd.Implant(dose=1e14, energy_keV=100.0, species="B", channel=ch)
+    _, dRp = base.range_statistics()
+    assert ch.length_cm / dRp > 3.0                                    # λ ≫ ΔR_p (the tail-dominant regime)
+    N_B = 1e15                                                          # background in the deep tail
+    _, dv_base = dd.two_step("B", implant=base, length_um=4.0, n_cells=1200)
+    _, dv_ch = dd.two_step("B", implant=imp, length_um=4.0, n_cells=1200)
+    xj_base = jn.junction_depth(dv_base.x, dv_base.N, N_B)
+    xj_ch = jn.junction_depth(dv_ch.x, dv_ch.N, N_B)
+    assert np.isfinite(xj_base) and np.isfinite(xj_ch)                 # both junctions resolve in-domain
+    assert xj_ch > xj_base                                             # channeling drags the junction DEEPER
+
+
+def test_tilt_suppresses_the_channeling_junction_deepening():
+    # Tilt monotonicity (the second tight leg): more tilt ⇒ smaller channeled fraction ⇒ shallower x_j.
+    # The 7° convention pulls the junction back toward (never below) the no-channel case — the physical
+    # reason wafers are implanted off-axis (punchthrough control).
+    base = dd.Implant(dose=1e14, energy_keV=100.0, species="B")
+    on_axis = dd.Implant(dose=1e14, energy_keV=100.0, species="B",
+                         channel=dd.Channeling(0.15, 0.25, tilt_deg=0.0))
+    tilted = dd.Implant(dose=1e14, energy_keV=100.0, species="B",
+                        channel=dd.Channeling(0.15, 0.25, tilt_deg=7.0))
+    N_B = 1e15
+    xjs = []
+    for imp in (base, on_axis, tilted):
+        _, dv = dd.two_step("B", implant=imp, length_um=4.0, n_cells=1200)
+        xjs.append(jn.junction_depth(dv.x, dv.N, N_B))
+    xj_base, xj_on, xj_tilt = xjs
+    assert xj_on > xj_tilt > xj_base                                   # tilt pulls x_j back toward no-channel
+
+
+def test_channeling_grid_dose_two_sided_truncation_and_structural_conservation():
+    # Flagged: on a finite grid the channeling IC loses dose off BOTH ends (surface truncation of the
+    # primary + the long tail running off the deep boundary), so the grid-dose sits below Q. Tight: the
+    # sealed drive-in nonetheless conserves whatever grid-dose it is HANDED to machine precision.
+    ch = dd.Channeling(fraction=0.2, length_um=0.3, tilt_deg=0.0)
+    imp = dd.Implant(dose=1e14, energy_keV=100.0, species="B", channel=ch)
+    grid = dd.uniform_grid(1.5 * UM, 900)                              # domain shallower than the full tail
+    ic = dd.implant_ic(grid, imp)
+    assert ic.stage == "implant"
+    assert ic.dose < imp.dose                                         # two-sided truncation (< Q, flagged)
+    ic2, drivein = dd.two_step("B", implant=imp, length_um=1.5, n_cells=900)
+    assert drivein.dose == pytest.approx(ic2.dose, rel=1e-10)          # structural conservation
+
+
+def test_channeling_applies_to_both_shapes():
+    # The channeling partition rides on WHICHEVER primary — Gaussian or Pearson-IV — since it scales the
+    # whole primary by (1−f). Both differ from their no-channel selves by the same added deep tail.
+    ch = dd.Channeling(fraction=0.15, length_um=0.25, tilt_deg=0.0)
+    grid = dd.uniform_grid(3.0 * UM, 1500)
+    for shape in ("gaussian", "pearson"):
+        plain = dd.Implant(dose=1e14, energy_keV=100.0, species="B", shape=shape)
+        chan = dd.Implant(dose=1e14, energy_keV=100.0, species="B", shape=shape, channel=ch)
+        Np, Nc = dd.implant_profile(grid.centers, plain), dd.implant_profile(grid.centers, chan)
+        Rp, _ = plain.range_statistics()
+        deep = grid.centers > Rp + 0.3 * UM                            # well into the tail region
+        assert np.all(Nc[deep] > Np[deep])                            # the channel adds a deep-side tail

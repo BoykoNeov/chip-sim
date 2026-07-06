@@ -641,14 +641,20 @@ class Implant:
     ``"pearson"`` is the **four-moment Pearson-IV** (skewness γ, kurtosis β via :func:`skew_kurtosis`) —
     the real, *skewed* as-implanted profile (boron backscatters to a surface tail, its peak deeper than
     R_p). Pearson skew is tabulated for boron only (the cited light-ion case); ``"pearson"`` for a
-    species without skew data raises here. The channeling tail (and its ``tilt`` suppression) and
-    damage→leakage remain named scope edges (slices 3–4), deliberately absent rather than half-built.
+    species without skew data raises here.
+
+    ``channel`` (slice 3, opt-in) adds a :class:`Channeling` **deep exponential tail** — the fraction of
+    the dose that channels along the low-index axes and penetrates *far* past ``R_p`` (§5c). It applies to
+    **either** shape (it partitions whichever primary), and its ``tilt`` suppresses it (the 7° convention).
+    ``None`` (default) is the seam: the profile is the exact slice-1/2 primary, bit-for-bit. Damage→leakage
+    remains a named scope edge (slice 4), deliberately absent rather than half-built.
     """
 
     dose: float          # cm⁻² — implanted areal dose Q (∫N dx of the as-implanted profile)
     energy_keV: float    # keV — sets R_p, ΔR_p via LSS range statistics (deeper at higher energy)
     species: str = "B"   # dopant (a DOPANTS key); B = the canonical V_t-adjust implant
     shape: str = "gaussian"   # "gaussian" (slice-1 seam) | "pearson" (slice-2 Pearson-IV skew)
+    channel: "Channeling | None" = None   # slice-3 deep channeling tail (None = seam: no tail)
 
     def __post_init__(self) -> None:
         if self.dose <= 0.0:
@@ -662,6 +668,8 @@ class Implant:
         if self.shape == "pearson" and self.species not in _SKEW_KURTOSIS:
             raise ValueError(f"no Pearson-IV skew data for {self.species!r} "
                              f"(have {sorted(_SKEW_KURTOSIS)}); use shape='gaussian'")
+        if self.channel is not None and not isinstance(self.channel, Channeling):
+            raise ValueError(f"channel must be a Channeling or None, got {type(self.channel).__name__}")
 
     def range_statistics(self) -> tuple[float, float]:
         """This implant's ``(R_p, ΔR_p)`` in **cm** (:func:`range_statistics` at its species/energy)."""
@@ -686,14 +694,26 @@ def implant_profile(x: np.ndarray, implant: Implant) -> np.ndarray:
     when ``R_p ≳ 4·ΔR_p``, flagged shallow), for Pearson-IV **both** tails (the power law is heavier —
     the two-sided flagged leg). The **buried-peak topology** (maximum at ``x > 0``, ``dN/dx > 0``
     shallower) is the sign-robust discriminator vs the surface-peaked predep ``erfc`` (max at ``x = 0``).
+
+    ``implant.channel`` (slice 3, §5c) partitions the primary: ``N = (1−f)·primary + f·dose·tail`` with
+    ``f`` the tilt-suppressed channeled fraction (:func:`channeled_fraction`) and ``tail`` the unit-area
+    deep exponential (:func:`channeling_tail`). The split **conserves ∫N dx = Q analytically** (the
+    channeled ions come *out* of the primary, not on top); a longer, flatter deep tail is what pushes the
+    annealed junction ``x_j`` **deeper** — the punchthrough failure mode. ``None`` ⇒ the exact primary.
     This is the field :func:`drive_in` consumes in place of the predep.
     """
     x = np.asarray(x, dtype=float)
     R_p, dRp = range_statistics(implant.species, implant.energy_keV)
     if implant.shape == "gaussian":
-        return (implant.dose / (math.sqrt(2.0 * math.pi) * dRp)) * np.exp(-((x - R_p) ** 2) / (2.0 * dRp ** 2))
-    gamma, beta = skew_kurtosis(implant.species, implant.energy_keV)
-    return pearson4_profile(x, implant.dose, R_p, dRp, gamma, beta)
+        primary = (implant.dose / (math.sqrt(2.0 * math.pi) * dRp)) * np.exp(-((x - R_p) ** 2) / (2.0 * dRp ** 2))
+    else:
+        gamma, beta = skew_kurtosis(implant.species, implant.energy_keV)
+        primary = pearson4_profile(x, implant.dose, R_p, dRp, gamma, beta)
+    if implant.channel is None:
+        return primary                              # seam: no channeling → the exact slice-1/2 primary
+    f = channeled_fraction(implant.channel.fraction, implant.channel.tilt_deg)
+    tail = implant.dose * channeling_tail(x, R_p, implant.channel.length_cm)
+    return (1.0 - f) * primary + f * tail
 
 
 def implant_ic(grid: Grid, implant: Implant) -> DopantProfile:
@@ -832,3 +852,103 @@ def pearson4_profile(x: np.ndarray, dose: float, R_p: float, sigma: float,
     x = np.asarray(x, dtype=float)
     ln_x = _pearson4_logshape(x - R_p, b0, b1, b2, W, c)
     return (dose / Z) * np.exp(ln_x - ln_max)
+
+
+# --------------------------------------------------------------------------- #
+# 5c. Channeling tail — the deep exponential a monocrystalline lattice adds (slice 3)
+# --------------------------------------------------------------------------- #
+# Slices 1–2 give the primary as-implanted peak (Gaussian, then Pearson-IV skew) — the ions that stop by
+# random nuclear+electronic collisions. In a **single-crystal** target a fraction of the beam instead
+# steers **down the open low-index channels** (⟨110⟩, ⟨100⟩), where the atomic rows shadow the nuclei so
+# stopping collapses — those ions penetrate **far past R_p** and pile a **deep exponential tail** onto the
+# profile (Plummer, Deal & Griffin §8; Campbell §5). It is not a knob for hitting a target — it is a
+# **failure mode**: the tail drags the annealed junction ``x_j`` DEEPER than the recipe intends → source-
+# drain **punchthrough**. The production countermeasures are all "break the channel": tilt the wafer off
+# the axis (the **7° convention**), a **screen oxide** to randomize entry, or **pre-amorphization** to
+# destroy the lattice before the dose. We carry the **tilt** lever (the dominant, always-present one);
+# screen-oxide / pre-amorphization are the same suppression named as scope edges.
+#
+# The model is a **two-population partition** (the standard channeling split), NOT an add-on: a fraction
+# ``f`` of the dose channels into a unit-area deep exponential ``tail(x) = (1/λ)·e^(−(x−R_p)/λ)`` (x ≥ R_p),
+# the remaining ``1−f`` stays in the primary — so ``N = (1−f)·primary + f·Q·tail`` conserves ``∫N dx = Q``
+# **analytically** (the channeled ions come *out* of the peak, not on top; adding-on-top would violate
+# dose). ``f`` is the tilt-suppressed ``f = f0·e^(−tilt/τ)``: on-axis (0°) channels maximally at the
+# flagged amplitude ``f0``; the 7° convention knocks it down by ``τ`` (:data:`_CHANNEL_TILT_SUPPRESSION_DEG`).
+#
+# Triad. **Tight (sign-robust):** (a) the SEAM — ``channel=None`` returns the exact slice-1/2 primary,
+# bit-for-bit; (b) dose — the partition ``∫N dx = Q`` analytically, and the sealed no-flux drive-in
+# conserves whatever grid-dose it is handed to machine precision (structural, shape-independent);
+# (c) the **deeper-junction** discriminator — a long tail (λ ≫ ΔR_p) dominates the super-exponential
+# Gaussian *in the deep-tail region where the junction lives*, so the annealed ``x_j`` moves DEEPER than
+# the no-channel case (constant-D drive-in linearity carries the as-implanted ordering through the anneal);
+# (d) **tilt monotonicity** — more tilt ⇒ smaller ``f`` ⇒ shallower ``x_j`` (the cited suppression sign).
+# **Flagged (house-calibrated magnitude):** the on-axis fraction ``f0``, the tail length ``λ``, and the
+# suppression rate ``τ`` — the SIGN (channeling deepens; tilt suppresses) is cited, the numbers are not
+# table anchors. **Single tail suffices** — the deferred *dual-Pearson* (channel + primary as two full
+# Pearson populations) is a named scope edge, NOT this: one exponential deep tail is the honest first cut.
+# The single-exponential deep tail is anchored at R_p (a Heaviside deep side) — a phenomenological form,
+# not a fitted channeling-fraction-vs-orientation table.
+
+# The tilt (degrees) over which channeling suppresses by 1/e — house-calibrated so the 7° convention
+# knocks the on-axis fraction down to ~1/5 (e^(−7/4.5) ≈ 0.21). FLAGGED: the SIGN (tilt suppresses) is
+# cited; the rate is a calibrated constant, not a measured one.
+_CHANNEL_TILT_SUPPRESSION_DEG = 4.5
+
+
+@dataclass(frozen=True)
+class Channeling:
+    """A channeling deep tail on an :class:`Implant`: a fraction of the dose penetrates far past ``R_p``.
+
+    The **failure-mode** slice-3 add-on (§5c): in a single-crystal target a fraction ``fraction`` (=``f0``,
+    the **on-axis / 0°** channeled fraction) steers down the open lattice channels and stops in a **deep
+    exponential tail** of decay length ``length_um`` (``λ ≫ ΔR_p``, the flagged tail depth). ``tilt_deg``
+    is the wafer tilt off the axis — the **7° convention** (default) suppresses channeling by
+    ``e^(−tilt/τ)`` (:func:`channeled_fraction`). Applied via :func:`implant_profile` as the two-population
+    partition ``N = (1−f)·primary + f·Q·tail`` (dose-conserving). The flagged magnitudes are ``f0``, ``λ``
+    and ``τ``; the cited content is the SIGN — channeling deepens the junction, tilt suppresses it.
+    """
+
+    fraction: float          # f0 — the ON-AXIS (0° tilt) channeled dose fraction, 0 < f0 < 1
+    length_um: float         # λ — deep-tail 1/e decay length in µm (≫ ΔR_p; the flagged tail depth)
+    tilt_deg: float = 7.0    # wafer tilt off-axis (deg); the 7° convention suppresses channeling
+
+    def __post_init__(self) -> None:
+        if not (0.0 < self.fraction < 1.0):
+            raise ValueError(f"channeled fraction f0 must be in (0, 1), got {self.fraction}")
+        if self.length_um <= 0.0:
+            raise ValueError(f"channeling tail length must be > 0 µm, got {self.length_um}")
+        if self.tilt_deg < 0.0:
+            raise ValueError(f"tilt must be ≥ 0°, got {self.tilt_deg}")
+
+    @property
+    def length_cm(self) -> float:
+        """The tail decay length ``λ`` in **cm** (the module's length unit)."""
+        return self.length_um * CM_PER_UM
+
+
+def channeled_fraction(fraction: float, tilt_deg: float) -> float:
+    """Effective channeled dose fraction ``f = f0·e^(−tilt/τ)`` (tilt suppresses channeling).
+
+    ``fraction`` is the on-axis (0°) fraction ``f0``; ``tilt_deg`` the wafer tilt off the low-index axis.
+    At ``tilt=0`` the full ``f0`` channels; the 7° convention knocks it down by
+    :data:`_CHANNEL_TILT_SUPPRESSION_DEG` (``τ``). Monotone **decreasing** in tilt (the cited suppression
+    sign) and always ``< f0 < 1`` (a valid partition weight). Magnitudes flagged; the sign is cited.
+    """
+    if not (0.0 < fraction < 1.0):
+        raise ValueError(f"channeled fraction f0 must be in (0, 1), got {fraction}")
+    if tilt_deg < 0.0:
+        raise ValueError(f"tilt must be ≥ 0°, got {tilt_deg}")
+    return fraction * math.exp(-tilt_deg / _CHANNEL_TILT_SUPPRESSION_DEG)
+
+
+def channeling_tail(x: np.ndarray, R_p: float, length_cm: float) -> np.ndarray:
+    """Unit-area deep-side channeling tail ``(1/λ)·e^(−(x−R_p)/λ)`` for ``x ≥ R_p``, else ``0`` (``x``, ``λ`` in cm).
+
+    The deep exponential the channeled population piles past the projected range — anchored at ``R_p`` (a
+    Heaviside deep side; the surface side is the primary's business). Normalized so
+    ``∫_{R_p}^{∞} tail dx = 1``, i.e. scaling it by the dose ``Q`` puts exactly ``Q`` under the tail — the
+    partition in :func:`implant_profile` then weights the two populations by ``f`` and ``1−f`` and
+    conserves ``∫N dx = Q``. A longer ``λ`` (flatter tail) is what drags the annealed junction deeper.
+    """
+    x = np.asarray(x, dtype=float)
+    return np.where(x >= R_p, np.exp(-(x - R_p) / length_cm) / length_cm, 0.0)

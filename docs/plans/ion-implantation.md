@@ -97,9 +97,20 @@ existing suite is byte-identical (the established seam discipline — cf. `drive
    structural (no-flux drive-in conserves the grid-dose). Consumer = the existing drive-in consumes the
    skewed IC (no new consumer; V_t is dose-only to first order — the x_j-shift at matched Q,R_p is a scope
    note, not forced). Demo = `chip-implant-pearson.png` (Gaussian vs Pearson-IV at 120 keV B).
-3. **Slice 3 — channeling tail** as a failure mode (deep-tail → junction-too-deep), tilt/screen-oxide
-   suppression.
-4. **Slice 4 — damage → leakage** via `lifetime.py` (residual-after-anneal).
+3. **Slice 3 — channeling tail** as a failure mode (deep-tail → junction-too-deep). ✅ BUILT (2026-07-06).
+   `Implant.channel=Channeling(fraction, length_um, tilt_deg)` opt-in (default `None` = slice-1/2 seam,
+   bit-for-bit; §5c in `diffusion_dopant.py`). A **two-population partition** `N = (1−f)·primary + f·Q·tail`
+   with `tail = (1/λ)·e^(−(x−R_p)/λ)` (deep side, x≥R_p) and `f = f0·e^(−tilt/τ)` — the channeled ions come
+   *out* of the primary, so `∫N dx = Q` **analytically** (not add-on-top, which would violate dose). Rides
+   on **either** shape (scales the whole primary by 1−f). CITED SIGN: channeling deepens the **annealed**
+   junction (a long tail λ≫ΔR_p dominates the super-exponential Gaussian in the deep-tail region where x_j
+   lives → deeper x_j through the constant-D drive-in — the punchthrough failure mode), and **tilt
+   suppresses** it (the 7° convention; more tilt → shallower x_j — the second tight leg). FLAGGED: f0, λ,
+   and the suppression rate τ (`_CHANNEL_TILT_SUPPRESSION_DEG=4.5`, house-calibrated so 7° → ~1/5). Tight
+   dose leg stays structural (sealed drive-in conserves grid-dose). Consumer = `junction.junction_depth`
+   (the annealed x_j, deeper → punchthrough). Demo = `chip-implant-channeling.png` (deep tail + x_j 0.71 →
+   1.91 µm on-axis, 7° pulls back to 1.52 µm). **Single tail suffices** — dual-Pearson stays deferred.
+4. **Slice 4 — damage → leakage** via `lifetime.py` (residual-after-anneal). ← the last open slice.
 
 Each slice: cited model class, triad tiers, seam preserved, demo = the predep-vs-implant contrast figure.
 
