@@ -32,6 +32,11 @@ wrong even where monotone. `r(T,t) = exp(−k0·e^(−Ea/kT)·t)`, monotone-decr
 `Ea = 1.5 eV` (in the cited ~1–2 eV point-defect-migration band); `k0 = 2.3e4` is a FLAGGED *effective
 lumped first-order* rate calibrated to spread the recovery across ~550–850 °C (NOT a phonon attempt
 frequency). First cliff-like at Ea=1.8/k0=1e7 → retuned for a graded curve (cf. [[gradual-failure-preferred]]).
+**Future-coupling gotcha (advisor):** k0/Ea are calibrated to the demo's **30-min** anneal, and `r` is
+*steeply* time-dependent — a 1 s 1050 °C spike gives r≈0.96 (almost NO recovery) vs r≈0 for 30 min at the
+same T. Qualitatively right (a spike under-anneals damage — a real shallow-junction tradeoff), but if this
+is ever wired to the E1/RTA spike path ([[fab-game-e1]]) the residual will be **far higher** than the 30-min
+curve implies. Deferred coupling, not a defect in this slice.
 
 **The seam / architecture.** Damage is a **read off** the implant, **NOT** a profile field — `implant_profile`
 `N(x)` is untouched (profile seam trivially intact; no new `Implant` field). Mirrors the **A1 dislocation
