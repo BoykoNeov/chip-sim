@@ -476,3 +476,84 @@ def test_channeling_applies_to_both_shapes():
         Rp, _ = plain.range_statistics()
         deep = grid.centers > Rp + 0.3 * UM                            # well into the tail region
         assert np.all(Nc[deep] > Np[deep])                            # the channel adds a deep-side tail
+
+
+# --------------------------------------------------------------------------- #
+# Slice 4 — damage → leakage (the residual displacement damage an incomplete anneal leaves)
+# --------------------------------------------------------------------------- #
+# Physics: the ions smash the lattice on the way in (nuclear collisions → Frenkel pairs); the modified
+# Kinchin–Pease / NRT count N_d = 0.8·E_n/(2·E_d) (E_n = ν·E) sets the displacement damage, which anneals
+# out with a separate Arrhenius. The residual-after-anneal density feeds chip.lifetime's 1/τ channel.
+#   * Tight/sign-robust: (a) N_d monotone in energy + HEAVIER ion (P) damages more than lighter (B); (b)
+#     the recovery seam — r = 1 at t = 0 (as-implanted), monotone DECREASING in anneal T and t; (c) damage
+#     density monotone in dose; (d) anneal recovers it (density falls with anneal T) — the discriminator.
+#   * Flagged: ν, E_d, the recovery Ea/k0 magnitudes (the SIGN — more dose/energy/mass → more damage, more
+#     anneal → less — is cited; NRT form + E_d≈15 eV cited).
+def test_displacements_per_ion_nrt_form_and_energy_monotone():
+    # N_d = 0.8·E_n/(2·E_d), E_n = ν·E: the closed NRT form, and monotone increasing in energy.
+    E = 100.0
+    nu = dd._NUCLEAR_STOPPING_FRACTION["B"]
+    expected = dd._NRT_EFFICIENCY * (nu * E * 1e3) / (2.0 * dd._SI_DISPLACEMENT_ENERGY_EV)
+    assert dd.displacements_per_ion("B", E) == pytest.approx(expected)
+    Nd = [dd.displacements_per_ion("B", e) for e in (10.0, 50.0, 100.0, 200.0)]
+    assert all(a < b for a, b in zip(Nd, Nd[1:]))                     # more energy → more displacements
+
+
+def test_heavier_ion_displaces_more_than_lighter():
+    # The cited SIGN: a HEAVIER ion (P) sheds more of its energy to nuclear stopping (larger ν) → more
+    # displacement damage than the lighter B at equal energy (the same physics that makes B penetrate deeper).
+    for E in (30.0, 100.0, 200.0):
+        assert dd.displacements_per_ion("P", E) > dd.displacements_per_ion("B", E)
+
+
+def test_displacements_per_ion_guards():
+    with pytest.raises(ValueError):
+        dd.displacements_per_ion("B", 0.0)                            # non-positive energy
+    with pytest.raises(ValueError):
+        dd.displacements_per_ion("Xe", 100.0)                        # no ν → no fabricated damage
+
+
+def test_damage_residual_fraction_seam_and_monotone_recovery():
+    # The recovery seam: no anneal (t = 0) leaves the FULL as-implanted damage (r = 1). With anneal, r is
+    # in (0, 1] and DECREASES monotonically with both anneal temperature and time (the cited recovery SIGN).
+    assert dd.damage_residual_fraction(700.0, 0.0) == 1.0             # t = 0 → full damage (the seam)
+    r_by_T = [dd.damage_residual_fraction(T, 1800.0) for T in (500.0, 700.0, 900.0, 1100.0)]
+    assert all(0.0 < r <= 1.0 for r in r_by_T)
+    assert all(b < a for a, b in zip(r_by_T, r_by_T[1:]))            # hotter anneal → less residual
+    r_by_t = [dd.damage_residual_fraction(750.0, t) for t in (60.0, 300.0, 1800.0, 7200.0)]
+    assert all(b < a for a, b in zip(r_by_t, r_by_t[1:]))            # longer anneal → less residual
+
+
+def test_damage_residual_fraction_guards():
+    with pytest.raises(ValueError):
+        dd.damage_residual_fraction(700.0, -1.0)                      # negative anneal time
+    with pytest.raises(ValueError):
+        dd.damage_residual_fraction(-400.0, 1800.0)                  # below absolute zero
+
+
+def test_implant_damage_density_dose_monotone_and_as_implanted_default():
+    # The characteristic residual trap density: with no anneal args it is the FULL as-implanted damage
+    # (r = 1), and it scales linearly with dose Q (more ions → more displacement damage).
+    peaks = []
+    for Q in (1e13, 1e14, 1e15):
+        imp = dd.Implant(dose=Q, energy_keV=100.0, species="B")
+        peaks.append(dd.implant_damage_density(imp))
+    assert all(a < b for a, b in zip(peaks, peaks[1:]))              # more dose → more damage
+    # linear in Q: doubling the dose doubles the density (the areal displacement dose is Q·N_d).
+    base = dd.implant_damage_density(dd.Implant(dose=1e14, energy_keV=100.0, species="B"))
+    dbl = dd.implant_damage_density(dd.Implant(dose=2e14, energy_keV=100.0, species="B"))
+    assert dbl == pytest.approx(2.0 * base)
+
+
+def test_anneal_recovers_the_implant_damage():
+    # THE slice-4 discriminator (sign-robust): the residual damage density falls monotonically as the
+    # anneal temperature rises — the leakage anneals OUT (unlike the metals/dislocations). The as-implanted
+    # (no-anneal) density is the ceiling; a hot anneal drives it toward zero.
+    imp = dd.Implant(dose=1e14, energy_keV=100.0, species="B")
+    as_implanted = dd.implant_damage_density(imp)
+    residuals = [
+        dd.implant_damage_density(imp, anneal_T_celsius=T, anneal_time_s=1800.0)
+        for T in (500.0, 700.0, 900.0, 1050.0)
+    ]
+    assert all(r < as_implanted for r in residuals)                 # any anneal removes some damage
+    assert all(b < a for a, b in zip(residuals, residuals[1:]))     # hotter anneal → less residual

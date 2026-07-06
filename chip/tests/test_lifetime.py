@@ -210,3 +210,53 @@ def test_device_leakage_rises_with_dislocation_density_clean_feed():
     assert leaky.j_leak > base.j_leak
     assert leaky.tau < base.tau
     assert life.device_leakage(None, N_A=1.0e17, dislocation_density=0.0).j_leak == base.j_leak
+
+
+# --------------------------------------------------------------------------- #
+# Slice 4 — implant damage: the third contributor on the same channel (the one that anneals out)
+# --------------------------------------------------------------------------- #
+def test_implant_damage_recombination_rate_is_linear_and_seam_at_zero():
+    # σ_d·v_th·N_dam: linear in the trap density, zero at N_dam = 0 (the seam — a fully-recovered or
+    # un-implanted wafer adds nothing).
+    assert life.implant_damage_recombination_rate(0.0) == 0.0
+    sv = life.DAMAGE_SIGMA_N * life.V_TH
+    assert life.implant_damage_recombination_rate(1.0e17) == pytest.approx(sv * 1.0e17)
+    assert life.implant_damage_recombination_rate(2.0e17) == pytest.approx(
+        2.0 * life.implant_damage_recombination_rate(1.0e17))
+    with pytest.raises(ValueError):
+        life.implant_damage_recombination_rate(-1.0)                  # density must be ≥ 0
+
+
+def test_implant_damage_adds_to_the_other_rates_on_the_same_channel():
+    # The implant-damage rate ADDS in 1/τ alongside the metal and dislocation rates — the same channel,
+    # a third contributor (rate-additivity: a regression guard, not an anchor).
+    metals = Contamination(Fe=1.0e12)
+    rho, N_dam = 5.0e4, 1.0e17
+    inv_bulk = 1.0 / life.TAU_BULK
+    inv_all = 1.0 / life.srh_lifetime(metals, dislocation_density=rho, damage_trap_density=N_dam)
+    expect = (
+        inv_bulk
+        + life.recombination_rate(metals)
+        + life.dislocation_recombination_rate(rho)
+        + life.implant_damage_recombination_rate(N_dam)
+    )
+    assert inv_all == pytest.approx(expect)
+
+
+def test_damage_trap_density_shortens_lifetime_and_is_seam_bitexact_at_zero():
+    # The default damage_trap_density = 0 reproduces the no-damage lifetime BIT-FOR-BIT (the seam), and a
+    # positive residual density shortens τ monotonically — an under-annealed implant makes it leaky.
+    assert life.srh_lifetime(None, damage_trap_density=0.0) == life.srh_lifetime(None)
+    assert life.srh_lifetime(None) == life.TAU_BULK
+    taus = [life.srh_lifetime(None, damage_trap_density=N) for N in (0.0, 1.0e16, 1.0e17, 1.0e18)]
+    assert all(t1 < t0 for t0, t1 in zip(taus, taus[1:]))
+
+
+def test_device_leakage_rises_with_implant_damage_and_seam_at_zero():
+    # A clean feed with residual implant damage still leaks — the isolation: the leakage comes from the
+    # implant's displacement damage, not contamination or dislocations. Seam: damage_trap_density = 0.
+    base = life.device_leakage(None, N_A=1.0e16)
+    leaky = life.device_leakage(None, N_A=1.0e16, damage_trap_density=1.0e17)
+    assert leaky.j_leak > base.j_leak
+    assert leaky.tau < base.tau
+    assert life.device_leakage(None, N_A=1.0e16, damage_trap_density=0.0).j_leak == base.j_leak

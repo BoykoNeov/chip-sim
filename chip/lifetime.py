@@ -27,14 +27,18 @@ lifetimes (``σ`` the capture cross-section, ``v_th`` the carrier thermal veloci
 (``n_1·p_1 = n_i²``). In the **p-type bulk under low injection** (the channel/body of our n-MOS) this
 collapses to a single minority-electron lifetime — the model the game consumes::
 
-    1/τ = 1/τ_bulk + Σ_i σ_n,i·v_th·N_i + K·ρ_disl   (deep-level metals + grown-in dislocations add rates)
+    1/τ = 1/τ_bulk + Σ_i σ_n,i·v_th·N_i + K·ρ_disl + σ_d·v_th·N_dam   (metals + dislocations + implant damage)
 
 — the **electron** capture cross-section governs (p-type ⇒ electrons are the minority carrier); ``τ_bulk``
 is the clean-material baseline. The minority-carrier **diffusion length** ``L = √(D·τ)`` falls out of it.
 The ``K·ρ_disl`` term (A1, :func:`dislocation_recombination_rate`) is a *second contributor on the same
 channel*: grown-in interstitial-side **dislocations** from a too-slow Czochralski pull (``ξ < ξ_t`` —
 :func:`chip.czochralski.dislocation_defect_density`) are recombination centres too, so a slow pull — not
-just a dirty feed — can make the diode leaky. Both default off (``ρ_disl = 0``, the seam).
+just a dirty feed — can make the diode leaky. The ``σ_d·v_th·N_dam`` term (Slice 4,
+:func:`implant_damage_recombination_rate`) is the *third contributor*: residual displacement damage from
+an ion implant (:func:`chip.diffusion_dopant.implant_damage_density`) — but unlike the metals and
+dislocations, it **anneals out** (a hotter/longer anneal recovers it), so an *under-annealed* implant is
+its failure mode. All three default off (``ρ_disl = 0``, ``N_dam = 0``, the seam).
 
 The reverse junction leakage (the device killer)
 ------------------------------------------------
@@ -150,6 +154,14 @@ JUNCTION_VOLTAGE_V: float = 1.0
 # The realistic growth regime is vacancy-side (ξ ≈ 0.29 > ξ_t), so this is a corner (chip.czochralski §1g).
 DISLOCATION_RECOMBINATION_COEFF: float = 30.0
 
+# Implant-damage trap capture cross-section σ (cm²) — the residual displacement-damage point defects
+# (:func:`chip.diffusion_dopant.implant_damage_density`, Slice 4) as deep-level recombination centres.
+# FLAGGED house number: smaller than the strong-metal Fe (5e-14) because the peak-vacancy count overcounts
+# the electrically-active residual centres — the calibration absorbing that active fraction. The SIGN
+# (residual implant damage shortens τ / raises leakage; the anneal recovers it) is cited; the magnitude
+# is not — the third contributor on this channel, and the only one that anneals out.
+DAMAGE_SIGMA_N: float = 1.0e-16
+
 
 # --------------------------------------------------------------------------- #
 # 1. The full SRH statistics (the shared core of the analytic + conservation legs)
@@ -215,23 +227,43 @@ def dislocation_recombination_rate(
     return coeff * dislocation_density_cm2
 
 
+def implant_damage_recombination_rate(
+    damage_trap_density: float, sigma: float = DAMAGE_SIGMA_N, v_th: float = V_TH) -> float:
+    """Added SRH recombination rate ``σ·v_th·N_dam`` (s⁻¹) from residual implant displacement damage (Slice 4).
+
+    The third contributor on the same ``1/τ`` channel as the deep-level metals (:func:`recombination_rate`)
+    and grown-in dislocations (:func:`dislocation_recombination_rate`) — but the only one that **anneals
+    out**: ``damage_trap_density`` is the residual-*after-anneal* trap density
+    (:func:`chip.diffusion_dopant.implant_damage_density`), so a hotter/longer anneal shrinks it toward the
+    seam. ``0.0`` at ``damage_trap_density = 0`` (the seam: a fully-recovered — or un-implanted — wafer
+    adds nothing). ``sigma`` is a FLAGGED house number; the SIGN (residual damage → leakage) is cited.
+    """
+    if damage_trap_density < 0.0:
+        raise ValueError(f"damage trap density must be ≥ 0, got {damage_trap_density}")
+    return sigma * v_th * damage_trap_density
+
+
 def srh_lifetime(metals, tau_bulk: float = TAU_BULK, sigma: dict[str, float] = CAPTURE_SIGMA_N,
-                 v_th: float = V_TH, *, dislocation_density: float = 0.0) -> float:
-    """Minority-carrier SRH lifetime ``τ`` (s): ``1/τ = 1/τ_bulk + Σ_i σ_n,i·v_th·N_i + K·ρ_disl``.
+                 v_th: float = V_TH, *, dislocation_density: float = 0.0,
+                 damage_trap_density: float = 0.0) -> float:
+    """Minority-carrier SRH lifetime ``τ`` (s): ``1/τ = 1/τ_bulk + Σ_i σ_n,i·v_th·N_i + K·ρ_disl + σ_d·v_th·N_dam``.
 
     The clean limit is recovered **bit-for-bit** — ``metals = None`` (or all-zero) **and**
-    ``dislocation_density = 0`` (the default) gives ``τ = τ_bulk`` exactly (the seam: a clean feed grown
-    on the vacancy side never moves lifetime). A deep-level metal adds its recombination rate
-    (:func:`recombination_rate`); a slow-pull grown-in **dislocation** population adds its own
-    (:func:`dislocation_recombination_rate`, A1) — the two contributors **add** in ``1/τ`` — so ``τ``
-    falls monotonically as the feedstock dirties (recovered by zone refining — :mod:`chip.purification`)
-    *or* as the pull drops below the Voronkov ``ξ_t`` (recovered by pulling toward ``ξ_t`` —
-    :mod:`chip.czochralski`).
+    ``dislocation_density = 0`` **and** ``damage_trap_density = 0`` (the defaults) give ``τ = τ_bulk``
+    exactly (the seam). Three contributors **add** in ``1/τ``: a deep-level metal
+    (:func:`recombination_rate`), a slow-pull grown-in **dislocation** population
+    (:func:`dislocation_recombination_rate`, A1), and residual **implant damage**
+    (:func:`implant_damage_recombination_rate`, Slice 4) — so ``τ`` falls monotonically as the feedstock
+    dirties (recovered by zone refining — :mod:`chip.purification`), as the pull drops below the Voronkov
+    ``ξ_t`` (recovered by pulling toward ``ξ_t`` — :mod:`chip.czochralski`), **or** as an implant is
+    under-annealed (recovered by a hotter/longer anneal — :func:`chip.diffusion_dopant.
+    implant_damage_density`, the only contributor that anneals out).
     """
     return 1.0 / (
         1.0 / tau_bulk
         + recombination_rate(metals, sigma, v_th)
         + dislocation_recombination_rate(dislocation_density)
+        + implant_damage_recombination_rate(damage_trap_density, v_th=v_th)
     )
 
 
@@ -311,19 +343,23 @@ class DiodeLeakage:
 def device_leakage(
     metals, N_A: float, *, tau_bulk: float = TAU_BULK, V_J: float = JUNCTION_VOLTAGE_V,
     D: float = D_MINORITY, n_i: float = NI_300K, sigma: dict[str, float] = CAPTURE_SIGMA_N,
-    v_th: float = V_TH, dislocation_density: float = 0.0,
+    v_th: float = V_TH, dislocation_density: float = 0.0, damage_trap_density: float = 0.0,
 ) -> DiodeLeakage:
     """Read the device leakage consequence (τ, L, J_gen) off the wafer ``metals`` + substrate ``N_A``.
 
     Convenience wiring of :func:`srh_lifetime` → :func:`diffusion_length` / :func:`generation_leakage_density`
     for the fab-line game's device step. ``metals`` may be a :class:`chip.purification.Contamination`,
     a dict, or ``None`` (clean); ``dislocation_density`` (cm⁻², A1) is the grown-in interstitial-side
-    dislocation population (:func:`chip.czochralski.dislocation_defect_density`). Both default to the
-    clean baseline — ``metals = None`` / ``dislocation_density = 0`` gives ``τ = τ_bulk`` and the baseline
-    leakage (the seam). *Bad purification* (deep-level metals) **or** *too-slow a pull* (grown-in
-    dislocations) in, a leaky low-lifetime diode out — the device consequence net doping cannot carry.
+    dislocation population (:func:`chip.czochralski.dislocation_defect_density`); ``damage_trap_density``
+    (cm⁻³, Slice 4) is the residual-after-anneal implant displacement damage
+    (:func:`chip.diffusion_dopant.implant_damage_density`). All three default to the clean baseline —
+    ``metals = None`` / ``dislocation_density = 0`` / ``damage_trap_density = 0`` gives ``τ = τ_bulk`` and
+    the baseline leakage (the seam). *Bad purification* (deep-level metals), *too-slow a pull* (grown-in
+    dislocations), **or** *an under-annealed implant* (residual damage) in, a leaky low-lifetime diode out
+    — the device consequence net doping cannot carry.
     """
-    tau = srh_lifetime(metals, tau_bulk, sigma, v_th, dislocation_density=dislocation_density)
+    tau = srh_lifetime(metals, tau_bulk, sigma, v_th, dislocation_density=dislocation_density,
+                       damage_trap_density=damage_trap_density)
     return DiodeLeakage(
         tau=tau, L_diff=diffusion_length(tau, D),
         j_leak=generation_leakage_density(tau, N_A, V_J, n_i), N_A=N_A,

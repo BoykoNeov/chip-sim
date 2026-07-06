@@ -572,8 +572,8 @@ def drive_in_program(
 # range-statistics-source memory note; the µm anchors are web-corroborated, flagged ~10%). The as-
 # implanted profile is the **symmetric Gaussian** ``N(x) = (Q/√(2π)ΔR_p)·exp(−(x−R_p)²/2ΔR_p²)`` — the
 # slice-1 default (``shape="gaussian"``); the **Pearson-IV skew is built in §5b (slice 2)** as the opt-in
-# ``shape="pearson"``, while the channeling tail (slice 3) and damage→leakage (slice 4) remain named
-# scope edges. **No new solver:**
+# ``shape="pearson"``, the **channeling tail in §5c (slice 3)**, and the **damage→leakage in §5d (slice 4)**
+# — the plan's four slices, all built. **No new solver:**
 # implant produces the *initial condition*, and the **identical** sealed-surface :func:`drive_in`
 # redistributes and (slice-1 assumption) activates it — the implant slots in as an alternative IC where
 # the predep ``erfc`` would go.
@@ -646,8 +646,12 @@ class Implant:
     ``channel`` (slice 3, opt-in) adds a :class:`Channeling` **deep exponential tail** — the fraction of
     the dose that channels along the low-index axes and penetrates *far* past ``R_p`` (§5c). It applies to
     **either** shape (it partitions whichever primary), and its ``tilt`` suppresses it (the 7° convention).
-    ``None`` (default) is the seam: the profile is the exact slice-1/2 primary, bit-for-bit. Damage→leakage
-    remains a named scope edge (slice 4), deliberately absent rather than half-built.
+    ``None`` (default) is the seam: the profile is the exact slice-1/2 primary, bit-for-bit.
+
+    Displacement damage (slice 4) is a *separate* read off this implant — not a profile field: the ions
+    also smash the lattice, and the residual-after-anneal trap density (:func:`implant_damage_density`,
+    §5d) feeds :mod:`chip.lifetime`'s leakage channel. It leaves ``N(x)`` untouched (the seam is trivially
+    intact) — damage is the deep-level consequence, dopant redistribution is the profile.
     """
 
     dose: float          # cm⁻² — implanted areal dose Q (∫N dx of the as-implanted profile)
@@ -952,3 +956,126 @@ def channeling_tail(x: np.ndarray, R_p: float, length_cm: float) -> np.ndarray:
     """
     x = np.asarray(x, dtype=float)
     return np.where(x >= R_p, np.exp(-(x - R_p) / length_cm) / length_cm, 0.0)
+
+
+# --------------------------------------------------------------------------- #
+# 5d. Implant damage → residual traps (slice 4 — the leakage a bad anneal leaves)
+# --------------------------------------------------------------------------- #
+# Slices 1–3 place the DOPANT (where the ions stop). But the ions also SMASH the lattice on the way in:
+# each nuclear (elastic) collision knocks a silicon atom off its site, cascading into a population of
+# vacancies/interstitials — displacement damage. Those point defects are DEEP-LEVEL recombination centres
+# (like the G4b metals), so incomplete removal leaves a leaky, low-lifetime diode. The crucial difference
+# from the metals (G4b, :func:`chip.lifetime.recombination_rate`) and grown-in dislocations (A1,
+# :func:`chip.lifetime.dislocation_recombination_rate`) — the two contributors already on the lifetime.py
+# ``1/τ`` channel — is that implant damage **ANNEALS OUT**: a real implant is always followed by an anneal
+# (our drive-in IS that anneal — it is what activates the dopant), and the residual AFTER the anneal is
+# what bites. So this slice is the dose → damage → (anneal recovers) → residual → leakage chain: leakage
+# you can anneal away, the failure mode being an INCOMPLETE anneal. That recovery is the discriminator (a
+# distinct regime, not a redundant third recombination centre).
+#
+# The displacement count is the modified Kinchin–Pease / NRT model (Norgett–Robinson–Torrens 1975; Sze,
+# *Physics of Semiconductor Devices*; Plummer, Deal & Griffin §8): an ion of energy E sheds a fraction ν
+# into nuclear (displacing) collisions — E_n = ν·E, the REST goes to electronic stopping (excites
+# electrons, displaces nothing) — and each eV of damage energy above threshold makes 0.8/(2·E_d) Frenkel
+# pairs:
+#     N_d = 0.8 · E_n / (2·E_d)         (displaced atoms per ion; E_d ≈ 15 eV the Si threshold, 0.8 = NRT)
+# The areal damage dose is Q·N_d; spread over the damage straggle (≈ ΔR_p) it is a characteristic peak
+# vacancy density N_dam = Q·N_d/(√(2π)·ΔR_p). CITED: the NRT form + the 0.8 efficiency + E_d ≈ 15 eV, and
+# the SIGN/TREND — more dose, more energy, or a HEAVIER ion (larger ν, more nuclear stopping) → more
+# damage. FLAGGED (house-calibrated): the nuclear-stopping fraction ν(species) and (in lifetime.py) the
+# damage-trap capture cross-section — magnitudes, not table anchors.
+#
+# The anneal recovery is a SEPARATE Arrhenius (NOT the dopant ∫D dt budget — damage annealing has its own
+# activation energy; conflating them is physically wrong even where monotone): a residual fraction
+#     r(T,t) = exp(−k0·e^(−Ea_rec/kT)·t)
+# monotone-DECREASING in both anneal temperature and time (hotter / longer → more recovery → less residual
+# → less leakage). Ea_rec/k0 are FLAGGED (the SIGN — anneal recovers damage — is cited; point-defect
+# migration in Si is ~1–2 eV). Amorphization threshold + solid-phase-epitaxial regrowth kinetics stay the
+# named deferred edge (plan §"scope edges") — this is the single flagged-coefficient first cut.
+
+# E_d — the silicon threshold displacement energy (eV): the energy to knock a lattice atom off its site.
+# CITED (NRT/Kinchin–Pease; Sze; the DPA literature quotes ~15 eV for Si, a 15–25 eV range by crystal
+# direction). The 0.8 is the NRT displacement efficiency (Norgett–Robinson–Torrens 1975 — not all damage
+# energy makes stable defects).
+_SI_DISPLACEMENT_ENERGY_EV = 15.0
+_NRT_EFFICIENCY = 0.8
+
+# ν — the fraction of implant energy going into NUCLEAR (displacing) collisions rather than electronic
+# stopping. FLAGGED, house-calibrated: the SIGN/TREND is cited — a HEAVIER ion loses more per collision to
+# nuclei, so ν(P) > ν(B) (the same heavy-ion-scatters-more physics that makes boron penetrate deeper, §5).
+# Energy-dependence (ν falls as electronic stopping ∝ √E takes over at high E) is a named scope edge — a
+# per-species constant carries the mass ordering.
+_NUCLEAR_STOPPING_FRACTION: dict[str, float] = {"B": 0.10, "P": 0.25}
+
+# The anneal-recovery Arrhenius (residual fraction r = exp(−k0·e^(−Ea/kT)·t)). FLAGGED house numbers — the
+# SIGN (higher T / longer t anneals MORE damage → less residual) is cited; the ``Ea = 1.5 eV`` sits in the
+# cited point-defect-migration band for Si (~1–2 eV), the prefactor is an EFFECTIVE (lumped, first-order)
+# recovery rate calibrated to the 30-min transition, NOT a phonon attempt frequency. A SEPARATE Arrhenius
+# from the dopant ∫D dt budget (damage annealing has its own activation energy). Calibrated so the residual
+# recovers gradually across ~550–850 °C (a full ~1000 °C / 30-min drive-in clears it; a low-T ~600 °C
+# anneal leaves a substantial residual) — the graded recovery curve the demo reads.
+_DAMAGE_RECOVERY_EA_EV = 1.5
+_DAMAGE_RECOVERY_K0_PER_S = 2.3e4
+
+
+def displacements_per_ion(species: str, energy_keV: float) -> float:
+    """Displaced silicon atoms per implanted ion — the modified Kinchin–Pease / NRT count ``0.8·E_n/(2·E_d)``.
+
+    ``E_n = ν·E`` is the energy the ion sheds into nuclear (displacing) collisions
+    (:data:`_NUCLEAR_STOPPING_FRACTION`; the rest is electronic stopping, no displacement); each eV above
+    the Si threshold ``E_d ≈ 15 eV`` makes ``0.8/(2·E_d)`` Frenkel pairs (NRT 1975 — the ``0.8``
+    displacement efficiency). Grows with energy (more ``E_n``) and with ion mass (a HEAVIER ion has larger
+    ν → more nuclear stopping → more damage: ``P`` > ``B``). CITED form/SIGN; the ν magnitude is FLAGGED.
+    Raises for a species without a tabulated ν (rather than fabricating one) and for a non-positive energy.
+    """
+    if energy_keV <= 0.0:
+        raise ValueError(f"implant energy must be > 0 keV, got {energy_keV}")
+    if species not in _NUCLEAR_STOPPING_FRACTION:
+        raise ValueError(f"no nuclear-stopping fraction for {species!r} "
+                         f"(have {sorted(_NUCLEAR_STOPPING_FRACTION)})")
+    E_n_eV = _NUCLEAR_STOPPING_FRACTION[species] * energy_keV * 1.0e3
+    return _NRT_EFFICIENCY * E_n_eV / (2.0 * _SI_DISPLACEMENT_ENERGY_EV)
+
+
+def damage_residual_fraction(anneal_T_celsius: float, anneal_time_s: float) -> float:
+    """Fraction of implant damage SURVIVING an anneal — ``r = exp(−k0·e^(−Ea/kT)·t)`` (``0 < r ≤ 1``).
+
+    The Arrhenius recovery: point defects migrate and recombine/regrow at a rate ``k(T) = k0·e^(−Ea/kT)``,
+    so the residual after time ``t`` decays as ``exp(−k·t)``. Monotone DECREASING in both anneal
+    temperature and time (hotter / longer → more recovery → less residual → less leakage — the cited SIGN,
+    the recovery discriminator). ``Ea``/``k0`` are FLAGGED house numbers (point-defect migration in Si
+    ~1–2 eV); a SEPARATE Arrhenius from the dopant ∫D dt budget. ``anneal_time_s = 0`` → ``r = 1`` (the
+    as-implanted full damage — no anneal). Raises for a negative time or a sub-absolute-zero temperature.
+    """
+    if anneal_time_s < 0.0:
+        raise ValueError(f"anneal time must be ≥ 0 s, got {anneal_time_s}")
+    if anneal_time_s == 0.0:
+        return 1.0
+    T_K = anneal_T_celsius + ABS_ZERO
+    if T_K <= 0.0:
+        raise ValueError(f"anneal temperature must be above absolute zero, got {anneal_T_celsius} °C")
+    k = _DAMAGE_RECOVERY_K0_PER_S * math.exp(-_DAMAGE_RECOVERY_EA_EV / (K_BOLTZMANN_EV * T_K))
+    return math.exp(-k * anneal_time_s)
+
+
+def implant_damage_density(
+    implant: Implant, *, anneal_T_celsius: float | None = None, anneal_time_s: float | None = None,
+) -> float:
+    """Residual displacement-damage trap density ``N_dam`` (cm⁻³) an :class:`Implant` leaves after anneal.
+
+    The characteristic peak vacancy density ``N_dam = Q·N_d/(√(2π)·ΔR_p)`` — areal displacement dose
+    ``Q·N_d`` (:func:`displacements_per_ion`) spread over the damage straggle (taken ``≈ ΔR_p``, the
+    Gaussian-peak normalization the dopant profile uses; the real damage peak sits shallower — a scope
+    note) — times the anneal-surviving fraction (:func:`damage_residual_fraction`). With no anneal args
+    (default) it is the FULL as-implanted damage (``r = 1``); pass the drive-in's ``(T, t)`` — the anneal
+    IS the drive-in — for the residual that actually bites. This scalar feeds :mod:`chip.lifetime`'s
+    ``1/τ`` channel (:func:`chip.lifetime.implant_damage_recombination_rate`) exactly as the G4b metals /
+    A1 dislocations do — a third contributor, but the only one that ANNEALS OUT. FLAGGED magnitude (ν and
+    the recovery constants); the SIGN — more dose/energy/mass → more damage, more anneal → less — is cited.
+    """
+    _, dRp = range_statistics(implant.species, implant.energy_keV)
+    N_d = displacements_per_ion(implant.species, implant.energy_keV)
+    peak = implant.dose * N_d / (math.sqrt(2.0 * math.pi) * dRp)
+    if anneal_T_celsius is None or anneal_time_s is None:
+        return peak
+    return peak * damage_residual_fraction(anneal_T_celsius, anneal_time_s)

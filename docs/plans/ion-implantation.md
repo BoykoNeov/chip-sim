@@ -110,9 +110,24 @@ existing suite is byte-identical (the established seam discipline — cf. `drive
    dose leg stays structural (sealed drive-in conserves grid-dose). Consumer = `junction.junction_depth`
    (the annealed x_j, deeper → punchthrough). Demo = `chip-implant-channeling.png` (deep tail + x_j 0.71 →
    1.91 µm on-axis, 7° pulls back to 1.52 µm). **Single tail suffices** — dual-Pearson stays deferred.
-4. **Slice 4 — damage → leakage** via `lifetime.py` (residual-after-anneal). ← the last open slice.
+4. **Slice 4 — damage → leakage** via `lifetime.py` (residual-after-anneal). ✅ BUILT (2026-07-06).
+   The ions also **smash the lattice**: displacement damage (`diffusion_dopant.py §5d`) — the modified
+   **Kinchin–Pease / NRT** count `N_d = 0.8·E_n/(2·E_d)` (`E_n = ν·E`, `E_d ≈ 15 eV`; Norgett–Robinson–
+   Torrens 1975 / Sze / Plummer §8) → a characteristic residual trap density `N_dam = Q·N_d/(√(2π)·ΔR_p)`.
+   It feeds `lifetime.py`'s `1/τ` channel as a **third contributor** (`damage_trap_density` kwarg on
+   `srh_lifetime`/`device_leakage`, `implant_damage_recombination_rate`) — alongside the G4b metals and A1
+   dislocations, but the **only one that ANNEALS OUT**. That recovery is the discriminator (not a redundant
+   third recombination centre): a **separate** Arrhenius residual `r(T,t) = exp(−k0·e^(−Ea/kT)·t)` (NOT the
+   dopant `∫D dt` budget — damage annealing has its own `Ea ≈ 1.5 eV`), so the failure mode is an
+   **incomplete anneal**. It is a *read off* the implant, **not** a profile field — `N(x)` is untouched
+   (the seam is trivially intact); the seam that bites is `damage_trap_density = 0` → `τ_bulk` bit-for-bit.
+   CITED (SIGN/form): NRT + `E_d ≈ 15 eV`; more dose/energy/mass → more damage; more anneal → less residual.
+   FLAGGED: `ν(species)`, `σ_damage`, the recovery `Ea/k0`. Consumer = `device_leakage.j_leak` (the leaky
+   diode). Demo = `chip-implant-damage.png` (leakage recovery vs anneal T with a spec window — pass ≈ 920 °C
+   — + the dose ∝ Q leg). Amorphization threshold + SPE regrowth kinetics stay the named deferred edge.
 
 Each slice: cited model class, triad tiers, seam preserved, demo = the predep-vs-implant contrast figure.
+**All four slices built — the ion-implantation plan is COMPLETE (2026-07-06).**
 
 ## Scope edges (named, deferred — no consumer yet)
 

@@ -35,6 +35,7 @@ import numpy as np
 from . import device as dev
 from . import diffusion_dopant as dd
 from . import junction as jn
+from . import lifetime as life
 
 # --- The contrast recipe: one dose Q, laid two ways ------------------------- #
 SPECIES = "B"                  # boron — the canonical acceptor V_t-adjust / retrograde implant
@@ -70,6 +71,18 @@ CHANNEL_DRIVEIN = (1000.0, 30.0)  # the shared anneal (°C, min) — constant-D,
 CHANNEL_DOMAIN_UM = 4.0        # deep domain: the channeling junction lives well past the no-channel one
 CHANNEL_CELLS = 1200           # enough cells to resolve x_j across the deep tail
 
+# Slice 4 — damage → leakage (the residual displacement damage an incomplete anneal leaves). The SAME
+# S/D-scale boron implant, its lattice damage recovered across a sweep of anneal temperatures: the failure
+# mode is an UNDER-annealed implant (residual traps → short lifetime → leaky diode).
+DAMAGE_ENERGY_KEV = 100.0      # keV — an S/D-scale implant (the junction whose diode leaks)
+DAMAGE_DOSE = 1.0e14           # cm⁻² — S/D dose; the displacement damage scales with it
+DAMAGE_N_A = 1.0e16            # cm⁻³ — the p-body substrate the reverse-leakage depletion width reads
+DAMAGE_ANNEAL_MIN = 30.0       # min — the anneal (= the drive-in) time the recovery Arrhenius integrates
+DAMAGE_ANNEAL_T = np.linspace(500.0, 1050.0, 56)   # °C — the anneal-temperature recovery sweep
+DAMAGE_J_SPEC_NA = 1.0         # nA/cm² — a teaching leakage spec: the anneal must recover below it
+DAMAGE_DOSE_SWEEP = (1.0e13, 3.0e13, 1.0e14, 3.0e14, 1.0e15)   # cm⁻² — the dose-monotonicity panel
+DAMAGE_DOSE_ANNEAL_T = 700.0   # °C — a fixed INCOMPLETE anneal for the dose sweep (residual still bites)
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-implant.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-implant.png"
@@ -77,6 +90,8 @@ DOCS_FIGURE_PEARSON = _REPO_ROOT / "docs" / "figures" / "chip-implant-pearson.pn
 OUTPUT_FIGURE_PEARSON = _REPO_ROOT / "outputs" / "chip-implant-pearson.png"
 DOCS_FIGURE_CHANNEL = _REPO_ROOT / "docs" / "figures" / "chip-implant-channeling.png"
 OUTPUT_FIGURE_CHANNEL = _REPO_ROOT / "outputs" / "chip-implant-channeling.png"
+DOCS_FIGURE_DAMAGE = _REPO_ROOT / "docs" / "figures" / "chip-implant-damage.png"
+OUTPUT_FIGURE_DAMAGE = _REPO_ROOT / "outputs" / "chip-implant-damage.png"
 
 
 @dataclass(frozen=True)
@@ -343,6 +358,128 @@ def save_channel_figure(c: ChannelResult) -> Path:
     return DOCS_FIGURE_CHANNEL
 
 
+# --------------------------------------------------------------------------- #
+# Slice 4 — damage → leakage: the residual displacement damage an incomplete anneal leaves
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class DamageResult:
+    """The implant-damage → leakage bundle (slice 4): the recovery curve and the dose monotonicity."""
+
+    anneal_T: np.ndarray           # °C — the anneal-temperature sweep
+    residual: np.ndarray           # r(T) — the surviving damage fraction (the recovery mechanism)
+    j_leak_nA: np.ndarray          # nA/cm² — reverse leakage vs anneal T (recovers as T rises)
+    j_baseline_nA: float           # nA/cm² — the clean (no-damage) leakage floor (the seam)
+    j_spec_nA: float               # nA/cm² — the teaching spec line
+    T_pass: float                  # °C — the anneal temperature that first recovers below spec
+    dose_sweep: np.ndarray         # cm⁻² — the fixed-anneal dose sweep
+    j_leak_by_dose_nA: np.ndarray  # nA/cm² — leakage vs dose (monotone ∝ Q — the dose leg)
+    dose_anneal_T: float           # °C — the (incomplete) anneal the dose sweep holds
+
+
+def damage_compute() -> DamageResult:
+    """The same S/D implant, its damage recovered across an anneal-T sweep → the leakage curve (slice 4)."""
+    implant = dd.Implant(dose=DAMAGE_DOSE, energy_keV=DAMAGE_ENERGY_KEV, species=SPECIES)
+    t_anneal = DAMAGE_ANNEAL_MIN * 60.0
+
+    residual = np.array([dd.damage_residual_fraction(T, t_anneal) for T in DAMAGE_ANNEAL_T])
+    N_dam = np.array([
+        dd.implant_damage_density(implant, anneal_T_celsius=T, anneal_time_s=t_anneal)
+        for T in DAMAGE_ANNEAL_T
+    ])
+    j_leak = np.array([
+        life.device_leakage(None, N_A=DAMAGE_N_A, damage_trap_density=N).j_leak_nA_cm2 for N in N_dam
+    ])
+    j_baseline = life.device_leakage(None, N_A=DAMAGE_N_A).j_leak_nA_cm2   # the seam floor (no damage)
+
+    # The anneal temperature that first recovers the leakage below spec (the process-window readout).
+    below = np.where(j_leak <= DAMAGE_J_SPEC_NA)[0]
+    T_pass = float(DAMAGE_ANNEAL_T[below[0]]) if below.size else float("nan")
+
+    # The dose leg: at a fixed INCOMPLETE anneal, leakage rises monotonically (∝ Q) with the implant dose.
+    dose_sweep = np.array(DAMAGE_DOSE_SWEEP)
+    j_by_dose = np.array([
+        life.device_leakage(
+            None, N_A=DAMAGE_N_A,
+            damage_trap_density=dd.implant_damage_density(
+                dd.Implant(dose=float(Q), energy_keV=DAMAGE_ENERGY_KEV, species=SPECIES),
+                anneal_T_celsius=DAMAGE_DOSE_ANNEAL_T, anneal_time_s=t_anneal),
+        ).j_leak_nA_cm2 for Q in dose_sweep
+    ])
+
+    return DamageResult(
+        anneal_T=DAMAGE_ANNEAL_T, residual=residual, j_leak_nA=j_leak,
+        j_baseline_nA=j_baseline, j_spec_nA=DAMAGE_J_SPEC_NA, T_pass=T_pass,
+        dose_sweep=dose_sweep, j_leak_by_dose_nA=j_by_dose, dose_anneal_T=DAMAGE_DOSE_ANNEAL_T,
+    )
+
+
+def print_damage_summary(d: DamageResult) -> None:
+    """Print the slice-4 damage story — the leakage an under-annealed implant leaves, and its recovery."""
+    N_d = dd.displacements_per_ion(SPECIES, DAMAGE_ENERGY_KEV)
+    print("Ion implantation §5 (slice 4): damage → leakage — the failure mode is an INCOMPLETE anneal\n")
+    print(f"  implant ({SPECIES}, {DAMAGE_ENERGY_KEV:.0f} keV, Q = {DAMAGE_DOSE:.1e} cm⁻²): the ions also "
+          f"smash the lattice —")
+    print(f"    Kinchin–Pease / NRT displaced atoms per ion N_d = 0.8·E_n/(2·E_d) = {N_d:.0f} "
+          f"(E_d ≈ 15 eV, cited)")
+    print(f"  the residual traps recover with the anneal (= the drive-in), {DAMAGE_ANNEAL_MIN:.0f} min:")
+    print(f"    clean (no-damage) leakage floor : {d.j_baseline_nA:.3g} nA/cm²  (the seam)")
+    for T in (500.0, 700.0, 900.0, 1000.0):
+        i = int(np.argmin(np.abs(d.anneal_T - T)))
+        print(f"    anneal {d.anneal_T[i]:6.0f} °C : residual r = {d.residual[i]:.2e}  →  "
+              f"leakage = {d.j_leak_nA[i]:10.3g} nA/cm²")
+    print(f"  → the anneal must reach ≈ {d.T_pass:.0f} °C to recover the leakage below the "
+          f"{d.j_spec_nA:.0f} nA/cm² spec — an under-annealed implant is a leaky diode.")
+    print(f"  → dose leg (fixed {d.dose_anneal_T:.0f} °C anneal): leakage ∝ Q — "
+          f"{d.dose_sweep[0]:.0e}→{d.dose_sweep[-1]:.0e} cm⁻² raises it "
+          f"{d.j_leak_by_dose_nA[0]:.2g}→{d.j_leak_by_dose_nA[-1]:.2g} nA/cm².")
+    print(f"  → the SIGN (more dose → more damage; more anneal → less residual) is cited; ν, σ_damage and "
+          f"the recovery Ea/k0 are FLAGGED. Unlike the metals/dislocations, this leakage ANNEALS OUT.\n")
+
+
+def save_damage_figure(d: DamageResult) -> Path:
+    """Render and save the slice-4 damage-recovery / leakage artifact (needs the ``viz`` extra)."""
+    import matplotlib
+    matplotlib.use("Agg")                            # headless
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.6))
+
+    ax = axes[0]
+    ax.semilogy(d.anneal_T, np.maximum(d.j_leak_nA, 1e-12), color="tab:red", lw=2,
+                label="implant leakage (recovers)")
+    ax.axhline(d.j_baseline_nA, color="tab:blue", ls="--", lw=1.5, label="clean floor (seam, no damage)")
+    ax.axhline(d.j_spec_nA, color="0.4", ls=":", lw=1.5, label=f"spec = {d.j_spec_nA:.0f} nA/cm²")
+    if np.isfinite(d.T_pass):
+        ax.axvline(d.T_pass, color="tab:green", ls=":", lw=1.5,
+                   label=f"pass ≈ {d.T_pass:.0f} °C")
+        ax.axvspan(d.T_pass, d.anneal_T[-1], color="tab:green", alpha=0.07)
+    ax.set_xlabel("anneal temperature  (°C, 30 min)")
+    ax.set_ylabel("reverse leakage  $J_{gen}$  (nA/cm²)")
+    ax.set_title("Recovery: an under-annealed implant is leaky (anneal it away)", fontsize=10)
+    ax.legend(fontsize=8, loc="upper right")
+
+    ax = axes[1]
+    ax.loglog(d.dose_sweep, d.j_leak_by_dose_nA, "o-", color="tab:purple", lw=2,
+              label=f"leakage ∝ Q  (fixed {d.dose_anneal_T:.0f} °C anneal)")
+    ax.axhline(d.j_baseline_nA, color="tab:blue", ls="--", lw=1.5, label="clean floor (seam)")
+    ax.set_xlabel("implant dose  Q  (cm⁻²)")
+    ax.set_ylabel("reverse leakage  $J_{gen}$  (nA/cm²)")
+    ax.set_title("Dose leg: more dose → more displacement damage → more leakage", fontsize=10)
+    ax.legend(fontsize=8, loc="upper left")
+    # Honesty caption: the SIGN (dose↑ damage↑; anneal↑ residual↓) is cited (NRT/Kinchin–Pease, E_d≈15 eV);
+    # ν, σ_damage and the recovery Ea/k0 are flagged house magnitudes.
+    ax.text(0.98, 0.06, "ν, σ_damage, Ea/k0 flagged;\nNRT form + E_d≈15 eV cited",
+            transform=ax.transAxes, ha="right", va="bottom", fontsize=7.5, color="0.35")
+
+    fig.suptitle("Ion implantation §5 slice 4 — displacement damage → junction leakage (the incomplete anneal)",
+                 fontsize=12)
+    fig.tight_layout()
+    for target in (DOCS_FIGURE_DAMAGE, OUTPUT_FIGURE_DAMAGE):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(target, dpi=130)
+    return DOCS_FIGURE_DAMAGE
+
+
 def save_figure(r: ContrastResult) -> Path:
     """Render and save the predep-vs-implant contrast artifact (needs the optional ``viz`` extra)."""
     import matplotlib
@@ -392,6 +529,8 @@ def main() -> None:
     print_pearson_summary(p)
     c = channel_compute()
     print_channel_summary(c)
+    dmg = damage_compute()
+    print_damage_summary(dmg)
     try:
         saved = save_figure(r)
         print(f"Figure saved → {saved.relative_to(_REPO_ROOT)}")
@@ -399,6 +538,8 @@ def main() -> None:
         print(f"Figure saved → {saved_p.relative_to(_REPO_ROOT)}")
         saved_c = save_channel_figure(c)
         print(f"Figure saved → {saved_c.relative_to(_REPO_ROOT)}")
+        saved_d = save_damage_figure(dmg)
+        print(f"Figure saved → {saved_d.relative_to(_REPO_ROOT)}")
     except ImportError:
         print("(matplotlib not installed — install the viz extra to render the figures: "
               "pip install -e .[viz])")

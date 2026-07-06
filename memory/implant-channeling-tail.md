@@ -48,5 +48,5 @@ monotonicity** (more tilt → shallower x_j — the second tight leg). Flagged: 
 **Consumer:** `junction.junction_depth` — the annealed x_j, deeper → punchthrough. Demo =
 `chip-implant-channeling.png` (log as-implanted tail + annealed x_j 0.71→1.91 µm on-axis, 7° pulls back
 to 1.52 µm; deep 4 µm domain so the channeled junction resolves). 9 new tests in `test_implant.py`.
-**Slice 4 (damage→leakage via `lifetime.py`) is the last open slice.** [[range-statistics-source]]
-[[implant-pearson-skew]] [[dopant-diffusivity-source]]
+**Slice 4 (damage→leakage via `lifetime.py`) BUILT 2026-07-06 → the plan is COMPLETE**
+([[implant-damage-leakage]]). [[range-statistics-source]] [[implant-pearson-skew]] [[dopant-diffusivity-source]]
