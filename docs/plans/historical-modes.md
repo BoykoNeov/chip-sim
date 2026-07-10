@@ -103,7 +103,7 @@ by implant* (`ion-implantation.md`). A1 delivers the distinct, sharper limitatio
   (`chip-doping-history.png`) + `chip/tests/test_doping_history.py`; gallery card `hist·A1`. **Consumer:**
   the implant contrast (real) + (later) the H0 era surface. No engine change; no existing behaviour touched.
 
-### A3 — Oxidation ambient variants · Tier-1 (real `Q_ox`→`V_t` and budget consumers)
+### A3 — Oxidation ambient variants · Tier-1 (real `Q_ox`→`V_t` and budget consumers) — ✅ BUILT (2026-07-10)
 
 Reuses Deal–Grove (`oxidation.py`). Two period ambients, each with a **real** consumer:
 
@@ -116,6 +116,14 @@ Reuses Deal–Grove (`oxidation.py`). Two period ambients, each with a **real** 
 - **Consumer:** `Q_ox`→`V_t` (HCl) and `∫D dt` budget (HP) — both real. **Seam:** `ambient="dry"/"wet"`
   default (no Cl, 1 atm) ⇒ current Deal–Grove bit-for-bit. **Cited:** Cl gettering efficiency (flagged),
   HP linear-rate pressure scaling.
+- **Built as** a pure additive consumer: `chip/oxidation_history.py` + `chip/demo_oxidation_history.py`
+  (`chip-oxidation-history.png`) + `chip/tests/test_oxidation_history.py`; gallery card `hist·A3`. No
+  engine change; no existing behaviour touched. **Sharpened at build (advisor):** a single shared exponent
+  = 1 on *both* `B` and `B/A` (cited Razouk–Lie–Deal 1981 linear scaling) keeps `A = B/(B/A)`
+  pressure-invariant → the collateral `∫D dt` budget scales **exactly** as `1/P` in *every* regime (a tight
+  identity, cross-checked against the real E1 `thermal_budget`), not just the asymptotes. The bigger
+  historical win (trade pressure for *temperature* → Arrhenius `D` collapse) ships as a **flagged** worked
+  example. HCl polarity is inverted vs A1 (the opt-in enables the *successor*; `Cl=0` = the pre-HCl period).
 
 ### B6 — Aluminum junction spiking · Tier-1 (real `x_j`→leakage consumer)
 
@@ -175,14 +183,14 @@ active area → motivated STI (F7 in `future-steps.md`, deferred there for want 
 
 1. **Tier-1 (real consumers — buildable *without* H0, since each ships its own `chip/demo_*.py` and
    surfaces in the glob-anchored physics gallery):** **A1** (doping-source dose-control wall → implant
-   contrast) — ✅ BUILT; **A3** (HCl/HP oxidation → `Q_ox`/budget); **B6** (Al spiking → leakage).
+   contrast) — ✅ BUILT; **A3** (HCl/HP oxidation → `Q_ox`/budget) — ✅ BUILT; **B6** (Al spiking → leakage).
 2. **H0 — era display surface.** The shared consumer that unblocks the Tier-2 chunks; debuts *justified by
    built content* (A1 + implant + whatever Tier-1 landed), not one recycled figure.
 3. **Tier-2 (surface-fed, gated on H0):** **A2** (litho tool/wavelength), **A4** (resist generations),
    **B5** (LOCOS bird's beak — also the 2-D engine's consumer).
 
 **Recommended sequence (revised 2026-07-10 — A1-first, the anti-over-build ordering):**
-**A1 ✅ → A3 → B6 → H0 → A2 → A4 → B5.** *(Superseded the earlier "H0 first": H0 only needs to precede the
+**A1 ✅ → A3 ✅ → B6 → H0 → A2 → A4 → B5.** *(Superseded the earlier "H0 first": H0 only needs to precede the
 Tier-2 chunks, not A1 — a Tier-1 mode surfaces in the physics gallery with no history page, so leading with
 H0 would have made the first deliverable a display surface over one recycled figure, exactly the over-build
 this repo rejects. Build the Tier-1 content first; stand up H0 once it has real tenants.)*
@@ -196,7 +204,7 @@ The forward axis (`future-steps.md`) and this backward axis meet in one timeline
 
 - **Doping:** grown/alloy/mesa → planar predep (**A1 dose-control wall** — solubility-pinned, can't meter a
   light dose) → implant (F1, the successor). ← the two axes' handoff.
-- **Oxidation:** drifting pre-HCl oxide → **HCl-gettered oxide (A3)**; 1-atm budget → high-pressure (A3).
+- **Oxidation:** drifting pre-HCl oxide → **HCl-gettered oxide (A3 ✅)**; 1-atm budget → high-pressure (A3 ✅).
 - **Litho:** contact → proximity → projection; g-line → EUV (**A2**). Resist: negative-swell → positive →
   CAR (**A4**).
 - **Isolation:** planar/implicit → **LOCOS bird's beak (B5)** → STI (F7 forward).
