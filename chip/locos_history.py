@@ -29,11 +29,13 @@ contour finding. Running the A4 test ("delete the 2-D solve — does the headlin
   **pinch-off** of the active island — **does** change if you delete the solve, and *that* is what the
   2-D engine earns (the :mod:`chip.device_2d` two-window pattern): a **different BC topology** (two field
   windows + a symmetry plane vs one semi-infinite edge) that at **wide stripes** independently
-  cross-checks the encroachment (``active ≈ W − 2·L_beak`` to grid precision), and — the finding the
-  engine earns — reveals that as the stripe narrows the two opposing beaks' oxidant fields **overlap**,
-  pinching the island off at a drawn width *larger* than the single-edge ``2·L_beak``: LOCOS is *worse*
-  than the isolated-edge estimate predicts. The *direction* of that interaction is robust; its exact
-  merge *width* is model-sensitive (it rides the flagged ``L_D``), so only the direction is asserted.
+  cross-checks the encroachment (``active ≈ W − 2·L_beak`` to grid precision), and — the effect the
+  two-field solve shows that a single edge cannot — as the stripe narrows the two opposing beaks'
+  availability fields **overlap**, pinching the island off at a drawn width *larger* than the single-edge
+  ``2·L_beak``. That earlier pinch-off is a **property of the linear model** (superposition of the
+  normalized field), not independently-established physics, and its exact merge *width* rides the flagged
+  ``L_D``; so the module reports only the *presence and sign* of the effect (LOCOS worse than the
+  isolated-edge estimate), never a physical merge width.
 
 So the 2-D solve produces a **normalized lateral oxidant-availability modulation** ``m(x) ∈ [0, 1]``
 (1 in the open field, decaying toward 0 under the nitride), and the absolute field-oxide thickness is
@@ -102,9 +104,9 @@ Named scope edges (honest ceilings, stated so the omission isn't silent)
   ``gradual-failure-preferred`` move) — named here, not built.
 * **The merge width is model-sensitive (only its direction is asserted).** Unlike :mod:`chip.device_2d`
   — whose contour sits in the deep exponential tail, so its two-window ≡ subtraction to grid precision
-  even near the knee — here the beaks interact well *above* the resolved scale: the pinch-off is real
-  and its *direction* robust (LOCOS worse than ``2·L_beak``), but its exact *width* rides the flagged
-  ``L_D`` of this linear-availability caricature, so the coefficient is flagged, not asserted.
+  even near the knee — here the beaks interact well *above* the resolved scale: the earlier pinch-off is
+  a property the linear-availability model exhibits (field superposition), so only its *sign* (LOCOS
+  worse than ``2·L_beak``) is reported; its exact *width* rides the flagged ``L_D``, not asserted.
 * **Deal–Grove supplies only a scalar field-oxide thickness.** The modulation ``t_ox = grow_oxide·m`` is
   a linear lateral weighting, not a 2-D Deal–Grove solve of oxide thickness (that would need the
   moving-boundary machinery above); the *vertical* thickness is the existing closed form.
@@ -139,14 +141,17 @@ UM_PER_NM = ox.UM_PER_NM          # 1 nm = 1e-3 µm (report thin beaks/oxides in
 # --------------------------------------------------------------------------- #
 # The flagged calibration — the beak's lateral scale and the "active" contour
 # --------------------------------------------------------------------------- #
-# The bird's-beak length is, to first order, comparable to the field-oxide thickness — the standard
-# LOCOS rule of thumb (beak encroachment ≈ 0.8–1× the field oxide for conventional pad-oxide/nitride
-# stacks; Wolf, "Silicon Processing for the VLSI Era" Vol. 2 §7; Plummer–Deal–Griffin §9). Modelled by
-# tying the normalized-oxidant lateral diffusion length L_D to the field-oxide thickness through a
-# FLAGGED dimensionless factor, so the beak/field-oxide ratio lands on that cited value and is roughly
-# recipe-robust (as real LOCOS is). This is a calibration, NOT a claimed emergence — the magnitude is
-# the flagged leg; the engine carries the beak SHAPE and the two-beak MERGE (the tight topology).
-BEAK_DIFFUSION_FACTOR = 3.0       # FLAGGED — L_D = factor·t_field_ox; sets beak ÷ field-oxide ≈ 0.9 (cited)
+# The bird's-beak length is, to first order, an order-unity fraction of the grown field-oxide thickness
+# — the standard LOCOS rule of thumb, ≈ 0.85× (beak length ÷ oxide thickness), the mechanism being
+# lateral oxidant diffusion under the nitride (Filipovic, "Topography Simulation of Novel Processing
+# Techniques," TU Wien diss., §6.1.4 LOCOS — confirms the lateral-under-nitride mechanism this models,
+# and that the ratio decreases toward a saturation length as the field oxide thickens; the ≈85% figure
+# is the widely-quoted textbook value). Modelled by tying the normalized-oxidant lateral diffusion
+# length L_D to the field-oxide thickness through a FLAGGED dimensionless factor, so the beak/field-oxide
+# ratio lands near that value. This is a calibration, NOT a claimed emergence — the magnitude is the
+# flagged leg; the engine carries the beak SHAPE and the two-beak MERGE (the tight topology). The ratio's
+# thickness-dependence (it saturates at thick field oxide) is a named ceiling, not modelled (fixed factor).
+BEAK_DIFFUSION_FACTOR = 3.0       # FLAGGED — L_D = factor·t_field_ox; sets beak ÷ field-oxide ≈ 0.9 (~cited 0.85×)
 ACTIVE_MODULATION_THRESHOLD = 0.5  # FLAGGED — m < this ⇒ active silicon (little oxide); ≥ ⇒ field oxide
 
 # A representative modern field-oxidation recipe (wet, the field/masking-oxide regime) — used as the
