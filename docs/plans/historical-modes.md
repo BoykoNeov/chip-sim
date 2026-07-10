@@ -159,18 +159,34 @@ short → leakage. Motivates Al–Si, then barrier metals, then damascene Cu.
   `1/τ` (which would wrongly kill lifetime) as "mirror of A1 dislocation / G4b metal plugs" implied — it
   blends an ohmic-short density into `j_leak` at the *current* level, over a graded shorted-area fraction.
 
-### A2 — Lithography tool & wavelength progression · Tier-2 (surface + CD/NILS)
+### A2 — Lithography tool & wavelength progression · Tier-2 (surface + CD/NILS) — ✅ BUILT (2026-07-10)
 
-Reuses the aerial-image / partial-coherence model (`litho.py`). The period ladder, each rung a wall:
+Reuses the aerial-image / partial-coherence model (`litho.py`). Two orthogonal modes in one chunk (the A3
+precedent), each a wall on the CD/contrast observables litho already computes:
 
-- **Printing mode:** contact (mask wear, defect printing) → proximity (**gap-diffraction blur** `≈√(λg)`
-  degrades CD) → projection (today). The proximity blur is the displayable limitation on the existing CD
-  observable.
-- **Wavelength ladder:** g-line 436 → i-line 365 → KrF 248 → ArF 193 → 193i → EUV 13.5 — each moves the
-  Rayleigh CD floor the sim already computes (`k₁λ/NA`). The contrast: same feature, different era
-  wavelength, different printability.
-- **Consumer:** era surface + the CD / NILS observables litho already computes. **Seam:** `tool="projection"`,
-  current `λ`/NA default ⇒ litho bit-for-bit. **Cited:** gap-blur form, the wavelength/NA table per node.
+- **§A — the wavelength / lens ladder (pure reuse).** g-line 436 → i-line 365 → KrF 248 → ArF 193 → 193i →
+  EUV 13.5 — each moves the Rayleigh CD floor `k₁λ/NA` the sim already computes. `image_at_node` is literally
+  `litho.expose_grating` at that node's `Imaging`; the **modern default node is ArF `(193, 0.85, 0.5)`** —
+  demo_litho's stepper — so it reproduces today's litho **bit-for-bit** (the seam is a real reduction).
+- **§B — contact/proximity/projection printing (the one small new model).** Shadow printing: a proximity gap
+  `g` blurs the mask on a **`√(λg)`** near-field length. Modelled consumer-side as a Gaussian blur of the
+  *true binary mask* that **rides the diffusion engine** (`litho.peb_blur` in **backward-Euler** — a sharp
+  step isn't band-limited, so CN would ring negative; BE's max-principle keeps the shadow ≥ 0) — a *second*
+  optical reason litho leans on the program's PDE (after v1.7 PEB). **Contact (`g = 0`) → σ = 0 → the sharp
+  mask bit-for-bit** (the seam). The wall is the monotone **contrast/NILS** collapse (CD is symmetry-pinned at
+  the mean-clip — Trap 2 — so it's the resolves/doesn't binary, not the live curve).
+- **Consumer:** era surface + the CD/NILS observables litho computes. **Triad — tight:** the ArF seam, the
+  `R = k₁λ/NA` **formula**-monotonicity (kept SEPARATE from the flagged *historical-ladder* λ/NA ordering,
+  which rests on the NA table), the `g = 0` contact seam, and the blur's mean conservation. **Flagged:** the
+  per-node NA table + the `√(λg)` prefactor `k ≈ 1` (well-founded — the grating dies where half-pitch ≈
+  `√(λg)`). **Scope edges named:** a monotone blur *envelope* not the Talbot near-field; contact's real wall
+  is defectivity not blur; the scalar model overstates 193i/EUV; a node carries only λ/NA/σ. **Cited:**
+  Levinson/Madou `√(λg)` proximity limit; Mack k₁/NILS (`[[litho-aerial-image-source]]`).
+- **Built as** a pure additive consumer: `chip/litho_history.py` + `chip/demo_litho_history.py`
+  (`chip-litho-history.png`) + `chip/tests/test_litho_history.py`; gallery card `hist·A2`; H0 timeline rung
+  (stage Lithography). No engine change; no existing behaviour touched. **Realism finding:** `√(λg)` resolves
+  *microns*, not sub-micron — a 600 nm feature dies by a ~0.25 µm gap, so the §B demo uses a realistic 8 µm
+  proximity feature (gaps 0–50 µm, wall ≈ 37 µm).
 
 ### A4 — Photoresist generations · Tier-2 (surface + CD)
 
@@ -206,11 +222,11 @@ active area → motivated STI (F7 in `future-steps.md`, deferred there for want 
    contrast) — ✅ BUILT; **A3** (HCl/HP oxidation → `Q_ox`/budget) — ✅ BUILT; **B6** (Al spiking → leakage) — ✅ BUILT.
 2. **H0 — era display surface.** ✅ BUILT — the shared consumer that unblocks the Tier-2 chunks; debuted
    *justified by built content* (A1 + implant + A3 + B6), not one recycled figure.
-3. **Tier-2 (surface-fed, now unblocked by H0):** **A2** (litho tool/wavelength) **← next up**, **A4**
-   (resist generations), **B5** (LOCOS bird's beak — also the 2-D engine's consumer).
+3. **Tier-2 (surface-fed, now unblocked by H0):** **A2** (litho tool/wavelength) ✅ BUILT, **A4**
+   (resist generations) **← next up**, **B5** (LOCOS bird's beak — also the 2-D engine's consumer).
 
 **Recommended sequence (revised 2026-07-10 — A1-first, the anti-over-build ordering):**
-**A1 ✅ → A3 ✅ → B6 ✅ → H0 ✅ → A2 → A4 → B5.** *(Superseded the earlier "H0 first": H0 only needs to precede the
+**A1 ✅ → A3 ✅ → B6 ✅ → H0 ✅ → A2 ✅ → A4 → B5.** *(Superseded the earlier "H0 first": H0 only needs to precede the
 Tier-2 chunks, not A1 — a Tier-1 mode surfaces in the physics gallery with no history page, so leading with
 H0 would have made the first deliverable a display surface over one recycled figure, exactly the over-build
 this repo rejects. Build the Tier-1 content first; stand up H0 once it has real tenants.)*
@@ -225,7 +241,7 @@ The forward axis (`future-steps.md`) and this backward axis meet in one timeline
 - **Doping:** grown/alloy/mesa → planar predep (**A1 dose-control wall** — solubility-pinned, can't meter a
   light dose) → implant (F1, the successor). ← the two axes' handoff.
 - **Oxidation:** drifting pre-HCl oxide → **HCl-gettered oxide (A3 ✅)**; 1-atm budget → high-pressure (A3 ✅).
-- **Litho:** contact → proximity → projection; g-line → EUV (**A2**). Resist: negative-swell → positive →
+- **Litho:** contact → proximity → projection; g-line → EUV (**A2 ✅**). Resist: negative-swell → positive →
   CAR (**A4**).
 - **Isolation:** planar/implicit → **LOCOS bird's beak (B5)** → STI (F7 forward).
 - **Metal:** period Al **spiking (B6 ✅)** → barrier metal → Cu damascene (F4 forward).

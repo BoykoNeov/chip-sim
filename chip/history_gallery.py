@@ -101,6 +101,15 @@ MODES = [
         "oxidation grows the same oxide for 1/P of the thermal budget (or the same oxide at lower T).",
     ),
     HistoryMode(
+        module="demo_litho_history", tag="A2", stage="Lithography", era="≈1980s",
+        period="Contact / proximity shadow printing (a mask held a small gap from the wafer), and early "
+        "g-line optics — resolution set by the gap and the long exposure wavelength.",
+        wall="A proximity gap g blurs the shadow on a √(λg) near-field length, so features can't go much "
+        "below √(λg); and the Rayleigh floor R = k₁·λ/NA is coarse at 436 nm — microns, not nanometres.",
+        successor="Projection steppers (a lens with a pupil) broke the √(λg) floor; then the wavelength/NA "
+        "race — g-line → i-line → KrF → ArF → immersion → EUV — walked the Rayleigh floor down to nm.",
+    ),
+    HistoryMode(
         module="demo_metallization_history", tag="B6", stage="Metallization", era="≈1970s",
         period="Evaporated pure-aluminium contacts, sintered sub-eutectically onto the silicon.",
         wall="The Al dissolves silicon and spikes through the shallow (implant-era) junction — a "

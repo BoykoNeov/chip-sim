@@ -154,6 +154,25 @@
         </div>
         <div class="rung">
           <div class="head">
+            <span class="era">≈1980s</span><span class="stage">Lithography</span><span class="rtag">A2</span>
+          </div>
+          <div class="contrast">
+            <a class="shot" href="figures/chip-litho-history.png" title="open the full modern-vs-period figure">
+              <img src="figures/chip-litho-history.png" alt="A2 — Lithography modern-vs-period contrast" loading="lazy">
+            </a>
+            <div class="story">
+              <div class="row"><span class="k period">Period</span><p class="v">Contact / proximity shadow printing (a mask held a small gap from the wafer), and early g-line optics — resolution set by the gap and the long exposure wavelength.</p></div>
+              <div class="row"><span class="k wall">The wall</span><p class="v">A proximity gap g blurs the shadow on a √(λg) near-field length, so features can&#x27;t go much below √(λg); and the Rayleigh floor R = k₁·λ/NA is coarse at 436 nm — microns, not nanometres.</p></div>
+              <div class="row"><span class="k next">Replaced by</span><p class="v">Projection steppers (a lens with a pupil) broke the √(λg) floor; then the wavelength/NA race — g-line → i-line → KrF → ArF → immersion → EUV — walked the Rayleigh floor down to nm.</p></div>
+              <div class="links">
+                <code>python -m chip.demo_litho_history</code>
+                <a class="src" href="http://localhost:8888/lab/tree/chip/demo_litho_history.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="rung">
+          <div class="head">
             <span class="era">≈1970s</span><span class="stage">Metallization</span><span class="rtag">B6</span>
           </div>
           <div class="contrast">

@@ -107,6 +107,8 @@ DEEPENINGS = [
          "Period oxidation ambients — HCl getters mobile Na (V_t recovery); high pressure grows the same oxide for 1/P the thermal budget."),
     Demo("demo_metallization_history", "hist·B6",
          "Aluminium junction spiking — pure Al shorts the shallow (implant-era) junction; Al–Si and barrier metals clear the wall."),
+    Demo("demo_litho_history", "hist·A2",
+         "Period lithography — the wavelength/lens ladder (g-line→EUV) moves the Rayleigh floor; contact/proximity printing hits the √(λg) gap wall projection broke."),
 ]
 
 ALL_DEMOS = SPINE + DEEPENINGS
