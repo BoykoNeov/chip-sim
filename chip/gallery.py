@@ -109,6 +109,8 @@ DEEPENINGS = [
          "Aluminium junction spiking — pure Al shorts the shallow (implant-era) junction; Al–Si and barrier metals clear the wall."),
     Demo("demo_litho_history", "hist·A2",
          "Period lithography — the wavelength/lens ladder (g-line→EUV) moves the Rayleigh floor; contact/proximity printing hits the √(λg) gap wall projection broke."),
+    Demo("demo_resist_history", "hist·A4",
+         "Period photoresist — negative-resist (KTFR) solvent swelling bridges fine lines at a floor ≈ the film thickness (optics-independent); positive/CAR don't swell and clear it."),
 ]
 
 ALL_DEMOS = SPINE + DEEPENINGS

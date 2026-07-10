@@ -188,17 +188,39 @@ precedent), each a wall on the CD/contrast observables litho already computes:
   *microns*, not sub-micron — a 600 nm feature dies by a ~0.25 µm gap, so the §B demo uses a realistic 8 µm
   proximity feature (gaps 0–50 µm, wall ≈ 37 µm).
 
-### A4 — Photoresist generations · Tier-2 (surface + CD)
+### A4 — Photoresist generations · Tier-2 (surface + CD) — ✅ BUILT (2026-07-10)
 
-Reuses the PEB/CAR machinery (`litho.py` §8/§9). The resist ladder:
+Reuses the PEB/CAR machinery (`litho.py` §6 develop + §9 CAR). The resist ladder:
 
 - **Negative resist (Kodak KTFR):** solvent-development **swelling** distorts and bridges fine features →
   a resolution floor. The swelling is the displayable limitation on CD.
 - **Positive DQN/novolak:** no swell → better CD → the successor. **CAR (v1.9, already built):** the DUV
   successor (amplification for dose).
-- **Consumer:** era surface + CD. **Seam:** `chemistry="car"`/positive default ⇒ current develop
-  bit-for-bit; `chemistry="negative"` opt-in adds the swelling term. **Cited:** swelling factor (flagged),
+- **Consumer:** era surface + CD. **Seam:** positive default ⇒ current develop bit-for-bit;
+  `chemistry="negative"` opt-in adds the swelling term. **Cited:** swelling factor (flagged),
   the negative→positive→CAR generational contrast.
+- **Built as** a pure additive consumer: `chip/resist_history.py` + `chip/demo_resist_history.py`
+  (`chip-resist-history.png`) + `chip/tests/test_resist_history.py`; gallery card `hist·A4`; H0 timeline
+  rung (stage Photoresist). No engine change; no existing behaviour touched. **Decisive build call
+  (advisor):** swelling is modelled **geometrically**, *not* on the diffusion engine. A diffusion solve is
+  conservative & symmetric; swelling **adds volume** and **dilates** the line — non-conservative &
+  asymmetric. The tempting engine ride (blur the developed line, re-threshold below the midpoint to grow
+  it) needs a *free contour level* that silently absorbs the calibration — a fudge dressed as an engine
+  ride (the `gradual-failure-preferred` trap). Discriminating test: **delete the solve and the CD floor is
+  unchanged** — it was never the engine's. So the swelling is a fixed edge displacement
+  `s = swelling_factor·thickness` (∝ **thickness**, not CD), and "reuse PEB/CAR machinery" is the
+  develop/metric path (`print_cd`/`image_contrast`/`nils`) + the CAR successor delegated straight to
+  `expose_grating_car`. **Headline (orthogonal to A2):** the swelling floor `≈ film thickness` is
+  **optics-independent** — A2 walked the Rayleigh floor `k₁λ/NA` down with wavelength; A4 shows a floor the
+  wavelength race **cannot** clear (only a non-swelling resist can). The demo isolates the two floors by
+  developing the *same* fine aerial image as positive (resolves to the optical floor) and negative (bridges
+  at the coarser, thickness-set swelling floor), with CAR resolving in the bridged band. **Triad — tight:**
+  the positive seam (= `expose_grating` bit-for-bit), the swelling **sign** (grows the line → space
+  bridges), the CAR delegation, and the floor's `∝ thickness` / optics-independence (structural — the floor
+  function takes no `Imaging`). **Flagged:** the swelling coefficient `SWELLING_FACTOR` + the representative
+  `RESIST_THICKNESS_NM`. **Named edges:** uniform lateral dilation (not a differential-swell profile
+  solve); bridging read as a per-feature cliff at `space=0` (graded fraction via line-edge non-uniformity
+  named, not built); the optical develop stays the existing constant-threshold resist.
 
 ### B5 — LOCOS isolation & the bird's beak · Tier-2 (surface + active-width geometry; feeds the 2-D engine)
 
@@ -223,10 +245,10 @@ active area → motivated STI (F7 in `future-steps.md`, deferred there for want 
 2. **H0 — era display surface.** ✅ BUILT — the shared consumer that unblocks the Tier-2 chunks; debuted
    *justified by built content* (A1 + implant + A3 + B6), not one recycled figure.
 3. **Tier-2 (surface-fed, now unblocked by H0):** **A2** (litho tool/wavelength) ✅ BUILT, **A4**
-   (resist generations) **← next up**, **B5** (LOCOS bird's beak — also the 2-D engine's consumer).
+   (resist generations) ✅ BUILT, **B5** (LOCOS bird's beak — also the 2-D engine's consumer) **← next up**.
 
 **Recommended sequence (revised 2026-07-10 — A1-first, the anti-over-build ordering):**
-**A1 ✅ → A3 ✅ → B6 ✅ → H0 ✅ → A2 ✅ → A4 → B5.** *(Superseded the earlier "H0 first": H0 only needs to precede the
+**A1 ✅ → A3 ✅ → B6 ✅ → H0 ✅ → A2 ✅ → A4 ✅ → B5.** *(Superseded the earlier "H0 first": H0 only needs to precede the
 Tier-2 chunks, not A1 — a Tier-1 mode surfaces in the physics gallery with no history page, so leading with
 H0 would have made the first deliverable a display surface over one recycled figure, exactly the over-build
 this repo rejects. Build the Tier-1 content first; stand up H0 once it has real tenants.)*
@@ -242,7 +264,7 @@ The forward axis (`future-steps.md`) and this backward axis meet in one timeline
   light dose) → implant (F1, the successor). ← the two axes' handoff.
 - **Oxidation:** drifting pre-HCl oxide → **HCl-gettered oxide (A3 ✅)**; 1-atm budget → high-pressure (A3 ✅).
 - **Litho:** contact → proximity → projection; g-line → EUV (**A2 ✅**). Resist: negative-swell → positive →
-  CAR (**A4**).
+  CAR (**A4 ✅**).
 - **Isolation:** planar/implicit → **LOCOS bird's beak (B5)** → STI (F7 forward).
 - **Metal:** period Al **spiking (B6 ✅)** → barrier metal → Cu damascene (F4 forward).
 

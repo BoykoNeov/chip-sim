@@ -110,6 +110,16 @@ MODES = [
         "race — g-line → i-line → KrF → ArF → immersion → EUV — walked the Rayleigh floor down to nm.",
     ),
     HistoryMode(
+        module="demo_resist_history", tag="A4", stage="Photoresist", era="≈1960s",
+        period="Negative photoresist (Kodak KTFR) — the exposed region crosslinks into the resist line, "
+        "then the network absorbs solvent developer and swells.",
+        wall="The swollen line dilates outward by a fixed amount set by the film thickness, so fine spaces "
+        "shrink and adjacent lines bridge — a resolution floor ≈ the resist thickness that no wavelength "
+        "or NA can clear (it is optics-independent).",
+        successor="Positive resist (DQN / novolak) dissolves instead of crosslinking — no swell, so it "
+        "resolves to the optical floor; chemically-amplified resist (CAR) is the DUV successor.",
+    ),
+    HistoryMode(
         module="demo_metallization_history", tag="B6", stage="Metallization", era="≈1970s",
         period="Evaporated pure-aluminium contacts, sintered sub-eutectically onto the silicon.",
         wall="The Al dissolves silicon and spikes through the shallow (implant-era) junction — a "
