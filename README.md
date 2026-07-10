@@ -106,6 +106,7 @@ until the page is rebuilt.
 | `chip.demo_metallization_history` | **hist·B6** — aluminium junction spiking: pure Al shorts the shallow (implant-era) junction; Al–Si and barrier metals clear the wall | [chip-metallization-history.png](docs/figures/chip-metallization-history.png) |
 | `chip.demo_litho_history` | **hist·A2** — period lithography: the wavelength/lens ladder (g-line→EUV) moves the Rayleigh floor; contact/proximity printing hits the `√(λg)` gap wall projection broke | [chip-litho-history.png](docs/figures/chip-litho-history.png) |
 | `chip.demo_resist_history` | **hist·A4** — period photoresist: negative-resist (KTFR) solvent swelling bridges fine lines at a floor ≈ the film thickness (optics-independent); positive/CAR don't swell and clear it | [chip-resist-history.png](docs/figures/chip-resist-history.png) |
+| `chip.demo_locos_history` | **hist·B5** — LOCOS isolation: oxidant under the nitride mask grows the bird's beak that eats active area; opposing beaks merge and pinch off below a min pitch (∝ field-oxide thickness); STI's vertical walls clear it | [chip-locos-history.png](docs/figures/chip-locos-history.png) |
 
 *(v1.5–v1.6 are engine-internal amendments — native nonlinear `D(u)` and explicit stepping — with no
 chip demo of their own; they surface through `engines/diffusion`'s own test suite.)*

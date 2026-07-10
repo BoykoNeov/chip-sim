@@ -120,6 +120,17 @@ MODES = [
         "resolves to the optical floor; chemically-amplified resist (CAR) is the DUV successor.",
     ),
     HistoryMode(
+        module="demo_locos_history", tag="B5", stage="Isolation", era="≈1980s",
+        period="LOCOS — local oxidation of silicon: a silicon-nitride mask over the active areas blocks "
+        "the oxidant while a thick field oxide grows between devices to isolate them.",
+        wall="Oxidant diffuses laterally under the nitride edge and grows the bird's beak that encroaches "
+        "into the active area; opposing beaks merge and pinch the active island off below a minimum "
+        "isolable pitch that scales with the field-oxide thickness — a hard limit on isolation density.",
+        successor="Shallow-trench isolation (STI) — a vertical trench is etched and filled with oxide, so "
+        "there is no lateral oxidant path and no beak; the active width equals the drawn width down to "
+        "the litho floor.",
+    ),
+    HistoryMode(
         module="demo_metallization_history", tag="B6", stage="Metallization", era="≈1970s",
         period="Evaporated pure-aluminium contacts, sintered sub-eutectically onto the silicon.",
         wall="The Al dissolves silicon and spikes through the shallow (implant-era) junction — a "

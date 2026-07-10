@@ -222,7 +222,20 @@ Reuses the PEB/CAR machinery (`litho.py` §6 develop + §9 CAR). The resist ladd
   solve); bridging read as a per-feature cliff at `space=0` (graded fraction via line-edge non-uniformity
   named, not built); the optical develop stays the existing constant-threshold resist.
 
-### B5 — LOCOS isolation & the bird's beak · Tier-2 (surface + active-width geometry; feeds the 2-D engine)
+### B5 — LOCOS isolation & the bird's beak · Tier-2 (surface + active-width geometry; feeds the 2-D engine) — ✅ BUILT (2026-07-10)
+
+**Built as** `chip/locos_history.py` + `chip/demo_locos_history.py` + `chip/tests/test_locos_history.py`;
+gallery card `hist·B5`; H0 timeline rung stage = **Isolation**; figure `chip-locos-history.png`. Pure
+additive consumer of the 2-D engine (`Diffusion2D` + `MaskedSurface`) + `chip.oxidation.grow_oxide`. The
+honest call (advisor, load-bearing — the A4 discriminator applied): the 2-D solve is **load-bearing for
+the topology** (two-beak merge → active-width pinch-off) and as an **independent cross-check**, *not* for
+the encroachment magnitude. The seam landmine (a linear scalar penetrates as √(Dt), not Deal–Grove
+√(Bt)) is resolved by making the solve a **normalized modulation `m(x) ∈ [0,1]`** and setting
+`t_ox = grow_oxide · m` (Deal–Grove stays the thickness source; `m ≡ 1` in the open field ⇒ planar seam
+exact). Beak/field-oxide ratio (~0.9) and the merge coefficient are **flagged**; the *direction* of the
+interaction-driven early pinch-off (LOCOS worse than 2·L_beak) is the tight 2-D finding. Headline: the
+minimum isolable active pitch **scales with the field-oxide thickness**; STI (vertical walls, no beak)
+cleared it.
 
 The one chunk that gives the **underused 2-D oxidation/diffusion regime** (v1.8/v1.11) a consumer.
 Oxidation under a nitride mask → lateral oxidant encroachment → the classic **bird's beak** that eats
@@ -245,10 +258,11 @@ active area → motivated STI (F7 in `future-steps.md`, deferred there for want 
 2. **H0 — era display surface.** ✅ BUILT — the shared consumer that unblocks the Tier-2 chunks; debuted
    *justified by built content* (A1 + implant + A3 + B6), not one recycled figure.
 3. **Tier-2 (surface-fed, now unblocked by H0):** **A2** (litho tool/wavelength) ✅ BUILT, **A4**
-   (resist generations) ✅ BUILT, **B5** (LOCOS bird's beak — also the 2-D engine's consumer) **← next up**.
+   (resist generations) ✅ BUILT, **B5** (LOCOS bird's beak — also the 2-D engine's consumer) — ✅ BUILT.
+   **The plan is COMPLETE — all seven historical modes built.**
 
 **Recommended sequence (revised 2026-07-10 — A1-first, the anti-over-build ordering):**
-**A1 ✅ → A3 ✅ → B6 ✅ → H0 ✅ → A2 ✅ → A4 ✅ → B5.** *(Superseded the earlier "H0 first": H0 only needs to precede the
+**A1 ✅ → A3 ✅ → B6 ✅ → H0 ✅ → A2 ✅ → A4 ✅ → B5 ✅.** *(Superseded the earlier "H0 first": H0 only needs to precede the
 Tier-2 chunks, not A1 — a Tier-1 mode surfaces in the physics gallery with no history page, so leading with
 H0 would have made the first deliverable a display surface over one recycled figure, exactly the over-build
 this repo rejects. Build the Tier-1 content first; stand up H0 once it has real tenants.)*
@@ -265,7 +279,7 @@ The forward axis (`future-steps.md`) and this backward axis meet in one timeline
 - **Oxidation:** drifting pre-HCl oxide → **HCl-gettered oxide (A3 ✅)**; 1-atm budget → high-pressure (A3 ✅).
 - **Litho:** contact → proximity → projection; g-line → EUV (**A2 ✅**). Resist: negative-swell → positive →
   CAR (**A4 ✅**).
-- **Isolation:** planar/implicit → **LOCOS bird's beak (B5)** → STI (F7 forward).
+- **Isolation:** planar/implicit → **LOCOS bird's beak (B5 ✅)** → STI (F7 forward).
 - **Metal:** period Al **spiking (B6 ✅)** → barrier metal → Cu damascene (F4 forward).
 
 Backward axis shows *the wall each modern step was built to clear*; forward axis *builds the step*. Same

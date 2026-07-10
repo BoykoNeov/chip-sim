@@ -111,6 +111,8 @@ DEEPENINGS = [
          "Period lithography — the wavelength/lens ladder (g-line→EUV) moves the Rayleigh floor; contact/proximity printing hits the √(λg) gap wall projection broke."),
     Demo("demo_resist_history", "hist·A4",
          "Period photoresist — negative-resist (KTFR) solvent swelling bridges fine lines at a floor ≈ the film thickness (optics-independent); positive/CAR don't swell and clear it."),
+    Demo("demo_locos_history", "hist·B5",
+         "LOCOS isolation — oxidant under the nitride mask grows the bird's beak that eats active area; opposing beaks merge and pinch off below a min pitch (∝ field-oxide thickness); STI's vertical walls clear it."),
 ]
 
 ALL_DEMOS = SPINE + DEEPENINGS
