@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>chip-sim &mdash; the era timeline (the backward axis)</title>
+  <style>
+      :root {
+        --bg: #f6f7f9; --card: #ffffff; --ink: #1c2530; --muted: #5b6772;
+        --line: #e2e6ea; --accent: #2f6db5; --code: #0b3a66; --shot-bg: #fafbfc;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink);
+             font: 16px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      header { padding: 2.6rem 1.5rem 1.4rem; border-bottom: 1px solid var(--line);
+               background: linear-gradient(180deg, #fff, var(--bg)); }
+      .wrap { max-width: 1180px; margin: 0 auto; }
+      h1 { margin: 0 0 .25rem; font-size: 1.9rem; letter-spacing: -.01em; }
+      .tagline { margin: 0 0 1rem; color: var(--muted); font-size: 1.05rem; }
+      .lead { margin: 0 0 1rem; max-width: 70ch; }
+      .quick { margin: 0; padding: .7rem .9rem; background: #0d1b2a; color: #e6edf3;
+               border-radius: 8px; overflow-x: auto; font: .85rem/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; }
+      .quick .c { color: #7fb0e0; }
+      .repo { display: inline-block; margin-top: .8rem; font-weight: 600; }
+      main { max-width: 1180px; margin: 0 auto; padding: 1.6rem 1.5rem 3rem; }
+      section { margin-top: 2.2rem; }
+      h2 { font-size: 1.3rem; margin: 0 0 .2rem; }
+      .sub { margin: 0 0 1.1rem; color: var(--muted); }
+      .grid { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              overflow: hidden; display: flex; flex-direction: column;
+              transition: box-shadow .15s ease, transform .15s ease; }
+      .card:hover { box-shadow: 0 8px 24px rgba(20,40,70,.12); transform: translateY(-2px); }
+      .shot { display: block; background: var(--shot-bg); border-bottom: 1px solid var(--line); }
+      .shot img { display: block; width: 100%; height: auto; }
+      .body { padding: .9rem 1rem 1rem; display: flex; flex-direction: column; gap: .55rem; flex: 1; }
+      .tag { align-self: flex-start; font-weight: 700; font-size: .76rem; letter-spacing: .03em;
+             text-transform: uppercase; color: var(--accent); background: #eaf2fb;
+             border-radius: 999px; padding: .12rem .6rem; }
+      .blurb { margin: 0; flex: 1; }
+      .links { display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+               margin-top: .2rem; padding-top: .6rem; border-top: 1px dashed var(--line); }
+      .links code { color: var(--code); background: #eef3f8; border-radius: 6px;
+                    padding: .2rem .45rem; font: .8rem ui-monospace, "Cascadia Code", Consolas, monospace;
+                    overflow-x: auto; }
+      .src { white-space: nowrap; font-size: .85rem; }
+      .deeper { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+      .deeper .item { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+                      padding: .9rem 1rem; }
+      .deeper .item h3 { margin: 0 0 .25rem; font-size: 1rem; }
+      .deeper .item p { margin: 0; color: var(--muted); font-size: .9rem; }
+      footer { border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem;
+               padding: 1.4rem 1.5rem 2.4rem; }
+      footer code { background: #eef3f8; border-radius: 5px; padding: .1rem .35rem;
+                    font: .82rem ui-monospace, Consolas, monospace; }
+
+      /* --- the era timeline (history page only) --------------------------------------- */
+      .timeline { position: relative; margin-top: 1.4rem; padding-left: 1.6rem;
+                  border-left: 2px solid var(--line); }
+      .rung { position: relative; margin-bottom: 2rem; }
+      .rung::before { content: ""; position: absolute; left: calc(-1.6rem - 6px); top: .4rem;
+                      width: 11px; height: 11px; border-radius: 50%; background: var(--accent);
+                      box-shadow: 0 0 0 4px var(--bg); }
+      .rung .era { display: inline-block; font-weight: 700; font-size: .82rem; letter-spacing: .03em;
+                   color: var(--accent); margin-right: .5rem; }
+      .rung .stage { font-weight: 600; }
+      .rung .rtag { align-self: flex-start; font-weight: 700; font-size: .72rem; letter-spacing: .03em;
+                    text-transform: uppercase; color: var(--accent); background: #eaf2fb;
+                    border-radius: 999px; padding: .1rem .5rem; margin-left: .4rem; }
+      .rung .contrast { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+                        overflow: hidden; margin-top: .6rem; display: grid; gap: 0;
+                        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+      @media (max-width: 720px) { .rung .contrast { grid-template-columns: 1fr; } }
+      .rung .contrast .shot { border-bottom: none; border-right: 1px solid var(--line); }
+      @media (max-width: 720px) { .rung .contrast .shot { border-right: none;
+                                  border-bottom: 1px solid var(--line); } }
+      .rung .contrast .shot img { display: block; width: 100%; height: auto; }
+      .rung .story { padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: .6rem; }
+      .rung .story .row { display: flex; gap: .55rem; }
+      .rung .story .k { flex: 0 0 5.4rem; font-weight: 700; font-size: .74rem; letter-spacing: .03em;
+                        text-transform: uppercase; padding-top: .12rem; }
+      .rung .story .k.period { color: var(--muted); }
+      .rung .story .k.wall { color: #b23c2f; }
+      .rung .story .k.next { color: #2e7d46; }
+      .rung .story .v { margin: 0; flex: 1; font-size: .92rem; }
+      .rung .story .links { display: flex; align-items: center; gap: .6rem; margin-top: .2rem;
+                            padding-top: .6rem; border-top: 1px dashed var(--line); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>chip-sim &mdash; the era timeline</h1>
+      <p class="tagline"><em>What each modern step was built to clear.</em> The backward axis: every
+        process re-run in the period mode whose limitation motivated its successor.</p>
+      <p class="lead">The rest of the gallery runs every step in its <strong>modern</strong>
+        configuration. This page runs the other direction: each rung re-runs a step we already model in
+        its <strong>period mode</strong> and reads the one contrast the sim can show &mdash;
+        <strong>the period result, the wall it hit, and the modern step that cleared it</strong>. A mode
+        earns a rung only when its limitation is <em>visible</em> in a quantity the sim already computes
+        (dose, V_t, thermal budget, junction leakage). Every mode is opt-in: the modern default
+        reproduces today's result byte-for-byte, so this timeline is pure contrast. (The forward axis &mdash;
+        each modern step <em>built</em> &mdash; is the <a href="index.html">physics gallery</a>.)</p>
+      <a class="repo" href="https://github.com/BoykoNeov/chip-sim">View the repository on GitHub&nbsp;&#8599;</a>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>The backward axis, along the process spine</h2>
+      <p class="sub">Doping &rarr; oxidation &rarr; metallization &mdash; each rung is a built historical
+        mode; click a figure for the full modern-vs-period contrast.</p>
+      <div class="timeline">
+        <div class="rung">
+          <div class="head">
+            <span class="era">≈1960s</span><span class="stage">Doping</span><span class="rtag">A1</span>
+          </div>
+          <div class="contrast">
+            <a class="shot" href="figures/chip-doping-history.png" title="open the full modern-vs-period figure">
+              <img src="figures/chip-doping-history.png" alt="A1 — Doping modern-vs-period contrast" loading="lazy">
+            </a>
+            <div class="story">
+              <div class="row"><span class="k period">Period</span><p class="v">Predep planar doping from a constant diffusion source (POCl₃ / BBr₃), the surface flooded at the solid-solubility limit.</p></div>
+              <div class="row"><span class="k wall">The wall</span><p class="v">The source floods at a fixed material constant (Trumbore solubility), so it cannot reproducibly meter a light V_t-adjust dose — laying 5e11 boron needs a sub-millisecond predep.</p></div>
+              <div class="row"><span class="k next">Replaced by</span><p class="v">Ion implantation — meters dose electrically by beam charge and sets depth independently by energy, the decoupling the predep line could not reach.</p></div>
+              <div class="links">
+                <code>python -m chip.demo_doping_history</code>
+                <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_doping_history.py">source&nbsp;&#8599;</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="rung">
+          <div class="head">
+            <span class="era">≈1970s</span><span class="stage">Oxidation</span><span class="rtag">A3</span>
+          </div>
+          <div class="contrast">
+            <a class="shot" href="figures/chip-oxidation-history.png" title="open the full modern-vs-period figure">
+              <img src="figures/chip-oxidation-history.png" alt="A3 — Oxidation modern-vs-period contrast" loading="lazy">
+            </a>
+            <div class="story">
+              <div class="row"><span class="k period">Period</span><p class="v">Neutral thermal oxidation at 1 atm — no chlorine in the ambient, atmospheric-pressure growth for thick isolation oxides.</p></div>
+              <div class="row"><span class="k wall">The wall</span><p class="v">Pre-HCl gate oxides drifted from mobile Na⁺ (unstable V_t); and a thick 1-atm oxide costs a large collateral diffusion budget while it grows.</p></div>
+              <div class="row"><span class="k next">Replaced by</span><p class="v">Chlorine (HCl) gettering removes the mobile Na → V_t recovers; high-pressure oxidation grows the same oxide for 1/P of the thermal budget (or the same oxide at lower T).</p></div>
+              <div class="links">
+                <code>python -m chip.demo_oxidation_history</code>
+                <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_oxidation_history.py">source&nbsp;&#8599;</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="rung">
+          <div class="head">
+            <span class="era">≈1970s</span><span class="stage">Metallization</span><span class="rtag">B6</span>
+          </div>
+          <div class="contrast">
+            <a class="shot" href="figures/chip-metallization-history.png" title="open the full modern-vs-period figure">
+              <img src="figures/chip-metallization-history.png" alt="B6 — Metallization modern-vs-period contrast" loading="lazy">
+            </a>
+            <div class="story">
+              <div class="row"><span class="k period">Period</span><p class="v">Evaporated pure-aluminium contacts, sintered sub-eutectically onto the silicon.</p></div>
+              <div class="row"><span class="k wall">The wall</span><p class="v">The Al dissolves silicon and spikes through the shallow (implant-era) junction — a graded shorted-area fraction; the shallower the junction, the worse the short.</p></div>
+              <div class="row"><span class="k next">Replaced by</span><p class="v">Barrier metals (Ti/TiN) stop the silicon uptake (Al–Si alloy is the partial fix); later Cu damascene — the spike wall never reaches the junction.</p></div>
+              <div class="links">
+                <code>python -m chip.demo_metallization_history</code>
+                <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_metallization_history.py">source&nbsp;&#8599;</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Go deeper</h2>
+      <p class="sub">The two front doors this timeline is a cut of, and the plan behind the axis.</p>
+      <div class="deeper">
+        <a class="item" href="index.html">
+          <h3>The physics gallery &#8599;</h3>
+          <p>The forward axis: the four-phase process spine + the litho/implant deepenings &mdash; each
+            modern step <em>built</em>, recipe in &rarr; device out. The history figures live there too,
+            as flat cards; this page is their timeline cut.</p>
+        </a>
+        <a class="item" href="fab-game.html">
+          <h3>The fab-line game &#8599;</h3>
+          <p>The gamified full line built on the same physics &mdash; sand &rarr; a binned chip, and you
+            can see <em>why</em> a die died.</p>
+        </a>
+        <a class="item" href="https://github.com/BoykoNeov/chip-sim/blob/main/docs/plans/historical-modes.md">
+          <h3>The historical-modes plan &#8599;</h3>
+          <p>historical-modes.md &mdash; the backward axis, the three-tier consumer bar, and why a period
+            variant earns code only when its limitation is observable.</p>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">Generated from the <code>demo_*_history</code> modules by
+      <code>python -m chip.history_gallery</code> &mdash; figure paths are introspected, never hand-typed,
+      so this timeline stays in lock-step with the banked contrasts. The backward axis complements the
+      forward one (<code>docs/plans/future-steps.md</code>): same observables, opposite direction.</div>
+  </footer>
+</body>
+</html>

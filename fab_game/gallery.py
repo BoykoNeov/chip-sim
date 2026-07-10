@@ -177,6 +177,7 @@ def render_html(local: bool = False) -> str:
         plan = f"{_LAB}/docs/plans/fab-game.md"
         backlog = f"{_LAB}/docs/plans/scope-edge-backlog.md"
         physics = "index.local.html"   # back to the physics gallery's local edition (next to this file)
+        history = "history.local.html"   # the era timeline (H0, backward axis), local edition
     else:
         title = "chip-sim &mdash; the fab-line game gallery"
         repo_link = f'<a class="repo" href="{_REPO_URL}">View the repository on GitHub&nbsp;&#8599;</a>'
@@ -198,6 +199,7 @@ def render_html(local: bool = False) -> str:
         plan = f"{_BLOB}/docs/plans/fab-game.md"
         backlog = f"{_BLOB}/docs/plans/scope-edge-backlog.md"
         physics = "index.html"   # back to the physics gallery (same /docs dir)
+        history = "history.html"   # the era timeline (H0, backward axis), same /docs dir
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -256,6 +258,12 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           <h3>The physics gallery &#8599;</h3>
           <p>The other front door: the four-phase process spine + the litho deepenings that this game
             layer is built on &mdash; recipe in, device out.</p>
+        </a>
+        <a class="item" href="{history}"{item_attr}>
+          <h3>The era timeline &#8599;</h3>
+          <p>The backward axis: the same steps re-run in their <em>period</em> mode &mdash; the wall each
+            modern step was built to clear (doping&rarr;implant, drifting oxide&rarr;HCl, Al
+            spiking&rarr;barrier metal), laid on the process spine.</p>
         </a>
         <a class="item" href="{readme}"{item_attr}>
           <h3>The fab_game README &#8599;</h3>

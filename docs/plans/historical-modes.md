@@ -62,7 +62,7 @@ mode is never a global switch — it is a parameter on the relevant process (`Ox
 Each chunk is independent after H0. Tier-1 chunks (A3, B6, A1) can be built before H0 if desired; Tier-2
 chunks (A2, A4, B5) are gated on H0.
 
-### H0 — Era display surface (the shared consumer) · Tier-0, build first
+### H0 — Era display surface (the shared consumer) · Tier-0 — ✅ BUILT (2026-07-10)
 
 The one piece with **no physics** — a display surface that reads any historical-mode contrast and lays it
 on the timeline. Consumer for every Tier-2 mode.
@@ -77,6 +77,17 @@ on the timeline. Consumer for every Tier-2 mode.
 - **Seam:** additive; no existing page changes. Golden test the new pages.
 - **Why first:** it is the shared consumer that converts the user's "modes with no consumer" from
   un-buildable into buildable. Without it, A2/A4/B5 have nothing to read them.
+- **Built as** a *third* gallery generator: `chip/history_gallery.py` (chip→chip — the modes are
+  `chip/demo_*_history.py`, no ADR-0005 direction issue) → `docs/history.html` + `docs/history.local.html`,
+  golden-tested by `chip/tests/test_history_gallery.py`. Reuses the physics gallery's primitives
+  (`_STYLE`, `figure_relpath`, the public/local link constants) unchanged and adds only `_TIMELINE_CSS` +
+  a `HistoryMode`/`_rung` renderer — the timeline is a *re-ordered, period→wall→successor annotated cut*
+  of the same banked figures the flat gallery lists. Inclusion anchored to the `demo_*_history.py` glob;
+  the three built modes (A1 doping, A3 oxidation, B6 metal) are its first rungs. **Discoverability
+  (user-chosen at build):** cross-link cards added **both ways** — `index.html` + `fab-game.html` (public
+  and local editions) each gain one "era timeline" Go-deeper card (the fab-game precedent), and a
+  markdown backward-axis cell was added to `chip/chip.ipynb`. *(Superseded the sketch's "no existing page
+  changes" seam: an undiscoverable shared-consumer surface defeats its purpose.)*
 
 ### A1 — Pre-implant diffusion doping: the dose-control wall · Tier-1 (implant-contrast consumer) — ✅ BUILT (2026-07-10)
 
@@ -193,13 +204,13 @@ active area → motivated STI (F7 in `future-steps.md`, deferred there for want 
 1. **Tier-1 (real consumers — buildable *without* H0, since each ships its own `chip/demo_*.py` and
    surfaces in the glob-anchored physics gallery):** **A1** (doping-source dose-control wall → implant
    contrast) — ✅ BUILT; **A3** (HCl/HP oxidation → `Q_ox`/budget) — ✅ BUILT; **B6** (Al spiking → leakage) — ✅ BUILT.
-2. **H0 — era display surface.** The shared consumer that unblocks the Tier-2 chunks; debuts *justified by
-   built content* (A1 + implant + A3 + B6), not one recycled figure. **← next up (all Tier-1 modes landed).**
-3. **Tier-2 (surface-fed, gated on H0):** **A2** (litho tool/wavelength), **A4** (resist generations),
-   **B5** (LOCOS bird's beak — also the 2-D engine's consumer).
+2. **H0 — era display surface.** ✅ BUILT — the shared consumer that unblocks the Tier-2 chunks; debuted
+   *justified by built content* (A1 + implant + A3 + B6), not one recycled figure.
+3. **Tier-2 (surface-fed, now unblocked by H0):** **A2** (litho tool/wavelength) **← next up**, **A4**
+   (resist generations), **B5** (LOCOS bird's beak — also the 2-D engine's consumer).
 
 **Recommended sequence (revised 2026-07-10 — A1-first, the anti-over-build ordering):**
-**A1 ✅ → A3 ✅ → B6 ✅ → H0 → A2 → A4 → B5.** *(Superseded the earlier "H0 first": H0 only needs to precede the
+**A1 ✅ → A3 ✅ → B6 ✅ → H0 ✅ → A2 → A4 → B5.** *(Superseded the earlier "H0 first": H0 only needs to precede the
 Tier-2 chunks, not A1 — a Tier-1 mode surfaces in the physics gallery with no history page, so leading with
 H0 would have made the first deliverable a display surface over one recycled figure, exactly the over-build
 this repo rejects. Build the Tier-1 content first; stand up H0 once it has real tenants.)*

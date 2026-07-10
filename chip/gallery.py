@@ -257,6 +257,7 @@ def render_html(local: bool = False) -> str:
         build_plan = f"{_LAB}/docs/plans/microchip-fabrication.md"
         engine = f"{_LAB}/engines/diffusion"
         fabgame = "fab-game.local.html"   # the sibling gallery's local edition (next to this file)
+        history = "history.local.html"    # the era timeline's local edition (H0, next to this file)
     else:
         title = "chip-sim — visualization &amp; demo gallery"
         repo_link = f'<a class="repo" href="{_REPO_URL}">View the repository on GitHub&nbsp;&#8599;</a>'
@@ -279,6 +280,7 @@ def render_html(local: bool = False) -> str:
         build_plan = f"{_BLOB}/docs/plans/microchip-fabrication.md"
         engine = f"{_TREE}/engines/diffusion"
         fabgame = "fab-game.html"   # the sibling gallery (the gamified full-line layer), in the same /docs dir
+        history = "history.html"    # the era timeline (H0, the backward axis), in the same /docs dir
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -335,6 +337,12 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           <p>A separate gallery: the gamified full-line layer built on this physics &mdash; sand &rarr; a
             binned chip across G1&ndash;G7, plus the crystal-growth and scope-edge deepenings. Recipe in
             &rarr; <strong>yield</strong> out, and you can see <em>why</em> a die died.</p>
+        </a>
+        <a class="item" href="{history}"{item_attr}>
+          <h3>The era timeline &#8599;</h3>
+          <p>The backward axis: the same steps re-run in their <em>period</em> mode &mdash; each
+            historical figure above laid on the process spine with the wall it hit and the modern step
+            that cleared it (doping&rarr;implant, drifting oxide&rarr;HCl, Al spiking&rarr;barrier metal).</p>
         </a>
         {notebook_card}
         <a class="item" href="{readme}"{item_attr}>
