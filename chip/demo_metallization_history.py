@@ -160,14 +160,14 @@ def save_figure(r: MetallizationHistoryResult) -> Path:
                label=f"clean baseline (seam): {r.baseline_nA:.1e} nA/cm²")
     ax.axhline(LEAK_SPEC_NA, color="tab:blue", ls="-.", lw=1.2, label=f"leakage spec ({LEAK_SPEC_NA:g} nA/cm²)")
     ax.axvline(AL_SI_EUT := mh.AL_SI_EUTECTIC_CELSIUS, color="0.6", ls=":", lw=1.0)
-    ax.annotate("577 °C\nAl–Si eutectic", xy=(AL_SI_EUT, r.baseline_nA * 30), fontsize=7,
-                color="0.5", ha="right", va="bottom")
+    ax.text(AL_SI_EUT - 4, r.baseline_nA * 4, "577 °C Al–Si eutectic", rotation=90, fontsize=7,
+            color="0.5", ha="right", va="bottom")
     ax.set_xlabel("contact sinter temperature  (°C)")
     ax.set_ylabel("reverse junction leakage  j_leak  (nA/cm²)")
     ax.set_xlim(r.T_celsius[0], r.T_celsius[-1])
     ax.set_title(f"Leakage vs sinter T at a shallow x_j = {X_J_SHALLOW} µm (barrier = the seam floor)",
                  fontsize=9.5)
-    ax.legend(fontsize=7.4, loc="center right")
+    ax.legend(fontsize=7.4, loc="lower left")
 
     fig.suptitle("Historical-modes B6 — aluminium junction spiking: pure Al shorts the shallow "
                  "(implant-era) junction; Al–Si and barrier metals clear the wall", fontsize=11)
