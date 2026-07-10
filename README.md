@@ -100,6 +100,8 @@ until the page is rebuilt.
 | `chip.demo_car` | **v1.9** — CAR reaction–diffusion PEB (the chemically-amplified bake) | [chip-car.png](docs/figures/chip-car.png) |
 | `chip.demo_zernike` | **v1.10** — Zernike aberrations (coma / astigmatism / spherical), a pupil phase | [chip-zernike.png](docs/figures/chip-zernike.png) |
 | `chip.demo_device_2d` | **v1.11** — 2-D MOSFET cross-section: lateral S/D diffusion shortens the channel (`L_eff`), not `V_t` | [chip-device-2d.png](docs/figures/chip-device-2d.png) |
+| `chip.demo_implant` | **§5** — ion implantation: the buried peak a predep cannot make; the honest `V_t`-adjust implant | [chip-implant.png](docs/figures/chip-implant.png) |
+| `chip.demo_doping_history` | **hist·A1** — pre-implant doping's dose-control wall: the solubility-pinned surface can't meter a light `V_t`-adjust dose; implant can | [chip-doping-history.png](docs/figures/chip-doping-history.png) |
 
 *(v1.5–v1.6 are engine-internal amendments — native nonlinear `D(u)` and explicit stepping — with no
 chip demo of their own; they surface through `engines/diffusion`'s own test suite.)*
