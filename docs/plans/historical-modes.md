@@ -125,19 +125,28 @@ Reuses Deal–Grove (`oxidation.py`). Two period ambients, each with a **real** 
   historical win (trade pressure for *temperature* → Arrhenius `D` collapse) ships as a **flagged** worked
   example. HCl polarity is inverted vs A1 (the opt-in enables the *successor*; `Cl=0` = the pre-HCl period).
 
-### B6 — Aluminum junction spiking · Tier-1 (real `x_j`→leakage consumer)
+### B6 — Aluminum junction spiking · Tier-1 (real `x_j`→leakage consumer) — ✅ BUILT (2026-07-10)
 
 The coupling is the payload: Al–Si eutectic (577 °C) → Al consumes Si → **spikes through shallow
 junctions**, and *the shallower the junction (which implant enables), the worse the spike* → junction
 short → leakage. Motivates Al–Si, then barrier metals, then damascene Cu.
 
-- **Model:** spiking depth as a function of anneal `T`/time and local Si solubility in Al; if spike depth
-  > `x_j` → the junction shorts. Reads `junction.junction_depth` (from diffusion/implant), writes through
-  `lifetime.py`'s leakage channel (the shorted-diode failure, mirror of the A1 dislocation / G4b metal
-  plugs).
-- **Consumer:** `x_j` → `device_leakage.j_leak` (real). **Seam:** `barrier="none"` default *modern* =
-  barrier metal present ⇒ no spiking, current result; `barrier=None`/period-Al opt-in enables it.
-  **Cited:** Al–Si eutectic T, Si solubility in Al; spiking-depth coefficient flagged.
+- **Model:** spiking depth from the sinter `T` (Si solid solubility in Al, cited-direction Arrhenius) and
+  the Al film thickness `t_Al` (the sink — the **solubility-saturated worst case**, anneal *time* taken as
+  time-to-saturation, a named edge). **Graded failure** (per `gradual-failure-preferred`): spike depths
+  are spatially non-uniform → a shorted-**area** fraction `f_short = exp(−x_j/d_spike)` (smooth 0→1),
+  *not* a cliff at `spike > x_j`. Reads `x_j`, lands on `lifetime.py`'s leakage observable.
+- **Consumer:** `x_j` → `device_leakage.j_leak` (real). **Seam:** `scheme="barrier"` default *modern* (Ti/TiN,
+  `si_uptake=0`) ⇒ `d_spike ≡ 0` ⇒ `f_short ≡ 0` ⇒ `j_leak` = `lifetime.generation_leakage_density`
+  **bit-for-bit**; `scheme="Al"` (pure period metal) opt-in enables the wall, `"Al-Si"` the partial fix.
+  **Cited:** Al–Si eutectic 577 °C + ~1.5 wt % max Si solubility (Murray & McAlister 1984); the
+  solubility curve, spike-concentration `κ`, and ohmic-short density flagged.
+- **Built as** a pure additive consumer: `chip/metallization_history.py` + `chip/demo_metallization_history.py`
+  (`chip-metallization-history.png`) + `chip/tests/test_metallization_history.py`; gallery card `hist·B6`.
+  No engine change; `lifetime.py`/`junction.py` untouched. **Divergence from this sketch (deliberate):**
+  spiking is a *geometric ohmic short*, not an SRH recombination centre, so it is **not** routed through
+  `1/τ` (which would wrongly kill lifetime) as "mirror of A1 dislocation / G4b metal plugs" implied — it
+  blends an ohmic-short density into `j_leak` at the *current* level, over a graded shorted-area fraction.
 
 ### A2 — Lithography tool & wavelength progression · Tier-2 (surface + CD/NILS)
 
@@ -183,14 +192,14 @@ active area → motivated STI (F7 in `future-steps.md`, deferred there for want 
 
 1. **Tier-1 (real consumers — buildable *without* H0, since each ships its own `chip/demo_*.py` and
    surfaces in the glob-anchored physics gallery):** **A1** (doping-source dose-control wall → implant
-   contrast) — ✅ BUILT; **A3** (HCl/HP oxidation → `Q_ox`/budget) — ✅ BUILT; **B6** (Al spiking → leakage).
+   contrast) — ✅ BUILT; **A3** (HCl/HP oxidation → `Q_ox`/budget) — ✅ BUILT; **B6** (Al spiking → leakage) — ✅ BUILT.
 2. **H0 — era display surface.** The shared consumer that unblocks the Tier-2 chunks; debuts *justified by
-   built content* (A1 + implant + whatever Tier-1 landed), not one recycled figure.
+   built content* (A1 + implant + A3 + B6), not one recycled figure. **← next up (all Tier-1 modes landed).**
 3. **Tier-2 (surface-fed, gated on H0):** **A2** (litho tool/wavelength), **A4** (resist generations),
    **B5** (LOCOS bird's beak — also the 2-D engine's consumer).
 
 **Recommended sequence (revised 2026-07-10 — A1-first, the anti-over-build ordering):**
-**A1 ✅ → A3 ✅ → B6 → H0 → A2 → A4 → B5.** *(Superseded the earlier "H0 first": H0 only needs to precede the
+**A1 ✅ → A3 ✅ → B6 ✅ → H0 → A2 → A4 → B5.** *(Superseded the earlier "H0 first": H0 only needs to precede the
 Tier-2 chunks, not A1 — a Tier-1 mode surfaces in the physics gallery with no history page, so leading with
 H0 would have made the first deliverable a display surface over one recycled figure, exactly the over-build
 this repo rejects. Build the Tier-1 content first; stand up H0 once it has real tenants.)*
@@ -208,7 +217,7 @@ The forward axis (`future-steps.md`) and this backward axis meet in one timeline
 - **Litho:** contact → proximity → projection; g-line → EUV (**A2**). Resist: negative-swell → positive →
   CAR (**A4**).
 - **Isolation:** planar/implicit → **LOCOS bird's beak (B5)** → STI (F7 forward).
-- **Metal:** period Al **spiking (B6)** → barrier metal → Cu damascene (F4 forward).
+- **Metal:** period Al **spiking (B6 ✅)** → barrier metal → Cu damascene (F4 forward).
 
 Backward axis shows *the wall each modern step was built to clear*; forward axis *builds the step*. Same
 observables, opposite direction.

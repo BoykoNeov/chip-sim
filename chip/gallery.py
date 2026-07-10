@@ -105,6 +105,8 @@ DEEPENINGS = [
          "Pre-implant doping's dose-control wall — the solubility-pinned surface can't meter a light V_t-adjust dose; implant can."),
     Demo("demo_oxidation_history", "hist·A3",
          "Period oxidation ambients — HCl getters mobile Na (V_t recovery); high pressure grows the same oxide for 1/P the thermal budget."),
+    Demo("demo_metallization_history", "hist·B6",
+         "Aluminium junction spiking — pure Al shorts the shallow (implant-era) junction; Al–Si and barrier metals clear the wall."),
 ]
 
 ALL_DEMOS = SPINE + DEEPENINGS

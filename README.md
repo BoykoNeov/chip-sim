@@ -102,6 +102,8 @@ until the page is rebuilt.
 | `chip.demo_device_2d` | **v1.11** — 2-D MOSFET cross-section: lateral S/D diffusion shortens the channel (`L_eff`), not `V_t` | [chip-device-2d.png](docs/figures/chip-device-2d.png) |
 | `chip.demo_implant` | **§5** — ion implantation: the buried peak a predep cannot make; the honest `V_t`-adjust implant | [chip-implant.png](docs/figures/chip-implant.png) |
 | `chip.demo_doping_history` | **hist·A1** — pre-implant doping's dose-control wall: the solubility-pinned surface can't meter a light `V_t`-adjust dose; implant can | [chip-doping-history.png](docs/figures/chip-doping-history.png) |
+| `chip.demo_oxidation_history` | **hist·A3** — period oxidation ambients: HCl getters mobile Na (`V_t` recovery); high pressure grows the same oxide for `1/P` the thermal budget | [chip-oxidation-history.png](docs/figures/chip-oxidation-history.png) |
+| `chip.demo_metallization_history` | **hist·B6** — aluminium junction spiking: pure Al shorts the shallow (implant-era) junction; Al–Si and barrier metals clear the wall | [chip-metallization-history.png](docs/figures/chip-metallization-history.png) |
 
 *(v1.5–v1.6 are engine-internal amendments — native nonlinear `D(u)` and explicit stepping — with no
 chip demo of their own; they surface through `engines/diffusion`'s own test suite.)*
