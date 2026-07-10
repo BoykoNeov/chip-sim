@@ -28,7 +28,7 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
 | # | Step | Era / history arc | Consumer observable it discriminates | Verdict |
 |---|------|-------------------|--------------------------------------|---------|
 | **F1** | **Ion implantation** | 1970s: predep → implant | **buried/retrograde peak** predep can't make; `device.py:78` V_t-adjust; damage→leakage (`lifetime.py`) | **✅ BUILT (2026-07-06 — all 4 slices)** (`ion-implantation.md`) |
-| **F2** | **Silicide / contact resistance** | 1980s salicide | **series R** → `I_Dsat` (the journey's `R_series_ohm` seam already exists!) | **PROMOTABLE — strongest live consumer** |
+| **F2** | **Silicide / contact resistance** | 1980s salicide | **series R** → `I_Dsat` (the journey's `R_series_ohm` seam already exists!) | **PROMOTABLE — strongest live consumer; SCOPED 2026-07-10** (`silicide-contact-f2.md`) |
 | **F3** | **High-κ / metal gate** | 2007 (45nm): SiO₂ → HfO₂ | **gate tunneling leakage** + EOT; the oxide stage's modern successor | **PROMOTABLE — new observable, modernises Ph5** |
 | **F4** | **BEOL interconnect (RC delay)** | Al → **Cu damascene (1997)** → Ru (3nm) | **new output: chip speed limited by wire RC, not the transistor** | **PROMOTABLE — best history arc, biggest build** |
 | **F5** | **SiGe strained source/drain** | ~2004 (90nm): strain era | **mobility → `I_Dsat`** (~2 GPa @ 20% Ge → up to 100% hole-µ) | PROMOTABLE — needs a µ-model in `device.py`; advanced-node |
