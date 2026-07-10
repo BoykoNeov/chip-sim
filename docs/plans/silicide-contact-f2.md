@@ -1,5 +1,17 @@
 # Plan — F2 silicide / contact resistance (the two-term series-R the diffusion consumer flattened)
 
+> **✅ BUILT 2026-07-10 as historical-mode B7.** `chip/contact_resistance.py` (TLM two-term series-R) +
+> `chip/demo_silicide_history.py` + `chip/tests/test_contact_resistance.py` (10 tests); gallery rung
+> `hist·B7`; `docs/figures/chip-silicide-history.png`. Consumer: `DeviceKnobs.contact_scheme` (None
+> default = access-only seam) threaded through `fab_game/steps.py:device_step`; both `pipeline.py` call
+> sites unchanged; `chip/device.py` untouched. Cited constants → `memory/silicide-contact-source.md`.
+> **Advisor reframes at build:** the discriminator is the *exponent gap* (access linear, contact
+> sublinear), not the "4.5×" number → per-scheme `ρ_c` carried freely; the `coth` moves the contact
+> exponent (½ at long contacts → 0 / `R_sh`-independent at scaled sub-µm ones — the `ρ_c`/area regime
+> where "lower `ρ_c` is the next frontier" lives); the robust tight leg is *contact-share rises as `R_sh`
+> falls for any `ρ_c`*, and the bottleneck **flip** is a calibrated operating point. See below for the
+> as-scoped plan (unchanged).
+
 **The discriminating observable, stated first (the build's licence):** the parasitic source series
 resistance `R_series` is **two terms with different exponents in the sheet resistance `R_sh`**, and no
 single scalar can move both:

@@ -545,6 +545,16 @@ class DeviceKnobs:
     independent — the deep/retrograde effective-``N_A`` case is a deferred slice). Defaults to ``0.0`` /
     ``None`` → **no adjust implant**, byte-for-byte the prior ``V_t`` (the seam; the G1–G7 banked demos and
     the journey are untouched), and the ``vt_adjust`` record key is added only when engaged.
+
+    ``contact_scheme`` (F2, the silicide/contact-resistance model) upgrades the source series resistance
+    from the access-only ``R_series = die.R_s · sd_contact_squares`` to the **two-term** access + TLM
+    contact model (:func:`chip.contact_resistance.series_resistance`): ``"direct-Al"`` adds a high-``ρ_c``
+    contact term on the diffused sheet, ``"salicide"`` shunts the sheet with a low-resistivity TiSi₂ film
+    so access collapses while the contact term lingers (the bottleneck flips access→contact). It feeds the
+    *same* ``R_series_ohm`` source-degeneration seam :func:`chip.device.saturation_current` already
+    consumes — ``device.py`` is untouched. Defaults to ``None`` → the access-only value **byte-for-byte**
+    (the seam; the G1–G7 banked demos and the journey are unchanged, since ``die.R_s · sd_contact_squares``
+    is exactly :func:`chip.contact_resistance.access_resistance`).
     """
 
     gate: str = "n+poly"               # n⁺-poly gate (φ_gate = +0.55 V)
@@ -552,6 +562,7 @@ class DeviceKnobs:
     overdrive_V: float = 1.0           # V_GS − V_t for I_Dsat
     vt_adjust_dose: float = 0.0        # §5 V_t-adjust implant dose (cm⁻²); 0 = no adjust implant (the seam)
     vt_adjust_kind: str | None = None  # "p" acceptor (raises V_t) | "n" donor (lowers) | None
+    contact_scheme: str | None = None  # F2 silicide/contact model ("direct-Al"|"salicide"); None = access-only (the seam)
 
 
 @dataclass(frozen=True)

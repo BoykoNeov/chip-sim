@@ -113,6 +113,8 @@ DEEPENINGS = [
          "Period photoresist — negative-resist (KTFR) solvent swelling bridges fine lines at a floor ≈ the film thickness (optics-independent); positive/CAR don't swell and clear it."),
     Demo("demo_locos_history", "hist·B5",
          "LOCOS isolation — oxidant under the nitride mask grows the bird's beak that eats active area; opposing beaks merge and pinch off below a min pitch (∝ field-oxide thickness); STI's vertical walls clear it."),
+    Demo("demo_silicide_history", "hist·B7",
+         "Silicide / contact resistance — the source series-R is two terms with different R_sh exponents (access linear + TLM contact sublinear); salicide shunts the sheet so access collapses and the bottleneck flips to the contact."),
 ]
 
 ALL_DEMOS = SPINE + DEEPENINGS

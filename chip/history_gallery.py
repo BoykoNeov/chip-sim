@@ -138,6 +138,17 @@ MODES = [
         successor="Barrier metals (Ti/TiN) stop the silicon uptake (Al–Si alloy is the partial fix); "
         "later Cu damascene — the spike wall never reaches the junction.",
     ),
+    HistoryMode(
+        module="demo_silicide_history", tag="B7", stage="Contacts", era="≈1980s",
+        period="Direct-aluminium contacts on the diffused source/drain — the drive current fights the "
+        "full diffused sheet resistance as a parasitic source access resistance.",
+        wall="The source series resistance is two terms with different sheet-resistance exponents — a "
+        "linear access term plus a sublinear TLM contact term — so the high-sheet diffused S/D is "
+        "access-limited and starves I_Dsat, and no single knob moves both terms.",
+        successor="Self-aligned silicide (salicide, TiSi₂) shunts the S/D sheet ~12×, collapsing the "
+        "access term; the contact term barely follows, so I_Dsat recovers and the bottleneck flips to "
+        "the contact — the reason lower-ρ_c contacts (Ti→Co→Ni) became the next frontier.",
+    ),
 ]
 
 

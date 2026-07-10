@@ -28,7 +28,7 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
 | # | Step | Era / history arc | Consumer observable it discriminates | Verdict |
 |---|------|-------------------|--------------------------------------|---------|
 | **F1** | **Ion implantation** | 1970s: predep → implant | **buried/retrograde peak** predep can't make; `device.py:78` V_t-adjust; damage→leakage (`lifetime.py`) | **✅ BUILT (2026-07-06 — all 4 slices)** (`ion-implantation.md`) |
-| **F2** | **Silicide / contact resistance** | 1980s salicide | **series R** → `I_Dsat` (the journey's `R_series_ohm` seam already exists!) | **PROMOTABLE — strongest live consumer; SCOPED 2026-07-10** (`silicide-contact-f2.md`) |
+| **F2** | **Silicide / contact resistance** | 1980s salicide | **series R** → `I_Dsat` (the journey's `R_series_ohm` seam already exists!) | **✅ BUILT (2026-07-10) as historical-mode B7** (`contact_resistance.py`); two-term access+TLM-contact, bottleneck flips access→contact |
 | **F3** | **High-κ / metal gate** | 2007 (45nm): SiO₂ → HfO₂ | **gate tunneling leakage** + EOT; the oxide stage's modern successor | **PROMOTABLE — new observable, modernises Ph5** |
 | **F4** | **BEOL interconnect (RC delay)** | Al → **Cu damascene (1997)** → Ru (3nm) | **new output: chip speed limited by wire RC, not the transistor** | **PROMOTABLE — best history arc, biggest build** |
 | **F5** | **SiGe strained source/drain** | ~2004 (90nm): strain era | **mobility → `I_Dsat`** (~2 GPa @ 20% Ge → up to 100% hole-µ) | PROMOTABLE — needs a µ-model in `device.py`; advanced-node |
@@ -42,9 +42,11 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
 
 1. **F1 — ion implantation** *(✅ BUILT 2026-07-06, all 4 slices).* The buried peak; carries the predep→implant
    history. Slices: Pearson-IV skew, channeling tail, damage→leakage (`diffusion_dopant.py` §5 + `lifetime.py`).
-2. **F2 — silicide / contact resistance.** Cheapest promotable: the journey *already* has an additive
-   `R_series_ohm` on `I_Dsat` (the Ph4 seam). Salicide is the honest source of a *reduction* in that R —
-   a live consumer with a seam already in place. Cited: specific contact resistivity `ρ_c`, sheet-R drop.
+2. **F2 — silicide / contact resistance** *(✅ BUILT 2026-07-10 as historical-mode B7).* Cheapest
+   promotable: the journey *already* had an additive `R_series_ohm` on `I_Dsat` (the Ph4 seam). Built as
+   the two-term series-R (`chip/contact_resistance.py`): access `R_sh·n_□` (linear) + TLM contact
+   `√(ρ_c·R_sh)/W·coth` (sublinear); salicide shunts the sheet so the bottleneck flips access→contact.
+   `device.py` untouched. Cited: TLM coth form, `ρ_c` / sheet-R bounds (`silicide-contact-source.md`).
 3. **F3 — high-κ / metal gate**, *or* **F4 — BEOL interconnect** — the first genuinely *new output*
    decision:
    - **F3** modernises the oxide stage: it adds a **gate-tunneling-leakage** observable (why SiO₂ stopped

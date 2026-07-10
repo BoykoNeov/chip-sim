@@ -20,6 +20,7 @@ from __future__ import annotations
 import math
 
 from chip import breakdown as bd
+from chip import contact_resistance as cr
 from chip import diffusion_dopant as dd
 from chip import etch_deposition as ed
 from chip import oxidation as ox
@@ -319,7 +320,19 @@ def device_step(
     # S/D series resistance (the diffusion-dose consumer): R_series = inherited R_s × the contact-square
     # count. 0 when off (n_□ = 0 the seam) or before the junction is read (die.R_s is None) → the ideal
     # saturation_current. Source degeneration then degrades only the drive current, never V_t.
-    R_series_ohm = die.R_s * sd_contact_squares if (sd_contact_squares > 0.0 and die.R_s is not None) else 0.0
+    # F2 (contact_scheme set): the access-only R_s·n_□ becomes the two-term access + TLM-contact model
+    # (chip.contact_resistance) — direct-Al adds a high-ρ_c contact term, salicide shunts the sheet so
+    # the bottleneck flips access→contact. It feeds the SAME R_series_ohm seam (device.py untouched).
+    # contact_scheme None → access_resistance(R_s, n_□) = R_s·n_□ byte-for-byte the prior value (the seam).
+    if sd_contact_squares > 0.0 and die.R_s is not None:
+        if knobs.contact_scheme is None:
+            R_series_ohm = die.R_s * sd_contact_squares                      # access-only — the seam
+        else:
+            R_series_ohm = cr.series_resistance(
+                die.R_s, sd_contact_squares, knobs.width_um,
+                scheme=knobs.contact_scheme).R_series_ohm                    # two-term access + contact
+    else:
+        R_series_ohm = 0.0
     i_dsat = dev.saturation_current(
         mos, mos.V_t + knobs.overdrive_V, knobs.width_um, R_series_ohm=R_series_ohm)
     # G4b/A1: the SRH lifetime → junction reverse leakage. Two contributors on the same channel — the
@@ -354,6 +367,8 @@ def device_step(
         knobs_in["getter_eff"] = gettering_efficiency        # (so a no-oxygen device record is byte-unchanged)
     if R_series_ohm > 0.0:                                   # diffusion fingerprint — only when the consumer is on
         knobs_in["R_series_ohm"] = R_series_ohm              # (so an ideal-contact device record is byte-unchanged)
+    if knobs.contact_scheme is not None:                     # F2 fingerprint — only when the two-term model is engaged
+        knobs_in["contact_scheme"] = knobs.contact_scheme    # (so an access-only device record is byte-unchanged)
     if mos.vt_adjust != 0.0:                                 # §5 fingerprint — only when a V_t-adjust implant is set
         knobs_in["vt_adjust"] = mos.vt_adjust                # (so a no-implant device record is byte-unchanged)
     outputs = {"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox,
