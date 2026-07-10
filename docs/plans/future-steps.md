@@ -27,20 +27,21 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
 
 | # | Step | Era / history arc | Consumer observable it discriminates | Verdict |
 |---|------|-------------------|--------------------------------------|---------|
-| **F1** | **Ion implantation** | 1970s: predep → implant | **buried/retrograde peak** predep can't make; `device.py:78` V_t-adjust; damage→leakage (`lifetime.py`) | **✅ DECIDED — building now** (`ion-implantation.md`) |
+| **F1** | **Ion implantation** | 1970s: predep → implant | **buried/retrograde peak** predep can't make; `device.py:78` V_t-adjust; damage→leakage (`lifetime.py`) | **✅ BUILT (2026-07-06 — all 4 slices)** (`ion-implantation.md`) |
 | **F2** | **Silicide / contact resistance** | 1980s salicide | **series R** → `I_Dsat` (the journey's `R_series_ohm` seam already exists!) | **PROMOTABLE — strongest live consumer** |
 | **F3** | **High-κ / metal gate** | 2007 (45nm): SiO₂ → HfO₂ | **gate tunneling leakage** + EOT; the oxide stage's modern successor | **PROMOTABLE — new observable, modernises Ph5** |
 | **F4** | **BEOL interconnect (RC delay)** | Al → **Cu damascene (1997)** → Ru (3nm) | **new output: chip speed limited by wire RC, not the transistor** | **PROMOTABLE — best history arc, biggest build** |
 | **F5** | **SiGe strained source/drain** | ~2004 (90nm): strain era | **mobility → `I_Dsat`** (~2 GPa @ 20% Ge → up to 100% hole-µ) | PROMOTABLE — needs a µ-model in `device.py`; advanced-node |
 | **F6** | **Epitaxy (buried layer / retrograde well)** | bipolar epi; CMOS wells | retrograde profile — **overlaps implant F1** | COUPLED to F1 — defer standalone |
-| **F7** | **Isolation: LOCOS → STI** | LOCOS (1970s) → STI (1998) | bird's-beak narrows active width → geometry; latchup | DEFERRED — weak (geometry only) consumer |
+| **F7** | **Isolation: LOCOS → STI** | LOCOS (1970s) → STI (1998) | bird's-beak narrows active width → geometry; latchup | **✅ bird's-beak BUILT (2026-07-10) as historical-mode B5** (`locos_history.py`); STI/latchup still deferred |
 | **F8** | **CMP / planarity** | enables Cu damascene | nothing reads layer thickness — **unblocks only after F4** | DEFERRED (backlog D2) — reevaluate post-F4 |
 | **F9** | **FinFET / GAA** | 2011 / 2022: 3-D channel | needs the **3-D engine** (deferred B1) + `device_2d` extension | DEFERRED — no 3-D consumer yet |
 | **F10** | **EUV / multipatterning** | 2019 (7nm) | extends litho; **no new observable** (litho already rich) | DEFERRED — no discriminating consumer |
 
 ## The recommended sequence (after F1 ships)
 
-1. **F1 — ion implantation** *(decided, in progress).* The buried peak; carries the predep→implant history.
+1. **F1 — ion implantation** *(✅ BUILT 2026-07-06, all 4 slices).* The buried peak; carries the predep→implant
+   history. Slices: Pearson-IV skew, channeling tail, damage→leakage (`diffusion_dopant.py` §5 + `lifetime.py`).
 2. **F2 — silicide / contact resistance.** Cheapest promotable: the journey *already* has an additive
    `R_series_ohm` on `I_Dsat` (the Ph4 seam). Salicide is the honest source of a *reduction* in that R —
    a live consumer with a seam already in place. Cited: specific contact resistivity `ρ_c`, sheet-R drop.
@@ -77,10 +78,13 @@ the sim actually runs, not narrated decoration.
 
 ## Deferred, and why (the spine — honest NO's)
 
-- **CMP (F8), FinFET/GAA (F9), EUV (F10), LOCOS/STI (F7)** — deferred for want of a discriminating
-  consumer *today*. F8 unblocks after F4 (multi-metal gives layer thickness a reader); F9 needs the 3-D
-  engine (B1); F10 adds no observable litho doesn't already have; F7 is geometry-only until a latchup or
-  active-width consumer exists.
+- **CMP (F8), FinFET/GAA (F9), EUV (F10)** — deferred for want of a discriminating consumer *today*. F8
+  unblocks after F4 (multi-metal gives layer thickness a reader); F9 needs the 3-D engine (B1); F10 adds
+  no observable litho doesn't already have.
+- **LOCOS/STI (F7) — bird's-beak now BUILT (2026-07-10) as historical-mode B5** (`locos_history.py`): under
+  the 2026-07-03 pedagogical-consumer reframing, the **active-pitch wall** (min active pitch ∝ field-oxide;
+  STI clears it) *is* the consumer that the "geometry-only" framing had marked as too weak. The 2-D engine's
+  2nd consumer. **Still deferred:** the STI process itself and a latchup electrical observable.
 - **Alloy / grown / mesa historical *device structures*** — deferred: they are device *geometries* with no
   planar-observable consumer. The history they carry is delivered by the **predep→implant profile
   contrast (F1)**, not by new structures — the same reasoning that keeps the backlog's device-geometry

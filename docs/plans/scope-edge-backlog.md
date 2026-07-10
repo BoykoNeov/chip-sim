@@ -376,6 +376,52 @@ deepening (`∫D dt` → shallower `x_j`).
 
 ---
 
+## Re-triage 2026-07-10 — nothing newly promotable (a *verified* NO)
+
+Re-run after the two large post-backlog build waves — the **implant plan** (`diffusion_dopant.py` §5:
+`Implant`/Pearson/`Channeling`/`implant_damage_density`; damage→leakage in `lifetime.py`) and the whole
+**historical-modes plan** (A1–A4, B5, B6, H0), including the 2-D engine's **2nd** consumer (LOCOS
+bird's beak, `locos_history.py`) and new back-end physics (Al spiking, `metallization_history.py`).
+
+**The discriminator.** A deferred edge here promotes **iff** a module built since 2026-06-14 introduced a
+consumer that *reads* the exact quantity it was fenced on — a **3-D field** (B1/F9), a **CZ solid-liquid
+interface shape** (A4/A5), a **layer thickness** (D2/CMP), or a **transient heat field** (E1/Robin-`G`).
+Grepped the new modules for each signature; **all four are absent**:
+
+- **3-D field** — zero hits across every `*_history.py`; nothing reads a 3-D dopant field. **B1/F9 hold.**
+- **CZ interface shape** — the only `Stefan`/interface code is the pre-existing CG-3 quasi-steady balance
+  (`czochralski.py`, a scalar gradient). No new shape reader. **A4/A5 hold.**
+- **Layer thickness / CMP** — only the pre-existing `etch_deposition.py` deferral + `wafer_prep.py` TTV.
+  Nothing new reads a metal/interconnect thickness. **D2 holds.**
+- **Transient heat field** — `diffusion_dopant.py:391` *re-asserts* "the thermal field is always flat —
+  `T(t)` is spatially uniform over the junction," i.e. the implant work *reconfirms* the falsification
+  rather than creating a heat consumer. **E1-heat-mode / Robin-`G` hold.**
+
+**Two tempting false-promotions, ruled out (the NO is *defended*, not asserted):**
+- **LOCOS / B5 is 2-D and reads the *oxide/silicon* interface**, not a 3-D field and not the *CZ
+  solid-liquid* interface. It does **not** promote B1 (still no 3-D device) and does **not** promote
+  A4/A5 (whose only would-be consumer, A2's radial `G(r)`, uses a **closed-form house profile**, not
+  interface shape — see A2).
+- **B6 Al spiking reads `x_j`** (spikes short the *shallower* junction), **not** an interconnect layer
+  thickness. It does **not** promote D2/CMP.
+
+**What actually moved is `deferred/in-progress → BUILT`, not `deferred → promotable` — and it lives in the
+successor doc (`future-steps.md`), not here:**
+- **F1 (ion implantation)** — future-steps still says "building now"; it is **COMPLETE** (all 4 slices).
+- **F7 (LOCOS/STI)** — future-steps still says "DEFERRED — weak geometry-only consumer"; its bird's-beak
+  physics **shipped as historical-mode B5** (`locos_history.py`). Under the 2026-07-03 pedagogical-consumer
+  reframing, the **active-pitch wall** *is* its consumer. (Those two corrections belong in `future-steps.md`.)
+
+**Verdict: Next promotable in *this backlog* = still NONE.** The named-consumer search remains exhausted;
+the two new build waves added 1-D-depth profiles and scalar trap/short densities feeding the *existing*
+junction / `V_t` / `1/τ` channels — none of the four promotion signatures. The **live frontier moved to
+`future-steps.md`** (F2 silicide, F3 high-κ, F4 BEOL were *already* promotable there before this work; B6
+merely built the *adjacent* Al-spiking failure mode, which does **not** change F2's status). New scope
+edges *named* by the implant/historical work (implant amorphization/SPE, B6 electromigration, LOCOS 2-D
+stress…) are further **DEFERRED** entries — backlog hygiene, not promotions — and are left unharvested here.
+
+---
+
 ## Recommended sequencing
 
 Promote in **consumer strength × cost** order; everything else stays deferred and named.
