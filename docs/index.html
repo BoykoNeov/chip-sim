@@ -8,18 +8,46 @@
       :root {
         --bg: #f6f7f9; --card: #ffffff; --ink: #1c2530; --muted: #5b6772;
         --line: #e2e6ea; --accent: #2f6db5; --code: #0b3a66; --shot-bg: #fafbfc;
+        --tag-bg: #eaf2fb; --code-bg: #eef3f8; --head-glow: #ffffff;
+        --note-bg: #fff7e6; --note-line: #f0d8a8;
+        --wall: #b23c2f; --next: #2e7d46;
+        --ok-ink: #2e7d46; --ok-bg: #e7f4ec; --part-ink: #8a5a00; --part-bg: #fdf3dd;
+        --hold-ink: #5b6772; --hold-bg: #eef1f4;
+        --shadow: 0 8px 24px rgba(20,40,70,.12);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #10151b; --card: #171e26; --ink: #e3e8ee; --muted: #97a3ae;
+          --line: #2a333d; --accent: #6ea8e0; --code: #a8c7e8; --shot-bg: #fafbfc;
+          --tag-bg: #1d2f42; --code-bg: #1c2733; --head-glow: #141b23;
+          --note-bg: #2b2416; --note-line: #5a4a22;
+          --wall: #e07a6d; --next: #58b878;
+          --ok-ink: #58b878; --ok-bg: #16281d; --part-ink: #d9a53f; --part-bg: #2b2310;
+          --hold-ink: #97a3ae; --hold-bg: #1d242c;
+          --shadow: 0 8px 24px rgba(0,0,0,.45);
+        }
       }
       * { box-sizing: border-box; }
       body { margin: 0; background: var(--bg); color: var(--ink);
              font: 16px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
       a { color: var(--accent); text-decoration: none; }
       a:hover { text-decoration: underline; }
-      header { padding: 2.6rem 1.5rem 1.4rem; border-bottom: 1px solid var(--line);
-               background: linear-gradient(180deg, #fff, var(--bg)); }
+      a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+      header { padding: 2.2rem 1.5rem 1.4rem; border-bottom: 1px solid var(--line);
+               background: linear-gradient(180deg, var(--head-glow), var(--bg)); }
       .wrap { max-width: 1180px; margin: 0 auto; }
+      .crumbs { display: flex; flex-wrap: wrap; gap: .4rem .5rem; margin: 0 0 1.3rem;
+                font-size: .84rem; }
+      .crumbs a, .crumbs .here { display: inline-block; border: 1px solid var(--line);
+                                 border-radius: 999px; padding: .16rem .75rem; background: var(--card); }
+      .crumbs a:hover { text-decoration: none; border-color: var(--accent); }
+      .crumbs .here { background: var(--accent); border-color: var(--accent); color: #fff;
+                      font-weight: 600; }
       h1 { margin: 0 0 .25rem; font-size: 1.9rem; letter-spacing: -.01em; }
       .tagline { margin: 0 0 1rem; color: var(--muted); font-size: 1.05rem; }
       .lead { margin: 0 0 1rem; max-width: 70ch; }
+      .localnote { background: var(--note-bg); border: 1px solid var(--note-line);
+                   border-radius: 8px; padding: .6rem .8rem; margin-top: 1rem; }
       .quick { margin: 0; padding: .7rem .9rem; background: #0d1b2a; color: #e6edf3;
                border-radius: 8px; overflow-x: auto; font: .85rem/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; }
       .quick .c { color: #7fb0e0; }
@@ -31,35 +59,62 @@
       .grid { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
       .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
               overflow: hidden; display: flex; flex-direction: column;
-              transition: box-shadow .15s ease, transform .15s ease; }
-      .card:hover { box-shadow: 0 8px 24px rgba(20,40,70,.12); transform: translateY(-2px); }
-      .shot { display: block; background: var(--shot-bg); border-bottom: 1px solid var(--line); }
+              transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease; }
+      .card:hover { box-shadow: var(--shadow); transform: translateY(-2px);
+                    border-color: var(--accent); }
+      .shot { display: block; position: relative; background: var(--shot-bg);
+              border-bottom: 1px solid var(--line); }
       .shot img { display: block; width: 100%; height: auto; }
       .body { padding: .9rem 1rem 1rem; display: flex; flex-direction: column; gap: .55rem; flex: 1; }
       .tag { align-self: flex-start; font-weight: 700; font-size: .76rem; letter-spacing: .03em;
-             text-transform: uppercase; color: var(--accent); background: #eaf2fb;
+             text-transform: uppercase; color: var(--accent); background: var(--tag-bg);
              border-radius: 999px; padding: .12rem .6rem; }
       .blurb { margin: 0; flex: 1; }
       .links { display: flex; align-items: center; justify-content: space-between; gap: .6rem;
                margin-top: .2rem; padding-top: .6rem; border-top: 1px dashed var(--line); }
-      .links code { color: var(--code); background: #eef3f8; border-radius: 6px;
+      .links code { color: var(--code); background: var(--code-bg); border-radius: 6px;
                     padding: .2rem .45rem; font: .8rem ui-monospace, "Cascadia Code", Consolas, monospace;
                     overflow-x: auto; }
       .src { white-space: nowrap; font-size: .85rem; }
       .deeper { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
       .deeper .item { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-                      padding: .9rem 1rem; }
-      .deeper .item h3 { margin: 0 0 .25rem; font-size: 1rem; }
+                      padding: .9rem 1rem; transition: border-color .15s ease, box-shadow .15s ease; }
+      .deeper .item:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+      .deeper .item h3 { margin: 0 0 .25rem; font-size: 1rem; color: var(--ink); }
       .deeper .item p { margin: 0; color: var(--muted); font-size: .9rem; }
       footer { border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem;
                padding: 1.4rem 1.5rem 2.4rem; }
-      footer code { background: #eef3f8; border-radius: 5px; padding: .1rem .35rem;
+      footer code { background: var(--code-bg); border-radius: 5px; padding: .1rem .35rem;
                     font: .82rem ui-monospace, Consolas, monospace; }
+      /* --- roadmap (planned-slice) cards — used by docs/roadmap.html only ---------------- */
+      .ribbon { position: absolute; top: .55rem; left: .55rem; z-index: 1; font-weight: 700;
+                font-size: .66rem; letter-spacing: .05em; text-transform: uppercase;
+                color: #fff; background: rgba(28,37,48,.78); border-radius: 999px;
+                padding: .16rem .6rem; pointer-events: none; }
+      .tagrow { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+      .status { font-weight: 700; font-size: .76rem; letter-spacing: .03em;
+                text-transform: uppercase; border-radius: 999px; padding: .12rem .6rem; }
+      .status.ok { color: var(--ok-ink); background: var(--ok-bg); }
+      .status.part { color: var(--part-ink); background: var(--part-bg); }
+      .status.hold { color: var(--hold-ink); background: var(--hold-bg); }
+      .facts { display: flex; flex-direction: column; gap: .35rem; }
+      .facts .row { display: flex; gap: .55rem; }
+      .facts .k { flex: 0 0 5.6rem; font-weight: 700; font-size: .72rem; letter-spacing: .03em;
+                  text-transform: uppercase; color: var(--muted); padding-top: .14rem; }
+      .facts .k.would { color: var(--next); }
+      .facts .k.gate { color: var(--wall); }
+      .facts .v { margin: 0; flex: 1; font-size: .9rem; }
   </style>
 </head>
 <body>
   <header>
     <div class="wrap">
+      <nav class="crumbs" aria-label="chip-sim pages">
+        <span class="here">Physics gallery</span>
+        <a href="fab-game.html">Fab-line game</a>
+        <a href="history.html">Era timeline</a>
+        <a href="roadmap.html">Roadmap</a>
+      </nav>
       <h1>chip-sim &mdash; the gallery</h1>
       <p class="tagline"><em>Process recipe in, device out.</em> An educational microchip-fabrication simulator.</p>
       <p class="lead">Every fab step ships a self-contained demo that prints a cited validation table and
@@ -380,6 +435,12 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           <p>The backward axis: the same steps re-run in their <em>period</em> mode &mdash; each
             historical figure above laid on the process spine with the wall it hit and the modern step
             that cleared it (doping&rarr;implant, drifting oxide&rarr;HCl, Al spiking&rarr;barrier metal).</p>
+        </a>
+        <a class="item" href="roadmap.html">
+          <h3>The roadmap &#8599;</h3>
+          <p>The planned-but-unbuilt slices &mdash; high-&kappa; gate, BEOL interconnect RC, strained
+            SiGe, FinFET/GAA &mdash; each with a <em>schematic preview</em> (not simulator output) and
+            the named consumer that gates its build.</p>
         </a>
         <div class="item">
           <h3>The teaching notebook</h3>

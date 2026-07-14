@@ -35,6 +35,7 @@ from chip.gallery import (
     _STYLE,
     _card,            # noqa: F401  (re-exported intent: shared card markup)
     _grid,
+    _nav,
     figure_relpath,
     _BLOB,
     _TREE,
@@ -158,8 +159,7 @@ def render_html(local: bool = False) -> str:
         title = "chip-sim &mdash; the fab-line game (local edition)"
         repo_link = f'<a class="repo" href="{_LAB_ROOT}"{item_attr}>Open the repo in Jupyter&nbsp;Lab&nbsp;&#8599;</a>'
         note = (
-            '\n      <p class="lead" style="background:#fff7e6;border:1px solid #f0d8a8;border-radius:8px;'
-            'padding:.6rem .8rem;margin-top:1rem;"><strong>Local edition.</strong> Every link here opens in '
+            '\n      <p class="lead localnote"><strong>Local edition.</strong> Every link here opens in '
             "your <strong>running JupyterLab</strong> &mdash; locally and live, not a static read-only page. "
             "Start it once from the repo root (<code>jupyter lab</code>), then click anything below: the "
             f"notebook card opens <em>live</em>, knobs and all. Links target <code>localhost:{_LOCAL_PORT}"
@@ -213,6 +213,7 @@ def render_html(local: bool = False) -> str:
 <body>
   <header>
     <div class="wrap">
+      {_nav("fab-game", local)}
       <h1>chip-sim &mdash; the fab-line game</h1>
       <p class="tagline"><em>Recipe in, yield out &mdash; and you can see why a die died.</em> The gamified
         full-production-line layer, built on the validated physics.</p>

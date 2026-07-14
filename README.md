@@ -76,7 +76,12 @@ the full figures, each with its run command and source — is generated to
 Pages → `main` / `/docs`*) to serve it at `https://boikoneov.github.io/chip-sim/`. The page is
 generated from the demo modules (figure paths introspected, never hand-typed) and guarded by a
 fast-lane test (`chip/tests/test_gallery.py`), so it can't drift: add a demo and the gate stays red
-until the page is rebuilt.
+until the page is rebuilt. A nav strip links it to the other three pages: the
+[fab-line game gallery](docs/fab-game.html), the [era timeline](docs/history.html), and the
+[roadmap](docs/roadmap.html) — the planned-but-unbuilt slices of `docs/plans/future-steps.md`,
+each with a *schematic preview* (stamped in-image as **not simulator output**) plus the consumer
+that gates its build (`python -m chip.roadmap_figures` + `python -m chip.roadmap_gallery`,
+guarded by `chip/tests/test_roadmap_gallery.py`).
 
 **The spine — the four process phases, in build order (start here):**
 

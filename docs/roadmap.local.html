@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>chip-sim &mdash; the roadmap (local edition)</title>
+  <style>
+      :root {
+        --bg: #f6f7f9; --card: #ffffff; --ink: #1c2530; --muted: #5b6772;
+        --line: #e2e6ea; --accent: #2f6db5; --code: #0b3a66; --shot-bg: #fafbfc;
+        --tag-bg: #eaf2fb; --code-bg: #eef3f8; --head-glow: #ffffff;
+        --note-bg: #fff7e6; --note-line: #f0d8a8;
+        --wall: #b23c2f; --next: #2e7d46;
+        --ok-ink: #2e7d46; --ok-bg: #e7f4ec; --part-ink: #8a5a00; --part-bg: #fdf3dd;
+        --hold-ink: #5b6772; --hold-bg: #eef1f4;
+        --shadow: 0 8px 24px rgba(20,40,70,.12);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #10151b; --card: #171e26; --ink: #e3e8ee; --muted: #97a3ae;
+          --line: #2a333d; --accent: #6ea8e0; --code: #a8c7e8; --shot-bg: #fafbfc;
+          --tag-bg: #1d2f42; --code-bg: #1c2733; --head-glow: #141b23;
+          --note-bg: #2b2416; --note-line: #5a4a22;
+          --wall: #e07a6d; --next: #58b878;
+          --ok-ink: #58b878; --ok-bg: #16281d; --part-ink: #d9a53f; --part-bg: #2b2310;
+          --hold-ink: #97a3ae; --hold-bg: #1d242c;
+          --shadow: 0 8px 24px rgba(0,0,0,.45);
+        }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink);
+             font: 16px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+      header { padding: 2.2rem 1.5rem 1.4rem; border-bottom: 1px solid var(--line);
+               background: linear-gradient(180deg, var(--head-glow), var(--bg)); }
+      .wrap { max-width: 1180px; margin: 0 auto; }
+      .crumbs { display: flex; flex-wrap: wrap; gap: .4rem .5rem; margin: 0 0 1.3rem;
+                font-size: .84rem; }
+      .crumbs a, .crumbs .here { display: inline-block; border: 1px solid var(--line);
+                                 border-radius: 999px; padding: .16rem .75rem; background: var(--card); }
+      .crumbs a:hover { text-decoration: none; border-color: var(--accent); }
+      .crumbs .here { background: var(--accent); border-color: var(--accent); color: #fff;
+                      font-weight: 600; }
+      h1 { margin: 0 0 .25rem; font-size: 1.9rem; letter-spacing: -.01em; }
+      .tagline { margin: 0 0 1rem; color: var(--muted); font-size: 1.05rem; }
+      .lead { margin: 0 0 1rem; max-width: 70ch; }
+      .localnote { background: var(--note-bg); border: 1px solid var(--note-line);
+                   border-radius: 8px; padding: .6rem .8rem; margin-top: 1rem; }
+      .quick { margin: 0; padding: .7rem .9rem; background: #0d1b2a; color: #e6edf3;
+               border-radius: 8px; overflow-x: auto; font: .85rem/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; }
+      .quick .c { color: #7fb0e0; }
+      .repo { display: inline-block; margin-top: .8rem; font-weight: 600; }
+      main { max-width: 1180px; margin: 0 auto; padding: 1.6rem 1.5rem 3rem; }
+      section { margin-top: 2.2rem; }
+      h2 { font-size: 1.3rem; margin: 0 0 .2rem; }
+      .sub { margin: 0 0 1.1rem; color: var(--muted); }
+      .grid { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              overflow: hidden; display: flex; flex-direction: column;
+              transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease; }
+      .card:hover { box-shadow: var(--shadow); transform: translateY(-2px);
+                    border-color: var(--accent); }
+      .shot { display: block; position: relative; background: var(--shot-bg);
+              border-bottom: 1px solid var(--line); }
+      .shot img { display: block; width: 100%; height: auto; }
+      .body { padding: .9rem 1rem 1rem; display: flex; flex-direction: column; gap: .55rem; flex: 1; }
+      .tag { align-self: flex-start; font-weight: 700; font-size: .76rem; letter-spacing: .03em;
+             text-transform: uppercase; color: var(--accent); background: var(--tag-bg);
+             border-radius: 999px; padding: .12rem .6rem; }
+      .blurb { margin: 0; flex: 1; }
+      .links { display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+               margin-top: .2rem; padding-top: .6rem; border-top: 1px dashed var(--line); }
+      .links code { color: var(--code); background: var(--code-bg); border-radius: 6px;
+                    padding: .2rem .45rem; font: .8rem ui-monospace, "Cascadia Code", Consolas, monospace;
+                    overflow-x: auto; }
+      .src { white-space: nowrap; font-size: .85rem; }
+      .deeper { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+      .deeper .item { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+                      padding: .9rem 1rem; transition: border-color .15s ease, box-shadow .15s ease; }
+      .deeper .item:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+      .deeper .item h3 { margin: 0 0 .25rem; font-size: 1rem; color: var(--ink); }
+      .deeper .item p { margin: 0; color: var(--muted); font-size: .9rem; }
+      footer { border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem;
+               padding: 1.4rem 1.5rem 2.4rem; }
+      footer code { background: var(--code-bg); border-radius: 5px; padding: .1rem .35rem;
+                    font: .82rem ui-monospace, Consolas, monospace; }
+      /* --- roadmap (planned-slice) cards — used by docs/roadmap.html only ---------------- */
+      .ribbon { position: absolute; top: .55rem; left: .55rem; z-index: 1; font-weight: 700;
+                font-size: .66rem; letter-spacing: .05em; text-transform: uppercase;
+                color: #fff; background: rgba(28,37,48,.78); border-radius: 999px;
+                padding: .16rem .6rem; pointer-events: none; }
+      .tagrow { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+      .status { font-weight: 700; font-size: .76rem; letter-spacing: .03em;
+                text-transform: uppercase; border-radius: 999px; padding: .12rem .6rem; }
+      .status.ok { color: var(--ok-ink); background: var(--ok-bg); }
+      .status.part { color: var(--part-ink); background: var(--part-bg); }
+      .status.hold { color: var(--hold-ink); background: var(--hold-bg); }
+      .facts { display: flex; flex-direction: column; gap: .35rem; }
+      .facts .row { display: flex; gap: .55rem; }
+      .facts .k { flex: 0 0 5.6rem; font-weight: 700; font-size: .72rem; letter-spacing: .03em;
+                  text-transform: uppercase; color: var(--muted); padding-top: .14rem; }
+      .facts .k.would { color: var(--next); }
+      .facts .k.gate { color: var(--wall); }
+      .facts .v { margin: 0; flex: 1; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <nav class="crumbs" aria-label="chip-sim pages">
+        <a href="index.local.html">Physics gallery</a>
+        <a href="fab-game.local.html">Fab-line game</a>
+        <a href="history.local.html">Era timeline</a>
+        <span class="here">Roadmap</span>
+      </nav>
+      <h1>chip-sim &mdash; the roadmap</h1>
+      <p class="tagline"><em>Planned, not yet built.</em> The future slices, triaged by the named
+        consumer that would earn each one its build.</p>
+      <p class="lead">Everything on the other three pages is <strong>built</strong> &mdash; every figure
+        there is the banked artifact of a cited, tested demo. This page is the opposite and says so
+        loudly: each card below is a slice from the roadmap triage
+        (<a href="http://localhost:8888/lab/tree/docs/plans/future-steps.md" target="_blank" rel="noopener">future-steps.md</a>) that does <strong>not exist in the code yet</strong>.
+        The images are <strong>schematic previews</strong> &mdash; hand-drawn illustrations of what the
+        slice would teach, stamped in-image and ribboned here, <em>never</em> simulator output. Each card
+        carries the plan&rsquo;s verdict verbatim: what observable the slice <span class="status ok"
+        style="font-size:.7rem">would add</span>, and the consumer its build is <span class="status hold"
+        style="font-size:.7rem">gated on</span> &mdash; the repo&rsquo;s <em>no regime without a named
+        consumer</em> bar, made browsable. When a slice ships, its card comes off this page and its real
+        figures join the galleries.</p>
+      <a class="repo" href="http://localhost:8888/lab" target="_blank" rel="noopener">Open the repo in Jupyter&nbsp;Lab&nbsp;&#8599;</a>
+      <p class="lead localnote"><strong>Local edition.</strong> Every plan link here opens in your <strong>running JupyterLab</strong> &mdash; start it once from the repo root (<code>jupyter lab</code>). Links target <code>localhost:8888</code>; a click can&rsquo;t start the server, only reach one already running.</p>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Promotable — the consumer is named</h2>
+      <p class="sub">Each of these already has a device observable waiting to read it; the plan's recommended sequence is F3/F4 (the new-output decision) then F5.</p>
+      <div class="grid">
+        <article class="card">
+          <a class="shot" href="figures/roadmap-f3.png" title="open the full schematic (a preview, not simulator output)">
+            <span class="ribbon">planned &mdash; schematic</span>
+            <img src="figures/roadmap-f3.png" alt="F3 — High-κ / metal gate schematic preview (planned, not simulator output)" loading="lazy">
+          </a>
+          <div class="body">
+            <div class="tagrow">
+              <span class="tag">F3 &middot; 2007 · 45 nm</span>
+              <span class="status ok">Promotable</span>
+            </div>
+            <p class="blurb"><strong>High-κ / metal gate.</strong> The oxide stage&#x27;s modern successor: SiO₂ stopped scaling at ~1.2 nm because direct tunneling explodes; HfO₂ holds the same EOT at ~3× the physical thickness.</p>
+            <div class="facts">
+              <div class="row"><span class="k would">Would add</span><p class="v">A gate-tunneling-leakage observable vs t_ox — a NEW output, plus the SiO₂→high-κ era contrast on the existing oxide/t_ox machinery.</p></div>
+              <div class="row"><span class="k gate">Gated on</span><p class="v">Nothing structural — the first genuinely new-output decision (F3 vs F4 order is the open call in the plan).</p></div>
+            </div>
+            <div class="links">
+              <code>docs/plans/future-steps.md</code>
+              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/roadmap-f4.png" title="open the full schematic (a preview, not simulator output)">
+            <span class="ribbon">planned &mdash; schematic</span>
+            <img src="figures/roadmap-f4.png" alt="F4 — BEOL interconnect (RC delay) schematic preview (planned, not simulator output)" loading="lazy">
+          </a>
+          <div class="body">
+            <div class="tagrow">
+              <span class="tag">F4 &middot; 1997 · Cu damascene</span>
+              <span class="status ok">Promotable</span>
+            </div>
+            <p class="blurb"><strong>BEOL interconnect (RC delay).</strong> The back end the sim has never had: subtractive Al → Cu dual-damascene → Ru, with chip speed set by wire RC rather than the transistor.</p>
+            <div class="facts">
+              <div class="row"><span class="k would">Would add</span><p class="v">Delay ∝ R_wire·C_wire — the first output the transistor chain does not set; the richest remaining history arc. Also gives CMP (F8) its missing consumer.</p></div>
+              <div class="row"><span class="k gate">Gated on</span><p class="v">Nothing structural — the biggest build of the promotable three.</p></div>
+            </div>
+            <div class="links">
+              <code>docs/plans/future-steps.md</code>
+              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/roadmap-f5.png" title="open the full schematic (a preview, not simulator output)">
+            <span class="ribbon">planned &mdash; schematic</span>
+            <img src="figures/roadmap-f5.png" alt="F5 — SiGe strained source/drain schematic preview (planned, not simulator output)" loading="lazy">
+          </a>
+          <div class="body">
+            <div class="tagrow">
+              <span class="tag">F5 &middot; ~2004 · 90 nm</span>
+              <span class="status ok">Promotable</span>
+            </div>
+            <p class="blurb"><strong>SiGe strained source/drain.</strong> The strain era: embedded SiGe pockets squeeze the p-channel (~2 GPa at ~20% Ge), and hole mobility — hence drive current — rises.</p>
+            <div class="facts">
+              <div class="row"><span class="k would">Would add</span><p class="v">Mobility → I_Dsat through a strain-aware µ model — the channel-strain rung of the era ladder.</p></div>
+              <div class="row"><span class="k gate">Gated on</span><p class="v">A µ(strain) mobility model in device.py — none exists yet; advanced-node, so it queues behind F3/F4.</p></div>
+            </div>
+            <div class="links">
+              <code>docs/plans/future-steps.md</code>
+              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Coupled &amp; partly built</h2>
+      <p class="sub">Real physics whose consumer is (partly) already served — built where the consumer exists, deferred where it would duplicate one.</p>
+      <div class="grid">
+        <article class="card">
+          <a class="shot" href="figures/roadmap-f6.png" title="open the full schematic (a preview, not simulator output)">
+            <span class="ribbon">planned &mdash; schematic</span>
+            <img src="figures/roadmap-f6.png" alt="F6 — Epitaxy (buried layer / retrograde well) schematic preview (planned, not simulator output)" loading="lazy">
+          </a>
+          <div class="body">
+            <div class="tagrow">
+              <span class="tag">F6 &middot; bipolar epi · CMOS wells</span>
+              <span class="status part">Coupled to F1</span>
+            </div>
+            <p class="blurb"><strong>Epitaxy (buried layer / retrograde well).</strong> An epitaxial layer over a doped substrate makes buried layers and retrograde wells — profiles a surface predep cannot reach.</p>
+            <div class="facts">
+              <div class="row"><span class="k would">Would add</span><p class="v">The retrograde/buried-peak profile — but ion implantation (F1, BUILT) already delivers exactly that contrast.</p></div>
+              <div class="row"><span class="k gate">Gated on</span><p class="v">Overlaps F1&#x27;s consumer: a standalone epi slice stays deferred until it would discriminate something implant does not.</p></div>
+            </div>
+            <div class="links">
+              <code>docs/plans/future-steps.md</code>
+              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/roadmap-f7.png" title="open the full schematic (a preview, not simulator output)">
+            <span class="ribbon">planned &mdash; schematic</span>
+            <img src="figures/roadmap-f7.png" alt="F7 — Isolation remainder: STI process + latchup schematic preview (planned, not simulator output)" loading="lazy">
+          </a>
+          <div class="body">
+            <div class="tagrow">
+              <span class="tag">F7 &middot; 1998 · STI</span>
+              <span class="status part">Partly built (B5)</span>
+            </div>
+            <p class="blurb"><strong>Isolation remainder: STI process + latchup.</strong> LOCOS&#x27;s bird&#x27;s beak and the min-active-pitch wall are BUILT (history-mode B5, the 2-D engine&#x27;s 2nd consumer); the successor&#x27;s own process is not.</p>
+            <div class="facts">
+              <div class="row"><span class="k would">Would add</span><p class="v">The STI trench etch/fill step itself and a latchup electrical observable — the two named leftovers of the isolation arc.</p></div>
+              <div class="row"><span class="k gate">Gated on</span><p class="v">A consumer for trench geometry / a latchup observable; the beak physics already shipped, so only the remainder is on the roadmap.</p></div>
+            </div>
+            <div class="links">
+              <code>docs/plans/future-steps.md</code>
+              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Deferred — no discriminating consumer yet</h2>
+      <p class="sub">The honest NO&rsquo;s, kept visible: each is fenced behind a named consumer that does not exist today, with its promotion trigger recorded.</p>
+      <div class="grid">
+        <article class="card">
+          <a class="shot" href="figures/roadmap-f8.png" title="open the full schematic (a preview, not simulator output)">
+            <span class="ribbon">planned &mdash; schematic</span>
+            <img src="figures/roadmap-f8.png" alt="F8 — CMP / dishing / planarity schematic preview (planned, not simulator output)" loading="lazy">
+          </a>
+          <div class="body">
+            <div class="tagrow">
+              <span class="tag">F8 &middot; enables Cu damascene</span>
+              <span class="status hold">Deferred — post-F4</span>
+            </div>
+            <p class="blurb"><strong>CMP / dishing / planarity.</strong> Preston-class removal with pattern-density dishing and erosion — post-CMP thickness non-uniformity.</p>
+            <div class="facts">
+              <div class="row"><span class="k would">Would add</span><p class="v">Post-CMP layer-thickness non-uniformity — IF something read a layer thickness.</p></div>
+              <div class="row"><span class="k gate">Gated on</span><p class="v">No consumer today: nothing in the device or yield path reads a layer thickness (backlog D2). Re-evaluate after F4 makes wire cross-section an RC observable.</p></div>
+            </div>
+            <div class="links">
+              <code>docs/plans/future-steps.md</code>
+              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/roadmap-f9.png" title="open the full schematic (a preview, not simulator output)">
+            <span class="ribbon">planned &mdash; schematic</span>
+            <img src="figures/roadmap-f9.png" alt="F9 — FinFET / gate-all-around schematic preview (planned, not simulator output)" loading="lazy">
+          </a>
+          <div class="body">
+            <div class="tagrow">
+              <span class="tag">F9 &middot; 2011 FinFET · 2022 GAA</span>
+              <span class="status hold">Deferred — needs 3-D (B1)</span>
+            </div>
+            <p class="blurb"><strong>FinFET / gate-all-around.</strong> The gate wraps the channel — 3 sides (fin) then all 4 (nanosheets) — so the dopant/potential field is non-separable in three dimensions.</p>
+            <div class="facts">
+              <div class="row"><span class="k would">Would add</span><p class="v">Width-dependent V_t / corner effects a 3-D depletion field carries — the consumer that would finally promote the engine&#x27;s last deferred regime.</p></div>
+              <div class="row"><span class="k gate">Gated on</span><p class="v">The 3-D engine (backlog B1, trigger recorded): 1-D depth + the 2-D cross-section serve every current device; 3-D waits for this consumer, exactly as 2-D waited for v1.8.</p></div>
+            </div>
+            <div class="links">
+              <code>docs/plans/future-steps.md</code>
+              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/roadmap-f10.png" title="open the full schematic (a preview, not simulator output)">
+            <span class="ribbon">planned &mdash; schematic</span>
+            <img src="figures/roadmap-f10.png" alt="F10 — EUV / multipatterning schematic preview (planned, not simulator output)" loading="lazy">
+          </a>
+          <div class="body">
+            <div class="tagrow">
+              <span class="tag">F10 &middot; 2019 · 7 nm</span>
+              <span class="status hold">Deferred</span>
+            </div>
+            <p class="blurb"><strong>EUV / multipatterning.</strong> The wavelength ladder&#x27;s last rung (λ = 13.5 nm) and pitch-splitting (LELE) — the current frontier of the litho arc.</p>
+            <div class="facts">
+              <div class="row"><span class="k would">Would add</span><p class="v">Nothing the model does not already have: litho.py computes the aerial image, R = k₁λ/NA, defocus, PEB and CAR down the whole ladder.</p></div>
+              <div class="row"><span class="k gate">Gated on</span><p class="v">No discriminating consumer — a shorter λ or a split pitch adds no new observable (the plan&#x27;s honest NO).</p></div>
+            </div>
+            <div class="links">
+              <code>docs/plans/future-steps.md</code>
+              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Go deeper</h2>
+      <p class="sub">The triage documents these cards are the visual twin of, and the built work.</p>
+      <div class="deeper">
+        <a class="item" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md" target="_blank" rel="noopener">
+          <h3>The roadmap triage &#8599;</h3>
+          <p>future-steps.md &mdash; the full future-slice triage: consumer observables, verdicts,
+            the recommended F3/F4 sequence, and the honest NO&rsquo;s.</p>
+        </a>
+        <a class="item" href="http://localhost:8888/lab/tree/docs/plans/scope-edge-backlog.md" target="_blank" rel="noopener">
+          <h3>The scope-edge backlog &#8599;</h3>
+          <p>The named-but-deferred edges (3-D engine B1, CMP D2, Stefan A5&hellip;) triaged by
+            consumer &mdash; the anti-over-build bar these cards inherit.</p>
+        </a>
+        <a class="item" href="history.local.html" target="_blank" rel="noopener">
+          <h3>The era timeline &#8599;</h3>
+          <p>The <em>built</em> half of the same history: each period mode already modelled, with the
+            wall it hit and the modern step that cleared it.</p>
+        </a>
+        <a class="item" href="index.local.html" target="_blank" rel="noopener">
+          <h3>The physics gallery &#8599;</h3>
+          <p>Back to the front door: everything that IS built &mdash; the process spine, the
+            deepenings, and the real banked figures.</p>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">Generated by <code>python -m chip.roadmap_gallery</code> from a manifest kept
+      verbatim with <code>docs/plans/future-steps.md</code>; the schematics are drawn by
+      <code>python -m chip.roadmap_figures</code> and stamped in-image as planned previews &mdash;
+      nothing on this page is simulator output.</div>
+  </footer>
+</body>
+</html>

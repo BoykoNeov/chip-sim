@@ -40,6 +40,7 @@ from pathlib import Path
 # the timeline chrome is added below as _TIMELINE_CSS, so chip.gallery's own output stays byte-identical.
 from chip.gallery import (
     _STYLE,
+    _nav,
     figure_relpath,
     _BLOB,
     _TREE,
@@ -183,7 +184,7 @@ _TIMELINE_CSS = """
                    color: var(--accent); margin-right: .5rem; }
       .rung .stage { font-weight: 600; }
       .rung .rtag { align-self: flex-start; font-weight: 700; font-size: .72rem; letter-spacing: .03em;
-                    text-transform: uppercase; color: var(--accent); background: #eaf2fb;
+                    text-transform: uppercase; color: var(--accent); background: var(--tag-bg);
                     border-radius: 999px; padding: .1rem .5rem; margin-left: .4rem; }
       .rung .contrast { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
                         overflow: hidden; margin-top: .6rem; display: grid; gap: 0;
@@ -198,8 +199,8 @@ _TIMELINE_CSS = """
       .rung .story .k { flex: 0 0 5.4rem; font-weight: 700; font-size: .74rem; letter-spacing: .03em;
                         text-transform: uppercase; padding-top: .12rem; }
       .rung .story .k.period { color: var(--muted); }
-      .rung .story .k.wall { color: #b23c2f; }
-      .rung .story .k.next { color: #2e7d46; }
+      .rung .story .k.wall { color: var(--wall); }
+      .rung .story .k.next { color: var(--next); }
       .rung .story .v { margin: 0; flex: 1; font-size: .92rem; }
       .rung .story .links { display: flex; align-items: center; gap: .6rem; margin-top: .2rem;
                             padding-top: .6rem; border-top: 1px dashed var(--line); }"""
@@ -250,8 +251,7 @@ def render_html(local: bool = False) -> str:
         title = "chip-sim &mdash; the era timeline (local edition)"
         repo_link = f'<a class="repo" href="{_LAB_ROOT}"{item_attr}>Open the repo in Jupyter&nbsp;Lab&nbsp;&#8599;</a>'
         note = (
-            '\n      <p class="lead" style="background:#fff7e6;border:1px solid #f0d8a8;border-radius:8px;'
-            'padding:.6rem .8rem;margin-top:1rem;"><strong>Local edition.</strong> Every source link here '
+            '\n      <p class="lead localnote"><strong>Local edition.</strong> Every source link here '
             "opens in your <strong>running JupyterLab</strong> &mdash; start it once from the repo root "
             f"(<code>jupyter lab</code>). Links target <code>localhost:{_LOCAL_PORT}</code>; a click can&rsquo;t "
             "start the server, only reach one already running.</p>"
@@ -280,6 +280,7 @@ def render_html(local: bool = False) -> str:
 <body>
   <header>
     <div class="wrap">
+      {_nav("history", local)}
       <h1>chip-sim &mdash; the era timeline</h1>
       <p class="tagline"><em>What each modern step was built to clear.</em> The backward axis: every
         process re-run in the period mode whose limitation motivated its successor.</p>
