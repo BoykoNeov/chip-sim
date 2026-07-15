@@ -49,7 +49,10 @@ per-material λ calibrated *from* leakage data cannot make this check. Same spir
 
 **Prefactor = FLAGGED house lump** (`J0_REFERENCE ≈ 2.8e8 A/cm²`), pinned at SiO₂/1.5 nm → 1 A/cm² @1 V,
 and **shared across materials** — deliberately, so it **cancels exactly** in fixed-EOT ratios, leaving
-`leakage_decades_saved` free of any calibrated constant. Named scope edges: no trapezoidal/field-lowering
+`leakage_decades_saved` free of any calibrated constant. At matched EOT the sharing is **physically**
+justified, not just convenient: equal EOT ⇒ **equal inversion charge** ⇒ the dominant supply function
+really is the same for both stacks. **Residual (unmodelled, not flagged):** the order-unity *transmission*
+prefactor ratio → report decades as "**≳ N**, exponent-dominated", never a precise count. Named scope edges: no trapezoidal/field-lowering
 or image-force correction (rectangular barrier at fixed bias, direct-tunnelling regime `V_g < φ_B`); no
 QM/poly-depletion EOT correction; no trap-assisted/stress-induced leakage.
 

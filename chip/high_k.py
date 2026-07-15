@@ -56,7 +56,10 @@ The honesty ladder (per the F3 plan + the ``historical-modes.md`` triad)
   construction (see above): the electrical gate is untouched while ``t_phys`` moves by ``K/3.9``.
 * **Tight — the ratio (prefactor-free).** The flagged prefactor ``J₀`` is **shared across materials**, so
   it **cancels exactly** in any leakage *ratio* at fixed EOT: :func:`leakage_decades_saved` is pure
-  cited-exponent physics (``φ_B``, ``m*``, ``K``) with **no calibrated constant in it**.
+  cited-exponent physics (``φ_B``, ``m*``, ``K``) with **no calibrated constant in it**. At matched EOT
+  that sharing is *physically* justified, not merely convenient (equal EOT ⇒ equal inversion charge ⇒ the
+  same supply function) — but an order-unity **transmission**-prefactor ratio is unmodelled, so read the
+  result as "**≳ N decades**, exponent-dominated", not as a precise count. See :data:`J0_REFERENCE`.
 * **Cross-check (non-circular).** The cited constants — sourced from band-offset/effective-mass work,
   **never fitted to a leakage curve** — reproduce the textbook SiO₂ slope of **~1 decade per ~2 Å**
   (this model: 1.78 Å at φ_B=3.2/m*=0.5). The slope is *predicted*, not calibrated. See the tests.
@@ -261,10 +264,18 @@ DIELECTRICS: dict[str, Dielectric] = {"SiO2": SIO2, "HfO2": HFO2, "TiO2": TIO2}
 # SiO₂ under 2 nm leaks "exceeding 1 A/cm² at 1 V", and the ~1.4 nm layer is the one whose leakage is too
 # large. We pin J(SiO₂, 1.5 nm, 1 V) = 1 A/cm², giving J₀ = exp(α_SiO₂·1.5 nm) A/cm² ≈ 2.8e8.
 #
-# Sharing J₀ across materials is the *honest* choice, not a shortcut: any per-material prefactor would be
-# invented, and sharing makes it **cancel exactly** in every fixed-EOT ratio, so the decades-saved figure
-# is pure cited-exponent physics (see :func:`leakage_decades_saved`). The prefactor sets only the absolute
-# A/cm² scale — flagged, never asserted as an exact current.
+# Sharing J₀ across materials is the *honest* choice, not a shortcut — and at matched EOT it is more than
+# a convenience: the two stacks present an **identical inversion charge** (that is what equal EOT *means*),
+# so the dominant supply-function prefactor genuinely IS the same for both, and cancels *physically* rather
+# than by assumption. Any per-material prefactor would be invented; sharing makes it cancel **exactly** in
+# every fixed-EOT ratio, so the decades-saved figure is pure cited-exponent physics
+# (see :func:`leakage_decades_saved`). The prefactor sets only the absolute A/cm² scale — flagged, never
+# asserted as an exact current.
+#
+# **The residual, stated so it isn't silent:** what does NOT cancel is the sub-exponential *transmission*
+# prefactor ratio (an order-unity factor, m*/φ_B-dependent), which this model does not carry. So a
+# decades-saved figure is exponent-dominated and should be read as "**≳ N decades**", not as a precise
+# cited count — the exponent is cited, the last order-unity factor is missing rather than flagged.
 J0_REFERENCE_VG = 1.0                  # V — the reference bias J₀ is quoted at (rectangular-barrier)
 _J0_ANCHOR_T_UM = 1.5e-3               # µm — the 1.5 nm SiO₂ calibration point
 _J0_ANCHOR_J = 1.0                     # A/cm² — Robertson's "exceeding 1 A/cm² at 1 V" scale
