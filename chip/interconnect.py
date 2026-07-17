@@ -526,9 +526,22 @@ def crossover_width_ratio(metal_a: Metal | str, metal_b: Metal | str) -> float:
     """``W_x(a)/W_x(b) = √(ρ₀(a)/ρ₀(b))`` — **prefactor-free**: how far the metal *shifts* the crossover.
 
     Since ``W_x = √(K/τ_gate)`` and ``K ∝ ρ₀``, everything else cancels — ``L``, ``c_pul``, ``V_dd``,
-    ``C_load``, the aspect ratio and the Elmore factor. Al→Cu returns **1.26**: copper pushes the
-    crossover **~21% further down** in linewidth (``1/1.26``), i.e. it *buys roughly one node* of scaling
-    before the wire takes over. That "one node" is the honest size of the 1997 escape — and, unlike the
-    absolute crossover width, it contains no house constant at all.
+    ``C_load``, the aspect ratio and the Elmore factor. **Argument order is the trap: the CHALLENGER goes
+    first**, since ``ratio(a, b)`` is ``W_x(a)/W_x(b)`` and a value **< 1 means ``a`` is the better wire**.
+    ``crossover_width_ratio("Cu", "Al")`` = **0.796** — copper pushes the crossover ~20% further down in
+    linewidth before the wire takes over. Spelling it the other way round and reciprocating gives the same
+    number here and the *reciprocal* for a metal that loses, which is how slice 3 first shipped silver as
+    a negative (see :mod:`chip.demo_beol_history`).
+
+    **Read the size of that win in node units, and do not round it up.** A technology node is a **0.7×**
+    linear step, so 0.796× is ``ln(0.796)/ln(0.7)`` = **0.64 of a node** — the celebrated 1997 escape
+    bought about *two-thirds of one generation*, not "roughly one node" (which this docstring claimed
+    until slice 3 did the arithmetic). Overstating a win is the one direction this module never rounds,
+    exactly as F3's ``floor_decades`` refuses it in the leakage currency. What is honest — and unlike the
+    absolute crossover width, free of every house constant — is that copper **shifted the line without
+    bending it**: ``W_x ∝ √ρ₀`` is the same √ for every metal, so a *second* node would need ``ρ`` halved
+    again to ~0.82 µΩ·cm, and no elemental conductor is there (silver, the best there is, is 1.59). The
+    bulk-``ρ₀`` **axis** is exhausted — which is precisely why slice 4 changes axis rather than shopping
+    for a better conductor.
     """
     return math.sqrt(wire_delay_ratio(metal_a, metal_b))

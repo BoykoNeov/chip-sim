@@ -117,6 +117,8 @@ DEEPENINGS = [
          "Silicide / contact resistance — the source series-R is two terms with different R_sh exponents (access linear + TLM contact sublinear); salicide shunts the sheet so access collapses and the bottleneck flips to the contact."),
     Demo("demo_highk_history", "hist·B8",
          "High-κ gate dielectric — one thickness feeds two currencies: SiO₂ scales into a tunnelling wall at EOT ≈ 1.5 nm, and HfO₂ clears it with a 6.4× thicker barrier at the SAME electrical gate (V_t / C_ox byte-identical)."),
+    Demo("demo_beol_history", "hist·B9",
+         "BEOL interconnect — τ_wire ∝ 1/W² climbs past a transistor that never moved, so a +3% device buys a +0.7% part; copper bought 0.64 of a node, and on the bulk-ρ axis there is no third metal."),
 ]
 
 ALL_DEMOS = SPINE + DEEPENINGS

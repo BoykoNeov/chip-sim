@@ -168,6 +168,27 @@ MODES = [
         "access term; the contact term barely follows, so I_Dsat recovers and the bottleneck flips to "
         "the contact — the reason lower-ρ_c contacts (Ti→Co→Ni) became the next frontier.",
     ),
+    HistoryMode(
+        module="demo_beol_history", tag="B9", stage="Interconnect (BEOL)", era="≈1990s",
+        period="Aluminium wiring, scaled with the node — and a grading policy that reads chip speed "
+        "straight off the transistor's drive current (the sim's own fab_game.spec.SpeedBin still says "
+        "'clock speed ∝ drive current', which is exactly the period assumption).",
+        wall="Chip delay is two terms with no shared variable, and the wire's term is blind to the "
+        "transistor: as the cross-section scales, R ∝ 1/(W·H) rises while C per unit length does not "
+        "move at all (it is ~2 pF/cm for any geometry — a 1 cm coax and an 80 nm line agree), so a global "
+        "line's τ_wire ∝ 1/W² climbs past the gate's flat τ_gate. Past that crossover a better transistor "
+        "stops buying speed: the return falls to exactly 1 − wire_share, so a +3% device is worth +0.7% "
+        "of a part. And because τ_wire is common-mode — the same on every die — the across-wafer drive "
+        "spread stops making a speed spread at all: tightening CD control stops buying speed grades.",
+        successor="Copper dual damascene (IBM, 1997, 0.22 µm) — ~40% less resistance, ~15% faster parts, "
+        "and low-κ dielectric arrived with it at the 250 nm node to work the other term. But the honest "
+        "size of the escape is small: W_x ∝ √ρ₀, so copper's 1.58× in resistivity moved the crossover "
+        "only 0.80× — 0.64 of a 0.7× node step, two-thirds of one generation. It shifted the line rather "
+        "than bending it, and the same √ closes the door behind it: one more node needs ρ ≤ 0.82 µΩ·cm "
+        "and silver, the best elemental conductor there is, is 1.59. The bulk-resistivity axis ran out of "
+        "metals — which is why the next move changes the axis rather than shopping for a conductor: below "
+        "~5λ the material enters only through ρ₀λ, where the bulk ordering no longer holds.",
+    ),
 ]
 
 

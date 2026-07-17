@@ -1,10 +1,39 @@
 # Plan — F4 BEOL interconnect (the delay the transistor doesn't set)
 
-> **STATUS: SLICES 1–2 BUILT (2026-07-17)** — `chip/interconnect.py` + `chip/tests/test_interconnect.py`
+> **STATUS: SLICES 1–3 BUILT (2026-07-17)** — `chip/interconnect.py` + `chip/tests/test_interconnect.py`
 > (29 tests); S2 wired the game consumer: `DeviceKnobs.interconnect`, `Die.delay`, `spec.DelayBins`, and
-> `fab_game/tests/test_interconnect_binning.py` (13 tests). **Full gate green serially at 1105.**
+> `fab_game/tests/test_interconnect_binning.py` (13 tests); **S3 = `chip/demo_beol_history.py` + 11 tests,
+> the 9th timeline rung (B9), both gallery manifests + all four golden HTMLs.**
 > `device.py` still untouched. Cited constants → `memory/beol-interconnect-source.md`.
-> Remaining: S3 (the B9 demo), S4 (size effects + barrier → Ru).
+> Remaining: **S4 only** (size effects + barrier → Ru).
+>
+> **S3's findings — two of them corrected claims this plan/module were already making:**
+> 1. **Copper bought 0.64 of a node, not "roughly one".** `W_x ∝ √ρ₀`, so Al→Cu's 1.58× in ρ moves the
+>    crossover 0.796× — and a node step is **0.70×**, so that is `ln(0.796)/ln(0.7)` = **0.64 of a node**.
+>    `crossover_width_ratio`'s docstring claimed "roughly one node" (a ~50% overstatement of the 1997
+>    escape); **fixed at S3**, and pinned by `test_copper_bought_two_thirds_of_a_node_and_is_never_rounded_up_to_one`.
+>    This is B8's `floor_decades` rule in the crossover's currency: never round a win up. New helper
+>    `demo_beol_history.nodes_bought()` makes the node the unit.
+> 2. **`crossover_width_ratio` argument order is a live sign trap — the S2 bound-swap's cousin.** The
+>    demo's first run shipped **silver as buying −0.08 of a node** (i.e. as *worse* than copper, which is
+>    false) because the call was made incumbent-first and reciprocated. For Al→Cu that reciprocal is the
+>    same number; for Cu→Ag it is *its reciprocal*, so the error renders as a perfectly plausible figure
+>    and only the **sign** gives it away. **The challenger goes first**; docstring fixed, direction pinned
+>    by a test.
+> 3. **The new headline (prefactor-free, and it earns S4 structurally): on the bulk-ρ axis the ladder is
+>    out of metals.** `W_x ∝ √ρ₀` ⇒ one more node needs `ρ ≤ 0.82 µΩ·cm`; **silver — the best elemental
+>    conductor there is — is 1.59** and buys +0.08 of a node. **Scoped deliberately to the axis** (advisor):
+>    "no metal beats Cu" would be *false*, since S4 has Ru winning with 4× copper's bulk ρ. The **axis** is
+>    exhausted, which is exactly *why* the axis must change — and on the scaling axis Ag's `ρ₀λ` ≈ 84 is
+>    worse than Cu's 65 (and Ru's 77): the best bulk conductor is the worst scaling metal. [Ag ρ₀/λ
+>    handbook — FLAGGED, the same status as Al's.]
+> 4. **The deep point of the arc, and it replaced a fragile framing.** `W_x ∝ √I_Dsat` **exactly as**
+>    `W_x ∝ √ρ₀`: a 2× better transistor pulls the crossover out to a 1.41× *wider* wire — an **earlier**
+>    node — by the very same √2 a 2× better metal pushes it in. **The transistor's own progress is what
+>    creates the wire wall.** (This replaced a "freezing the gate is conservative" gloss the advisor
+>    killed: the bias direction rides on *which* τ_gate you freeze at — conservative only if you freeze at
+>    the ladder's oldest device, ≈neutral at the crossover node, and it **flips to overstating** if you
+>    freeze newer. The √ inversion is rigorous and says more.)
 >
 > **S2's finding — the damping law, sharper than the crossover:** `∂ln f/∂ln I_Dsat = 1 − wire_share`,
 > **exact at every `I_Dsat`** (from `f = I/(A + τ_wire·I)`), not a linearization. It is the payload in one
@@ -203,17 +232,40 @@ node→(W,H) ladder.
   **A three-rung seam:** knob off (nothing emitted) → knob on + `delay_bins=None` (the delay is emitted
   and **read by no one** — still byte-for-byte, the `bv_V`/`t_rr`/`j_gate` additive discipline) → knob on
   + delay binning (the inversion). It is the **pair** that overturns the premise, never the knob alone.
-- **S3 — the B9 history mode + demo** (`chip/demo_beol_history.py`; the **9th** timeline rung, after B8).
-  The node-scaling ladder into the crossover, then the Al→Cu escape — the mirror of F3's `t_ox` ladder
-  into the leakage wall. **Cap it honestly** (the F3 magnitude-trap lesson: cap the ladder where the model
-  is valid, lead with the *shape*, let curves exit the axis rather than print a fabricated number).
-  Per F3's slice-3 finding, **no `beol_history.py` wrapper** unless it carries period physics
-  `interconnect.py` lacks (the demo-rides-the-base-module pattern, B7/B8).
-  **Checked at S2, for S3's benefit: don't rework-then-read-bins.** `rework_litho` re-runs `device_step`,
-  so a reworked die's delay **is** refreshed with the knob on — but rework **never re-packages** (only
-  front-end fails are re-attempted, and a recovered die carries `verdict.passed` with `bin=None`). That
-  is pre-existing and **identical for both currencies**, so F4 adds no asymmetry — but a demo that reworks
-  and then reads a bin histogram would silently under-count either way.
+- **S3 — the B9 history mode + demo. ✅ BUILT.** `chip/demo_beol_history.py` + 11 tests; the **9th**
+  timeline rung. **No `beol_history.py` wrapper** — the period physics is already in `interconnect.py`
+  (Al and Cu are both in `METALS`); the node ladder is a *demo recipe*, not physics, so the demo rides the
+  base module (the B7/B8 pattern), as F3's slice-3 finding requires. Three panels:
+  **the wall** (the node ladder — τ_gate a flat line, τ_wire ∝ 1/W² climbing past it, a crossing that
+  exists *with no help from the transistor*; the metals are **parallel**, a better metal shifts the line
+  and does not bend it) · **the payload** (at 250 nm, the premise's `f ∝ I_Dsat` diagonal vs the damped
+  reality, slope = 1 − wire_share exactly; a +3% transistor is worth **+0.7%** on an Al line) · **the
+  escape and its ceiling** (`W_x/W_x(Cu) = √(ρ/ρ_Cu)` — **prefactor-free**; 0.64 of a node, then nothing).
+  **The ladder is capped at W = 0.20 µm** and the cap is *binding, not cosmetic*: `interconnect.py` is
+  bulk-ρ only, Cu's `bulk_regime_ok` refuses below `5λ` ≈ **0.194 µm**, and **the next real node (0.18 µm)
+  is already inside that refusal** — which the figure draws as a shaded zone with the 0.18 rung sitting in
+  it. That is the cleanest possible hand-off to S4 and it matches cited history (the size effect became a
+  **copper** problem at sub-200 nm). Walking past the cap would fabricate exactly the number S4 exists to
+  compute — the F3 magnitude trap.
+  **Open question 4, DECIDED: a demo-local, WIRE-ONLY sweep** — the ladder scales the cross-section and
+  the transistor is held fixed. It is *not* a house node→device table (that would have invented two more
+  flagged lumps): the period device is a **real `device.py` read** (a 0.5 µm-era n-MOS, 10 nm gate oxide
+  at the 3.3 V `V_DD_HOUSE`, `N_A` set to land a period-plausible `V_t` = 0.58 V — chosen on device
+  grounds, **not** to place the crossover). Freezing the gate is what isolates the claim, and the middle
+  panel **prices** the freeze instead of hiding it (`W_x ∝ √I_Dsat`).
+  **The landing is a CONSISTENCY check, never a prediction** (advisor): `W_x ∝ L`, *and the device recipe
+  is a second lump-carrier* — `W_x(Al)` moved 0.49 → 0.38 µm across a plausible `N_A` range (~¾ of a node).
+  That an **untuned** 1 mm line + a period-plausible transistor land `W_x(Al)` ≈ **0.45 µm** — the
+  mid-1990s, where the cited history puts gate ≈ interconnect — has exactly the status of the IBM ~40%
+  check. **Lead with the shape and the 1.26 shift.**
+  **The featured 250 nm rung is `WireGeometry()`'s default byte-for-byte** — the same line S2's game knob
+  runs, so the demo and the binning inversion are about one wire. (`wire_share` still differs from S2's
+  ≈0.71: same wire, a *different transistor* — which is the point, not a discrepancy.)
+  **Checked at S2, and S3 stayed clear of it: don't rework-then-read-bins.** `rework_litho` re-runs
+  `device_step`, so a reworked die's delay **is** refreshed with the knob on — but rework **never
+  re-packages**. Pre-existing and **identical for both currencies**, so F4 adds no asymmetry — but a demo
+  that reworks and then reads a bin histogram would silently under-count either way. (B9 is chip-side and
+  reads no bins at all, so this never arose.)
 - **S4 — the honest ceiling: size effect + barrier fraction → Ru.** FS/MS `ρ_eff(d)`, the `ρ₀λ` FOM, the
   `W_eff = W − 2·t_b` floor. The slice that makes the arc real, exactly as F3's IL did.
 
@@ -239,7 +291,7 @@ land in the **same commit** or `assert_manifest_complete()` fails (F3 slice 3's 
 - **`I_Dsat` keeps its meaning.** `τ_gate` is computed *at the delay read*, never written back — the F2
   (`die.R_s` access-only) / F3 (`die.t_ox_um` = what the furnace grew) discipline.
 
-## Open questions — 1–3 DECIDED at S2; 4 is S3's
+## Open questions — 1–3 DECIDED at S2; 4 DECIDED at S3 (see the S3 slice above). None open.
 
 1. **Where the delay output lives.** ✅ **`Die.delay` (s) + `Die.delay_ps`** — *not* `tau_ps`: `Die.tau`
    is already the minority-carrier **lifetime** (G4b), and `tau_ps` next to it would read as "the
@@ -255,6 +307,11 @@ land in the **same commit** or `assert_manifest_complete()` fails (F3 slice 3's 
    `C_ox` and printed CD) — it makes `τ_gate` a genuine CV/I read of the existing chain, costs nothing,
    and is what exposed the withdrawn S1 crossover claim above. `V_dd` and `L` remain house lumps.
 4. **Does the node ladder drive `die.t_ox_um`/CD upstream** (F3 slice 3's move) or is it a demo-local
-   geometry sweep? **Still S3's to decide.** The latter is likely, since the sim has no node concept —
-   but that means the node ladder is a **house geometry table**, and it must be flagged as one. S2 leaves
-   this open by design: the knob is metal-only, so nothing in the game constrains S3's choice yet.
+   geometry sweep? ✅ **Demo-local, and WIRE-ONLY** — the ladder scales the cross-section; the transistor
+   is a fixed **real `device.py` read**, not a house table. The node→`W` mapping is the only new house
+   assumption (`W` = the node number, `H` = 2`W`), and it is a mild one: pre-2000 the node name *was*
+   roughly the metal half-pitch, so the rungs (1.0/0.7/0.5/0.35/0.25 µm) are the **real** node ladder
+   rather than an invented one. The aspect ratio is flagged and cancels in every headline ratio. Driving
+   the device upstream would have added a fabricated node→(t_ox, CD) table **and** cost the panel its
+   cleanest claim — that the crossover happens *with no help from the transistor*. See the S3 slice above
+   for the consistency-check discipline the frozen device requires.

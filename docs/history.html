@@ -320,6 +320,25 @@
             </div>
           </div>
         </div>
+        <div class="rung">
+          <div class="head">
+            <span class="era">≈1990s</span><span class="stage">Interconnect (BEOL)</span><span class="rtag">B9</span>
+          </div>
+          <div class="contrast">
+            <a class="shot" href="figures/chip-beol-history.png" title="open the full modern-vs-period figure">
+              <img src="figures/chip-beol-history.png" alt="B9 — Interconnect (BEOL) modern-vs-period contrast" loading="lazy">
+            </a>
+            <div class="story">
+              <div class="row"><span class="k period">Period</span><p class="v">Aluminium wiring, scaled with the node — and a grading policy that reads chip speed straight off the transistor&#x27;s drive current (the sim&#x27;s own fab_game.spec.SpeedBin still says &#x27;clock speed ∝ drive current&#x27;, which is exactly the period assumption).</p></div>
+              <div class="row"><span class="k wall">The wall</span><p class="v">Chip delay is two terms with no shared variable, and the wire&#x27;s term is blind to the transistor: as the cross-section scales, R ∝ 1/(W·H) rises while C per unit length does not move at all (it is ~2 pF/cm for any geometry — a 1 cm coax and an 80 nm line agree), so a global line&#x27;s τ_wire ∝ 1/W² climbs past the gate&#x27;s flat τ_gate. Past that crossover a better transistor stops buying speed: the return falls to exactly 1 − wire_share, so a +3% device is worth +0.7% of a part. And because τ_wire is common-mode — the same on every die — the across-wafer drive spread stops making a speed spread at all: tightening CD control stops buying speed grades.</p></div>
+              <div class="row"><span class="k next">Replaced by</span><p class="v">Copper dual damascene (IBM, 1997, 0.22 µm) — ~40% less resistance, ~15% faster parts, and low-κ dielectric arrived with it at the 250 nm node to work the other term. But the honest size of the escape is small: W_x ∝ √ρ₀, so copper&#x27;s 1.58× in resistivity moved the crossover only 0.80× — 0.64 of a 0.7× node step, two-thirds of one generation. It shifted the line rather than bending it, and the same √ closes the door behind it: one more node needs ρ ≤ 0.82 µΩ·cm and silver, the best elemental conductor there is, is 1.59. The bulk-resistivity axis ran out of metals — which is why the next move changes the axis rather than shopping for a conductor: below ~5λ the material enters only through ρ₀λ, where the bulk ordering no longer holds.</p></div>
+              <div class="links">
+                <code>python -m chip.demo_beol_history</code>
+                <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_beol_history.py">source&nbsp;&#8599;</a>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
