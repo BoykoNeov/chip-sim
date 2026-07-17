@@ -114,6 +114,8 @@ class Die:
     bv_V: float | None = None                   # drain–body junction avalanche breakdown (V) — set by the device step (slice 2)
     t_rr: float | None = None                   # diode reverse-recovery (storage) time (s) ∝ τ — set by the device step (slice 5)
     j_gate: float | None = None                 # direct-tunnelling gate-leakage density (A/cm²) — set by the device step (F3); None ⇒ dielectric knob off
+    delay: float | None = None                  # chip switching delay τ_total = τ_gate + τ_wire (s) — set by the device step (F4); None ⇒ interconnect knob off
+    #                                             NOTE: `tau` above is the minority-carrier LIFETIME (G4b) — a different quantity entirely. This is a delay.
     defects: tuple[DefectEvent, ...] = ()       # killer particles caught at wafer prep (G3)
     killed_by_defect: bool | None = None        # set by wafer prep; True ⇒ a functional fail
     voided: bool | None = None                  # set by etch/depo (G5); True ⇒ a depo void → functional fail
@@ -147,6 +149,17 @@ class Die:
     def t_rr_ns(self) -> float | None:
         """Diode reverse-recovery time in **ns** (the power-rectifier spec-window / readout unit, slice 5)."""
         return None if self.t_rr is None else self.t_rr * 1.0e9
+
+    @property
+    def delay_ps(self) -> float | None:
+        """Chip switching delay ``τ_total = τ_gate + τ_wire`` in **ps** (the F4 delay-binning unit).
+
+        The currency :class:`fab_game.spec.DelayBins` grades on — **lower is faster**, the inverse of the
+        ``I_Dsat`` proxy :class:`fab_game.spec.SpeedBins` grades on. ``None`` until the ``interconnect``
+        knob is engaged (the gap-vs-fake-zero rule): a die with no wire has no *chip* delay to speak of,
+        only a gate delay, and the pre-1997 premise reads that off ``I_Dsat`` already.
+        """
+        return None if self.delay is None else self.delay * 1.0e12
 
     def record(self, step: str, knobs_in: dict, outputs: dict, **updates) -> "Die":
         """Return a new die with ``updates`` applied and a :class:`DieStepRecord` appended (append-only)."""

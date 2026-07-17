@@ -1,23 +1,53 @@
 # Plan — F4 BEOL interconnect (the delay the transistor doesn't set)
 
-> **STATUS: SLICE 1 BUILT (2026-07-17)** — `chip/interconnect.py` + `chip/tests/test_interconnect.py`
-> (26 tests, fast lane green at 1088). **No existing file touched, `device.py` and `fab_game/` included.**
-> The two-term split, the cited `c_pul` invariance, the closed-form crossover, the prefactor-free ratios,
-> and the Al+Cu registry. Cited constants → `memory/beol-interconnect-source.md`.
-> Remaining: S2 (the knob + the binning inversion), S3 (the B9 demo), S4 (size effects + barrier → Ru).
+> **STATUS: SLICES 1–2 BUILT (2026-07-17)** — `chip/interconnect.py` + `chip/tests/test_interconnect.py`
+> (29 tests); S2 wired the game consumer: `DeviceKnobs.interconnect`, `Die.delay`, `spec.DelayBins`, and
+> `fab_game/tests/test_interconnect_binning.py` (13 tests). **Full gate green serially at 1105.**
+> `device.py` still untouched. Cited constants → `memory/beol-interconnect-source.md`.
+> Remaining: S3 (the B9 demo), S4 (size effects + barrier → Ru).
 >
-> **Three corrections the S1 review forced — S2/S4 inherit them:**
+> **S2's finding — the damping law, sharper than the crossover:** `∂ln f/∂ln I_Dsat = 1 − wire_share`,
+> **exact at every `I_Dsat`** (from `f = I/(A + τ_wire·I)`), not a linearization. It is the payload in one
+> line: `τ_wire` is **common-mode**, so it adds a *level* and **no spread** — the across-wafer `I_Dsat`
+> spread maps to a speed spread damped by exactly that factor while the transistor histogram is
+> bit-for-bit unchanged. As `wire_share → 1` a better transistor buys **nothing**. Measured end-to-end
+> (house geometry, `wire_share ≈ 0.71`): a tight process's **23 premium parts → 0**.
+>
+> **S2's framing correction (advisor — it inverts the obvious reading): the compression is SYMMETRIC.**
+> The wire pulls the slow tail **up** exactly as it pulls the fast tail down — the bin-out tail *shrinks*
+> (loose process: reject 2 → 0). ⇒ the licensed claim is **"sorting by drive current stops producing a
+> speed spread; the premium *grade* collapses"**, never "wires cost yield". A **grading loss, not a yield
+> loss** — the die count is untouched.
+>
+> **S2's trap, and what licenses the slice:** `τ_total` is strictly monotone in `I_Dsat`, so re-binning
+> with edges mapped through *that same function* is a **byte-identical partition** — re-binning alone
+> proves nothing. The edges must encode the **market's promise** ("a 2.6%-faster part"), anchored on the
+> nominal part: `τ_edge = τ_nom·(I_nom/I_edge)` (`DelayBins.from_speed_bins`). Adds **no new house number**
+> and **cancels the flagged `L`** (nominal ≡ typical under both policies), so only the compression
+> survives. Control: at `τ_wire = 0` the partition is identical, grade for grade.
+>
+> **Corrections the S1 review forced — S3/S4 inherit them:**
 > 1. **The headline is bounded.** The module drops the driver↔wire Elmore cross terms, one of which
 >    (`R_driver·C_wire`) **is** weakly `I_Dsat`-dependent. ⇒ the licensed claim is **"the wire's
 >    *intrinsic* RC is a common-mode floor"**, *not* "the transistor can't touch the wire term". The
->    discriminator survives; the stronger phrasing was unearned. **S2 must use the bounded form.**
-> 2. **S4 is not a Ru-only slice.** The `bulk_regime_ok` guard **fires on copper's own crossover**
->    (~0.167 µm vs the ~0.19 µm the bulk model wants) — historically exact: the size effect was a *copper*
->    problem at sub-200 nm before Ru existed as an option.
+>    discriminator survives; the stronger phrasing was unearned. **S2 uses the bounded form throughout.**
+> 2. ~~**S4 is not a Ru-only slice** — the guard fires on copper's own crossover (~0.167 µm).~~
+>    **PREMISE WITHDRAWN at S2; the conclusion stands on other legs.** That ~0.167 µm rested on a
+>    **test-local 23 fF load** (a *1 µm* channel), not on anything the sim runs. Wiring the **real** chain
+>    (S2's `C_load` = the fan-out-1 `C_ox·W·L` off the game's own device ⇒ **4.1 fF**) puts Cu's crossover
+>    at **~0.395 µm** — **comfortably inside** the bulk regime (Cu wants W > ~0.19 µm). *Where the
+>    crossover lands is a statement about the **load**, not a property of the slice.* **S4 is still
+>    motivated for copper** — because the size-effect correction **grows as W scales below ~0.19 µm**, and
+>    the size effect became a *copper* problem at sub-200 nm (cited history, which never needed the
+>    operating-point claim). What died is only "this slice already sits outside its own model's
+>    competence": it does not. Fixed in the S1 docstring + test; **both** loads now pinned, with the
+>    direction (`W_x ∝ 1/√C_load`) as the invariant rather than either number.
 > 3. **The IBM ~40% check is a *consistency* check, not a non-circular one** — at fixed geometry
->    `R_Al/R_Cu ≡ ρ_Al/ρ_Cu`, so it validates the inputs, not a structural form. Weaker than F3's.
+>    `R_Al/R_Cu ≡ ρ_Al/ρ_Cu`, so it validates the inputs, not a structural form. Weaker than F3's. (The S1
+>    *test file's* header still billed it "non-circular" while the module said otherwise — fixed at S2.)
 >
-> Predecessor F3 (high-κ) shipped 2026-07-17 and its card graduated.
+> Predecessor F3 (high-κ) shipped 2026-07-17 and its card graduated. **F4's roadmap card stays up until
+> S4** — the graduation rule fires when the slice *plan* completes, as F3's did.
 
 **The discriminating observable, stated first (the build's licence):** chip delay is **two terms with no
 shared variable**, and no single scalar can move both:
@@ -165,9 +195,14 @@ node→(W,H) ladder.
 - **S1 — `chip/interconnect.py`.** `R_wire`, `C_wire`, `τ_wire`, `τ_gate`, `τ_total`, the **crossover**;
   Al + Cu registry. Pure, cited, unit-tested. **`device.py` untouched** — it reads `I_Dsat` as a
   loose-coupled scalar (the F2/F3 precedent: plain scalars across the module boundary).
-- **S2 — the game knob + the binning inversion.** `DeviceKnobs`-sibling (`interconnect`, `None` = seam) →
-  `τ_total` → `SpeedBins`. The slice that makes the discriminator **assertable end-to-end**: the same
-  wafer, the same `I_Dsat` histogram, the premium bin collapsing. Knob-off byte-for-byte.
+- **S2 — the game knob + the binning inversion. ✅ BUILT.** `DeviceKnobs.interconnect` (`"Al"`|`"Cu"`,
+  `None` = seam) → `Die.delay` → `spec.DelayBins` (a `SpeedBins` sibling in the inverse currency), wired
+  at `device_step` (where `I_Dsat` and `C_ox` already are — there is no BEOL step, and inventing one
+  would claim more than F4 models). **Metal-only knob**: geometry stays the module default, since the
+  payload holds at fixed geometry and S3's ladder sweeps `chip.interconnect` directly (anti-front-load).
+  **A three-rung seam:** knob off (nothing emitted) → knob on + `delay_bins=None` (the delay is emitted
+  and **read by no one** — still byte-for-byte, the `bv_V`/`t_rr`/`j_gate` additive discipline) → knob on
+  + delay binning (the inversion). It is the **pair** that overturns the premise, never the knob alone.
 - **S3 — the B9 history mode + demo** (`chip/demo_beol_history.py`; the **9th** timeline rung, after B8).
   The node-scaling ladder into the crossover, then the Al→Cu escape — the mirror of F3's `t_ox` ladder
   into the leakage wall. **Cap it honestly** (the F3 magnitude-trap lesson: cap the ladder where the model
@@ -199,14 +234,22 @@ land in the **same commit** or `assert_manifest_complete()` fails (F3 slice 3's 
 - **`I_Dsat` keeps its meaning.** `τ_gate` is computed *at the delay read*, never written back — the F2
   (`die.R_s` access-only) / F3 (`die.t_ox_um` = what the furnace grew) discipline.
 
-## Open questions (decide at build, F3-style)
+## Open questions — 1–3 DECIDED at S2; 4 is S3's
 
-1. **Where the delay output lives.** `Die.tau_ps`? (the `bv_V`/`t_rr`/`j_gate` sibling pattern; `None` on
-   a bare die *and* when the knob is off — the gap-vs-fake-zero rule).
-2. **Does `SpeedBins` gain a `τ` mode, or does the knob feed a τ-derived pseudo-`I_Dsat`?** Prefer the
-   former (honest); the latter would overload a documented field — the exact overload F3 rejected.
-3. **`C_load`: the real `C_ox·W·L` from `device.py`, or a house lump?** Prefer the real one — it makes
-   `τ_gate` a genuine CV/I read of the existing chain and costs nothing.
+1. **Where the delay output lives.** ✅ **`Die.delay` (s) + `Die.delay_ps`** — *not* `tau_ps`: `Die.tau`
+   is already the minority-carrier **lifetime** (G4b), and `tau_ps` next to it would read as "the
+   lifetime, in ps". Different quantity, different name. `None` when the knob is off (gap-vs-fake-zero).
+2. **Does `SpeedBins` gain a `τ` mode, or does the knob feed a τ-derived pseudo-`I_Dsat`?** ✅ **Neither
+   — a separate `DelayBins`/`DelayBin` pair.** A mode flag would put four optional edges on one bin class;
+   the pseudo-`I_Dsat` would overload a documented field (the overload F3 rejected). A sibling keeps
+   `SpeedBin`'s mA bands honest *as the era artifact they are* — the false premise stays legible in the
+   tree, and `DelayBins.from_speed_bins` is the bridge. **The bound swap is the trap**: `lo_mA` (the fast
+   edge) → `hi_ps`, since the currency inverts. Get it backwards and every part mis-grades while the
+   histogram still looks like a clean partition.
+3. **`C_load`: the real `C_ox·W·L`, or a house lump?** ✅ **The real one** (fan-out-1, off the die's own
+   `C_ox` and printed CD) — it makes `τ_gate` a genuine CV/I read of the existing chain, costs nothing,
+   and is what exposed the withdrawn S1 crossover claim above. `V_dd` and `L` remain house lumps.
 4. **Does the node ladder drive `die.t_ox_um`/CD upstream** (F3 slice 3's move) or is it a demo-local
-   geometry sweep? The latter is likely, since the sim has no node concept — but that means the node
-   ladder is a **house geometry table**, and it must be flagged as one.
+   geometry sweep? **Still S3's to decide.** The latter is likely, since the sim has no node concept —
+   but that means the node ladder is a **house geometry table**, and it must be flagged as one. S2 leaves
+   this open by design: the knob is metal-only, so nothing in the game constrains S3's choice yet.

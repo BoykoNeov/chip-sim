@@ -254,7 +254,8 @@ def run_line(
     #    per-die perturbation) and **only** when the back end is lossy AND the stochastic layer is on, so a
     #    perfect back end (the default) consumes no randomness and leaves every good die packaged — the
     #    seam, and the G1–G5 banked demos byte-for-byte unchanged.
-    return _package_wafer(wafer, recipe.packaging, specs.speed_bins, rng, variation.enabled)
+    return _package_wafer(wafer, recipe.packaging, specs.speed_bins, rng, variation.enabled,
+                          specs.delay_bins)
 
 
 # --------------------------------------------------------------------------- #
@@ -360,7 +361,7 @@ def _verdict_die(die: Die, specs: SpecSet, geometry_reason: str | None = None) -
 # --------------------------------------------------------------------------- #
 # Packaging & final test (G6) — the back-end yield funnel + the speed binning
 # --------------------------------------------------------------------------- #
-def _package_wafer(wafer, knobs, bins, rng, variation_enabled: bool) -> WaferState:
+def _package_wafer(wafer, knobs, bins, rng, variation_enabled: bool, delay_bins=None) -> WaferState:
     """Run the back-end assembly + final-test binning over the tested wafer → the packaged wafer.
 
     A per-die Bernoulli back-end survival is drawn (in fixed die order, **after** every per-die
@@ -369,6 +370,12 @@ def _package_wafer(wafer, knobs, bins, rng, variation_enabled: bool) -> WaferSta
     variation consumes no RNG and packages every good die (the seam). The packaging step then assembles
     + bins each die; the ``packaging`` provenance summary carries the **funnel** (front-end → final
     yield) and the bin histogram (the demo artifact).
+
+    ``delay_bins`` (F4, ``None`` = the seam) switches the grade currency from ``I_Dsat`` to the chip
+    delay ``τ_total`` — the *whole* final test moves together, histogram included, so the summary's
+    ``bins`` keys come from whichever policy actually graded. The back-end **assembly** draw is
+    untouched by it: how a part is *graded* cannot change whether it survived a wire-bond, so engaging
+    delay binning never perturbs the RNG stream (the determinism contract).
     """
     Y = knobs.assembly_yield
     draw = variation_enabled and Y < 1.0
@@ -377,12 +384,12 @@ def _package_wafer(wafer, knobs, bins, rng, variation_enabled: bool) -> WaferSta
         survived = True
         if draw and d.verdict is not None and d.verdict.passed:
             survived = bool(rng.random() < Y)
-        new_dies.append(packaging_step(d, knobs, survived, bins))
+        new_dies.append(packaging_step(d, knobs, survived, bins, delay_bins))
     new_dies = tuple(new_dies)
 
     n_total = len(new_dies)
     n_good = sum(d.verdict.passed for d in new_dies if d.verdict is not None)
-    histogram = {label: 0 for label in bins.labels}
+    histogram = {label: 0 for label in (bins if delay_bins is None else delay_bins).labels}
     for d in new_dies:
         if d.bin is not None:
             histogram[d.bin] = histogram.get(d.bin, 0) + 1

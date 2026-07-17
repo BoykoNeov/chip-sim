@@ -24,6 +24,7 @@ from chip import contact_resistance as cr
 from chip import diffusion_dopant as dd
 from chip import etch_deposition as ed
 from chip import high_k as hk
+from chip import interconnect as ic
 from chip import oxidation as ox
 from chip import litho
 from chip import device as dev
@@ -41,7 +42,7 @@ from .recipe import (
     OxidationKnobs,
     PackagingKnobs,
 )
-from .spec import SpeedBins
+from .spec import DelayBins, SpeedBins
 from .state import DefectEvent, Die, Verdict
 from .variation import DiePerturbation
 
@@ -314,7 +315,28 @@ def device_step(
     approximation — ``device.py`` is untouched) while the leakage moves by orders of magnitude. One
     thickness, two currencies; ``die.t_ox_um`` is never written back (it stays what the furnace grew).
     ``dielectric = None`` → ``t_ox_um`` flows through untouched and no leakage is emitted (the seam);
-    ``"SiO2"`` is the engaged seam (``EOT == t_phys`` exactly) — the same device, leakage now readable."""
+    ``"SiO2"`` is the engaged seam (``EOT == t_phys`` exactly) — the same device, leakage now readable.
+
+    **BEOL interconnect delay (F4)** — with ``knobs.interconnect`` set, the die gains the sim's **first
+    output the transistor chain does not set**: ``τ_total = τ_gate(I_Dsat) + τ_wire``
+    (:func:`chip.interconnect.delay`). ``τ_gate = C_load·V_dd/I_Dsat`` is a genuine CV/I read of the
+    device just computed — ``C_load`` is the **real** fan-out-1 gate load ``C_ox·W·L`` off this die's own
+    ``mos.C_ox`` and printed CD, not a house lump (the "consume the real number" move F2 made with
+    ``die.R_s`` and F3 with ``die.t_ox_um``). ``τ_wire`` reads only the metal and the house geometry:
+    **``∂τ_wire/∂I_Dsat = 0``**, so it is a **common-mode floor** — identical on every die, carrying no
+    across-wafer spread of its own.
+
+    Computed *at the delay read* and **never written back**: ``I_Dsat`` keeps its meaning (the F2
+    ``die.R_s`` / F3 ``die.t_ox_um`` discipline). Purely **additive**, like ``bv_V``/``t_rr`` — it never
+    moves ``V_t``/``I_Dsat``, and it is scored only by :attr:`fab_game.spec.SpecSet.delay_bins`, which is
+    ``None`` by default. So engaging this knob **alone** changes nothing observable; it is the *pair*
+    (knob + delay-binning) that inverts :class:`fab_game.spec.SpeedBin`'s "clock speed ∝ drive current"
+    premise. ``interconnect = None`` → no delay is emitted at all (the seam; G1–G7 and the journey are
+    byte-for-byte unchanged).
+
+    It lives in the device step because that is where ``I_Dsat`` and ``C_ox`` are — there is no BEOL step
+    in this line, and inventing one would be a bigger claim than F4 makes (the wire here is a *reading* of
+    a representative line, not a modelled metallization the recipe builds)."""
     if die.t_ox_um is None or die.cd_um is None or die.resolved is False:
         reason = ("litho image not resolved" if die.resolved is False
                   else "missing upstream t_ox/CD")
@@ -379,6 +401,17 @@ def device_step(
     # moves V_t/I_Dsat.
     bv_V = (bd.junction_breakdown(channel_N_A, die.x_j_um).bv
             if die.x_j_um is not None and math.isfinite(die.x_j_um) else None)
+    # F4 (interconnect set): the chip delay τ_total = τ_gate(I_Dsat) + τ_wire(metal, house geometry). The
+    # gate term is a real CV/I read of the device above (C_load = the fan-out-1 C_ox·W·L off THIS die's
+    # C_ox and printed CD — the real number, not a lump); the wire term reads no device quantity at all
+    # (∂τ_wire/∂I_Dsat = 0 — a common-mode floor, the same ps on every die). Purely additive: never
+    # written back, never moves V_t/I_Dsat, scored only by specs.delay_bins. interconnect None → no delay
+    # emitted (the seam). Requires I_Dsat > 0 (gate_delay's guard) — a refused device never reaches here.
+    if knobs.interconnect is None:
+        wire_delay = None
+    else:
+        c_load = ic.gate_load_capacitance(mos.C_ox, knobs.width_um, die.cd_um)
+        wire_delay = ic.delay(ic.WireGeometry(), i_dsat, c_load, metal=knobs.interconnect)
     knobs_in = {"gate": knobs.gate, "width_um": knobs.width_um, "overdrive_V": knobs.overdrive_V,
                 "Q_ox": Q_ox, "N_A": channel_N_A}
     if thermal_donor_density > 0.0:                          # C1 fingerprint — only when donors are present
@@ -394,6 +427,8 @@ def device_step(
     if stack is not None:                                    # F3 fingerprint — only when a gate stack is specified
         knobs_in["dielectric"] = stack.material             # (so a bare-t_ox device record is byte-unchanged)
         knobs_in["t_phys_um"] = stack.t_phys_um             # what was physically deposited (EOT·K/3.9)
+    if wire_delay is not None:                               # F4 fingerprint — only when the wire is specified
+        knobs_in["interconnect"] = knobs.interconnect        # (so an unwired device record is byte-unchanged)
     if mos.vt_adjust != 0.0:                                 # §5 fingerprint — only when a V_t-adjust implant is set
         knobs_in["vt_adjust"] = mos.vt_adjust                # (so a no-implant device record is byte-unchanged)
     outputs = {"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox,
@@ -404,16 +439,24 @@ def device_step(
     if stack is not None:                                    # F3 — the new additive output, only when engaged
         outputs["j_gate_A_cm2"] = stack.gate_leakage_A_cm2  # FLAGGED absolute (the shared house prefactor)
         outputs["decades_saved"] = stack.decades_saved_vs_sio2   # prefactor-free vs SiO₂ at this same EOT
+    if wire_delay is not None:                               # F4 — the new additive output, only when engaged
+        outputs["tau_total_ps"] = wire_delay.tau_total_ps    # FLAGGED absolute (τ_wire ∝ the house L²)
+        outputs["tau_wire_ps"] = wire_delay.tau_wire_s * 1.0e12   # the common-mode floor (no I_Dsat in it)
+        outputs["tau_gate_ps"] = wire_delay.tau_gate_s * 1.0e12   # the transistor's term (∝ 1/I_Dsat)
+        outputs["wire_share"] = wire_delay.wire_share        # who sets the speed (graded, prefactor-free-ish)
+        outputs["drive_sensitivity"] = wire_delay.drive_sensitivity   # ∂ln f/∂ln I_Dsat = 1 − wire_share
     return die.record(
         "device",
         knobs_in=knobs_in,
         outputs=outputs,
         V_t=mos.V_t, i_dsat=i_dsat, tau=leak.tau, j_leak=leak.j_leak, bv_V=bv_V, t_rr=t_rr,
         j_gate=None if stack is None else stack.gate_leakage_A_cm2,
+        delay=None if wire_delay is None else wire_delay.tau_total_s,
     )
 
 
-def packaging_step(die: Die, knobs: PackagingKnobs, survived: bool, bins: SpeedBins) -> Die:
+def packaging_step(die: Die, knobs: PackagingKnobs, survived: bool, bins: SpeedBins,
+                   delay_bins: DelayBins | None = None) -> Die:
     """Back-end packaging & final test on one die (G6) — assemble, then bin by speed (the funnel's end).
 
     The line's last step, run **after** wafer sort (the ``test`` step's per-die verdict). Only a
@@ -431,10 +474,22 @@ def packaging_step(die: Die, knobs: PackagingKnobs, survived: bool, bins: SpeedB
       **bin-out** — a *working but out-of-grade* reject (the verdict flips to a fail, ``bin="reject"``),
       distinct from a front-end parametric fail.
 
-    At the default knobs (``assembly_yield = 1`` ⇒ ``survived`` always True; one open bin ⇒ no reject)
-    the step is the **identity**: every front-end-good die packages, bins to the single ``"pass"`` grade,
-    and its verdict is untouched — so the seam and the G1–G5 banked demos are byte-for-byte unchanged.
-    Records the outcome on the append-only history regardless (every die saw every step).
+    **The F4 inversion** — when ``delay_bins`` is given, the part is graded on the **chip delay**
+    ``τ_total`` (:class:`DelayBins`) instead of on ``I_Dsat``. That is the whole point: the ``I_Dsat``
+    proxy encodes "clock speed ∝ drive current", the *era-appropriate and false* pre-1997 premise, and
+    ``τ_total = τ_gate(I_Dsat) + τ_wire`` is what the part actually switches at. Since ``τ_wire`` is a
+    **common-mode floor** (no ``I_Dsat`` in it), the across-wafer drive spread maps to a speed spread
+    damped by ``1 − wire_share`` — the *same* silicon and the *same* ``I_Dsat`` histogram, grading
+    differently. ``delay_bins = None`` (the default) ⇒ grade on ``I_Dsat`` exactly as today (the seam).
+    A die with no delay (the ``interconnect`` knob off) cannot be graded on a currency it does not carry
+    and bins to ``reject`` — :meth:`DelayBins.assign`'s rule for a missing read, mirroring
+    :meth:`SpeedBins.assign`'s for a missing ``I_Dsat``.
+
+    At the default knobs (``assembly_yield = 1`` ⇒ ``survived`` always True; one open bin ⇒ no reject;
+    ``delay_bins = None`` ⇒ the ``I_Dsat`` grade) the step is the **identity**: every front-end-good die
+    packages, bins to the single ``"pass"`` grade, and its verdict is untouched — so the seam and the
+    G1–G5 banked demos are byte-for-byte unchanged. Records the outcome on the append-only history
+    regardless (every die saw every step).
     """
     knobs_in = {"assembly_yield": knobs.assembly_yield, "step_yields": knobs.step_yields}
     # A front-end-failed (or untested) die is not packaged — it carries no assembly outcome.
@@ -447,16 +502,29 @@ def packaging_step(die: Die, knobs: PackagingKnobs, survived: bool, bins: SpeedB
         return die.record("packaging", knobs_in=knobs_in,
                           outputs={"packaged": True, "assembled": False, "verdict": "assembly scrap"},
                           assembled=False, verdict=v)
-    # Final test: bin the surviving part by I_Dsat (the speed proxy); a too-slow part bins out.
-    label = bins.assign(die.i_dsat_mA)
-    if bins.is_reject(label):
-        v = Verdict(False, (f"binned out — I_Dsat {die.i_dsat_mA:.2f} mA below the slowest sellable bin "
-                            f"(a working but out-of-grade part)",))
-        return die.record("packaging", knobs_in=knobs_in,
-                          outputs={"packaged": True, "assembled": True, "bin": label,
-                                   "i_dsat_mA": die.i_dsat_mA},
-                          assembled=True, bin=label, verdict=v)
-    return die.record("packaging", knobs_in=knobs_in,
-                      outputs={"packaged": True, "assembled": True, "bin": label,
-                               "i_dsat_mA": die.i_dsat_mA},
-                      assembled=True, bin=label)
+    # Final test: grade the surviving part. By default on I_Dsat (the pre-1997 speed proxy) exactly as
+    # today — the seam. With delay_bins given, on the chip delay τ_total instead: the F4 inversion, where
+    # the same part is graded in the currency it actually switches in.
+    if delay_bins is None:
+        label = bins.assign(die.i_dsat_mA)
+        rejected = bins.is_reject(label)
+        reason = (f"binned out — I_Dsat {die.i_dsat_mA:.2f} mA below the slowest sellable bin "
+                  f"(a working but out-of-grade part)")
+        outputs = {"packaged": True, "assembled": True, "bin": label, "i_dsat_mA": die.i_dsat_mA}
+    else:
+        label = delay_bins.assign(die.delay_ps)
+        rejected = delay_bins.is_reject(label)
+        if die.delay_ps is None:
+            # A misconfiguration, not a slow part: delay grading with no delay read to grade.
+            reason = ("binned out — no chip delay to grade (τ_total was never read; delay binning "
+                      "needs the `interconnect` knob on)")
+        else:
+            reason = (f"binned out — τ_total {die.delay_ps:.1f} ps outside every sellable grade "
+                      f"(a working but out-of-grade part)")
+        outputs = {"packaged": True, "assembled": True, "bin": label, "i_dsat_mA": die.i_dsat_mA}
+        if die.delay_ps is not None:                 # F4 fingerprint — the currency that actually graded
+            outputs["tau_total_ps"] = die.delay_ps
+    if rejected:
+        return die.record("packaging", knobs_in=knobs_in, outputs=outputs,
+                          assembled=True, bin=label, verdict=Verdict(False, (reason,)))
+    return die.record("packaging", knobs_in=knobs_in, outputs=outputs, assembled=True, bin=label)

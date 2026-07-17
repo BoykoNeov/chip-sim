@@ -13,9 +13,10 @@ The triad, per ``docs/plans/beol-interconnect-f4.md`` + ``historical-modes.md``:
     the aspect ratio, the Elmore factor) **cancels exactly** in
     :func:`chip.interconnect.wire_delay_ratio` and :func:`chip.interconnect.crossover_width_ratio` — the
     F3 ``leakage_decades_saved`` discipline, and the module's only licensed headline;
-  * **cross-check (non-circular):** the cited bulk resistivities — handbook values, **never fitted to a
-    delay curve** — reproduce IBM's independently reported **~40%** resistance reduction for the 1997
-    Al→Cu swap;
+  * **consistency check (deliberately NOT billed as non-circular — it is weaker than F3's):** the cited
+    bulk resistivities reproduce IBM's independently reported **~40%** resistance reduction for the 1997
+    Al→Cu swap. At a fixed geometry ``R_Al/R_Cu`` **is** ``ρ_Al/ρ_Cu`` identically, so this checks the
+    *inputs* against the report, not a structural form;
   * **honesty guards (claims about where the model may speak, not physics):** Ru is absent from the
     registry until slice 4 carries the size-effect physics, and the bulk model's ``W ≫ λ`` validity bound
     is explicit;
@@ -316,23 +317,87 @@ def test_bulk_regime_guard_marks_where_this_slice_may_speak():
     assert not cu.bulk_regime_ok(0.003)         # 3 nm — wildly outside; the Ru era.
 
 
-def test_the_guard_fires_on_coppers_own_crossover_which_is_why_s4_is_not_a_ru_only_slice():
-    """The guard flags THIS slice's own operating point — physically right, and the S4 motivation.
+def test_where_the_guard_fires_is_a_statement_about_the_LOAD_not_a_property_of_the_slice():
+    """Whether Cu's crossover is inside the bulk regime depends on ``C_load`` — **corrected at slice 2**.
 
-    Cu's crossover lands at ~0.167 µm but the bulk model wants W > ~0.19 µm (5λ), so the size effect is
-    already a ~20% correction exactly where the Al→Cu story ends. That is not a defect and not a
-    contradiction — it is *historically exact*: the size effect became a **copper** problem at sub-200 nm,
-    long before ruthenium was on any roadmap. Pinned so slice 4 cannot frame ρ_eff(d) as a Ru-only
-    concern, and so this slice's own ceiling stays visible rather than implied.
+    Slice 1 asserted "the guard fires on copper's own crossover (~0.167 µm), which is why S4 is not a
+    Ru-only slice" — but that rested on the **test-local** 23 fF load below (a *1 µm* channel), not on
+    any operating point the sim runs. When slice 2 wired the **real** chain, the fan-out-1 load off the
+    game's own device (``t_ox`` ≈ 14 nm, W = 10 µm, L = the printed ~167 nm CD ⇒ ``C_load`` ≈ 4.1 fF)
+    put the crossover at ~0.395 µm — **comfortably inside** the bulk regime. Both are pinned here: the
+    load is what moves the crossover, so neither is "the" operating point.
+
+    The **S4 motivation survives and is unchanged**, because it never needed this: the size-effect
+    correction grows without bound as W scales below ~0.19 µm, and the size effect became a **copper**
+    problem at sub-200 nm (cited history) long before ruthenium was an option. What died is only the
+    claim that *this* slice already sits outside its own model's competence — it does not.
     """
-    load = ic.gate_load_capacitance(device.oxide_capacitance(0.015), 10.0, 1.0)
     cu = ic.METALS["Cu"]
-    w_x = ic.crossover_width_um(3.3e-3, load, metal="Cu")
-    assert not cu.bulk_regime_ok(w_x)                       # this slice's own operating point is outside
-    assert cu.bulk_regime_ok(5.0 * w_x)                     # ...and a wide line is comfortably inside
-    # The correction it is missing there is real but not fatal (~λ/W ≈ 20%), which is why S1 may still
-    # speak about the Al→Cu ERA (250 nm, comfortably bulk) while S4 owns the sub-200 nm regime.
-    assert 0.15 < cu.mfp_nm / (w_x * 1e3) < 0.35
+    # The game's real fan-out-1 load (channel = the printed CD) — the crossover is INSIDE the bulk regime.
+    game_load = ic.gate_load_capacitance(device.oxide_capacitance(0.0141), 10.0, 0.167)
+    w_game = ic.crossover_width_um(3.3e-3, game_load, metal="Cu")
+    assert 0.35 < w_game < 0.45                             # ~0.395 µm
+    assert cu.bulk_regime_ok(w_game)                        # ...and the bulk model may speak there
+
+    # A HEAVIER load (a 1 µm channel / fan-out > 1) pushes the crossover down, and there the guard fires.
+    heavy_load = ic.gate_load_capacitance(device.oxide_capacitance(0.015), 10.0, 1.0)
+    w_heavy = ic.crossover_width_um(3.3e-3, heavy_load, metal="Cu")
+    assert 0.15 < w_heavy < 0.19                            # ~0.167 µm
+    assert not cu.bulk_regime_ok(w_heavy)                   # outside — the size effect is ~20% there
+    assert 0.15 < cu.mfp_nm / (w_heavy * 1e3) < 0.35
+
+    # The direction is the invariant, not either number: a heavier load ⇒ a slower gate ⇒ the wire only
+    # takes over at a NARROWER line. W_x ∝ 1/√τ_gate ∝ 1/√C_load.
+    assert w_heavy < w_game
+    assert w_game / w_heavy == pytest.approx(math.sqrt(heavy_load / game_load), rel=1e-9)
+
+
+# --------------------------------------------------------------------------- #
+# The damping law — ∂ln f/∂ln I_Dsat = 1 − wire_share (the consumer's payload, verified numerically)
+# --------------------------------------------------------------------------- #
+def test_drive_sensitivity_equals_the_numerical_log_derivative_of_the_real_clock_rate():
+    """``drive_sensitivity`` is not a restatement — the analytic ``1 − wire_share`` matches a finite
+    difference of the model's own ``f = 1/τ_total``, at every drive current.
+
+    This is the slice-2 payload's engine: it says exactly how much a better transistor is still worth.
+    Asserting it against a numerical derivative (rather than against ``1 − wire_share`` again) is what
+    makes it a *check* — the property claims an analytic identity, and the model has to honour it.
+    """
+    geom = ic.WireGeometry()
+    load = 4.0e-15
+    for i in (5.0e-4, 1.0e-3, 3.3e-3, 1.0e-2, 5.0e-2):
+        d = ic.delay(geom, i_dsat_A=i, c_load_farad=load)
+        h = i * 1.0e-6                                       # a central difference in ln-space
+        f_hi = 1.0 / ic.delay(geom, i + h, load).tau_total_s
+        f_lo = 1.0 / ic.delay(geom, i - h, load).tau_total_s
+        numeric = (math.log(f_hi) - math.log(f_lo)) / (math.log(i + h) - math.log(i - h))
+        assert d.drive_sensitivity == pytest.approx(numeric, rel=1e-5)
+        assert 0.0 < d.drive_sensitivity < 1.0               # the wire always damps, never inverts
+
+
+def test_drive_sensitivity_is_one_without_a_wire_and_collapses_to_zero_as_the_wire_takes_over():
+    """The two limits that bracket the era: ``1`` = the pre-1997 premise, ``→ 0`` = the wire wall.
+
+    A zero-length wire has no ``τ_wire``, so ``∂ln f/∂ln I = 1`` **exactly** — a 3%-faster transistor is
+    a 3%-faster part, which is precisely what :class:`fab_game.spec.SpeedBin` assumes. As the wire term
+    grows the same transistor improvement buys monotonically less, → 0: the transistor stops setting
+    speed. Nothing here is calibrated — the limits are structural.
+    """
+    load = 4.0e-15
+    no_wire = ic.delay(ic.WireGeometry(length_um=0.0), 3.3e-3, load)
+    assert no_wire.tau_wire_s == 0.0
+    assert no_wire.drive_sensitivity == 1.0                  # exact — the pre-1997 premise, recovered
+    assert no_wire.wire_share == 0.0
+
+    # Lengthen the wire (τ_wire ∝ L²): the sensitivity falls monotonically toward zero.
+    sens = [ic.delay(ic.WireGeometry(length_um=L), 3.3e-3, load).drive_sensitivity
+            for L in (0.0, 100.0, 1000.0, 10_000.0)]
+    assert sens == sorted(sens, reverse=True)                # monotone decreasing
+    assert sens[-1] < 0.01                                   # a 1 cm global wire: the drive is worth ~nothing
+    # ...and a WORSE metal damps harder at the same geometry (Al's τ_wire is 1.58× Cu's).
+    al = ic.delay(ic.WireGeometry(), 3.3e-3, load, metal="Al")
+    cu = ic.delay(ic.WireGeometry(), 3.3e-3, load, metal="Cu")
+    assert al.drive_sensitivity < cu.drive_sensitivity
 
 
 # --------------------------------------------------------------------------- #

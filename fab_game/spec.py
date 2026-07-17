@@ -128,6 +128,127 @@ class SpeedBins:
 
 
 @dataclass(frozen=True)
+class DelayBin:
+    """One speed bin graded on **chip delay** ``τ_total`` — a label + a half-open band ``(lo, hi]`` in **ps**.
+
+    The F4 sibling of :class:`SpeedBin`, and the **inverse currency**: ``SpeedBin`` grades on ``I_Dsat``
+    where *higher is faster*; this grades on delay where **lower is faster**. So the premium grade is the
+    band with the **low** ``hi_ps`` and an open ``lo_ps`` — the ordering flips, which is exactly what
+    :meth:`DelayBins.from_speed_bins` exists to get right once.
+
+    **The band is ``(lo_ps, hi_ps]`` — exclusive low, inclusive high — the deliberate mirror of
+    ``SpeedBin``'s ``[lo_mA, hi_mA)``, not a slip.** ``SpeedBin`` is inclusive on ``lo_mA``, which is its
+    *fast* edge; reversing the currency puts the fast edge at ``hi_ps``, so that is where the inclusive
+    bound belongs. It is also what the grade *means*: "premium = **at least** 2.6% faster than typical"
+    is ``delay ≤ τ_edge``, not ``<``.
+
+    Honest scope on that: the convention is **not empirically distinguishable**, and no test here claims
+    otherwise. A part sitting *exactly* on an edge resolves arbitrarily under any convention, because the
+    mapped edge and the part's own delay are equal algebraically but ~1 ulp apart in float. It is kept
+    because it is the principled reading, and it costs nothing. The bound **swap** (``lo_mA`` → ``hi_ps``)
+    is the trap that *does* bite — get it backwards and every part mis-grades while the histogram still
+    looks like a clean partition. ``None`` = open on that side.
+    """
+
+    label: str
+    lo_ps: float | None = None
+    hi_ps: float | None = None
+
+    def contains(self, delay_ps: float) -> bool:
+        return ((self.lo_ps is None or delay_ps > self.lo_ps)
+                and (self.hi_ps is None or delay_ps <= self.hi_ps))
+
+
+@dataclass(frozen=True)
+class DelayBins:
+    """The final-test binning policy graded on **chip delay** — the F4 inversion of :class:`SpeedBins`.
+
+    Same policy, **true currency.** :class:`SpeedBins` grades on ``I_Dsat`` because "clock speed ∝ drive
+    current" — the *era-appropriate and false* pre-1997 premise (its own docstring says so). This grades
+    on the delay the chip actually switches at, ``τ_total = τ_gate(I_Dsat) + τ_wire``, where the wire term
+    is **blind to the transistor**. Binning is still a **grading policy, not physics** (ADR 0005 §1) and
+    the ps edges are still house numbers; what changes is *which quantity the grade reads*.
+
+    **Why re-binning is not, by itself, a finding.** ``τ_total`` is a strictly monotone function of
+    ``I_Dsat``, so binning on it with edges mapped through *that same function* yields a **byte-identical
+    partition** — every die keeps its grade, and nothing is learned. The finding requires the edges to
+    encode the market's promise (*"a 2.6%-faster part"*) rather than a mapped threshold, which is what
+    :meth:`from_speed_bins` constructs. Hand-written ps edges risk manufacturing the collapse out of a
+    threshold choice; that constructor is the honest path, and it introduces **no new house number**.
+    """
+
+    bins: tuple[DelayBin, ...] = ()
+    reject_label: str = "reject"
+
+    @classmethod
+    def from_speed_bins(cls, speed_bins: SpeedBins, i_dsat_nom_mA: float,
+                        tau_nom_ps: float) -> "DelayBins":
+        """Re-express an ``I_Dsat`` grade ladder as the **same market promise** in the delay currency.
+
+        A speed grade is a claim about **clock rate relative to the nominal part**: G6's
+        ``premium ≥ 3.38 mA`` against a ~3.294 mA nominal *means* "at least 2.6% faster than typical".
+        Under the pre-1997 premise (speed ∝ ``I_Dsat``) that promise is believed to cost exactly
+        ``I_edge/I_nom`` of drive, so the delay a part must hit to honour it is
+
+            ``τ_edge = τ_nom · (I_nom / I_edge)``
+
+        — the **old premise's own arithmetic**, evaluated at the nominal part (``tau_nom_ps`` = that
+        part's *true* ``τ_total``, wire included). Every edge maps through this; ``None`` (an open side)
+        stays open, and the bounds **swap** (higher mA = faster = *lower* ps), which is the ordering trap
+        this constructor exists to contain.
+
+        **What makes the result honest:** it introduces no new house number (the fractions are G6's
+        existing bins, the anchor is the nominal part), and the flagged ``L`` **cancels** — the nominal
+        part is "typical" under both policies by construction, so the wire's absolute level shift is gone
+        and only its *compression* survives. A die at ``I_edge`` truly has
+        ``τ_total − τ_edge = τ_wire·(1 − I_nom/I_edge)``: **positive** above nominal (it misses the
+        premium grade it would have won) and **negative** below (the slow tail is *rescued* from the
+        bin-out). At ``τ_wire = 0`` both are zero and the partition is **identical** — the seam. The
+        distribution compresses **symmetrically** toward typical: the wire costs the premium *grade*, not
+        the die count. This is a grading loss, never a yield loss.
+        """
+        if i_dsat_nom_mA <= 0.0:
+            raise ValueError(f"i_dsat_nom_mA must be > 0, got {i_dsat_nom_mA}")
+        if tau_nom_ps <= 0.0:
+            raise ValueError(f"tau_nom_ps must be > 0, got {tau_nom_ps}")
+
+        def edge(i_mA: float | None) -> float | None:
+            """The delay the old premise says an ``i_mA`` part hits (``None`` = open stays open)."""
+            if i_mA is None:
+                return None
+            if i_mA <= 0.0:
+                raise ValueError(f"speed-bin edges must be > 0 mA to map to a delay, got {i_mA}")
+            return tau_nom_ps * (i_dsat_nom_mA / i_mA)
+
+        # lo_mA (the FAST edge) → hi_ps (the fast edge in delay); hi_mA → lo_ps. The bounds swap.
+        return cls(bins=tuple(DelayBin(b.label, lo_ps=edge(b.hi_mA), hi_ps=edge(b.lo_mA))
+                              for b in speed_bins.bins),
+                   reject_label=speed_bins.reject_label)
+
+    def assign(self, delay_ps: float | None) -> str:
+        """The bin label for a die's ``τ_total`` (ps) — the first containing bin, else ``reject_label``.
+
+        ``None`` (a die with no delay read — the ``interconnect`` knob is off, or the device refused)
+        bins to ``reject_label``: it cannot be graded on a currency it does not carry. Mirrors
+        :meth:`SpeedBins.assign`'s rule for a missing ``I_Dsat`` exactly.
+        """
+        if delay_ps is None:
+            return self.reject_label
+        for b in self.bins:
+            if b.contains(delay_ps):
+                return b.label
+        return self.reject_label
+
+    def is_reject(self, label: str) -> bool:
+        return label == self.reject_label
+
+    @property
+    def labels(self) -> tuple[str, ...]:
+        """Every grade label plus the reject tail — the bin-histogram keys (a fixed, ordered set)."""
+        return tuple(b.label for b in self.bins) + (self.reject_label,)
+
+
+@dataclass(frozen=True)
 class SpecSet:
     """The full per-die acceptance test: the functional gates + the parametric windows.
 
@@ -172,6 +293,10 @@ class SpecSet:
     #                                                                      not a transistor's acceptance axis)
     geometry: GeometrySpec = field(default_factory=GeometrySpec)
     speed_bins: SpeedBins = field(default_factory=SpeedBins)   # G6 final-test binning (default: one open bin)
+    delay_bins: "DelayBins | None" = None   # F4 delay binning — None (the seam) ⇒ grade on I_Dsat as today.
+    #                                         Set ⇒ grade on τ_total instead (the pre-1997 premise inverted);
+    #                                         needs the `interconnect` knob on, or every die bins to reject
+    #                                         (it carries no delay to grade). See DelayBins.
     require_resolved: bool = True
 
     def verdict(self, die: Die, geometry_reason: str | None = None) -> Verdict:

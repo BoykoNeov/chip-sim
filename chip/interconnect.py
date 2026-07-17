@@ -94,12 +94,21 @@ F4 plan exists to prevent. Ru arrives in slice 4 **with** the size-effect and ba
 make its constants mean anything. ``λ`` is carried here **only as a validity guard** (an honesty device,
 like F3's ladder cap) — slice 4 promotes it from a guard to a term.
 
-**And the guard already fires on copper, which is the point, not a defect:** the house operating point
-puts Cu's crossover at ~0.167 µm, where :meth:`Metal.bulk_regime_ok` is **False** (Cu needs ``W`` >
-~0.19 µm at ``margin=5``) — the size effect is already a ~20% correction there. That is *physically
-correct and historically exact*: it is **why** the size effect became a copper problem at sub-200 nm,
-long before ruthenium was on anyone's roadmap. **So slice 4 is motivated for Cu too, not only for Ru** —
-it is the honest ceiling on *this* slice's own operating point, not merely the gate on a future metal.
+**Where the bulk model stops being valid — and a slice-1 claim slice 2 had to correct.** *Where* the
+crossover lands is a statement about the **load**, not a fixed property of this module. At the **game's
+own** operating point — the fan-out-1 load off the real chain (``C_ox`` at the grown ``t_ox`` ≈ 14 nm,
+``W`` = 10 µm, ``L`` = the printed ~167 nm CD ⇒ ``C_load`` ≈ 4.1 fF) — Cu's crossover sits at
+**~0.395 µm**, which is **comfortably inside** the bulk regime (Cu wants ``W`` > ~0.19 µm at
+``margin=5``). A **heavier** load pushes it down: at ``C_load`` ≈ 23 fF (a 1 µm channel, or fan-out > 1)
+it lands at ~0.167 µm, *outside* the regime, and :meth:`Metal.bulk_regime_ok` fires. **Slice 1 asserted
+that second case as "this slice's own operating point"; it was a test-local load, and the first is the
+one the game actually runs** — so the honest reading is that this slice's Al→Cu era (250 nm, ``W`` ≫ Cu's
+39 nm ``λ``) is **inside** the bulk model's competence, exactly as claimed.
+
+**Slice 4 is still motivated for copper, not only for ruthenium** — but for the *right* reason: not
+because the operating point is already outside the bulk regime (it is not), but because the size-effect
+correction **grows without bound as ``W`` scales below ~0.19 µm**, and that is cited history — the size
+effect became a **copper** problem at sub-200 nm, long before ruthenium was on anyone's roadmap.
 
 Named scope edges (honest ceilings)
 -----------------------------------
@@ -401,6 +410,31 @@ class Delay:
     def wire_limited(self) -> bool:
         """Whether the wire term is the majority of ``τ_total`` — i.e. the transistor no longer sets speed."""
         return self.wire_share > 0.5
+
+    @property
+    def drive_sensitivity(self) -> float:
+        """``∂ln f / ∂ln I_Dsat = 1 − wire_share`` — what a drive improvement is still worth. **Exact.**
+
+        The clock rate is ``f = 1/τ_total = I/(A + τ_wire·I)`` with ``A = C_load·V_dd`` (so
+        ``τ_gate = A/I``). Differentiating, ``∂ln f/∂ln I = 1 − τ_wire/(τ_gate + τ_wire) = 1 −
+        wire_share`` — **exact at every ``I_Dsat``**, not a small-signal linearization, and structurally
+        prefactor-free (every house constant enters only through ``wire_share``, which is a *readout*,
+        not a claim).
+
+        This is the law the binning consumer turns into money, and the sharpest form of the
+        discriminator. Under the pre-1997 premise (``speed ∝ I_Dsat``, which
+        :class:`fab_game.spec.SpeedBin` still encodes) this sensitivity is **1**: a 3%-faster transistor
+        is a 3%-faster part. Here it is ``1 − wire_share``, because ``τ_wire`` is a **common-mode**
+        additive floor — it shifts every die's delay by the same amount and contributes **no spread of
+        its own**. So the across-wafer ``I_Dsat`` spread maps to a speed spread damped by exactly this
+        factor while the transistor histogram is *untouched*, and as ``wire_share → 1`` it → **0**:
+        **tightening CD control stops buying speed grades.**
+
+        Note the damping is **symmetric** — it compresses the *whole* speed distribution toward typical,
+        pulling the slow tail up exactly as it pulls the fast tail down. The wire costs the **premium
+        grade** (the margin), not the die count: this is a *grading* loss, never a yield loss.
+        """
+        return 1.0 - self.wire_share
 
 
 def delay(

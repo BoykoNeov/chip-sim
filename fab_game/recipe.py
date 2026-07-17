@@ -572,6 +572,21 @@ class DeviceKnobs:
     t_phys`` exactly (:func:`chip.high_k.eot` at K=3.9 is the identity), so it reproduces the ``None``
     device byte-for-byte and merely **turns the leakage readout on**; the ``dielectric``/``j_gate`` record
     keys are added only when engaged.
+
+    ``interconnect`` (F4, the BEOL wire) names the metal the chip is wired in (a
+    :data:`chip.interconnect.METALS` key — ``"Al"`` | ``"Cu"``) and turns on the **chip delay** readout
+    ``τ_total = τ_gate(I_Dsat) + τ_wire`` (:func:`chip.interconnect.delay`), on a representative
+    **global** line (:class:`chip.interconnect.WireGeometry`'s house geometry — the metal is the only
+    knob; the node ladder is a demo-local sweep, since the sim has no node concept). It adds the sim's
+    **first output the transistor chain does not set**: the two terms share no variable, and
+    ``∂τ_wire/∂I_Dsat = 0`` — the wire term is a **common-mode floor** on every die.
+
+    Like ``bv_V``/``t_rr`` it is **purely additive** — it never moves ``V_t``/``I_Dsat``, and it is scored
+    only by :attr:`fab_game.spec.SpecSet.delay_bins` (``None`` by default). So engaging it alone changes
+    **nothing**: the delay is emitted and read by no one. It is the *pair* — the knob plus delay-binning —
+    that inverts the ``SpeedBin`` premise "clock speed ∝ drive current" this module's own docstring still
+    states. Defaults to ``None`` → **no delay is emitted at all** (the seam; the G1–G7 banked demos and the
+    journey are unchanged), and the ``interconnect``/``τ`` record keys are added only when engaged.
     """
 
     gate: str = "n+poly"               # n⁺-poly gate (φ_gate = +0.55 V)
@@ -581,6 +596,7 @@ class DeviceKnobs:
     vt_adjust_kind: str | None = None  # "p" acceptor (raises V_t) | "n" donor (lowers) | None
     contact_scheme: str | None = None  # F2 silicide/contact model ("direct-Al"|"salicide"); None = access-only (the seam)
     dielectric: str | None = None      # F3 gate stack ("SiO2"|"HfO2"|"TiO2"); None = t_ox as-is, no leakage (the seam)
+    interconnect: str | None = None    # F4 BEOL wire metal ("Al"|"Cu"); None = no wire, no delay emitted (the seam)
 
 
 @dataclass(frozen=True)
