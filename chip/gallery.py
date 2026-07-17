@@ -115,6 +115,8 @@ DEEPENINGS = [
          "LOCOS isolation — oxidant under the nitride mask grows the bird's beak that eats active area; opposing beaks merge and pinch off below a min pitch (∝ field-oxide thickness); STI's vertical walls clear it."),
     Demo("demo_silicide_history", "hist·B7",
          "Silicide / contact resistance — the source series-R is two terms with different R_sh exponents (access linear + TLM contact sublinear); salicide shunts the sheet so access collapses and the bottleneck flips to the contact."),
+    Demo("demo_highk_history", "hist·B8",
+         "High-κ gate dielectric — one thickness feeds two currencies: SiO₂ scales into a tunnelling wall at EOT ≈ 1.5 nm, and HfO₂ clears it with a 6.4× thicker barrier at the SAME electrical gate (V_t / C_ox byte-identical)."),
 ]
 
 ALL_DEMOS = SPINE + DEEPENINGS

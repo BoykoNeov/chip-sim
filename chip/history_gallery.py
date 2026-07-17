@@ -132,6 +132,19 @@ MODES = [
         "the litho floor.",
     ),
     HistoryMode(
+        module="demo_highk_history", tag="B8", stage="Gate dielectric", era="≈2000s",
+        period="Thermal SiO₂ as the gate dielectric, scaled thinner at every node — the electrical gate "
+        "(the capacitance) and the physical tunnel barrier are the same single layer.",
+        wall="Because that one layer is both currencies, every ångström of electrical scaling comes off "
+        "the tunnel barrier: gate leakage climbs ~1 decade per ~1.8 Å, so the ladder's last 2 nm costs "
+        "~11 decades and the gate runs past ~1 A/cm² at EOT ≈ 1.5 nm — the roadmap's electrical target "
+        "and its leakage budget stop being satisfiable by the same thickness.",
+        successor="A high-κ dielectric (HfO₂, 2007, 45 nm) splits the thickness into two currencies: at "
+        "the same EOT the device is untouched — same C_ox, same V_t, same drive — while the physical "
+        "layer is 6.4× thicker, so the tunnelling collapses by orders of magnitude. More κ is not "
+        "automatically better: TiO₂ (κ=80) buys 20× the thickness with a zero barrier and still leaks.",
+    ),
+    HistoryMode(
         module="demo_metallization_history", tag="B6", stage="Metallization", era="≈1970s",
         period="Evaporated pure-aluminium contacts, sintered sub-eutectically onto the silicon.",
         wall="The Al dissolves silicon and spikes through the shallow (implant-era) junction — a "

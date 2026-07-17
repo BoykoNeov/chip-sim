@@ -1,8 +1,10 @@
 ---
 name: high-k-gate-f3
-description: "project (2026-07-15, slice 2 wired 2026-07-17): F3 high-κ — EOT is an IDENTITY (device.py untouched); search overturned the plan's single-λ; knob = material-only, reads inherited t_ox as target EOT"
-metadata:
+description: "project (2026-07-15 → slice 3 BUILT 2026-07-17): F3 high-κ — EOT is an IDENTITY (device.py untouched); knob = material-only; B8 demo rides high_k.py (no Tier-2 wrapper); ladder capped at the honest regime. Only the IL slice remains"
+metadata: 
+  node_type: memory
   type: project
+  originSessionId: b2dd0b8e-9346-4717-9573-14712a863ee8
 ---
 
 **F3 slice 1 BUILT (2026-07-15)** — `chip/high_k.py` + 23 tests, fast lane green, **no existing file
@@ -95,7 +97,38 @@ keys only when engaged; `j_gate=None` on knob-off/refused/bare (gap ≠ fake zer
 **separate** from [[fab-game-g4b]]'s SRH channel (`j_leak`/`τ`/`t_rr` unmoved). **Not scored by any target
 yet** — a window would need the flagged absolute `J₀`, whereas `decades_saved` is prefactor-free.
 
-**Remaining F3:** `highk_history.py` Tier-2 mode + demo + gallery rung (slice 3; the scaling ladder drives
-thinning through `die.t_ox_um` upstream), then the **interfacial-layer** slice (series tunnel barrier +
-series capacitance, both sides at once). Then **F4 (BEOL interconnect RC)** is the last PROMOTABLE roadmap
-step. Roadmap card comes off `docs/roadmap.html` only when F3 ships ([[roadmap-page]]).
+---
+
+**SLICE 3 BUILT (2026-07-17)** — `chip/demo_highk_history.py` = **B8**, the 8th timeline mode + both gallery
+rungs + `test_demo_highk_history.py` (7 tests). Fast lane green (1048). **`device.py`, `high_k.py`, `fab_game/`
+all untouched** — slice 3 is a display surface. Slotted **B5→B8→B6** (the gate stack's place on the process
+spine, not appended).
+
+**NO `highk_history.py` — a deliberate deviation from the plan's own "What to touch"** (that line predates F2).
+Advisor concurred: a Tier-2 `*_history.py` earns its place only by carrying **period physics the base lacks**
+(A2 blur, A4 swelling, B5 beak); `high_k.py` already holds SiO₂/HfO₂/TiO₂ as registry entries and
+`gate_stack()` is *documented* as "the demo's unit of comparison" → a wrapper = zero physics. **B7 is the
+precedent** (`contact_resistance.py` + `demo_silicide_history.py`, no `silicide_history.py`). Rule of thumb:
+**demo rides the base module unless there's distinct period physics to hold.**
+
+**The magnitude trap governed the build (it was the acceptance criterion, not a caveat).** Ladder capped at
+**EOT = 1.0 nm** — the 45 nm target, *inside* the validated direct-tunnelling regime — where the model lands
+**on top of published data** (SiO₂ 6.5e2, HfO₂ 1.8e-3 A/cm²) and the featured win is **+5.6 dec** (m* band
+3.9–9.5; lit ~3–5). Wall reads **EOT ≈ 1.50 nm** (the J₀ anchor showing through). **The trap has a SECOND
+end nobody flagged:** off the *thick* end HfO₂ runs to ~**1e-22 A/cm²** (meaningless — trap-limited long
+before). Fix = the left panel's **display floor as an honesty device**: curves **exit the axis** rather than
+print a fabricated number, which *also* un-squashes the SiO₂ wall (the payload) from ⅓ of the panel. **2 of
+7 tests are honesty guards, not physics guards** (ladder cap; never round a "≳ N" claim **up** — 5.6 must not
+read 6), pinned because they're claims about *where the model may speak*.
+
+**The bug the build caught (worth remembering — it nearly shipped).** At a 1 nm gate `Q_dep/C_ox` collapses →
+unadjusted n-MOS reads **V_t ≈ 0.02 V**, a device that never turns off, headed for a student-facing figure.
+Fix = the **V_t-adjust implant `device.py` already had** (§5 `implant_dose`/`implant_kind`, cf. `demo_implant`)
+→ V_t ≈ 0.35 V. **Cannot disturb the invariance**: ΔV_t = q·dose/C_ox reads the *same* C_ox all 3 share
+(asserted). Lesson: a *representative* recipe at a scaled node isn't representative without the era's knobs.
+
+**Remaining F3:** the **interfacial-layer** slice only (series tunnel barrier + series capacitance, both sides
+at once — the honest EOT floor). Then **F4 (BEOL interconnect RC)** = last PROMOTABLE roadmap step. ⚠️ **The
+roadmap card was deliberately NOT pulled** — "F3 ships" is ambiguous while IL is open, and pulling a card off
+a published page is a **user call, not a commit side effect** (advisor). Surfaced to the user, awaiting the
+call ([[roadmap-page]]).

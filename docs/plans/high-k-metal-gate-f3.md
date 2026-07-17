@@ -22,6 +22,37 @@
 > **byte-for-byte identical for every material** through the real, untouched `device.py`, while `j_gate`
 > moves 22 decades across the registry — the proof the "don't touch `device.py`" claim was making.
 > Remaining: the history mode + demo (slice 3), and the interfacial-layer slice.
+>
+> **SLICE 3 BUILT (2026-07-17)** — the history mode + demo: `chip/demo_highk_history.py` (**B8**, the 8th
+> timeline mode), both gallery manifests, `chip/tests/test_demo_highk_history.py` (7 tests). Fast lane green
+> (1048); **`device.py`, `chip/high_k.py` and `fab_game/` all untouched** — slice 3 is a display surface.
+> Closes **open Q2**. **Deliberate deviation from "What to touch" below: NO `chip/highk_history.py`.** That
+> line predates F2 establishing the demo-rides-the-base-module pattern (B7 = `contact_resistance.py` +
+> `demo_silicide_history.py`, no `silicide_history.py`). A Tier-2 `*_history.py` exists to carry *period
+> physics the base module lacks* (A2's proximity blur, A4's swelling, B5's beak); `high_k.py` already carries
+> SiO₂/HfO₂/TiO₂ as first-class registry entries and `gate_stack()` is documented as "the demo's unit of
+> comparison" — a wrapper would hold **zero** distinct physics. Advisor concurred.
+>
+> **The magnitude trap (below) governed the build, and cost two design moves:** (a) the ladder is capped at
+> **EOT = 1.0 nm** — the 45 nm node's target, where the model sits *inside* the validated direct-tunnelling
+> regime and its numbers land **on top of published data** (SiO₂ 6.5e2, HfO₂ 1.8e-3 A/cm²); the featured win
+> is **+5.6 decades**, inside the flagged m* band (3.9–9.5) and adjacent to lit ~3–5. (b) The left panel's
+> **display floor is an honesty device**: HfO₂ off the *thick* end runs to ~1e-22 A/cm² (meaningless — real
+> stacks are trap-limited long before), so curves are allowed to **exit the axis** rather than print a
+> fabricated number, which also stops the SiO₂ wall — the payload — being squashed into a third of the panel.
+> Two of the 7 tests are **honesty guards, not physics guards** (the ladder cap; no rounding a "≳ N" claim
+> up), pinned because they are claims about *where the model may speak*.
+>
+> **One real bug the build surfaced:** at a 1 nm gate the depletion term collapses and an unadjusted n-MOS
+> reads **V_t ≈ 0.02 V** — a device that never turns off, which would have shipped in a student-facing
+> figure. Fixed with the **V_t-adjust implant** `device.py` already supports (§5, `implant_dose`/
+> `implant_kind`) → V_t ≈ 0.35 V, an honest 45 nm threshold. It cannot disturb the invariance: ΔV_t =
+> q·dose/C_ox reads the *same* C_ox all three materials share (asserted).
+>
+> Remaining: the **interfacial-layer** slice (the honest EOT floor — series tunnel barrier *and* series
+> capacitance, both sides at once). ⚠️ **The roadmap card (`docs/roadmap.html`) is deliberately NOT pulled**
+> — see [[roadmap-page]]'s graduation rule; whether F3 counts as "shipped" with the IL slice still open is a
+> user call, not a side effect of this commit.
 
 **The discriminating observable, stated first (the build's licence):** the gate oxide thickness feeds
 **two device quantities with different functional dependence**, and no single scalar can move both:
@@ -182,8 +213,12 @@ reports the `t_phys = EOT·κ/3.9` that target needs. The alternative — a knob
    leakage — additive, never folded into `lifetime.py`'s `device_leakage`, and asserted not to move
    `j_leak`/`τ`/`t_rr`. A scoring window is a **later** decision (it would need the flagged absolute `J₀`,
    whereas `decades_saved` is prefactor-free).
-2. **Demo home** — OPEN (slice 3). Lean unchanged: standalone `highk_history.py` — the consumer is the
-   *device*, not the furnace.
+2. **Demo home — RESOLVED (slice 3): `chip/demo_highk_history.py` alone, riding `chip/high_k.py` directly.**
+   The lean ("standalone, the consumer is the *device*, not the furnace") was right about the *home*; the
+   `highk_history.py` half was dropped — see the slice-3 header note. It lands as **B8** on the timeline
+   (`stage="Gate dielectric"`, era ≈2000s), slotted between **B5** (isolation) and **B6** (metallization) —
+   the gate stack's place on the process spine, not appended. Both gallery manifests are **glob-anchored**,
+   so the demo file and both rungs had to land in the same commit or `assert_manifest_complete()` fails.
 
    ⚠️ **The magnitude trap slice 3 inherits (raised at slice 2, do not walk into it).** Slice 2's driven
    numbers — HfO₂ `j_gate` = 1.1e-14 A/cm² at `t_phys` = 12.8 nm, a 22-decade span across the registry,
