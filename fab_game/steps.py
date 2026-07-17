@@ -23,6 +23,7 @@ from chip import breakdown as bd
 from chip import contact_resistance as cr
 from chip import diffusion_dopant as dd
 from chip import etch_deposition as ed
+from chip import high_k as hk
 from chip import oxidation as ox
 from chip import litho
 from chip import device as dev
@@ -301,7 +302,19 @@ def device_step(
     Like ``BV`` it is **purely additive** — it never moves ``V_t``/``I_Dsat`` and is scored only by the
     power-rectifier target's optional ``t_rr`` window (the MOSFET flavors leave it open), so the seam and the
     G1–G7 banked demos are byte-for-byte unchanged (``t_rr`` is set whenever the device resolves, like
-    ``τ``/leakage; a refused/bare die carries ``t_rr = None``)."""
+    ``τ``/leakage; a refused/bare die carries ``t_rr = None``).
+
+    **High-κ gate stack (F3)** — with ``knobs.dielectric`` set, the **inherited** grown oxide ``die.t_ox_um``
+    is read as the gate stack's target **EOT** and :func:`chip.high_k.gate_stack` re-implements that same
+    *electrical* gate in the chosen material: the physical layer grows by ``K/3.9`` and the new ``j_gate``
+    output — direct tunnelling, **exponential in the physical thickness** — collapses. This is the F3
+    discriminator, and the wiring is what makes it assertable end-to-end: the EOT feeds the *existing*
+    ``t_ox_um`` argument of :func:`chip.device.threshold_voltage`, so ``V_t``/``I_Dsat``/``C_ox`` are
+    **identical for every material at the same EOT** (``ε_SiO₂/EOT ≡ ε₀K/t_phys`` is an identity, not an
+    approximation — ``device.py`` is untouched) while the leakage moves by orders of magnitude. One
+    thickness, two currencies; ``die.t_ox_um`` is never written back (it stays what the furnace grew).
+    ``dielectric = None`` → ``t_ox_um`` flows through untouched and no leakage is emitted (the seam);
+    ``"SiO2"`` is the engaged seam (``EOT == t_phys`` exactly) — the same device, leakage now readable."""
     if die.t_ox_um is None or die.cd_um is None or die.resolved is False:
         reason = ("litho image not resolved" if die.resolved is False
                   else "missing upstream t_ox/CD")
@@ -311,10 +324,19 @@ def device_step(
             outputs={"refused": reason},
         )
     Q_ox = 0.0 if contamination is None else sodium_oxide_charge(contamination.Na)
+    # F3 (dielectric set): re-implement the incumbent electrical gate in the chosen material. The inherited
+    # GROWN thickness is read as the target EOT — the matched-EOT historical move — so the physical layer
+    # becomes t_phys = EOT·K/3.9 and tunnels j_gate, while the EOT below feeds the SAME t_ox_um argument
+    # device.threshold_voltage already consumes (ε_SiO₂/EOT ≡ ε₀K/t_phys is an IDENTITY → V_t/I_Dsat/C_ox
+    # are material-independent at fixed EOT; device.py untouched). die.t_ox_um is never written back.
+    # dielectric None → t_ox_um flows through and no leakage is emitted (the seam); "SiO2" → EOT == t_phys
+    # exactly (high_k.eot at K=3.9 is the identity), the same device with the leakage readout turned on.
+    stack = None if knobs.dielectric is None else hk.gate_stack(die.t_ox_um, knobs.dielectric)
+    t_ox_electrical_um = die.t_ox_um if stack is None else stack.eot_um
     # §5 V_t-adjust implant (the honest de-fake): a shallow implanted sheet shifts V_t by ±q·Q/C_ox
     # (acceptor raises, donor lowers). dose 0 (the default) skips the term → byte-for-byte the prior V_t.
     mos = dev.threshold_voltage(
-        channel_N_A, die.t_ox_um, gate=knobs.gate, channel_length_um=die.cd_um, Q_ox=Q_ox,
+        channel_N_A, t_ox_electrical_um, gate=knobs.gate, channel_length_um=die.cd_um, Q_ox=Q_ox,
         implant_dose=knobs.vt_adjust_dose, implant_kind=knobs.vt_adjust_kind,
     )
     # S/D series resistance (the diffusion-dose consumer): R_series = inherited R_s × the contact-square
@@ -369,6 +391,9 @@ def device_step(
         knobs_in["R_series_ohm"] = R_series_ohm              # (so an ideal-contact device record is byte-unchanged)
     if knobs.contact_scheme is not None:                     # F2 fingerprint — only when the two-term model is engaged
         knobs_in["contact_scheme"] = knobs.contact_scheme    # (so an access-only device record is byte-unchanged)
+    if stack is not None:                                    # F3 fingerprint — only when a gate stack is specified
+        knobs_in["dielectric"] = stack.material             # (so a bare-t_ox device record is byte-unchanged)
+        knobs_in["t_phys_um"] = stack.t_phys_um             # what was physically deposited (EOT·K/3.9)
     if mos.vt_adjust != 0.0:                                 # §5 fingerprint — only when a V_t-adjust implant is set
         knobs_in["vt_adjust"] = mos.vt_adjust                # (so a no-implant device record is byte-unchanged)
     outputs = {"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox,
@@ -376,11 +401,15 @@ def device_step(
                "t_rr_ns": t_rr * 1.0e9}                      # slice-5 reverse recovery (∝ τ; additive)
     if bv_V is not None:                                     # slice-2 BV — only when the junction was resolved
         outputs["bv_V"] = bv_V                              # (so a no-x_j device record is byte-unchanged)
+    if stack is not None:                                    # F3 — the new additive output, only when engaged
+        outputs["j_gate_A_cm2"] = stack.gate_leakage_A_cm2  # FLAGGED absolute (the shared house prefactor)
+        outputs["decades_saved"] = stack.decades_saved_vs_sio2   # prefactor-free vs SiO₂ at this same EOT
     return die.record(
         "device",
         knobs_in=knobs_in,
         outputs=outputs,
         V_t=mos.V_t, i_dsat=i_dsat, tau=leak.tau, j_leak=leak.j_leak, bv_V=bv_V, t_rr=t_rr,
+        j_gate=None if stack is None else stack.gate_leakage_A_cm2,
     )
 
 

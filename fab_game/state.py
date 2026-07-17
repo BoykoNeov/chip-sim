@@ -113,6 +113,7 @@ class Die:
     j_leak: float | None = None                 # junction reverse-leakage density (A/cm²) — the metal killer (G4b)
     bv_V: float | None = None                   # drain–body junction avalanche breakdown (V) — set by the device step (slice 2)
     t_rr: float | None = None                   # diode reverse-recovery (storage) time (s) ∝ τ — set by the device step (slice 5)
+    j_gate: float | None = None                 # direct-tunnelling gate-leakage density (A/cm²) — set by the device step (F3); None ⇒ dielectric knob off
     defects: tuple[DefectEvent, ...] = ()       # killer particles caught at wafer prep (G3)
     killed_by_defect: bool | None = None        # set by wafer prep; True ⇒ a functional fail
     voided: bool | None = None                  # set by etch/depo (G5); True ⇒ a depo void → functional fail

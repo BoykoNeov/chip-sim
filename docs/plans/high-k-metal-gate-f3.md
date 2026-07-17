@@ -12,6 +12,16 @@
 > gain nets to only **~2× in the exponent**, not 6.4×. The discriminator itself is **unchanged** (see the
 > identity note below); only the leakage *magnitude* moves. Remaining: the game knob, the `steps.py`
 > wiring, the history mode + demo, and the interfacial-layer slice.
+>
+> **SLICE 2 BUILT (2026-07-17)** — the game knob + the `steps.py` wiring (`DeviceKnobs.dielectric`,
+> `Die.j_gate`, `fab_game/tests/test_gate_dielectric.py`, 8 tests; fast lane green, **`device.py` and
+> `chip/high_k.py` both untouched**). Closes **open Q1**. The knob carries the **material only** and reads
+> the *inherited* `die.t_ox_um` as the stack's **target EOT** — the matched-EOT historical move — rather
+> than carrying an explicit `t_phys` (see "The knob's parameterization" below). This is the slice that
+> makes the F3 discriminator *assertable end-to-end*: at a fixed EOT, `V_t`/`I_Dsat`/`C_ox` come out
+> **byte-for-byte identical for every material** through the real, untouched `device.py`, while `j_gate`
+> moves 22 decades across the registry — the proof the "don't touch `device.py`" claim was making.
+> Remaining: the history mode + demo (slice 3), and the interfacial-layer slice.
 
 **The discriminating observable, stated first (the build's licence):** the gate oxide thickness feeds
 **two device quantities with different functional dependence**, and no single scalar can move both:
@@ -137,11 +147,41 @@ plan's single-λ form is *only* valid within one material. Resolutions:
   generation) — additive, never folded into `lifetime.py`'s `device_leakage`, and it **never moves**
   `V_t`/`I_Dsat` (the same discipline as `BV` and the SRH leakage).
 
-## Open questions — status after slice 1
+## The knob's parameterization — RESOLVED AT SLICE 2 (material-only, EOT = the inherited `t_ox`)
 
-1. **Where the leakage output lives** — OPEN (slice 2, the `steps.py` wiring). Lean unchanged: a new
-   field beside `leakage`/`BV`/`t_rr`, `None` on a bare die. `chip/high_k.py` already returns the
-   `GateStack` record the consumer will read.
+`DeviceKnobs.dielectric` is a **registry key and nothing else** (`"SiO2"`|`"HfO2"`|`"TiO2"`, `None` = the
+seam) — a clean parallel to F2's `contact_scheme`. It **re-implements the incumbent electrical gate in the
+chosen material**: the inherited `die.t_ox_um` is read as the stack's *target EOT*, and `gate_stack()`
+reports the `t_phys = EOT·κ/3.9` that target needs. The alternative — a knob carrying an explicit deposited
+`(material, t_phys)` — was **rejected** at build:
+
+- **Slice 1's API is already EOT-target-shaped.** `gate_stack(eot_um, …)` and `leakage_decades_saved(eot_um,
+  …)` both take **EOT**; an explicit-`t_phys` knob would fight that signature and make every caller
+  pre-compute `physical_thickness_for_eot` by hand.
+- **It is F2's precedent exactly.** `contact_scheme` reads `die.R_s` and feeds it through a richer model
+  without writing back; F3 reads `die.t_ox_um` the same way. An explicit deposit would instead *discard*
+  the Phase-2 grown oxide, cutting the device gate loose from the oxidation stage.
+- **The `eot()` identity branch was built for this seam.** `if kappa == K_SIO2: return t_phys_um` exists so
+  that `dielectric="SiO2"` reaches `device.threshold_voltage` with the *same float*. Only this
+  parameterization exercises it — and it is what makes the engaged seam byte-for-byte rather than ≈.
+- **No semantic overload on `t_ox_um`** (the honesty check this had to clear): the device read *already*
+  treats `t_ox_um` as the **electrical** thickness — that is slice 1's identity insight, that physical and
+  electrical merely *coincide* for SiO₂. The field keeps storing what the furnace grew and is never
+  mutated; the matched-EOT counterfactual is the historical move itself (HfO₂ at 45 nm targeted the EOT the
+  SiO₂ roadmap called for). A hybrid `(material, t_phys=None)` mode was rejected too: a second code path,
+  a fragile seam (explicit SiO₂ only matches if the caller hand-passes `t_phys == t_ox`), and no consumer —
+  slice 3's scaling ladder drives thinning through `die.t_ox_um` upstream anyway.
+
+## Open questions — status after slice 2
+
+1. **Where the leakage output lives — RESOLVED (slice 2).** `Die.j_gate` (A/cm²), a new field beside
+   `bv_V`/`t_rr`, `None` on a bare/refused die *and* whenever the knob is off (the gap-vs-fake-zero rule).
+   The record carries `dielectric`/`t_phys_um` in `knobs_in` and `j_gate_A_cm2`/`decades_saved` in
+   `outputs`, **only when engaged** (the established fingerprint discipline → a knob-off device record is
+   byte-unchanged). Not scored by any target: gate leakage is a *separate channel* from the SRH junction
+   leakage — additive, never folded into `lifetime.py`'s `device_leakage`, and asserted not to move
+   `j_leak`/`τ`/`t_rr`. A scoring window is a **later** decision (it would need the flagged absolute `J₀`,
+   whereas `decades_saved` is prefactor-free).
 2. **Demo home** — OPEN (slice 3). Lean unchanged: standalone `highk_history.py` — the consumer is the
    *device*, not the furnace.
 3. **Interfacial layer core-vs-edge — RESOLVED: its own slice. ⚠️ This REVERSES the plan's "lean:

@@ -555,6 +555,23 @@ class DeviceKnobs:
     consumes — ``device.py`` is untouched. Defaults to ``None`` → the access-only value **byte-for-byte**
     (the seam; the G1–G7 banked demos and the journey are unchanged, since ``die.R_s · sd_contact_squares``
     is exactly :func:`chip.contact_resistance.access_resistance`).
+
+    ``dielectric`` (F3, the high-κ gate stack) **re-implements the incumbent electrical gate in the chosen
+    material** (a :data:`chip.high_k.DIELECTRICS` key — ``"SiO2"`` | ``"HfO2"`` | ``"TiO2"``): the
+    **inherited** grown thickness ``die.t_ox_um`` is read as the stack's target **EOT**, and
+    :func:`chip.high_k.gate_stack` reports the physical thickness that target needs in this material
+    (``t_phys = EOT·K/3.9``) plus the direct-tunnelling leakage that thickness passes. It is the *matched-EOT*
+    historical move itself (HfO₂ at 45 nm targeted the EOT the SiO₂ roadmap called for), and it splits one
+    thickness into **two currencies**: ``C_ox``/``V_t``/``I_Dsat`` see the **EOT** and so are *identical for
+    every material* (an identity — ``ε_SiO₂/EOT ≡ ε₀K/t_phys``; ``device.py`` is untouched), while the new
+    ``j_gate`` output sees ``t_phys`` and collapses exponentially. ``die.t_ox_um`` keeps its documented
+    meaning (**what the furnace grew**) and is never written back.
+
+    Defaults to ``None`` → today's ``t_ox`` flows through untouched and **no leakage is emitted** (the seam;
+    the G1–G7 banked demos and the journey are unchanged). ``"SiO2"`` is the *engaged* seam — ``EOT ==
+    t_phys`` exactly (:func:`chip.high_k.eot` at K=3.9 is the identity), so it reproduces the ``None``
+    device byte-for-byte and merely **turns the leakage readout on**; the ``dielectric``/``j_gate`` record
+    keys are added only when engaged.
     """
 
     gate: str = "n+poly"               # n⁺-poly gate (φ_gate = +0.55 V)
@@ -563,6 +580,7 @@ class DeviceKnobs:
     vt_adjust_dose: float = 0.0        # §5 V_t-adjust implant dose (cm⁻²); 0 = no adjust implant (the seam)
     vt_adjust_kind: str | None = None  # "p" acceptor (raises V_t) | "n" donor (lowers) | None
     contact_scheme: str | None = None  # F2 silicide/contact model ("direct-Al"|"salicide"); None = access-only (the seam)
+    dielectric: str | None = None      # F3 gate stack ("SiO2"|"HfO2"|"TiO2"); None = t_ox as-is, no leakage (the seam)
 
 
 @dataclass(frozen=True)
