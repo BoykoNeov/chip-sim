@@ -12,19 +12,19 @@ at all (B7, the demo-only precedent, has no demo test):
     grows ∝ EOT, so a ladder walked to 2–3 nm EOT would feature a *fabricated* +11–16-decade HfO₂ win
     (real HfO₂ that thick is trap-limited, which this model does not carry). The cap is a claim about
     where the model may speak, so it is pinned here rather than left to a reader's restraint;
-  * **the headline is never rounded up** — a "≳ N decades" claim that rounds 5.6 to 6 is not a ≳ claim.
+  * **the headline is never rounded up** — a "≳ N decades" claim is a *lower bound*, so the displayed N may
+    only ever sit **below** the computed win. This one caught a live instance: the featured 5.565-decade
+    win rendered as "≳5.6" under plain ``.1f``, claiming more than the model supports.
 
 The figure is **not** in the correctness path (ADR 0002): rendering is checked only for "builds without
 error", and skipped where the optional viz extra is absent.
 """
-import math
-
 import pytest
 
 from chip import device as dev
 from chip import high_k as hk
 from chip.demo_highk_history import (
-    CHANNEL_N_A, EOT_LADDER_UM, FEATURE_EOT_UM, MATERIALS, WALL_J_A_CM2, compute,
+    CHANNEL_N_A, EOT_LADDER_UM, FEATURE_EOT_UM, MATERIALS, WALL_J_A_CM2, compute, floor_decades,
 )
 
 
@@ -93,11 +93,24 @@ def test_the_ladder_stays_inside_the_validated_regime():
     assert 3.9 <= saved <= 9.5, f"the featured win ({saved:.1f} dec) escaped the flagged m* band"
 
 
-def test_the_headline_is_never_rounded_up():
-    """A "≳ N decades" claim rounded *up* is not a ≳ claim — the summary must not overstate the win."""
-    r = compute()
-    saved = r.stacks["HfO2"].decades_saved_vs_sio2
-    assert float(f"{saved:.1f}") <= saved or math.isclose(float(f"{saved:.1f}"), saved, abs_tol=0.05)
+def test_the_headline_claim_is_floored_never_rounded_up():
+    """A "≳ N decades" claim rounded *up* is not a ≳ claim — the featured win may never be overstated.
+
+    This is not hypothetical: the featured HfO₂ win is **5.565** decades, which plain ``f"{x:.1f}"``
+    renders **"5.6"** — asserting "at least 5.6" for a value that is *below* 5.6. Hence
+    :func:`chip.demo_highk_history.floor_decades`, and hence this assert being on the **formatted string
+    the reader actually sees** rather than on the float behind it.
+    """
+    saved = compute().stacks["HfO2"].decades_saved_vs_sio2
+    assert float(floor_decades(saved)) <= saved, (
+        f"the displayed claim ≳{floor_decades(saved)} overstates the computed win ({saved!r})"
+    )
+    assert float(f"{saved:.1f}") > saved, (
+        "regression canary: plain .1f no longer rounds this value UP, so floor_decades is no longer "
+        "demonstrably load-bearing here — re-check the featured EOT before relaxing anything"
+    )
+    # The rule must hold for any value, not just today's — including the ones .1f rounds up.
+    assert floor_decades(5.565) == "5.5" and floor_decades(5.99) == "5.9" and floor_decades(6.0) == "6.0"
 
 
 def test_figure_builds():

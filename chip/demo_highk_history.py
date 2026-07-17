@@ -33,6 +33,7 @@ different discriminator — see :mod:`chip.high_k`). Run headless:
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -96,6 +97,18 @@ def _mos_at(eot_um: float) -> dev.MOSDevice:
     )
 
 
+def floor_decades(decades: float) -> str:
+    """Format a "≳ N decades" claim — **floored** to 1 dp, never rounded (the honesty rule).
+
+    ``≳ N`` asserts the win is *at least* N, so the displayed N may only ever be **below** the computed
+    value. Plain ``f"{x:.1f}"`` rounds to nearest and quietly breaks that: the featured HfO₂ win is
+    5.565 decades, which ``.1f`` renders "5.6" — a number the model does not support. Flooring renders
+    "5.5". The difference is cosmetically nil and exactly the kind of overstatement this module refuses
+    everywhere else (see :func:`chip.high_k.leakage_decades_saved` on reading the result as "≳ N").
+    """
+    return f"{math.floor(decades * 10.0) / 10.0:.1f}"
+
+
 def _wall_eot_um(j_sio2: np.ndarray, eot: np.ndarray) -> float:
     """The EOT where the SiO₂ ladder crosses :data:`WALL_J_A_CM2` — interpolated on log(J), monotone."""
     return float(np.interp(np.log10(WALL_J_A_CM2), np.log10(j_sio2), eot))
@@ -147,7 +160,7 @@ def print_summary(r: HighKHistoryResult) -> None:
     print(f"\n    → V_t and C_ox are BYTE-FOR-BYTE identical across all three ({len(vts)} distinct V_t,"
           f" {len(coxs)} distinct C_ox): the EOT identity means the capacitance path never")
     print(f"      learns which material it is. HfO₂ buys {hf.thickness_gain:.1f}× the physical thickness at"
-          f" the same electrical gate → ≳{hf.decades_saved_vs_sio2:.1f} decades less leakage,")
+          f" the same electrical gate → ≳{floor_decades(hf.decades_saved_vs_sio2)} decades less leakage,")
     print(f"      for free device-side. TiO₂ (κ=80, φ_B=0) buys {r.stacks['TiO2'].thickness_gain:.0f}× the"
           f" thickness and leaks flat out at every EOT — 'more κ is better' is FALSE.")
     print(f"\n    [read the decades as '≳ N' — exponent-dominated: the shared prefactor cancels in the ratio")
@@ -235,7 +248,7 @@ def save_figure(r: HighKHistoryResult) -> Path:
     ax.set_xticklabels(["SiO₂\n(period)", "HfO₂\n(2007, 45 nm)", "TiO₂\n(κ=80, no barrier)"], fontsize=8.5)
     ax.set_title(f"The discriminator at EOT = {FEATURE_EOT_UM*1e3:.1f} nm: one input, two currencies\n"
                  f"(HfO₂: {r.stacks['HfO2'].thickness_gain:.1f}× the thickness, same device,"
-                 f" ≳{r.stacks['HfO2'].decades_saved_vs_sio2:.1f} decades less leakage)", fontsize=9.5)
+                 f" ≳{floor_decades(r.stacks['HfO2'].decades_saved_vs_sio2)} decades less leakage)", fontsize=9.5)
 
     fig.suptitle("Historical-modes B8 — the high-κ gate dielectric: the SAME electrical gate (V_t, C_ox "
                  "untouched) with a 6.4× thicker tunnel barrier — the wall SiO₂ could not scale past",
