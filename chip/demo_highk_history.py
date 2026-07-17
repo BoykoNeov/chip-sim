@@ -191,27 +191,41 @@ def print_summary(r: HighKHistoryResult) -> None:
           f"  — the wall the SiO₂ roadmap stopped at\n")
 
     print(f"  The escape — the same electrical gate at EOT = {FEATURE_EOT_UM*1e3:.1f} nm, in three materials"
-          f"  (through the real, untouched device.py):\n")
+          f" + the stack a fab actually builds  (through the real, untouched device.py):\n")
     print(f"    {'material':<26} {'κ':>5} {'t_phys':>9} {'V_t':>8} {'C_ox':>11} {'j_gate':>11} {'vs SiO₂':>10}")
-    for m in r.materials:
-        s, d = r.stacks[m], r.mos[m]
-        saved = "—" if m == "SiO2" else f"{s.decades_saved_vs_sio2:+.1f} dec"
-        print(f"    {s.material:<26} {s.kappa:>5.1f} {s.t_phys_um*1e3:>7.2f} nm {d.V_t:>7.4f} V"
+    # The as-built stack is a row here for the same reason it is a bar on the figure: without it the
+    # table quotes the *idealized* win as the 45 nm number. Decades are FLOORED, not rounded — a "≳ N"
+    # claim may only ever be understated, and plain `.1f` renders the 5.565 win as "5.6".
+    for m in (*r.materials, "real"):
+        s = r.real_stack if m == "real" else r.stacks[m]
+        d = _mos_at(s.eot_um)
+        # "≳" reads as a *win* claim, so only a positive gets it; a loss (TiO₂) is stated as a loss.
+        # Flooring is the conservative direction either way — it can only ever understate the benefit.
+        won = s.decades_saved_vs_sio2 > 0.0
+        saved = ("—" if m == "SiO2" else
+                 f"≳{floor_decades(s.decades_saved_vs_sio2)} dec" if won else
+                 f"{floor_decades(s.decades_saved_vs_sio2)} dec")
+        name = f"{s.material} + {s.t_il_um*1e3:.1f} nm IL" if s.has_interfacial_layer else s.material
+        print(f"    {name:<26} {s.kappa:>5.1f} {s.t_phys_um*1e3:>7.2f} nm {d.V_t:>7.4f} V"
               f" {d.C_ox:>10.4e} {s.gate_leakage_A_cm2:>11.1e} {saved:>10}")
 
-    vts = {d.V_t for d in r.mos.values()}
-    coxs = {d.C_ox for d in r.mos.values()}
+    # Counted over every row of the table above — the two-layer stack included, which is the stronger
+    # claim: the invariance is over the stack's STRUCTURE, not just which material it is made of.
+    rows = [*r.mos.values(), _mos_at(r.real_stack.eot_um)]
+    vts = {d.V_t for d in rows}
+    coxs = {d.C_ox for d in rows}
     hf = r.stacks["HfO2"]
-    print(f"\n    → V_t and C_ox are BYTE-FOR-BYTE identical across all three ({len(vts)} distinct V_t,"
-          f" {len(coxs)} distinct C_ox): the EOT identity means the capacitance path never")
-    print(f"      learns which material it is. HfO₂ buys {hf.thickness_gain:.1f}× the physical thickness at"
-          f" the same electrical gate → ≳{floor_decades(hf.decades_saved_vs_sio2)} decades less leakage,")
+    print(f"\n    → V_t and C_ox are BYTE-FOR-BYTE identical across all {len(rows)} ({len(vts)} distinct V_t,"
+          f" {len(coxs)} distinct C_ox) — the two-layer stack included: only the")
+    print(f"      TOTAL EOT ever reaches device.py, so it cannot tell these stacks apart at all."
+          f" HfO₂ buys {hf.thickness_gain:.1f}× the physical thickness at the same")
+    print(f"      electrical gate → ≳{floor_decades(hf.decades_saved_vs_sio2)} decades less leakage,")
     print(f"      for free device-side. TiO₂ (κ=80, φ_B=0) buys {r.stacks['TiO2'].thickness_gain:.0f}× the"
           f" thickness and leaks flat out at every EOT — 'more κ is better' is FALSE.")
 
     # The IL — the honest EOT floor, and why the row above is a CEILING rather than a prediction.
     real = r.real_stack
-    print(f"\n  The floor — the interfacial layer (the row above is the IDEALIZED stack; a fab cannot build it):\n")
+    print(f"\n  The floor — the interfacial layer (the bare HfO₂ row is IDEALIZED; no fab builds it):\n")
     print(f"    a real HfO₂ gate grows ~{real.t_il_um*1e3:.1f} nm of SiO₂ underneath it — unavoidable, and wanted")
     print(f"    (interface quality). It is charged on BOTH currencies at once:")
     print(f"      · capacitance — its EOT adds ({hk.K_SIO2} is SiO₂'s κ, so {real.t_il_um*1e3:.1f} nm of IL"

@@ -142,7 +142,12 @@ MODES = [
         successor="A high-κ dielectric (HfO₂, 2007, 45 nm) splits the thickness into two currencies: at "
         "the same EOT the device is untouched — same C_ox, same V_t, same drive — while the physical "
         "layer is 6.4× thicker, so the tunnelling collapses by orders of magnitude. More κ is not "
-        "automatically better: TiO₂ (κ=80) buys 20× the thickness with a zero barrier and still leaks.",
+        "automatically better: TiO₂ (κ=80) buys 20× the thickness with a zero barrier and still leaks. "
+        "Nor is the escape unlimited — a real stack grows an SiO₂ interfacial layer under the high-κ, "
+        "and it is charged on both currencies at once: it is the better barrier per nm and still a pure "
+        "loss, because per nm of EOT spent it returns half what the high-κ would. It costs ~0.56 decades "
+        "of the win per ångström and floors the stack at EOT > t_IL for any κ at all — which is why "
+        "EOT scaling stalled too, and why the ideal no-IL win is a ceiling rather than a product.",
     ),
     HistoryMode(
         module="demo_metallization_history", tag="B6", stage="Metallization", era="≈1970s",
