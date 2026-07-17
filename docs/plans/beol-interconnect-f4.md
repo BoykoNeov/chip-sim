@@ -209,6 +209,11 @@ node→(W,H) ladder.
   is valid, lead with the *shape*, let curves exit the axis rather than print a fabricated number).
   Per F3's slice-3 finding, **no `beol_history.py` wrapper** unless it carries period physics
   `interconnect.py` lacks (the demo-rides-the-base-module pattern, B7/B8).
+  **Checked at S2, for S3's benefit: don't rework-then-read-bins.** `rework_litho` re-runs `device_step`,
+  so a reworked die's delay **is** refreshed with the knob on — but rework **never re-packages** (only
+  front-end fails are re-attempted, and a recovered die carries `verdict.passed` with `bin=None`). That
+  is pre-existing and **identical for both currencies**, so F4 adds no asymmetry — but a demo that reworks
+  and then reads a bin histogram would silently under-count either way.
 - **S4 — the honest ceiling: size effect + barrier fraction → Ru.** FS/MS `ρ_eff(d)`, the `ρ₀λ` FOM, the
   `W_eff = W − 2·t_b` floor. The slice that makes the arc real, exactly as F3's IL did.
 
