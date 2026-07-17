@@ -50,9 +50,13 @@
 > q·dose/C_ox reads the *same* C_ox all three materials share (asserted).
 >
 > Remaining: the **interfacial-layer** slice (the honest EOT floor — series tunnel barrier *and* series
-> capacitance, both sides at once). ⚠️ **The roadmap card (`docs/roadmap.html`) is deliberately NOT pulled**
-> — see [[roadmap-page]]'s graduation rule; whether F3 counts as "shipped" with the IL slice still open is a
-> user call, not a side effect of this commit.
+> capacitance, both sides at once) — and nothing else.
+>
+> **The roadmap card — USER DECIDED (2026-07-17): leave it until the IL slice lands.** So for the graduation
+> rule, **"F3 ships" means the IL slice is done**, not slices 1–3: the F3 card stays on `docs/roadmap.html`
+> (schematic, "not simulator output") until then, and the card understating what already exists is the
+> accepted cost. Do not pull it early. (Alternatives put to the user and rejected: pull now and treat the IL
+> as a follow-on; pull and add a standalone `F3-IL` card.)
 
 **The discriminating observable, stated first (the build's licence):** the gate oxide thickness feeds
 **two device quantities with different functional dependence**, and no single scalar can move both:

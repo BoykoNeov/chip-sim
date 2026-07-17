@@ -128,7 +128,10 @@ Fix = the **V_t-adjust implant `device.py` already had** (§5 `implant_dose`/`im
 (asserted). Lesson: a *representative* recipe at a scaled node isn't representative without the era's knobs.
 
 **Remaining F3:** the **interfacial-layer** slice only (series tunnel barrier + series capacitance, both sides
-at once — the honest EOT floor). Then **F4 (BEOL interconnect RC)** = last PROMOTABLE roadmap step. ⚠️ **The
-roadmap card was deliberately NOT pulled** — "F3 ships" is ambiguous while IL is open, and pulling a card off
-a published page is a **user call, not a commit side effect** (advisor). Surfaced to the user, awaiting the
-call ([[roadmap-page]]).
+at once — the honest EOT floor). Then **F4 (BEOL interconnect RC)** = last PROMOTABLE roadmap step.
+
+**ROADMAP CARD — USER DECIDED 2026-07-17: LEAVE IT until the IL slice lands.** So **"F3 ships" ≡ IL done**,
+not slices 1–3 — the F3 card stays on `docs/roadmap.html` (schematic, "not simulator output") meanwhile, and
+comes off with the IL slice. **Don't re-ask, and don't pull it early**; the card understating what exists
+today is accepted cost. Rejected alternatives: pull now (treat IL as a follow-on), pull + add an `F3-IL` card.
+([[roadmap-page]] graduation rule.)
