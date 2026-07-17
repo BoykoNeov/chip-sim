@@ -184,6 +184,18 @@ reports the `t_phys = EOT·κ/3.9` that target needs. The alternative — a knob
    whereas `decades_saved` is prefactor-free).
 2. **Demo home** — OPEN (slice 3). Lean unchanged: standalone `highk_history.py` — the consumer is the
    *device*, not the furnace.
+
+   ⚠️ **The magnitude trap slice 3 inherits (raised at slice 2, do not walk into it).** Slice 2's driven
+   numbers — HfO₂ `j_gate` = 1.1e-14 A/cm² at `t_phys` = 12.8 nm, a 22-decade span across the registry,
+   **+11 decades saved at EOT = 2 nm** — are **extrapolated outside the regime the model is validated in**
+   (direct tunnelling, ~1–1.5 nm EOT). Real HfO₂ at ~13 nm is **trap-limited, not tunnel-limited** (already
+   a named module scope edge), and lit. puts the win at **~3–5 decades at EOT = 1 nm**. Internal to slice 2
+   (nothing renders them), but a *demo* puts them in front of a student, where +11 decades would read as a
+   datasheet claim it is not. **Slice 3 must therefore:** (a) **cap the ladder near EOT ≈ 1–1.5 nm** — the
+   era's actual wall — rather than walking it to 2–3 nm where the HfO₂ advantage is dramatically
+   overstated; (b) feature `decades_saved` with the module's own caveat (**"≳ N decades**, exponent-
+   dominated"; trap floor not modelled); and (c) lead with the **shape** (monotone, sign, the wall) —
+   which is the honest payload — not the absolute count.
 3. **Interfacial layer core-vs-edge — RESOLVED: its own slice. ⚠️ This REVERSES the plan's "lean:
    include", and the reason is the build's physics correction.** With the barrier now in the model an IL
    is a **series tunnel barrier**, not merely a series capacitance. Carrying it on the `C_ox` side only

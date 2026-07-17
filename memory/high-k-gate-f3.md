@@ -72,11 +72,22 @@ furnace grew" and is never written back (F2's `die.R_s` access-only discipline).
 
 **What slice 2 proved that slice 1 could not.** The `device.py`-untouched claim is only assertable *here*,
 against the real device model: at fixed EOT, `V_t`/`I_Dsat`/`C_ox` come out **byte-for-byte identical for
-all 4 materials** while `j_gate` spans **22 decades**. Driven numbers @EOT=2 nm: SiO₂ `t_phys`=2 nm/1.5e-3
-A/cm²; HfO₂ 12.8 nm/**1.1e-14** (+11.1 dec — decades ∝ EOT, so ≈2× the +5.6 @1 nm); TiO₂ 41 nm/**2.8e+8**
-(= `J₀` exactly, −11.3 dec — 41 nm of dielectric buys *nothing*). SiO₂ @1.5 nm reads exactly 1.000 A/cm² —
-the Robertson calibration anchor showing through. **Ladder = the wall:** 3→1.2 nm EOT costs SiO₂ **10
-decades** of leakage.
+all 4 materials** while `j_gate` spans 22 decades. **Why the invariance is exact — stronger than the
+identity framing** (advisor): `steps.py` passes `die.t_ox_um` *as* the `eot_um` arg and `gate_stack` echoes
+it back, so `t_ox_electrical_um` is the **same float** for every material — at the wiring level this is the
+trivially-exact "same input → same output", not a float-identity round-trip (that's slice 1's job, tested
+there). The test still earns its keep: had the wiring fed `t_phys`, `hfo2.V_t == sio2.V_t` would fail.
+Driven @EOT=2 nm: SiO₂ `t_phys`=2 nm/1.5e-3 A/cm²; HfO₂ 12.8 nm/1.1e-14 (+11.1 dec — decades ∝ EOT, so ≈2×
+the +5.6 @1 nm); TiO₂ 41 nm/**2.8e+8** (= `J₀` exactly, −11.3 dec — 41 nm of dielectric buys *nothing*).
+SiO₂ @1.5 nm reads exactly 1.000 A/cm² — the Robertson calibration anchor showing through.
+
+⚠️ **DO NOT FEATURE THOSE MAGNITUDES LITERALLY (slice-3 trap, advisor).** The "22 decades" / HfO₂ 1.1e-14 @
+12.8 nm numbers are **extrapolated outside the validated direct-tunnelling regime (~1–1.5 nm EOT)** — real
+HfO₂ at ~13 nm is **trap-limited, not tunnel-limited** (already a named module scope edge), and +11 dec
+@EOT=2 nm vs lit **~3–5 @1 nm** would read as a datasheet claim it is not. Internal-only in slice 2 (fine).
+**Slice 3 must:** cap the ladder near **EOT ~1–1.5 nm**, and feature `decades_saved` with the "**≳ N**,
+exponent-dominated, trap floor not modelled" caveat. **Ladder = the wall:** 3→1.2 nm EOT costs SiO₂ **10
+decades** of leakage (the *shape* is the payload; the sign/monotonicity is the honest claim).
 
 **Ladder/seam ordering (the teaching shape):** `None` (nothing emitted, byte-for-byte today) → `"SiO2"` (the
 *engaged* seam — same device, leakage readout **ON**) → `"HfO2"` (same device, leakage gone). Fingerprint
