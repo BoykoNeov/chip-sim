@@ -1,8 +1,23 @@
 # Plan — F4 BEOL interconnect (the delay the transistor doesn't set)
 
-> **STATUS: PLANNED (2026-07-17).** The last promotable roadmap step whose consumer is already named
-> (`docs/plans/future-steps.md` F4; the roadmap card is live in `chip/roadmap_gallery.py`). Nothing built
-> yet. Predecessor F3 (high-κ) shipped 2026-07-17 and its card graduated.
+> **STATUS: SLICE 1 BUILT (2026-07-17)** — `chip/interconnect.py` + `chip/tests/test_interconnect.py`
+> (26 tests, fast lane green at 1088). **No existing file touched, `device.py` and `fab_game/` included.**
+> The two-term split, the cited `c_pul` invariance, the closed-form crossover, the prefactor-free ratios,
+> and the Al+Cu registry. Cited constants → `memory/beol-interconnect-source.md`.
+> Remaining: S2 (the knob + the binning inversion), S3 (the B9 demo), S4 (size effects + barrier → Ru).
+>
+> **Three corrections the S1 review forced — S2/S4 inherit them:**
+> 1. **The headline is bounded.** The module drops the driver↔wire Elmore cross terms, one of which
+>    (`R_driver·C_wire`) **is** weakly `I_Dsat`-dependent. ⇒ the licensed claim is **"the wire's
+>    *intrinsic* RC is a common-mode floor"**, *not* "the transistor can't touch the wire term". The
+>    discriminator survives; the stronger phrasing was unearned. **S2 must use the bounded form.**
+> 2. **S4 is not a Ru-only slice.** The `bulk_regime_ok` guard **fires on copper's own crossover**
+>    (~0.167 µm vs the ~0.19 µm the bulk model wants) — historically exact: the size effect was a *copper*
+>    problem at sub-200 nm before Ru existed as an option.
+> 3. **The IBM ~40% check is a *consistency* check, not a non-circular one** — at fixed geometry
+>    `R_Al/R_Cu ≡ ρ_Al/ρ_Cu`, so it validates the inputs, not a structural form. Weaker than F3's.
+>
+> Predecessor F3 (high-κ) shipped 2026-07-17 and its card graduated.
 
 **The discriminating observable, stated first (the build's licence):** chip delay is **two terms with no
 shared variable**, and no single scalar can move both:

@@ -6,8 +6,17 @@ variable**, and *no single scalar can move both*:
   * **Gate delay** ``τ_gate = C_load·V_dd / I_Dsat`` — the transistor's term (the CV/I metric).
     **Inversely ∝ ``I_Dsat``**, the number the whole existing chain already computes (CD → ``V_t`` →
     ``I_Dsat``, plus F2's ``R_series`` source degeneration).
-  * **Wire delay** ``τ_wire = k·R_wire·C_wire``, ``R_wire = ρ·L/(W·H)``, ``C_wire = c_pul·L`` —
-    the interconnect's term. **``∂τ_wire/∂I_Dsat = 0``**: it is blind to the transistor *entirely*.
+  * **Wire delay** ``τ_wire = k·R_wire·C_wire``, ``R_wire = ρ·L/(W·H)``, ``C_wire = c_pul·L`` — the
+    wire's **intrinsic** RC. **``∂τ_wire/∂I_Dsat = 0``**: the transistor does not appear in it.
+
+**The precise claim (bounded — read this before quoting the headline).** What is modelled here is the
+wire's **intrinsic** ``R_w·C_w``, and *that* is the term no transistor can touch. The full single-stage
+Elmore delay is ``R_d·(C_w + C_L) + R_w·(C_w/2 + C_L)``; this module carries ``R_d·C_L`` (as ``τ_gate``,
+the CV/I form) and ``R_w·C_w`` (as ``τ_wire``), and **drops the two cross terms** — see the scope edges.
+One of those, ``R_driver·C_wire``, *is* weakly ``I_Dsat``-dependent, so the honest statement is **"the
+wire's intrinsic RC is a common-mode floor"**, not "the transistor cannot touch the wire at all". The
+discriminator is unharmed — an ``I_Dsat``-independent floor still exists, and it still ends the
+``I_Dsat``-is-speed premise — but the stronger phrasing would be a claim this model has not earned.
 
 ``τ_total = τ_gate + τ_wire``. Past the **crossover** (``τ_wire > τ_gate``) **halving the gate delay less
 than halves the chip delay** — the transistor stops setting speed. That is the discriminating observable
@@ -58,11 +67,14 @@ The honesty ladder (per the F4 plan + the ``historical-modes.md`` triad)
   :func:`crossover_width_ratio` (``√(ρ_a/ρ_b)``) contain **no house constant at all** — ``L``, ``c_pul``,
   ``V_dd``, ``C_load`` and the Elmore factor **cancel exactly**. This is the F3 ``leakage_decades_saved``
   discipline, and it is where the module's headline must live, because ``L`` is a lump (below).
-* **The non-circular cross-check (unplanned, and the reason to keep ρ₀ cited rather than fitted).** The
-  cited bulk resistivities — materials-handbook values, **never fitted to a delay curve** — *predict*
-  IBM's independently reported **~40% resistance reduction** for the 1997 Al→Cu swap: ``ρ_Al/ρ_Cu`` =
-  2.65/1.68 = 1.58 ⇒ **~37% less resistance** (and ~46% for a real Al–Cu alloy line at ρ ≈ 3.1). Same
-  spirit as Irvin-vs-Masetti and F3's cited-(φ_B,m*)-predicts-the-2 Å-slope check.
+* **A consistency check on the constants (deliberately NOT called non-circular — it is weaker than F3's).**
+  The cited bulk resistivities reproduce IBM's independently reported **~40% resistance reduction** for the
+  1997 Al→Cu swap: ``ρ_Al/ρ_Cu`` = 2.65/1.68 = 1.58 ⇒ **~37% less** (and ~46% for a real Al–Cu alloy line
+  at ρ ≈ 3.1, so the report is bracketed). **Its honest status:** at a fixed geometry ``R_Al/R_Cu`` **is**
+  ``ρ_Al/ρ_Cu`` identically, so this checks that the handbook ratio matches the reported ratio — it does
+  **not** validate a structural form. F3's (φ_B, m*)-predicts-the-2 Å-slope check was stronger because it
+  ran through the *exponential*, so cited inputs predicted a **different functional form's** slope. This
+  one is a sanity check on the inputs, and must not be quoted as more.
 * **Flagged — the magnitudes.** The wire length :data:`GLOBAL_WIRE_LENGTH_UM` (**nothing in the sim carries
   a wire length** — the analogue of F2's ``CONTACT_LENGTH_UM`` and B6's ``SPIKE_CONCENTRATION``; checked:
   B6's ``t_Al`` is a contact-metallization *thickness*, not a line length), the Elmore distributed-line
@@ -82,8 +94,24 @@ F4 plan exists to prevent. Ru arrives in slice 4 **with** the size-effect and ba
 make its constants mean anything. ``λ`` is carried here **only as a validity guard** (an honesty device,
 like F3's ladder cap) — slice 4 promotes it from a guard to a term.
 
+**And the guard already fires on copper, which is the point, not a defect:** the house operating point
+puts Cu's crossover at ~0.167 µm, where :meth:`Metal.bulk_regime_ok` is **False** (Cu needs ``W`` >
+~0.19 µm at ``margin=5``) — the size effect is already a ~20% correction there. That is *physically
+correct and historically exact*: it is **why** the size effect became a copper problem at sub-200 nm,
+long before ruthenium was on anyone's roadmap. **So slice 4 is motivated for Cu too, not only for Ru** —
+it is the honest ceiling on *this* slice's own operating point, not merely the gate on a future metal.
+
 Named scope edges (honest ceilings)
 -----------------------------------
+* **The driver↔wire cross terms — the omission a student asks about first.** The full single-stage Elmore
+  delay is ``R_d·(C_w + C_L) + R_w·(C_w/2 + C_L)``. This module keeps ``R_d·C_L`` (≡ ``τ_gate``, in CV/I
+  form) and ``R_w·C_w`` (≡ ``τ_wire``) and **drops ``R_driver·C_wire`` and ``R_wire·C_load``**. *"Doesn't
+  the transistor still have to charge the wire capacitance?"* — **yes, and that is the dropped
+  ``R_d·C_w``.** It matters for framing: ``R_d ~ V/I``, so ``R_d·C_w`` **is** weakly ``I_Dsat``-dependent,
+  which is why the licensed claim is "the wire's **intrinsic** RC is a common-mode floor" and not "the
+  transistor cannot touch the wire". The intrinsic ``R_w·C_w`` floor is real and ``I_Dsat``-free, so the
+  discriminator stands; the two-term split is a *decomposition*, not a full delay model. Building the
+  cross terms is a candidate deepening, not a correction.
 * **Repeater / buffer insertion — the big one.** Real chips break long wires with repeaters, which makes
   delay ∝ ``L`` and **not** ``L²``. Un-named, this model would silently claim wire delay is unfixable and
   **overstate the wall**; the ``L²`` growth here is the *un-repeated* wire (the F3 trap-limited-floor

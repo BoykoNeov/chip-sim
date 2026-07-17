@@ -193,13 +193,16 @@ def test_copper_buys_roughly_one_node_of_scaling():
     assert 0.7 < 1.0 / r < 0.85
 
 
-def test_cited_resistivities_reproduce_ibms_reported_40_percent_win():
-    """NON-CIRCULAR: handbook ρ₀ values, never fitted to a delay curve, predict IBM's reported ~40%.
+def test_cited_resistivities_are_consistent_with_ibms_reported_40_percent_win():
+    """CONSISTENCY check on the constants — deliberately NOT billed as non-circular (it is weaker than F3's).
 
     IBM reported the 1997 Al→Cu swap as "~40% less resistance" (→ ~15% chip speed; PowerPC 300→400 MHz).
     The registry's cited ρ₀ pair gives ~37% for PURE Al — and real Al interconnect was an Al–Cu alloy at
-    ρ ≈ 3.0–3.2 µΩ·cm, which lands ~44–47%. The reported figure sits inside that band, from constants
-    this model never tuned. Same spirit as Irvin-vs-Masetti and F3's (φ_B, m*)-predicts-the-2 Å-slope.
+    ρ ≈ 3.0–3.2 µΩ·cm, which lands ~44–47%, so the reported figure is bracketed by constants this model
+    never tuned. **Honest status:** at a fixed geometry ``R_Al/R_Cu`` *is* ``ρ_Al/ρ_Cu`` identically, so
+    this validates the *inputs*, not a structural form. F3's (φ_B, m*)-predicts-the-2 Å-slope check ran
+    through the **exponential** — cited inputs predicting a different functional form's slope — which is
+    a genuinely stronger claim than this one. Do not quote this as F3-grade.
     """
     reduction = 1.0 - 1.0 / ic.wire_delay_ratio("Al", "Cu")
     assert 0.34 < reduction < 0.40                       # pure-Al leg: ~37%, just under the reported ~40%
@@ -311,6 +314,25 @@ def test_bulk_regime_guard_marks_where_this_slice_may_speak():
     assert cu.bulk_regime_ok(0.25)              # a 250 nm line ≫ Cu's 39 nm λ — the Al→Cu era. Valid.
     assert not cu.bulk_regime_ok(0.05)          # a 50 nm line — the size effect rules. Slice 4's job.
     assert not cu.bulk_regime_ok(0.003)         # 3 nm — wildly outside; the Ru era.
+
+
+def test_the_guard_fires_on_coppers_own_crossover_which_is_why_s4_is_not_a_ru_only_slice():
+    """The guard flags THIS slice's own operating point — physically right, and the S4 motivation.
+
+    Cu's crossover lands at ~0.167 µm but the bulk model wants W > ~0.19 µm (5λ), so the size effect is
+    already a ~20% correction exactly where the Al→Cu story ends. That is not a defect and not a
+    contradiction — it is *historically exact*: the size effect became a **copper** problem at sub-200 nm,
+    long before ruthenium was on any roadmap. Pinned so slice 4 cannot frame ρ_eff(d) as a Ru-only
+    concern, and so this slice's own ceiling stays visible rather than implied.
+    """
+    load = ic.gate_load_capacitance(device.oxide_capacitance(0.015), 10.0, 1.0)
+    cu = ic.METALS["Cu"]
+    w_x = ic.crossover_width_um(3.3e-3, load, metal="Cu")
+    assert not cu.bulk_regime_ok(w_x)                       # this slice's own operating point is outside
+    assert cu.bulk_regime_ok(5.0 * w_x)                     # ...and a wide line is comfortably inside
+    # The correction it is missing there is real but not fatal (~λ/W ≈ 20%), which is why S1 may still
+    # speak about the Al→Cu ERA (250 nm, comfortably bulk) while S4 owns the sub-200 nm regime.
+    assert 0.15 < cu.mfp_nm / (w_x * 1e3) < 0.35
 
 
 # --------------------------------------------------------------------------- #

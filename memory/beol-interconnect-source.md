@@ -75,6 +75,25 @@ invariance (tight) and the **`ρ₀λ` figure of merit** (which carries the Cu�
   the `τ_wire/τ_gate` ratio and the crossover, never absolute picoseconds** (the [[high-k-gate-f3]]
   `decades_saved` discipline — a ratio cancels the house constant).
 
+* **BOUND THE HEADLINE — the dropped driver↔wire cross terms (caught at S1 review).** Full single-stage
+  Elmore = `R_d·(C_w+C_L) + R_w·(C_w/2+C_L)`. The module keeps `R_d·C_L` (=`τ_gate`, CV/I form) and
+  `R_w·C_w` (=`τ_wire`) and **drops `R_driver·C_wire` and `R_wire·C_load`**. Since `R_d ~ V/I`,
+  **`R_d·C_w` IS weakly `I_Dsat`-dependent** — the transistor *does* help charge the wire cap. ⇒ **The
+  licensed claim is "the wire's INTRINSIC RC is a common-mode floor", NOT "the transistor can't touch the
+  wire term".** The discriminator survives (the intrinsic `R_w·C_w` floor is real and `I_Dsat`-free), but
+  **S2 must use the bounded phrasing.**
+
+* **S4 IS NOT A Ru-ONLY SLICE (caught at S1 review).** The `bulk_regime_ok` guard **fires on copper's own
+  crossover**: Cu's operating point is ~0.167 µm but the bulk model wants W > ~0.19 µm (5λ) ⇒ the size
+  effect is already a ~20% correction there. Physically right and historically exact — **the size effect
+  became a *copper* problem at sub-200 nm, long before Ru was on any roadmap.** S1 may still speak about
+  the Al→Cu **era** (250 nm, comfortably bulk); S4 owns sub-200 nm, **for Cu as well as Ru**.
+
+* **The IBM ~40% check is a CONSISTENCY check, not a non-circular one** (corrected at S1 review). At fixed
+  geometry `R_Al/R_Cu ≡ ρ_Al/ρ_Cu`, so it validates the *inputs*, not a structural form.
+  [[high-k-gate-f3]]'s (φ_B,m*)→2 Å-slope check ran through the **exponential** (cited inputs predicting a
+  *different functional form's* slope) and is genuinely stronger. **Do not quote this as F3-grade.**
+
 * **NAMED, NOT MODELLED (honest ceilings).** **Repeater/buffer insertion** — real chips break long wires
   with repeaters, making delay ∝ `L` **not** `L²`; without naming it the model silently claims wire delay
   is unfixable and overstates the wall (the F3 trap-limited-floor analogue). **Low-κ ILD** — the C-side
