@@ -1,7 +1,7 @@
 """The roadmap page generator — the visual front door for the PLANNED, not-yet-built slices.
 
 Builds ``docs/roadmap.html`` (and the ``…local.html`` JupyterLab edition): one card per unbuilt
-slice of ``docs/plans/future-steps.md`` (F3 high-κ … F10 EUV), each showing its **schematic
+slice of ``docs/plans/future-steps.md`` (F4 BEOL … F10 EUV), each showing its **schematic
 preview** (:mod:`chip.roadmap_figures`), its **triage status** verbatim with the plan
 (PROMOTABLE / COUPLED / partly built / DEFERRED), the **observable it would add**, and the
 **named consumer that gates it** — the repo's anti-over-build bar made browsable.
@@ -61,7 +61,7 @@ class Slice:
     gate / observable text is kept verbatim with the triage in ``docs/plans/future-steps.md``
     (B1's trigger with the scope-edge backlog) — the page displays the plan, it does not re-triage."""
 
-    fid: str         # the plan's slice id, e.g. "F3" — also keys FIGURES / the banked PNG
+    fid: str         # the plan's slice id, e.g. "F4" — also keys FIGURES / the banked PNG
     era: str         # the era transition the slice carries, e.g. "2007 · 45 nm"
     title: str       # the human name
     status: str      # the badge text, verbatim with the plan's verdict
@@ -71,17 +71,12 @@ class Slice:
     gate: str        # what its build is gated on / why it is not built yet
 
 
+# F3 (high-κ / metal gate) GRADUATED 2026-07-17 — its card came off this page when the slice shipped,
+# per the page's standing rule: a card is a promise, and built work belongs on the galleries instead
+# (history-mode B8 + chip.high_k). "Shipped" was taken to mean the *interfacial-layer* slice, not the
+# first three — a deliberate call, since without the IL the module's headline win was a ceiling no fab
+# could build. Do not re-add the card; F4 is now the head of the promotable queue.
 SLICES = [
-    Slice(
-        fid="F3", era="2007 · 45 nm", title="High-κ / metal gate",
-        status="Promotable", badge="ok",
-        blurb="The oxide stage's modern successor: SiO₂ stopped scaling at ~1.2 nm because direct "
-              "tunneling explodes; HfO₂ holds the same EOT at ~3× the physical thickness.",
-        would_add="A gate-tunneling-leakage observable vs t_ox — a NEW output, plus the "
-                  "SiO₂→high-κ era contrast on the existing oxide/t_ox machinery.",
-        gate="Nothing structural — the first genuinely new-output decision (F3 vs F4 order is "
-             "the open call in the plan).",
-    ),
     Slice(
         fid="F4", era="1997 · Cu damascene", title="BEOL interconnect (RC delay)",
         status="Promotable", badge="ok",
@@ -99,7 +94,7 @@ SLICES = [
         would_add="Mobility → I_Dsat through a strain-aware µ model — the channel-strain rung of "
                   "the era ladder.",
         gate="A µ(strain) mobility model in device.py — none exists yet; advanced-node, so it "
-             "queues behind F3/F4.",
+             "queues behind F4.",
     ),
     Slice(
         fid="F6", era="bipolar epi · CMOS wells", title="Epitaxy (buried layer / retrograde well)",
@@ -157,8 +152,8 @@ SLICES = [
 # The page's sections, in the plan's own order: consumer strength first, the honest NO's last.
 SECTIONS = [
     ("Promotable — the consumer is named",
-     "Each of these already has a device observable waiting to read it; the plan's recommended "
-     "sequence is F3/F4 (the new-output decision) then F5.",
+     "Each of these already has a device observable waiting to read it. F3 (high-κ) has shipped and "
+     "its card came off; F4 now heads the queue, then F5.",
      [s for s in SLICES if s.badge == "ok"]),
     ("Coupled &amp; partly built",
      "Real physics whose consumer is (partly) already served — built where the consumer exists, "
@@ -305,7 +300,7 @@ def render_html(local: bool = False) -> str:
         <a class="item" href="{plan}"{item_attr}>
           <h3>The roadmap triage &#8599;</h3>
           <p>future-steps.md &mdash; the full future-slice triage: consumer observables, verdicts,
-            the recommended F3/F4 sequence, and the honest NO&rsquo;s.</p>
+            the recommended sequence, and the honest NO&rsquo;s.</p>
         </a>
         <a class="item" href="{backlog}"{item_attr}>
           <h3>The scope-edge backlog &#8599;</h3>

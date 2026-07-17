@@ -1,8 +1,13 @@
 """Roadmap schematic previews — the banked figures for the PLANNED, not-yet-built slices.
 
-Draws one figure per unbuilt roadmap slice of ``docs/plans/future-steps.md`` (F3 high-κ, F4 BEOL,
-F5 SiGe, F6 epitaxy, F7 STI remainder, F8 CMP, F9 FinFET/GAA, F10 EUV) into ``docs/figures/
-roadmap-*.png``, for the ``docs/roadmap.html`` page (:mod:`chip.roadmap_gallery`) to display.
+Draws one figure per unbuilt roadmap slice of ``docs/plans/future-steps.md`` (F4 BEOL, F5 SiGe,
+F6 epitaxy, F7 STI remainder, F8 CMP, F9 FinFET/GAA, F10 EUV) into ``docs/figures/roadmap-*.png``,
+for the ``docs/roadmap.html`` page (:mod:`chip.roadmap_gallery`) to display.
+
+A slice that **ships** loses its schematic here and its card on the page (F3 high-κ graduated
+2026-07-17) — the drawing is a promise, and once the real demo exists the banked artifact on the
+history gallery is the honest picture. Deleting the draw function is what keeps the two in step:
+the manifest guard pins ``FIGURES`` against the page's ``SLICES``.
 
 **These are illustrations, not results — the honesty rules:**
 
@@ -76,49 +81,6 @@ def _bare(ax, xlim=(0.0, 10.0), ylim=(0.0, 6.0)):
 def _rect(ax, x, y, w, h, fc, ec=INK2, lw=0.9, z=2):
     import matplotlib.patches as mp
     ax.add_patch(mp.Rectangle((x, y), w, h, facecolor=fc, edgecolor=ec, linewidth=lw, zorder=z))
-
-
-# --------------------------------------------------------------------------------------------- #
-# F3 — high-κ / metal gate (2007, 45 nm)
-# --------------------------------------------------------------------------------------------- #
-def _draw_f3(fig) -> None:
-    _chrome(fig, "F3 — high-κ / metal gate (2007, 45 nm): same EOT, a ~3× thicker tunnel barrier")
-    ax = _bare(fig.add_axes((0.02, 0.02, 0.96, 0.84)), xlim=(0, 12), ylim=(0, 6.4))
-
-    def stack(x0, t_diel, diel_fc, diel_label, gate_label, gate_fc):
-        w = 3.4
-        _rect(ax, x0, 0.7, w, 1.5, SI_GRAY)                       # substrate
-        ax.text(x0 + w / 2, 1.45, "Si substrate", ha="center", va="center", fontsize=9, color=INK2)
-        _rect(ax, x0, 2.2, w, t_diel, diel_fc)                    # the dielectric
-        ax.text(x0 + w + 0.15, 2.2 + t_diel / 2, diel_label, ha="left", va="center",
-                fontsize=9, color=INK)
-        _rect(ax, x0, 2.2 + t_diel, w, 1.3, gate_fc)              # the gate
-        ax.text(x0 + w / 2, 2.2 + t_diel + 0.65, gate_label, ha="center", va="center",
-                fontsize=9, color=INK)
-        return x0 + w / 2, 2.2 + t_diel
-
-    # period-side: thermal SiO₂ scaled to its wall
-    cx, ytop = stack(0.6, 0.28, BLUE_PALE, "SiO₂  t ≈ 1.2 nm\n(the scaling wall)", "poly-Si gate", GATE_GRAY)
-    for dx in (-0.9, 0.0, 0.9):
-        ax.annotate("", xy=(cx + dx, 1.9), xytext=(cx + dx, ytop + 0.9),
-                    arrowprops=dict(arrowstyle="-|>", color=RED, lw=1.6, linestyle=(0, (4, 2))))
-    ax.text(cx, 0.25, "direct tunneling — gate leakage\nexplodes below ~1.2 nm", ha="center",
-            va="bottom", fontsize=9, color=RED)
-
-    # successor: HfO₂ at the same EOT
-    cx2, _ = stack(7.2, 0.84, BLUE_LT, "HfO₂  κ ≈ 20\nt ≈ 3× thicker,\nsame EOT", "metal gate", GATE_GRAY)
-    ax.annotate("", xy=(cx2, 2.62), xytext=(cx2, 3.5),
-                arrowprops=dict(arrowstyle="-|>", color=MUTED, lw=1.6, linestyle=(0, (4, 2))))
-    ax.text(cx2, 2.38, "✕", ha="center", va="center", fontsize=13, color=AQUA, fontweight="bold", zorder=5)
-    ax.text(cx2, 0.25, "tunneling collapses — the barrier is\nphysically thick at the same EOT",
-            ha="center", va="bottom", fontsize=9, color=AQUA)
-
-    ax.annotate("", xy=(6.9, 3.0), xytext=(5.0, 3.0),
-                arrowprops=dict(arrowstyle="-|>", color=INK2, lw=1.4))
-    ax.text(5.95, 3.25, "2007", ha="center", va="bottom", fontsize=9, color=INK2)
-    ax.text(5.95, 5.9, "the would-be observable: gate tunneling leakage vs t_ox —\n"
-                       "EOT = t_phys · (3.9 / κ) keeps the capacitance while the barrier thickens",
-            ha="center", va="top", fontsize=9, color=INK2, style="italic")
 
 
 # --------------------------------------------------------------------------------------------- #
@@ -369,7 +331,6 @@ def _draw_f10(fig) -> None:
 
 # The registry the roadmap page + drift guard anchor on: slice id → its draw function.
 FIGURES = {
-    "F3": _draw_f3,
     "F4": _draw_f4,
     "F5": _draw_f5,
     "F6": _draw_f6,

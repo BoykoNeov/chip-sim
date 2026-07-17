@@ -1,5 +1,10 @@
 # Plan — F3 high-κ gate dielectric (the EOT/leakage split one thickness can't carry)
 
+> ## ✅ COMPLETE (2026-07-17) — all 4 slices built; the roadmap card has graduated.
+> Module `chip/high_k.py` · knob `DeviceKnobs.dielectric` · demo `chip/demo_highk_history.py` (**B8**) ·
+> sources `memory/high-k-dielectric-source.md`. **`chip/device.py` was never touched** — the EOT route is
+> an identity, which is the finding the whole plan turned on. **Next: F4 (BEOL interconnect RC).**
+
 > **SLICE 1 BUILT (2026-07-15)** — `chip/high_k.py` + `chip/tests/test_high_k.py` (23 tests, fast lane
 > green; no existing file touched, `device.py` included). The EOT identity, the WKB tunnelling exponent,
 > the cited dielectric registry, and the prefactor-free `leakage_decades_saved`. Cited constants →
@@ -49,14 +54,53 @@
 > `implant_kind`) → V_t ≈ 0.35 V, an honest 45 nm threshold. It cannot disturb the invariance: ΔV_t =
 > q·dose/C_ox reads the *same* C_ox all three materials share (asserted).
 >
-> Remaining: the **interfacial-layer** slice (the honest EOT floor — series tunnel barrier *and* series
-> capacitance, both sides at once) — and nothing else.
+> **SLICE 4 BUILT (2026-07-17) — the interfacial layer. F3 IS COMPLETE; the roadmap card is PULLED.**
+> `chip/high_k.py` §5 (`Layer`, `stack_eot_um`, `stack_tunnel_exponent`, `stack_leakage`, `eot_floor_um`,
+> `Dielectric.decay_per_eot_um`), `gate_stack(…, t_il_um=0.0)`, the B8 demo's 3rd panel, +14 tests. Fast
+> lane green (1062). **`device.py` and `fab_game/` untouched** — and the game needed no IL knob (the demo is
+> the consumer; a knob with no consumer is the over-build the repo's bar rejects — advisor).
 >
-> **The roadmap card — USER DECIDED (2026-07-17): leave it until the IL slice lands.** So for the graduation
-> rule, **"F3 ships" means the IL slice is done**, not slices 1–3: the F3 card stays on `docs/roadmap.html`
-> (schematic, "not simulator output") until then, and the card understating what already exists is the
-> accepted cost. Do not pull it early. (Alternatives put to the user and rejected: pull now and treat the IL
-> as a follow-on; pull and add a standalone `F3-IL` card.)
+> **Both currencies are ADDITIVE over series layers, each with its own per-layer coefficient** — that single
+> observation is the slice. Series caps ⇒ EOTs add (`EOT = EOT_IL + EOT_HK`, Ando eq. 1); series barriers ⇒
+> WKB exponents add (`Σ αᵢ·tᵢ`, each layer carrying its **own** (φ_B, m*), since the WKB integral runs over
+> the whole path). `device.py` survives *again*, and for the same reason as slice 1: the sum of series EOTs
+> **is** an EOT, so the capacitance path still receives one number and cannot tell a two-layer stack from a
+> one-layer one. The invariance is now over stack **structure**, not just material.
+>
+> **THE PAYLOAD — the IL is the *better barrier* and STILL a pure loss, and only both sides together get
+> that sign right.** SiO₂'s φ_B (3.2 eV) beats HfO₂'s (1.4), so a capacitance-blind model calls the IL a
+> leakage *win*; a barrier-blind model misses that the barrier is real. The tiebreak is the **figure of
+> merit** `α·κ/3.9` = *exponent bought per nm of EOT spent* (`Dielectric.decay_per_eot_um`) — Yeo's
+> three-term (barrier AND mass AND κ) structure, finally explicit: **SiO₂ 12.96/nm vs HfO₂ 25.78/nm**. The
+> IL spends the budget at **half value**, and that ~2× *is the entire high-κ win being handed back*. Cost is
+> **linear**: −0.56 decades/Å, reaching **exactly zero** at `t_IL = EOT`, where the high-κ is squeezed out of
+> its own budget and the "stack" is a plain SiO₂ gate again. **The floor and the cost are the same line.**
+>
+> **The floor is the tightest claim in the module:** `EOT > t_IL·(3.9/K_IL)` for **any** κ — even κ=2000 —
+> geometric, prefactor-free, zero barrier physics. `gate_stack` **raises** below it rather than
+> extrapolating through. This is the honest ceiling the plan wanted, and it is why "just use more κ" was
+> never the end of the story.
+>
+> **The framing was decided by a number, not a lean (advisor).** The IL halves the featured win (5.6 → 2.8
+> decades at EOT=1 nm), and whether that reads as "the IL *corrects* an overstatement" or "the IL *brackets*
+> the ideal from below" turned on the literature's matched-EOT figure — which the search pinned at a **~2–6
+> decade spread**, *wider than either of the model's numbers*. So: **both endpoints sit inside the reported
+> band**, and the IL is **one real mechanism spreading it, not the whole explanation** (m*, film quality and
+> traps also move it). Do not upgrade this to "the model now matches published better".
+>
+> **The trap the advisor caught before it shipped:** the demo's "HfO₂ 1.8e-3 A/cm² lands on published data"
+> is a **no-IL** statement, and the with-IL stack reads ~1 A/cm² — ~3 decades apart. Those two cannot both
+> stand unlabelled on one figure. **J₀ was NOT re-anchored** to reconcile them (the whole prefactor-free
+> discipline rests on it being shared); instead both HfO₂ stacks are now plotted and *labelled* —
+> **"idealized: no IL"** vs **"as built (2007, 45 nm)"** — and the era label moved to the as-built bar. A
+> pinned honesty test guards it: the idealized win is a **ceiling no fab can build**, and this demo used to
+> feature it under the 45 nm label. The new right panel is **prefactor-free** (a ratio cancels J₀), which is
+> what earns it the headline.
+>
+> **The roadmap card is OFF** (`chip/roadmap_gallery.py` `SLICES`, `chip/roadmap_figures.py` `FIGURES`,
+> `docs/figures/roadmap-f3.png` deleted, both editions regenerated) — the user's 2026-07-17 call was that
+> **"F3 ships" ≡ the IL slice is done**, and it is. The manifest guard pins card↔schematic, so both had to go
+> together. **F4 (BEOL interconnect RC) now heads the promotable queue** — the last promotable roadmap step.
 
 **The discriminating observable, stated first (the build's licence):** the gate oxide thickness feeds
 **two device quantities with different functional dependence**, and no single scalar can move both:
@@ -235,12 +279,17 @@ reports the `t_phys = EOT·κ/3.9` that target needs. The alternative — a knob
    overstated; (b) feature `decades_saved` with the module's own caveat (**"≳ N decades**, exponent-
    dominated"; trap floor not modelled); and (c) lead with the **shape** (monotone, sign, the wall) —
    which is the honest payload — not the absolute count.
-3. **Interfacial layer core-vs-edge — RESOLVED: its own slice. ⚠️ This REVERSES the plan's "lean:
-   include", and the reason is the build's physics correction.** With the barrier now in the model an IL
-   is a **series tunnel barrier**, not merely a series capacitance. Carrying it on the `C_ox` side only
-   (`EOT = t_IL + t_hk·3.9/κ`) while ignoring the barrier it adds would be *exactly* the half-physical
-   middle this module rejects everywhere else. It stays a **named scope edge in the module docstring**
-   (the honest EOT floor) until it can be built on both sides at once.
+3. **Interfacial layer core-vs-edge — RESOLVED, then BUILT (slice 4, 2026-07-17).** The reversal held: an
+   IL is a **series tunnel barrier**, not merely a series capacitance, so it got its own slice and was
+   built on **both sides at once**. The suspicion that motivated the deferral was right, and stronger than
+   expected — carrying only `EOT = t_IL + t_hk·3.9/κ` would not merely have been incomplete, it would have
+   got the **sign of the barrier term backwards** (SiO₂ is the *better* barrier per nm; it is the worse buy
+   only per nm of **EOT**, which needs both currencies to see). Delivered: additive EOTs + additive WKB
+   exponents, the `decay_per_eot_um` figure of merit, the hard `eot_floor_um`, and the demo's third panel.
+   What remains a **named scope edge**: how thin an IL can actually be made (~0.4–0.5 nm in practice —
+   below that it stops being a film, and scavenging harder costs work-function control and reliability;
+   Ando), and non-SiO₂ IL composition (SiON/silicate — `il=` accepts any `Dielectric`, but only SiO₂ has a
+   cited (φ_B, m*) pair here).
 4. **Which high-κ anchors "modern" — RESOLVED: HfO₂ (κ=25, φ_B=1.4).** Registry is SiO₂ + HfO₂ + **TiO₂**
    (κ=80, φ_B=**0**) as the counterexample. Al₂O₃/ZrO₂/La₂O₃/Si₃N₄ are **docstring table rows only**:
    their `m*` is not separately sourceable, and a `Dielectric` without a cited `(φ_B, m*)` pair could only

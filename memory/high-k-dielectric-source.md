@@ -1,12 +1,15 @@
 ---
 name: high-k-dielectric-source
-description: "F3: cited EOT identity + κ/φ_B table (Robertson EPJ AP 28:265) and the FLAGGED tunnelling masses; the κ↔gap inverse correlation is the load-bearing bit"
-metadata:
+description: "F3: cited EOT identity + κ/φ_B table (Robertson EPJ AP 28:265) and the FLAGGED tunnelling masses; the κ↔gap inverse correlation is the load-bearing bit. + Ando 2012 for the interfacial layer (additive EOT, the ~0.5 nm floor)"
+metadata: 
+  node_type: memory
   type: reference
+  originSessionId: 11551c9e-1fb7-47a6-afca-3202943ba3a2
 ---
 
-Cited constants behind `chip/high_k.py` (F3 slice 1). **Web-verified 2026-07-15**; the recalled anchors in
-`docs/plans/high-k-metal-gate-f3.md` were partly wrong, which is why the search-don't-recall rule exists.
+Cited constants behind `chip/high_k.py` (F3). **Web-verified 2026-07-15** (Robertson) / **2026-07-17**
+(Ando, the IL slice); the recalled anchors in `docs/plans/high-k-metal-gate-f3.md` were partly wrong, which
+is why the search-don't-recall rule exists.
 
 **Primary source — one coherent set.** J. Robertson, "High dielectric constant oxides", *Eur. Phys. J.
 Appl. Phys.* **28**, 265–291 (2004). (The plan named **Wilk/Wallace/Anthony JAP 89:5243 (2001)** — not
@@ -56,5 +59,46 @@ prefactor ratio → report decades as "**≳ N**, exponent-dominated", never a p
 or image-force correction (rectangular barrier at fixed bias, direct-tunnelling regime `V_g < φ_B`); no
 QM/poly-depletion EOT correction; no trap-assisted/stress-induced leakage.
 
+---
+
+**SECOND SOURCE — the interfacial layer (slice 4).** T. Ando, "Ultimate Scaling of High-κ Gate
+Dielectrics: Higher-κ or Interfacial Layer Scavenging?", *Materials* **5**(3), 478–500 (2012),
+doi:10.3390/ma5030478. Open-access, **web-verified 2026-07-17**. Its *title* is the question the model
+answers with a computed rate; picked because it is about the IL specifically, where Robertson is about the
+materials.
+
+- **Eq. (1) verbatim: `EOT = EOT_IL + EOT_HK`** — the **additive series EOT**, load-bearing for the whole
+  slice (`EOT_IL = t_IL·(3.9/K_IL)`). Series caps ⇒ EOTs add ⇒ the sum **is still an EOT** ⇒ `device.py`
+  survives a *two-layer stack* for the same reason it survived one layer. The barrier half (`Σ αᵢ·tᵢ`) is
+  **NOT from Ando** — it is the WKB path integral, i.e. the module's own §2 applied per layer.
+- **IL composition/κ:** silicon-oxide-based, **K ≈ 3.9** → the registry's `SIO2` is the cited IL. (La-silicate
+  ILs raise K — named scope edge, not built: no citable (φ_B, m*).)
+- **The IL floor — FLAGGED as practice, not physics:** "highly precise IL thickness control in an ultra-thin
+  IL regime (**<0.5 nm**) will be the key technology"; ~**0.4 nm** is where quality degrades. Zero-IL costs
+  **EWF control** + mobility; aggressive scavenging costs reliability (**50–100× lifetime reduction per
+  0.1 nm**). ⚠️ This is a *manufacturability* bound — the model's `eot_floor_um` is the **geometric** one
+  (`EOT > t_IL`, any κ), which is tight/prefactor-free. The 0.4–0.5 nm practical limit is a **named scope
+  edge**: the model prices a 0.1 nm IL, a fab cannot build one. Featured IL = **0.5 nm** (in range).
+- **Why the IL dominates:** "the first generation HKMG devices already employ the thinnest possible high-κ
+  layer" → there is "little room" left in `EOT_HK`, so the IL *is* the remaining EOT.
+- **CORROBORATES two existing claims from an independent paper** (both were single-sourced before):
+  * **κ↔gap inverse correlation** — Ando quantifies it: **`Eg ~ k^−0.65`**, and K>30 materials suffer
+    "excessive direct tunneling currents". Robertson's Table 2 + Fig. 5 said the same qualitatively. This is
+    the module's headline, so a second source matters.
+  * **the ~1-decade-per-2-Å SiO₂ slope** — Ando's "ideal SiO₂ scaling" = **10× Jg per 0.2 nm**, i.e.
+    0.5 dec/Å vs the model's *predicted* 0.563 (1.78 Å/decade). The non-circular cross-check now has a
+    second, independent confirmation.
+- **Ando gives NO absolute A/cm²** → it does **not** re-anchor `J0_REFERENCE`, and must not be used to.
+
+**The matched-EOT win — the literature spread, pinned 2026-07-17 (this decided the slice's FRAMING).**
+Reported values range **~2–6 decades** (searched: "4 orders at EOT=1.3 nm"; "5–6 orders vs poly/SiO₂";
+">2 orders at EOT≈1 nm"). ⚠️ **This CORRECTS [[high-k-gate-f3]]'s earlier recalled "lit ~3–5"** — the real
+band is wider on both sides. Consequence: the model's idealized **5.6** (no IL) and as-built **2.8**
+(0.5 nm IL) **both sit inside** the reported band, which is *wider than the pair*. So the IL is **one real
+mechanism spreading the literature, not the whole explanation** (m*, film quality, traps also move it) —
+do **not** upgrade this to "the IL makes the model match published better". The advisor flagged this as
+the framing tiebreak, and the number, not the lean, decided it.
+
 Consumer: [[high-k-gate-f3]]. Cousin sources: [[deal-grove-oxidation-source]] (the *physical* oxide this
-never touches), [[mos-threshold-voltage-source]] (the `C_ox` path EOT feeds).
+never touches — and note the IL is *not* Deal–Grove's oxide either), [[mos-threshold-voltage-source]] (the
+`C_ox` path EOT feeds).

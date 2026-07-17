@@ -10,6 +10,11 @@ The triad, per ``docs/plans/high-k-metal-gate-f3.md`` + ``historical-modes.md``:
     the proof that F3 needs no change there;
   * **tight — the ratio:** the flagged prefactor is shared, so it **cancels exactly** in
     :func:`chip.high_k.leakage_decades_saved` — the decades-saved figure is pure cited-exponent physics;
+  * **tight — the EOT floor:** ``EOT > t_IL·(3.9/K_IL)`` for **any** κ (:func:`chip.high_k.eot_floor_um`)
+    — geometric, prefactor-free, no barrier physics: the honest ceiling on the high-κ escape. The
+    interfacial-layer tests below are the module's "both sides at once" rule made assertable — the IL is
+    the *better barrier* and **still** a pure loss, and only carrying capacitance **and** barrier
+    together gets that sign right (a capacitance-blind model calls the IL a leakage win);
   * **cross-check (non-circular):** the cited (φ_B, m*) pairs — never fitted to a leakage curve —
     reproduce the textbook SiO₂ "~1 decade per ~2 Å" slope;
   * **flagged:** the absolute prefactor ``J0_REFERENCE`` and the tunnelling masses (HfO₂'s spread
@@ -254,6 +259,169 @@ def test_string_lookup_matches_object_form():
         hk.leakage_decades_saved(1.0e-3, hk.HFO2, reference=hk.SIO2)
 
 
+# --------------------------------------------------------------------------- #
+# The interfacial layer — the honest EOT floor, charged on BOTH currencies at once
+# --------------------------------------------------------------------------- #
+def test_t_il_zero_is_the_bit_for_bit_sub_seam():
+    """t_il_um = 0 reproduces the idealized single-layer stack **exactly** — the IL slice's seam.
+
+    Not approx and not field-by-field: the whole frozen record compares equal, which is what makes the
+    IL purely additive to what was already banked.
+    """
+    for m in ("SiO2", "HfO2", "TiO2"):
+        assert hk.gate_stack(1.0e-3, m, t_il_um=0.0) == hk.gate_stack(1.0e-3, m)
+        assert hk.leakage_decades_saved(1.0e-3, m, t_il_um=0.0) == hk.leakage_decades_saved(1.0e-3, m)
+    assert hk.eot_floor_um(0.0) == 0.0                         # no IL, no floor
+    assert not hk.gate_stack(1.0e-3, "HfO2").has_interfacial_layer
+
+
+def test_both_currencies_are_additive_over_series_layers():
+    """The IL slice's whole physical content: series caps ⇒ EOTs add; series barriers ⇒ exponents add.
+
+    Ando eq. (1) (``EOT = EOT_IL + EOT_HK``) on one side, the WKB path integral on the other. Each layer
+    carries its *own* coefficient — that is what a shared α or a capacitance-only IL would destroy.
+    """
+    il, hi = hk.Layer(hk.SIO2, 0.5e-3), hk.Layer(hk.HFO2, 3.2e-3)
+    assert hk.stack_eot_um([il, hi]) == pytest.approx(il.eot_um + hi.eot_um, rel=1e-12)
+    assert hk.stack_eot_um([il, hi]) == pytest.approx(0.5e-3 + 3.2e-3 * (3.9 / 25.0), rel=1e-12)
+    assert hk.stack_tunnel_exponent([il, hi]) == pytest.approx(
+        hk.SIO2.decay_per_um * 0.5e-3 + hk.HFO2.decay_per_um * 3.2e-3, rel=1e-12)
+    # a one-layer "stack" is just the single-layer reading — the seam that makes the generalization safe
+    assert hk.stack_leakage([hi]) == hk.gate_leakage(3.2e-3, hk.HFO2)
+
+
+def test_the_eot_floor_is_hard_geometric_and_kappa_independent():
+    """**The headline:** ``EOT > t_IL`` for *any* κ, however large — prefactor-free, no barrier physics.
+
+    The honest ceiling on the high-κ escape, and the reason "just use more κ" was never the end of the
+    story: a target EOT at or below the interfacial layer is unreachable by *any* dielectric, so it
+    raises rather than extrapolating through.
+    """
+    assert hk.eot_floor_um(0.5e-3) == 0.5e-3                    # the SiO₂ IL: the eot() identity
+    for kappa in (25.0, 80.0, 2000.0):                         # κ=2000 (SrTiO₃) does not help either
+        diel = hk.Dielectric("absurd-κ", kappa, 1.4, 0.11)
+        with pytest.raises(ValueError, match="floor"):
+            hk.gate_stack(0.5e-3, diel, t_il_um=0.5e-3)        # exactly at the floor: no room left
+        with pytest.raises(ValueError, match="floor"):
+            hk.gate_stack(0.3e-3, diel, t_il_um=0.5e-3)        # below it: unreachable
+        assert hk.gate_stack(0.51e-3, diel, t_il_um=0.5e-3).eot_um == 0.51e-3   # just above: fine
+    # the floor is the IL's *EOT*, so a higher-κ IL lowers it — the other lever Ando weighs
+    assert hk.eot_floor_um(0.5e-3, hk.HFO2) == pytest.approx(0.5e-3 * 3.9 / 25.0, rel=1e-12)
+
+
+def test_the_il_costs_the_win_linearly_and_hits_zero_where_the_high_k_is_squeezed_out():
+    """The IL destroys the win on a **straight line**, reaching exactly 0 at ``t_IL == EOT``.
+
+    At that endpoint the high-κ has no EOT budget left and the "stack" is a plain SiO₂ gate — so the
+    floor and the cost are the same line. Prefactor-free (it is a ratio), hence assertable.
+    """
+    eot = 1.0e-3
+    saved = [hk.leakage_decades_saved(eot, "HfO2", t_il_um=f * eot) for f in (0.0, 0.25, 0.5, 0.75)]
+    diffs = [b - a for a, b in zip(saved, saved[1:])]
+    assert all(d == pytest.approx(diffs[0], rel=1e-9) for d in diffs)      # equal steps ⇒ linear
+    assert all(b < a for a, b in zip(saved, saved[1:])), "the IL must monotonically destroy the win"
+    # → 0 exactly at t_IL = EOT: the stack IS the reference gate, so it can save nothing over it
+    assert hk.leakage_decades_saved(eot, "HfO2", t_il_um=eot * (1.0 - 1e-9)) == pytest.approx(0.0, abs=1e-7)
+
+
+def test_the_il_is_a_pure_loss_on_both_currencies_at_once():
+    """The trap the "both sides at once" rule exists for: the IL *adds barrier* and is **still** a loss.
+
+    SiO₂ has the *higher* φ_B, so a capacitance-blind model would call the IL a leakage win, and a
+    barrier-blind model would miss that the barrier it adds is real. The sign only falls out of the two
+    together — per **nm of EOT spent** the IL returns ~12.96 where HfO₂ returns ~25.78, so every nm the
+    IL takes is spent at about half value. That ~2× *is* the whole high-κ win being handed back.
+    """
+    assert hk.SIO2.barrier_eV > hk.HFO2.barrier_eV              # the IL really is the better barrier …
+    assert hk.SIO2.decay_per_um > hk.HFO2.decay_per_um          # … and really does decay faster per nm
+    assert hk.SIO2.decay_per_eot_um < hk.HFO2.decay_per_eot_um  # … and is STILL the worse buy per nm of EOT
+
+    ratio = hk.HFO2.decay_per_eot_um / hk.SIO2.decay_per_eot_um
+    assert ratio == pytest.approx(2.0, abs=0.1)
+    # the FoM is exactly α·κ/3.9 — the three-term (barrier, mass, κ) combination, not κ alone
+    assert hk.HFO2.decay_per_eot_um == pytest.approx(hk.HFO2.decay_per_um * 25.0 / 3.9, rel=1e-12)
+    assert hk.TIO2.decay_per_eot_um == 0.0                      # κ=80 and still worth nothing per nm
+
+    # and so the IL raises leakage at fixed EOT, despite being the high-barrier material
+    with_il = hk.gate_stack(1.0e-3, "HfO2", t_il_um=0.5e-3)
+    ideal = hk.gate_stack(1.0e-3, "HfO2")
+    assert with_il.gate_leakage_A_cm2 > ideal.gate_leakage_A_cm2
+    assert with_il.eot_um == ideal.eot_um                       # … at the *same* electrical gate
+
+
+def test_the_real_stack_win_is_about_half_the_idealized_one():
+    """The IL is why the ideal ≳5.5 decades is a **ceiling**, not a prediction. Sizes flagged, order tight.
+
+    At a 45 nm-era ~0.5 nm IL the win is ≈2.8 decades — roughly half the idealized 5.6. Both sit inside
+    the literature's own matched-EOT spread (~2–6 decades), which is *wider* than either: the IL is one
+    real mechanism spreading it, not the whole explanation (m*, film quality and traps also move it).
+    """
+    ideal = hk.leakage_decades_saved(1.0e-3, "HfO2", t_il_um=0.0)
+    real = hk.leakage_decades_saved(1.0e-3, "HfO2", t_il_um=0.5e-3)
+    assert ideal == pytest.approx(5.6, abs=0.3)
+    assert real == pytest.approx(2.8, abs=0.3)
+    assert 0.0 < real < ideal                                  # still a win, but roughly halved
+    assert 2.0 <= real <= 6.0 and 2.0 <= ideal <= 6.0          # both inside the reported lit spread
+
+
+def test_the_il_never_moves_the_device_because_only_the_total_eot_reaches_it():
+    """The invariance is over stack **structure**, not just material — the identity's real reach.
+
+    A two-layer IL+HfO₂ stack and a single-layer SiO₂ gate at the same EOT are physically *nothing*
+    alike, and ``device.py`` cannot tell them apart: series EOTs add, so only one number ever arrives.
+    Asserted against the real device model — the same proof slice 1 made, now for stacks.
+    """
+    eot_um, N_A = 1.0e-3, 5.0e16
+    stacks = [hk.gate_stack(eot_um, "HfO2", t_il_um=t) for t in (0.0, 0.3e-3, 0.7e-3)]
+    stacks.append(hk.gate_stack(eot_um, "SiO2"))
+    vts = {device.threshold_voltage(N_A, s.eot_um, channel_length_um=0.045).V_t for s in stacks}
+    assert len(vts) == 1, "the stack's structure reached V_t — only its total EOT should"
+    assert len({device.oxide_capacitance(s.eot_um) for s in stacks}) == 1
+    # … while the physical stacks are wildly different and their leakage spans decades
+    assert len({round(s.t_total_um, 12) for s in stacks}) == len(stacks)
+    assert stacks[0].gate_leakage_A_cm2 < stacks[-1].gate_leakage_A_cm2 * 1e-3
+
+
+def test_gate_stack_records_the_il_and_the_thickness_gain_is_diluted():
+    """The record carries the IL; ``thickness_gain`` reads the *total* the electron tunnels through."""
+    s = hk.gate_stack(1.0e-3, "HfO2", t_il_um=0.5e-3)
+    assert s.has_interfacial_layer and s.t_il_um == 0.5e-3 and s.il_kappa == 3.9
+    assert "SiO" in s.il_material
+    assert s.t_phys_um == pytest.approx(0.5e-3 * 25.0 / 3.9, rel=1e-12)   # the hk fills the REMAINING EOT
+    assert s.t_total_um == pytest.approx(s.t_il_um + s.t_phys_um, rel=1e-12)
+    assert s.eot_floor_um == 0.5e-3
+    # the IL dilutes the 6.4× gain (it contributes thickness at 1×) — and dilutes it with the cheap kind
+    assert s.thickness_gain < hk.gate_stack(1.0e-3, "HfO2").thickness_gain
+    assert hk.gate_stack(1.0e-3, "HfO2").thickness_gain == pytest.approx(25.0 / 3.9, rel=1e-12)
+
+
+def test_il_decades_saved_stays_prefactor_free():
+    """The IL must not smuggle a calibrated constant in: the ratio still cancels J₀ exactly."""
+    decades = hk.leakage_decades_saved(1.0e-3, "HfO2", t_il_um=0.5e-3)
+    layers_new = [hk.Layer(hk.SIO2, 0.5e-3), hk.Layer(hk.HFO2, 0.5e-3 * 25.0 / 3.9)]
+    for J0 in (1.0, 1e5, hk.J0_REFERENCE, 1e12):
+        ratio = math.log10(hk.gate_leakage(1.0e-3, hk.SIO2, J0=J0) / hk.stack_leakage(layers_new, J0=J0))
+        assert ratio == pytest.approx(decades, rel=1e-9)
+
+
+def test_scavenging_an_angstrom_of_il_returns_about_half_a_decade():
+    """Ando's title question ("higher-κ *or* IL scavenging?") answered with a rate, from cited constants.
+
+    Every Å of IL scavenged hands its EOT budget back to the high-κ, which spends it at ~2× the value:
+    **~0.56 decades per Å**. Flagged as a *coincidence*, not a law: this lands within ~1% of SiO₂'s own
+    ~1-decade-per-1.78-Å thinning slope only because HfO₂'s FoM is ≈2× SiO₂'s, making the difference
+    ``FoM_hk − FoM_IL`` ≈ ``FoM_IL``. A different high-κ breaks the coincidence, not the physics.
+    """
+    eot = 1.0e-3
+    per_angstrom = (hk.leakage_decades_saved(eot, "HfO2", t_il_um=0.0)
+                    - hk.leakage_decades_saved(eot, "HfO2", t_il_um=0.1e-3))
+    assert per_angstrom == pytest.approx(0.56, abs=0.02)
+    # the numerical near-equality with the plain-SiO₂ thinning slope, and *why* it is only that
+    sio2_thinning_per_angstrom = 1.0 / (hk.decade_thickness_um(3.2, 0.5) * 1e4)
+    assert per_angstrom == pytest.approx(sio2_thinning_per_angstrom, rel=0.02)
+    assert per_angstrom != sio2_thinning_per_angstrom          # near, not equal — it is not an identity
+
+
 @pytest.mark.parametrize("bad", [0.0, -1.0])
 def test_non_positive_thicknesses_and_kappa_are_rejected(bad):
     """Guards — a zero/negative thickness or K is a recipe bug, not a limit to extrapolate into."""
@@ -267,6 +435,10 @@ def test_non_positive_thicknesses_and_kappa_are_rejected(bad):
         hk.gate_leakage(bad, hk.SIO2)
     with pytest.raises(ValueError):
         hk.leakage_decades_saved(bad, hk.HFO2)
+    with pytest.raises(ValueError):
+        hk.eot_floor_um(-1.0)                       # a negative IL is a bug; zero is the sub-seam
+    with pytest.raises(ValueError):
+        hk.Layer(hk.SIO2, bad)                      # a zero-thickness layer is not a layer
 
 
 def test_negative_barrier_and_non_positive_mass_are_rejected():

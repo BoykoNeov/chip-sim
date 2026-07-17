@@ -29,7 +29,7 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
 |---|------|-------------------|--------------------------------------|---------|
 | **F1** | **Ion implantation** | 1970s: predep → implant | **buried/retrograde peak** predep can't make; `device.py:78` V_t-adjust; damage→leakage (`lifetime.py`) | **✅ BUILT (2026-07-06 — all 4 slices)** (`ion-implantation.md`) |
 | **F2** | **Silicide / contact resistance** | 1980s salicide | **series R** → `I_Dsat` (the journey's `R_series_ohm` seam already exists!) | **✅ BUILT (2026-07-10) as historical-mode B7** (`contact_resistance.py`); two-term access+TLM-contact, bottleneck flips access→contact |
-| **F3** | **High-κ gate dielectric** | 2007 (45nm): SiO₂ → HfO₂ | **gate tunneling leakage** (exp in `t_phys`) vs **`C_ox`** (linear in EOT) — one thickness, two currencies | **🔨 SLICES 1–2 BUILT (2026-07-15/17)** (`chip/high_k.py` + the `dielectric` knob/wiring) — EOT identity + per-material WKB tunneling, now proved end-to-end through the untouched `device.py`. Remaining: history mode + demo, IL slice |
+| **F3** | **High-κ gate dielectric** | 2007 (45nm): SiO₂ → HfO₂ | **gate tunneling leakage** (exp in `t_phys`) vs **`C_ox`** (linear in EOT) — one thickness, two currencies | **✅ BUILT (2026-07-17 — all 4 slices) as historical-mode B8** (`chip/high_k.py` + the `dielectric` knob + `demo_highk_history.py`); EOT identity (`device.py` untouched), per-material WKB tunneling, and the interfacial layer on **both** currencies → the honest EOT floor. **Roadmap card graduated** |
 | **F4** | **BEOL interconnect (RC delay)** | Al → **Cu damascene (1997)** → Ru (3nm) | **new output: chip speed limited by wire RC, not the transistor** | **PROMOTABLE — best history arc, biggest build** |
 | **F5** | **SiGe strained source/drain** | ~2004 (90nm): strain era | **mobility → `I_Dsat`** (~2 GPa @ 20% Ge → up to 100% hole-µ) | PROMOTABLE — needs a µ-model in `device.py`; advanced-node |
 | **F6** | **Epitaxy (buried layer / retrograde well)** | bipolar epi; CMOS wells | retrograde profile — **overlaps implant F1** | COUPLED to F1 — defer standalone |
@@ -47,19 +47,23 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
    the two-term series-R (`chip/contact_resistance.py`): access `R_sh·n_□` (linear) + TLM contact
    `√(ρ_c·R_sh)/W·coth` (sublinear); salicide shunts the sheet so the bottleneck flips access→contact.
    `device.py` untouched. Cited: TLM coth form, `ρ_c` / sheet-R bounds (`silicide-contact-source.md`).
-3. **F3 — high-κ / metal gate**, *or* **F4 — BEOL interconnect** — the first genuinely *new output*
-   decision:
-   - **F3** modernises the oxide stage: it adds a **gate-tunneling-leakage** observable (why SiO₂ stopped
-     scaling at ~1.2 nm → HfO₂ at higher physical thickness, same EOT). Contained, teaches the `SiO₂→high-κ`
-     contrast, reuses the oxide/`t_ox` machinery.
-   - **F4** adds a **back-end output the sim has never had**: chip speed set by interconnect `RC`, not the
-     transistor — plus the richest history arc (subtractive Al → Cu dual-damascene 1997 + CMP → Ru
-     semi-damascene at 3 nm). Bigger build; also *unblocks CMP (F8)* by giving layer-thickness a consumer.
-4. **F5 — SiGe strained S/D** once a mobility model exists in `device.py` (strain → µ → `I_Dsat`).
+3. **F3 — high-κ / metal gate** *(✅ BUILT 2026-07-17, all 4 slices, as historical-mode B8).* The first
+   genuinely *new output*: gate-tunnelling leakage (`chip/high_k.py`). The EOT route turned out to be an
+   **identity** (`ε_SiO₂/EOT ≡ ε₀κ/t_phys`), so `device.py` was never touched — the split is that one
+   thickness feeds `C_ox` **linearly** and `J_g` **exponentially**. Slices: the module, the `dielectric`
+   knob, the B8 demo, and the **interfacial layer** — series capacitance *and* series tunnel barrier at
+   once, which is what makes `EOT > t_IL` (for any κ) the honest floor under the whole escape. Cited:
+   Robertson's κ/φ_B table + the κ↔gap inverse correlation, Ando's additive EOT
+   (`high-k-dielectric-source.md`).
+4. **F4 — BEOL interconnect** — now the head of the queue. Adds a **back-end output the sim has never
+   had**: chip speed set by interconnect `RC`, not the transistor — plus the richest history arc
+   (subtractive Al → Cu dual-damascene 1997 + CMP → Ru semi-damascene at 3 nm). The biggest build of the
+   promotable set; also *unblocks CMP (F8)* by giving layer-thickness a consumer.
+5. **F5 — SiGe strained S/D** once a mobility model exists in `device.py` (strain → µ → `I_Dsat`).
 
-Recommendation: **F1 → F2 → F3 → F4**, deciding F3-vs-F4 order at the time by whether we want the
-contained oxide-successor (F3) or to open the back-end (F4). F2 is unambiguously the right second step —
-its consumer is already wired.
+Recommendation: **F1 → F2 → F3 → F4**. The F3-vs-F4 call was taken for F3 — the contained
+oxide-successor — and it has shipped; **F4 is next**, and is the last promotable step whose consumer is
+already named.
 
 ## The historical/educational spine (the game's timeline)
 

@@ -14,17 +14,22 @@ at all (B7, the demo-only precedent, has no demo test):
     where the model may speak, so it is pinned here rather than left to a reader's restraint;
   * **the headline is never rounded up** — a "≳ N decades" claim is a *lower bound*, so the displayed N may
     only ever sit **below** the computed win. This one caught a live instance: the featured 5.565-decade
-    win rendered as "≳5.6" under plain ``.1f``, claiming more than the model supports.
+    win rendered as "≳5.6" under plain ``.1f``, claiming more than the model supports;
+  * **the idealized stack is never presented as the shipped product** (the IL slice's guard) — the no-IL
+    win is a *ceiling* no fab can build, and this demo used to feature it under a "2007, 45 nm" label.
+    Both HfO₂ stacks are now on the figure and the era label belongs to the as-built one.
 
 The figure is **not** in the correctness path (ADR 0002): rendering is checked only for "builds without
 error", and skipped where the optional viz extra is absent.
 """
+import numpy as np
 import pytest
 
 from chip import device as dev
 from chip import high_k as hk
 from chip.demo_highk_history import (
-    CHANNEL_N_A, EOT_LADDER_UM, FEATURE_EOT_UM, MATERIALS, WALL_J_A_CM2, compute, floor_decades,
+    CHANNEL_N_A, EOT_LADDER_UM, FEATURE_EOT_UM, FEATURE_T_IL_UM, IL_SWEEP_UM, MATERIALS, WALL_J_A_CM2,
+    compute, floor_decades,
 )
 
 
@@ -111,6 +116,66 @@ def test_the_headline_claim_is_floored_never_rounded_up():
     )
     # The rule must hold for any value, not just today's — including the ones .1f rounds up.
     assert floor_decades(5.565) == "5.5" and floor_decades(5.99) == "5.9" and floor_decades(6.0) == "6.0"
+
+
+def test_the_demo_does_not_present_the_idealized_stack_as_the_shipped_product():
+    """**An honesty guard.** The figure carries two HfO₂ leakages; the 45 nm one must be the *as-built* one.
+
+    The idealized no-IL win (≳5.5 decades, 1.8e-3 A/cm²) is a **ceiling**, not a product: no fab builds a
+    high-κ gate without an interfacial layer. Featuring it under a "2007, 45 nm" label — which is what
+    this demo did before the IL was modelled — states the ceiling as the shipped number. Both are now
+    plotted, and this pins that the real one exists, is distinct, and is the worse of the two.
+    """
+    r = compute()
+    ideal, real = r.stacks["HfO2"], r.real_stack
+    assert real.has_interfacial_layer and real.t_il_um == FEATURE_T_IL_UM
+    assert real.eot_um == ideal.eot_um                          # the same electrical gate …
+    assert real.gate_leakage_A_cm2 > ideal.gate_leakage_A_cm2   # … and it really does leak more
+    assert 0.0 < real.decades_saved_vs_sio2 < ideal.decades_saved_vs_sio2   # still a win, roughly halved
+    # both ends of the model's claim sit inside the reported literature spread (~2–6 decades)
+    assert 2.0 <= real.decades_saved_vs_sio2 <= 6.0
+    assert 2.0 <= ideal.decades_saved_vs_sio2 <= 6.0
+
+
+def test_the_il_panel_is_prefactor_free_and_linear_to_the_floor():
+    """The right panel's payload: the win falls **linearly** to exactly zero at the EOT floor.
+
+    Prefactor-free by construction (a ratio cancels the house J₀), so this panel contains no flagged
+    magnitude at all — which is why it is allowed to carry the slice's headline.
+    """
+    r = compute()
+    d = r.decades_saved_vs_t_il
+    assert all(b < a for a, b in zip(d, d[1:])), "the IL must monotonically destroy the win"
+    steps = np.diff(d)
+    assert np.allclose(steps, steps[0], rtol=1e-9), "the cost of the IL must be linear in t_IL"
+    assert d[0] == pytest.approx(r.stacks["HfO2"].decades_saved_vs_sio2)   # t_IL=0 is the idealized end
+    assert d[-1] > 0.0                                          # the sweep stops just short of the floor
+    # …and extrapolating the line to t_IL = EOT lands on zero: the high-κ squeezed out of its own budget
+    at_floor = hk.leakage_decades_saved(FEATURE_EOT_UM, "HfO2", t_il_um=FEATURE_EOT_UM * (1 - 1e-9))
+    assert at_floor == pytest.approx(0.0, abs=1e-7)
+
+
+def test_the_eot_floor_is_real_and_the_demo_never_walks_through_it():
+    """The floor is a **refusal**, not a curve that keeps going: below t_IL the stack cannot be built."""
+    r = compute()
+    assert r.real_stack.eot_floor_um == FEATURE_T_IL_UM         # SiO₂ IL ⇒ the floor IS its thickness
+    with pytest.raises(ValueError, match="floor"):
+        hk.gate_stack(FEATURE_T_IL_UM * 0.9, "HfO2", t_il_um=FEATURE_T_IL_UM)
+    assert min(IL_SWEEP_UM) >= 0.0 and max(IL_SWEEP_UM) < FEATURE_EOT_UM, "the sweep must stay buildable"
+    # the ladder never dips under the floor either, so the as-built curve is defined the whole way
+    assert min(EOT_LADDER_UM) > FEATURE_T_IL_UM
+    assert not np.isnan(r.j_gate_real).any()
+
+
+def test_the_representative_il_is_one_a_fab_could_actually_grow():
+    """The featured IL must sit in the range real stacks live in — ~0.4–0.5 nm is the practical limit.
+
+    The model will happily price a 0.1 nm IL; a fab cannot build one (below ~0.4 nm the film stops being
+    a film, and scavenging that hard costs work-function control and reliability — a named scope edge).
+    Featuring a sub-limit IL would understate the floor exactly the way the idealized stack does.
+    """
+    assert 0.4e-3 <= FEATURE_T_IL_UM <= 1.0e-3
+    assert FEATURE_T_IL_UM < FEATURE_EOT_UM, "the featured stack must be buildable at the featured EOT"
 
 
 def test_figure_builds():

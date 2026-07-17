@@ -1,6 +1,6 @@
 ---
 name: high-k-gate-f3
-description: "project (2026-07-15 → slice 3 BUILT 2026-07-17): F3 high-κ — EOT is an IDENTITY (device.py untouched); knob = material-only; B8 demo rides high_k.py (no Tier-2 wrapper); ladder capped at the honest regime. Only the IL slice remains"
+description: "project (2026-07-15 → COMPLETE 2026-07-17, all 4 slices): F3 high-κ — EOT is an IDENTITY (device.py untouched); knob = material-only; B8 demo rides high_k.py; the IL is additive on BOTH currencies → the honest EOT floor. Roadmap card PULLED; next = F4"
 metadata: 
   node_type: memory
   type: project
@@ -127,11 +127,54 @@ Fix = the **V_t-adjust implant `device.py` already had** (§5 `implant_dose`/`im
 → V_t ≈ 0.35 V. **Cannot disturb the invariance**: ΔV_t = q·dose/C_ox reads the *same* C_ox all 3 share
 (asserted). Lesson: a *representative* recipe at a scaled node isn't representative without the era's knobs.
 
-**Remaining F3:** the **interfacial-layer** slice only (series tunnel barrier + series capacitance, both sides
-at once — the honest EOT floor). Then **F4 (BEOL interconnect RC)** = last PROMOTABLE roadmap step.
+---
 
-**ROADMAP CARD — USER DECIDED 2026-07-17: LEAVE IT until the IL slice lands.** So **"F3 ships" ≡ IL done**,
-not slices 1–3 — the F3 card stays on `docs/roadmap.html` (schematic, "not simulator output") meanwhile, and
-comes off with the IL slice. **Don't re-ask, and don't pull it early**; the card understating what exists
-today is accepted cost. Rejected alternatives: pull now (treat IL as a follow-on), pull + add an `F3-IL` card.
+**SLICE 4 BUILT (2026-07-17) — the interfacial layer. F3 IS COMPLETE (all 4 slices); CARD PULLED.**
+`high_k.py` §5 (`Layer`, `stack_eot_um`, `stack_tunnel_exponent`, `stack_leakage`, `eot_floor_um`,
+`Dielectric.decay_per_eot_um`) + `gate_stack(…, t_il_um=0.0)` + B8's 3rd panel + 14 tests. Fast lane green
+(**1062**). **`device.py` AND `fab_game/` untouched.** No IL game knob — advisor: the demo is the consumer,
+a knob without one is the over-build the repo's bar rejects. (`fab_game` calls `gate_stack(t_ox, material)`,
+so the `t_il_um=0.0` sub-seam covers it with zero game change.)
+
+**THE SLICE IN ONE LINE: both currencies are ADDITIVE over series layers, each with its own per-layer
+coefficient.** Series caps ⇒ EOTs add (`EOT = EOT_IL + EOT_HK`, Ando eq. 1 — cited); series barriers ⇒ WKB
+exponents add (`Σ αᵢ·tᵢ`, each layer its **own** (φ_B, m*) — the path integral, not Ando). **`device.py`
+survives AGAIN, same reason as slice 1:** a sum of series EOTs **is** an EOT → one number still arrives →
+the invariance is now over stack **STRUCTURE**, not just material (asserted: a 2-layer stack and a 1-layer
+SiO₂ gate at one EOT give identical `V_t`/`C_ox`).
+
+**THE PAYLOAD — the IL is the *better barrier* and STILL a pure loss; only both sides together get the sign
+right.** SiO₂ φ_B=3.2 > HfO₂ 1.4, so a **capacitance-only IL would have got the barrier term's sign
+BACKWARDS** (not merely been incomplete — this vindicates the slice-1 deferral, harder than expected). The
+tiebreak = the FoM **`α·κ/3.9` = exponent bought per nm of EOT *spent*** (`decay_per_eot_um`) — Yeo's
+three-term (barrier AND mass AND κ) finally explicit: **SiO₂ 12.96/nm vs HfO₂ 25.78/nm**. The IL spends the
+budget at **half value**, and that ~2× **IS the whole high-κ win, handed back**. Cost is **LINEAR**:
+**−0.56 dec/Å**, hitting **exactly 0** at `t_IL = EOT` (high-κ squeezed out → a plain SiO₂ gate again).
+**The floor and the cost are the same line.** ⚠️ The 0.557 dec/Å ≈ SiO₂'s own 0.563 thinning slope is a
+**COINCIDENCE** (only because FoM ratio ≈2 ⇒ the difference ≈ SiO₂'s own value) — flagged as such, not a law.
+
+**The floor = the module's TIGHTEST claim:** `EOT > t_IL·(3.9/K_IL)` for **any** κ (even κ=2000) —
+geometric, prefactor-free, **zero barrier physics**. `gate_stack` **RAISES** below it rather than
+extrapolating. This is why "just use more κ" was never the end of the story.
+
+**FRAMING DECIDED BY A NUMBER, NOT A LEAN (advisor).** The IL halves the win (5.6 → 2.8 @EOT=1 nm). Whether
+that reads "corrects an overstatement" or "brackets from below" turned on the lit matched-EOT figure →
+searched: **~2–6 decades**, **WIDER than either model number** (⚠️ this **corrects** the earlier recalled
+"~3–5"). So **both endpoints sit inside the band**, and the IL is **one mechanism spreading it, NOT the
+explanation**. **Do not upgrade to "now matches published better."** → [[high-k-dielectric-source]].
+
+**THE TRAP THE ADVISOR CAUGHT PRE-SHIP:** the demo's "HfO₂ 1.8e-3 lands on published data" is a **no-IL**
+statement; with-IL reads ~1 A/cm² — **~3 decades apart, both can't stand unlabelled on one figure**.
+**J₀ was NOT re-anchored** (the whole prefactor-free discipline rests on it being shared). Fix = plot both,
+**labelled**: "idealized: no IL" vs **"as built (2007, 45 nm)"** — the **era label moved to the as-built
+bar** (it had been sitting on the ceiling no fab can build). Pinned by an honesty test. The new 3rd panel is
+**prefactor-free** (a ratio cancels J₀) — that's what earns it the headline.
+
+**ROADMAP CARD PULLED** — the user's 2026-07-17 call (**"F3 ships" ≡ IL done**) discharged. Touched
+`roadmap_gallery.py` `SLICES` + `roadmap_figures.py` `FIGURES` (`_draw_f3` deleted) +
+`docs/figures/roadmap-f3.png` deleted + both editions regenerated; **the manifest guard pins
+card↔schematic, so both must go together**. Graduation note left in the section subtitle (honest, not a
+card). `future-steps.md` F3 row → ✅ BUILT. → [[roadmap-page]].
+
+**NEXT: F4 (BEOL interconnect RC)** = the last PROMOTABLE roadmap step, now head of the queue.
 ([[roadmap-page]] graduation rule.)

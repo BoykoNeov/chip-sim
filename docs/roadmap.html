@@ -136,29 +136,8 @@
   <main>
     <section>
       <h2>Promotable — the consumer is named</h2>
-      <p class="sub">Each of these already has a device observable waiting to read it; the plan's recommended sequence is F3/F4 (the new-output decision) then F5.</p>
+      <p class="sub">Each of these already has a device observable waiting to read it. F3 (high-κ) has shipped and its card came off; F4 now heads the queue, then F5.</p>
       <div class="grid">
-        <article class="card">
-          <a class="shot" href="figures/roadmap-f3.png" title="open the full schematic (a preview, not simulator output)">
-            <span class="ribbon">planned &mdash; schematic</span>
-            <img src="figures/roadmap-f3.png" alt="F3 — High-κ / metal gate schematic preview (planned, not simulator output)" loading="lazy">
-          </a>
-          <div class="body">
-            <div class="tagrow">
-              <span class="tag">F3 &middot; 2007 · 45 nm</span>
-              <span class="status ok">Promotable</span>
-            </div>
-            <p class="blurb"><strong>High-κ / metal gate.</strong> The oxide stage&#x27;s modern successor: SiO₂ stopped scaling at ~1.2 nm because direct tunneling explodes; HfO₂ holds the same EOT at ~3× the physical thickness.</p>
-            <div class="facts">
-              <div class="row"><span class="k would">Would add</span><p class="v">A gate-tunneling-leakage observable vs t_ox — a NEW output, plus the SiO₂→high-κ era contrast on the existing oxide/t_ox machinery.</p></div>
-              <div class="row"><span class="k gate">Gated on</span><p class="v">Nothing structural — the first genuinely new-output decision (F3 vs F4 order is the open call in the plan).</p></div>
-            </div>
-            <div class="links">
-              <code>docs/plans/future-steps.md</code>
-              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
-            </div>
-          </div>
-        </article>
         <article class="card">
           <a class="shot" href="figures/roadmap-f4.png" title="open the full schematic (a preview, not simulator output)">
             <span class="ribbon">planned &mdash; schematic</span>
@@ -193,7 +172,7 @@
             <p class="blurb"><strong>SiGe strained source/drain.</strong> The strain era: embedded SiGe pockets squeeze the p-channel (~2 GPa at ~20% Ge), and hole mobility — hence drive current — rises.</p>
             <div class="facts">
               <div class="row"><span class="k would">Would add</span><p class="v">Mobility → I_Dsat through a strain-aware µ model — the channel-strain rung of the era ladder.</p></div>
-              <div class="row"><span class="k gate">Gated on</span><p class="v">A µ(strain) mobility model in device.py — none exists yet; advanced-node, so it queues behind F3/F4.</p></div>
+              <div class="row"><span class="k gate">Gated on</span><p class="v">A µ(strain) mobility model in device.py — none exists yet; advanced-node, so it queues behind F4.</p></div>
             </div>
             <div class="links">
               <code>docs/plans/future-steps.md</code>
@@ -330,7 +309,7 @@
         <a class="item" href="https://github.com/BoykoNeov/chip-sim/blob/main/docs/plans/future-steps.md">
           <h3>The roadmap triage &#8599;</h3>
           <p>future-steps.md &mdash; the full future-slice triage: consumer observables, verdicts,
-            the recommended F3/F4 sequence, and the honest NO&rsquo;s.</p>
+            the recommended sequence, and the honest NO&rsquo;s.</p>
         </a>
         <a class="item" href="https://github.com/BoykoNeov/chip-sim/blob/main/docs/plans/scope-edge-backlog.md">
           <h3>The scope-edge backlog &#8599;</h3>
