@@ -233,7 +233,8 @@ has been re-examined (F8, F5) it had already been released.
     number; the overstatement is the **mechanism's** cited ratio, not a correction applied to that die.
 - **S3 — the B10 history mode + demo. ✅ BUILT 2026-08-10.** `chip/demo_strain_history.py` + its test; the
   10th timeline rung, slotted **between B8 and B6** (the timeline is process order, not chronological —
-  the channel sits after the gate dielectric and before contact metal). Fast lane 1164 → 1174. What the
+  the channel sits after the gate dielectric and before contact metal). Fast lane **1165 → 1175**
+  (measured at `HEAD~1` in a worktree, not carried from the S2 note, which said 1164). What the
   build settled and found:
   - **The period is a POINT, not a curve — so the panel had to be built around that.** Every prior rung
     (B5–B9) draws a period *line* the modern one departs from; here the period is the factor `1.0`, and

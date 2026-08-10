@@ -259,6 +259,16 @@ def compute() -> StrainHistoryResult:
     )
 
 
+def _wrap(text: str, width: int) -> list[str]:
+    """Soft-wrap ``text`` for the summary — used so the refusal message prints its whole *reasoning*.
+
+    Truncating it would show only the first clause ("…is a pMOS technique"), which is the *fact*; the
+    part that matters is *why* returning a number would be worse than raising, and that is the tail.
+    """
+    import textwrap
+    return textwrap.wrap(text, width=width) or [""]
+
+
 def print_summary(r: StrainHistoryResult) -> None:
     """Print the B10 story — the term with no owner, the fork, and the bound the wired path cannot avoid."""
     print("\nHistorical-modes B10: strained silicon (the I_Dsat factor no process step had ever moved)\n")
@@ -294,7 +304,7 @@ def print_summary(r: StrainHistoryResult) -> None:
     print(f"    [the DECADES are recipe-carrying and this demo quotes the cheap reading. Holding the channel")
     print(f"     doping fixed lets V_t sag as the oxide thins ({r.mos.V_t:.3f} →"
           f" {_period_mos(r.oxide_t_ox_matching_um).V_t:.3f} V), so the drive rises faster")
-    print(f"     than 1/t_ox and a {(1-ratio)*100:.0f}% thinning already suffices: ≳{r.oxide_decades_to_match:.2f} decades."
+    print(f"     than 1/t_ox and a thinning of just {(1-ratio)*100:.0f}% suffices: ≳{r.oxide_decades_to_match:.2f} decades."
           f" Re-adjusting V_t at every rung —")
     print(f"     what a fab actually does — gives I ∝ C_ox exactly and costs"
           f" ≳{r.oxide_decades_to_match_fixed_vt:.2f} decades, about twice as much.")
@@ -308,8 +318,10 @@ def print_summary(r: StrainHistoryResult) -> None:
         print(f"      {m.name:<44} {m.carrier:<10} {m.sign:<13} {floor}{m.mobility_factor:>6.2f}×"
               f" {m.drive_factor:>13.2f}×{mark}")
     print(f"    → chip.device is n-channel-only, so only {r.wired} is wired. Asking for the hole leg on")
-    print(f"      this device does not return a number — it raises, and the message is the point:")
-    print(f"        \"{r.hole_leg_refused[:96]}…\"")
+    print(f"      this device does not return a number — it raises, and the REASONING is the point, so")
+    print(f"      the message is printed far enough to carry it:")
+    for line in _wrap(r.hole_leg_refused, 92):
+        print(f"        {line}")
     print(f"      Applying a pMOS technique's COMPRESSIVE strain to an electron channel would degrade it")
     print(f"      while looking like a result. That the two carriers disagree is why the era needed two")
     print(f"      different processes on one die — not an oversight in this model.\n")

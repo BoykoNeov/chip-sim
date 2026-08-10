@@ -195,9 +195,18 @@ def test_the_figure_says_what_the_bound_and_the_composition_are():
     assert "VELOCITY SATURATION IS NAMED, NOT BUILT" in src        # on the figure's own suptitle
     assert "recipe-carrying" in src and "strain's zero does not" in src
     assert "NO wire_share is quoted" in src
-    # and the composition really is stated as the law rather than evaluated at 90 nm
+    # And the composition really is stated as the law rather than evaluated at 90 nm. Anchored on the
+    # IMPORT, not on call-site spellings: a token list ("interconnect.delay", "crossover_width", …) is
+    # evadable by aliasing (B9 itself calls the module `ic`), while "the demo cannot reach the wire model
+    # at all" is the fact that makes the claim true and there is exactly one way to spell it.
     assert "1 − wire_share" in src
-    assert not any(tok in src for tok in ("interconnect.delay", "wire_share=", "crossover_width"))
+    imports = [ln.strip() for ln in src.splitlines()
+               if ln.strip().startswith(("import ", "from "))]        # incl. any lazy in-function import
+    assert not any("interconnect" in ln for ln in imports), (
+        "the B10 demo must not import chip.interconnect at all — a 90 nm line is deep inside the bulk "
+        "path's refusal, so the F4 composition is stated as the exact law and never evaluated. "
+        f"Found: {[ln for ln in imports if 'interconnect' in ln]}"
+    )
 
 
 def test_figure_builds():
