@@ -1,11 +1,11 @@
 ---
 name: strained-silicon-f5
-description: "F5 strained silicon — chosen over F8, S1+S2 BUILT 2026-08-10; the carrier fork, the elasticity bound, the first non-additive knob, and the falsified roadmap card"
+description: "F5 strained silicon — chosen over F8, S1+S2+S3 BUILT 2026-08-10; the carrier fork, the elasticity bound, the first non-additive knob, the falsified roadmap card, and the flattering-direction composition trap"
 metadata: 
   node_type: memory
   type: project
   originSessionId: a2c43319-403d-4ea8-b282-cb56454922b7
-  modified: 2026-08-10T08:11:11.953Z
+  modified: 2026-08-10T09:23:07.431Z
 ---
 
 **F5 = strained silicon** (roadmap card title: "SiGe strained source/drain"), **PLANNED 2026-08-10**,
@@ -45,7 +45,47 @@ the elasticity **definition** trap, live in [[strained-silicon-source]].
    identities (`τ_wire` byte-identical, `τ_gate` ∝ inverse drive ratio) — *not* `∂ln f/∂ln I = 1−wire_share`,
    which is an exact derivative and would need a tolerance over a finite +20% step.
 
-Remaining: **S3** the B10 history mode + demo, **S4** uncommitted.
+**S3 BUILT 2026-08-10** (`chip/demo_strain_history.py` + test; **B10**, the 10th timeline rung, slotted
+**B8 → B10 → B6** — the timeline is *process* order, not chronological. Fast lane **1165 → 1175**,
+measured at `HEAD~1` in a worktree; the S2 note's 1164 was off by one). **No wrapper** (open question 3
+closed): rides `chip.strain` directly, the B7/B8/B9 precedent. What it settled:
+
+1. **THE DURABLE ONE — a display-layer composition with a prior slice can be wrong in the FLATTERING
+   direction with every input cited.** The B10 wall was first sketched as an *exchange rate* against B8:
+   "the oxide thinning that buys the same +20% drive costs N decades of gate leakage." No bad citation
+   needed to overstate F5 — only the naive `I ∝ 1/t_ox` read, which is wrong because thinning **also
+   drops `V_t`**, so drive rises *faster* than `1/t_ox` ⇒ **less** thinning suffices ⇒ the rival lever is
+   **cheaper** than naive says. **The fix is the general move: find the STRUCTURAL claim under the
+   numerical one and demote the number to a flagged band.** Here: `high_k.gate_leakage` takes a thickness
+   and a dielectric — **mobility is not one of its arguments** ⇒ `∂J_g/∂µ = 0` *structurally* (B9's
+   `∂τ_wire/∂I_Dsat = 0` shape; F3/B8's "one thickness, two currencies" inverted to **one knob, one
+   currency**). Pinned as a bit-for-bit identity under an *absurd* mobility, so a future µ→gate-stack path
+   fails a test instead of silently turning a structural fact into a coincidence. Same class as the
+   [[gradual-failure-preferred]] fudge but at the **figure** layer, which is new.
+2. **The surviving exchange rate is quoted in the direction that does NOT flatter the slice.** Two
+   defensible conventions differ ~2×: fixed channel doping (`V_t` sags, an 8% thinning suffices) =
+   **≳0.90 decades**; re-adjusting `V_t` per rung (what a fab does, `I ∝ C_ox` exactly) = **≳1.88**. The
+   demo headlines the **cheap** one and a *test pins that ordering* — flipping it rounds the win up
+   (F4's `floor_decades` rule in the leakage currency). **The band is recipe-carrying; the zero is not.**
+3. **The period is a POINT, not a curve** — and that recurs for *every* "no process ever touched this
+   term" slice. B5–B9 each draw a period *line* the modern one departs from; an unstrained channel is the
+   factor `1.0`, so the only honest drawing is the point **both paths leave from** — which puts the seam
+   on the *figure*, not just in the API (`strained_channel(MU_N_EFF, None)` **is**
+   `saturation_current`'s default, so they start together by identity).
+4. **The unwired leg must be marked cited-only ON THE FIGURE, not only at the API.** The plan rejected a
+   computed p-drive as decoration; two bars side by side re-introduce exactly that read at the display
+   layer. Each mechanism is captioned on **its own side of the zero** (the fork drawn literally), the hole
+   bars say `CITED DATA ONLY (no pMOS)`, and the demo prints `nmos_mobility`'s raised message **verbatim
+   and soft-wrapped** — truncating it cut after the *fact* ("is a pMOS technique") and lost the *reasoning*.
+5. **Two review catches worth the pattern.** The bound panel must be built from `long_channel_drive_factor`,
+   never by sweeping `strain.elasticity()` (which *raises* at µ ≤ 1, and the axis starts at exactly 1.0).
+   And a "this demo never computes X" guard written as a **token blacklist is evadable by aliasing** —
+   `"wire_share="` never matched the legitimate `1 − wire_share`, and `ic.delay(...)` would have walked
+   past it; re-anchored on the **import lines**, the one spelling that cannot be dodged.
+
+The F4 composition stayed **off every axis** (trap #3): stated in `print_summary` as the exact law
+`∂ln f/∂ln I_Dsat = 1 − wire_share`, never evaluated — a 90 nm line is deep inside `interconnect`'s bulk
+refusal. Remaining: **S4 uncommitted**; the F5 roadmap card stays up until it ships (graduation rule).
 
 **The observable:** `µ` is the **one factor in `I_Dsat` no process step has ever moved** — `MU_N_EFF = 450.0`
 has been a module constant since Phase 4. Strain is a *mechanical* state, so F5 is the first device number
