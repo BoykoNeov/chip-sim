@@ -17,11 +17,21 @@ The triad, per ``docs/plans/beol-interconnect-f4.md`` + ``historical-modes.md``:
     bulk resistivities reproduce IBM's independently reported **~40%** resistance reduction for the 1997
     Al→Cu swap. At a fixed geometry ``R_Al/R_Cu`` **is** ``ρ_Al/ρ_Cu`` identically, so this checks the
     *inputs* against the report, not a structural form;
-  * **honesty guards (claims about where the model may speak, not physics):** Ru is absent from the
-    registry until slice 4 carries the size-effect physics, and the bulk model's ``W ≫ λ`` validity bound
-    is explicit;
-  * **flagged:** ``GLOBAL_WIRE_LENGTH_UM``, ``ELMORE_FACTOR``, ``V_DD_HOUSE``, the Al ``ρ₀`` — asserted by
-    shape/sign/ratio, **never as absolute picoseconds**.
+  * **tight — slice 4's two impossibility results, on cited constants only:** the size effect alone can
+    **never** flip the Cu→Ru sign (the no-barrier ratio asymptotes to ``ρ₀λ(Ru)/ρ₀λ(Cu)`` = 1.179 > 1 and
+    approaches it monotonically from 4.23 above), and the barrier alone on bulk ``ρ`` flips it only below
+    **5.2 nm** — a nanometre above the **4.0 nm** width at which copper has no conductor at all. Both are
+    asserted as closed forms *and* against the numeric model;
+  * **tight — the geometric conductor floor:** ``W = 2·t_b``, for any ``ρ``, ``L``, ``C`` or aspect ratio
+    (F3's "``EOT > t_IL`` for any κ", in the wire's currency);
+  * **honesty guards (claims about where the model may speak, not physics):** the game knob refuses Ru
+    (:data:`chip.interconnect.BULK_ERA_METALS` — a 250 nm bulk answer for Ru is *correct* and reads as a
+    false verdict), the narrow-wire reads refuse Al (its flattering ``ρ₀λ`` is unsupportable while its
+    disqualifier is a currency this module lacks), and the bulk model's ``W ≫ λ`` validity bound is
+    explicit — slice 4 adds a second path beside it rather than retiring it;
+  * **flagged:** ``GLOBAL_WIRE_LENGTH_UM``, ``ELMORE_FACTOR``, ``V_DD_HOUSE``, the Al ``ρ₀``,
+    ``SIZE_EFFECT_C`` — asserted by shape/sign/ratio/band, **never as absolute picoseconds or as a
+    predicted crossing width**.
 
 Import + numeric only (no matplotlib), so it rides the fast lane.
 """
@@ -280,17 +290,28 @@ def test_crossover_scales_linearly_with_the_flagged_wire_length():
 # --------------------------------------------------------------------------- #
 # The registry + the S4 gate (honesty guards, not physics guards)
 # --------------------------------------------------------------------------- #
-def test_copper_beats_aluminium_in_the_bulk_but_ruthenium_is_not_in_the_registry_yet():
-    """The S4 gate, pinned: Ru MUST NOT be plottable before the size-effect physics exists.
+def test_copper_beats_aluminium_in_the_bulk_and_ruthenium_loses_there_which_is_why_the_knob_refuses_it():
+    """The S4 gate, **migrated not dropped**: Ru is in the registry now, and still not a bulk-era option.
 
-    A bulk-only model ranks Ru LAST (its ρ₀ is ~4× copper's), which is the F4 sign error inverted. Ru's
-    constants only mean something once slice 4 carries ρ_eff(d) and the barrier fraction. This guard is a
-    claim about where the model may speak — the F3 ladder-cap discipline — not a claim about physics.
+    Slices 1–3 kept Ru out of :data:`chip.interconnect.METALS` entirely, because a bulk-only model ranks
+    it LAST and "Ru is the worst wire metal" is the F4 sign error inverted. Slice 4 gives Ru a regime, so
+    it joins the registry — but the *bulk* answer did not become less misleading. It is worse than that:
+    at 250 nm the bulk answer is **correct** (Ru really is ~4× worse there) and would still read as a
+    verdict on the metal. So the guard moves from "not in the registry" to "not offered where it would be
+    misread": :data:`chip.interconnect.BULK_ERA_METALS`, which the game knob validates against.
     """
     assert ic.METALS["Cu"].rho0_uohm_cm < ic.METALS["Al"].rho0_uohm_cm    # the real, cited bulk win
-    assert "Ru" not in ic.METALS
-    with pytest.raises(KeyError):
-        ic.delay(ic.WireGeometry(), 3.3e-3, 2.3e-14, metal="Ru")
+    assert "Ru" in ic.METALS                                              # slice 4 gave it a regime...
+    assert ic.BULK_ERA_METALS == ("Al", "Cu")                             # ...but not this one
+    assert "Ru" not in ic.BULK_ERA_METALS
+
+    # The bulk read still *works* for Ru — nothing raises — which is exactly why the knob must gate it:
+    # the number is true at 250 nm and false as a claim about the metal. It is also the ladder's rung 1.
+    geom = ic.WireGeometry()
+    ru = ic.delay(geom, 3.3e-3, 2.3e-14, metal="Ru").tau_wire_s
+    cu = ic.delay(geom, 3.3e-3, 2.3e-14, metal="Cu").tau_wire_s
+    assert ru / cu == pytest.approx(ic.METALS["Ru"].rho0_uohm_cm / ic.METALS["Cu"].rho0_uohm_cm, rel=1e-12)
+    assert ru > cu                                                        # ~4.2× worse, and true at 250 nm
 
 
 def test_the_scaling_fom_ordering_is_not_the_bulk_ordering():
@@ -461,4 +482,282 @@ def test_delay_terms_reject_unphysical_inputs():
     with pytest.raises(ValueError):
         ic.Metal("bad", rho0_uohm_cm=1.68, mfp_nm=0.0)
     with pytest.raises(ValueError):
+        ic.Metal("bad", rho0_uohm_cm=1.68, mfp_nm=20.0, barrier_nm=-1.0)
+    with pytest.raises(ValueError):
         ic.WireGeometry(width_um=0.0)
+
+
+# --------------------------------------------------------------------------- #
+# SLICE 4 — the narrow-wire era: the two impossibility results, the floor, and the band
+#
+# The slice's conclusion is a SIGN (a metal with 4× copper's bulk ρ wins), so these tests are organised
+# around what could invert it: a mechanism credited with more than it does, a deep-limit shortcut taken
+# outside its domain, a flattering number printed for a metal that is disqualified elsewhere, and a
+# crossing width quoted as a point when the cited inputs only support a band.
+# --------------------------------------------------------------------------- #
+def test_the_size_effect_ALONE_can_never_flip_the_sign_at_any_width():
+    """**Impossibility result (a)** — cited constants only, and it is a limit, not an approximation.
+
+    "Ruthenium wins because its mean free path is short" is the sign error the F4 plan exists to prevent,
+    and this is the test that kills it: with the barrier off, R(Ru)/R(Cu) falls monotonically from the
+    bulk ratio 4.23 toward ``ρ₀λ(Ru)/ρ₀λ(Cu)`` = **1.179** — and never reaches 1. The cited FOM buys
+    ruthenium *parity*; parity is necessary and is not sufficient.
+    """
+    limit = ic.size_effect_ratio_limit("Ru", "Cu")
+    assert limit == pytest.approx(ic.METALS["Ru"].rho0_lambda / ic.METALS["Cu"].rho0_lambda, rel=1e-12)
+    assert limit == pytest.approx(1.179, abs=5e-4)
+    assert limit > 1.0                                       # THE claim: the FOM ranks Ru second
+
+    # ...and the numeric model agrees at every width, over eight decades, monotonically.
+    widths = [100.0, 10.0, 1.0, 0.1, 0.02, 0.01, 1e-3, 1e-4, 1e-5, 1e-6]             # 100 µm → 1 pm
+    ratios = [ic.resistance_ratio("Ru", "Cu", w, barrier=False) for w in widths]
+    assert all(r > 1.0 for r in ratios)                      # never flips — not once, anywhere
+    assert all(a > b for a, b in zip(ratios, ratios[1:]))    # monotone: it is approaching the limit
+    assert ratios[0] == pytest.approx(4.226, abs=2e-3)       # the wide end IS the bulk ratio
+    assert ratios[-1] == pytest.approx(limit, rel=1e-4)      # the narrow end IS the FOM ratio
+    assert ratios[-1] > limit                                # approached from above, never crossing it
+    # The 20 nm rung is the one to read: even where the size effect is severe, Ru is still 2.2× worse.
+    assert ratios[widths.index(0.02)] == pytest.approx(2.217, abs=2e-3)
+    # C cancels in the limit, which is why the limit needs no flagged input.
+    for c in (0.375, 1.0, 5.0):
+        assert ic.resistance_ratio("Ru", "Cu", 1e-6, c=c, barrier=False) == pytest.approx(limit, rel=1e-3)
+
+
+def test_the_barrier_ALONE_on_bulk_rho_flips_only_below_a_width_with_no_conductor_left():
+    """**Impossibility result (b)** — the mirror of (a), and the reason "Ru wins on the liner" is wrong too.
+
+    ``W < 2t_b/(1 − ρ₀Cu/ρ₀Ru)`` = 5.2 nm at the cited ``t_b`` = 2 nm, while copper's conductor floor is
+    4.0 nm. A **1.2 nm** window, immediately above the width at which copper is all barrier: the barrier
+    acting on bulk resistivity has never had anywhere to act.
+    """
+    flip_nm = ic.barrier_only_flip_width_um("Ru", "Cu") * 1e3
+    floor_nm = ic.conductor_floor_width_um("Cu") * 1e3
+    assert flip_nm == pytest.approx(5.24, abs=0.01)
+    assert floor_nm == pytest.approx(4.0, abs=1e-9)
+    assert floor_nm < flip_nm < 1.5 * floor_nm               # the window exists and is ~1 nm wide
+
+    # The closed form agrees with the numeric model on both sides of that width.
+    assert ic.resistance_ratio("Ru", "Cu", (flip_nm - 0.3) * 1e-3, size_effect=False) < 1.0
+    assert ic.resistance_ratio("Ru", "Cu", (flip_nm + 0.3) * 1e-3, size_effect=False) > 1.0
+    # ...and at every width a fab has ever printed, the barrier on bulk ρ leaves Ru losing — by a lot,
+    # and by more the wider the line, since a fixed liner is a shrinking fraction of a growing budget.
+    losses = [ic.resistance_ratio("Ru", "Cu", w * 1e-3, size_effect=False) for w in (7.0, 12.0, 20.0, 50.0)]
+    assert all(r > 1.8 for r in losses)
+    assert all(a < b for a, b in zip(losses, losses[1:]))    # 1.81 → 2.82 → 3.38 → 3.90, toward 4.23
+
+    # A challenger that already has the lower bulk ρ has no deficit to overcome — the read refuses.
+    with pytest.raises(ValueError):
+        ic.barrier_only_flip_width_um("Cu", "Ru")
+
+
+def test_the_three_rung_ladder_is_what_gets_the_sign_right_and_neither_rung_alone_does():
+    """The payload: 4.23 → 1.90 → 0.92 at a 12 nm line, with the barrier-only rung at 2.82 as the control.
+
+    This is F3's IL structure in the wire's currency — two currencies, additive, and *neither one alone
+    gets the sign right*. Pinned as a table so a later "simplification" to one mechanism fails loudly.
+    """
+    W = 0.012                                                # 12 nm drawn linewidth
+    bulk = ic.resistance_ratio("Ru", "Cu", W, size_effect=False, barrier=False)
+    sized = ic.resistance_ratio("Ru", "Cu", W, size_effect=True, barrier=False)
+    barred = ic.resistance_ratio("Ru", "Cu", W, size_effect=False, barrier=True)
+    both = ic.resistance_ratio("Ru", "Cu", W, size_effect=True, barrier=True)
+
+    assert bulk == pytest.approx(4.226, abs=2e-3)            # ruthenium is hopeless on bulk ρ
+    assert sized == pytest.approx(1.901, abs=2e-3)           # the size effect closes most of it...
+    assert barred == pytest.approx(2.817, abs=2e-3)          # ...and so does the barrier, separately...
+    assert both == pytest.approx(0.917, abs=2e-3)            # ...and only TOGETHER do they flip it
+
+    assert sized > 1.0 and barred > 1.0 and both < 1.0       # THE claim, in one line
+    assert bulk == pytest.approx(ic.METALS["Ru"].rho0_uohm_cm / ic.METALS["Cu"].rho0_uohm_cm, rel=1e-12)
+
+
+def test_the_narrow_wire_ratio_is_prefactor_free():
+    """L, H, the aspect ratio, c_pul, the Elmore factor and V_dd all cancel — as in every F4 headline."""
+    W = 0.012
+    expected = ic.resistance_ratio("Ru", "Cu", W)
+    for length in (1.0, 1000.0, 5.0e4):
+        for thick in (0.006, 0.024, 1.0):
+            geom = ic.WireGeometry(length_um=length, width_um=W, thickness_um=thick)
+            ru = ic.narrow_line_resistance("Ru", geom)
+            cu = ic.narrow_line_resistance("Cu", geom)
+            assert ru / cu == pytest.approx(expected, rel=1e-12)
+
+
+def test_the_crossing_is_a_BAND_over_the_cited_barrier_range_not_a_point():
+    """Where ruthenium wins is set by the thickness of the layer that stopped scaling — that IS the finding.
+
+    The cited ``t_b`` = 2–3 nm range alone moves the crossing 12.9 → 17.1 nm (about a node), so quoting a
+    point would fabricate a precision the cited inputs do not carry. The flagged ``C`` widens it further.
+    Status: the IBM ~40% consistency check's, never a prediction.
+    """
+    lo_tb, hi_tb = ic.BARRIER_NM_CITED_RANGE
+    w_lo = ic.equal_resistance_width_nm("Ru", "Cu", barrier_nm=lo_tb)
+    w_hi = ic.equal_resistance_width_nm("Ru", "Cu", barrier_nm=hi_tb)
+    assert w_lo == pytest.approx(12.88, abs=0.05)
+    assert w_hi == pytest.approx(17.13, abs=0.05)
+    assert w_lo < w_hi                                       # a thicker liner ⇒ Ru wins EARLIER (wider)
+
+    # The band sits inside the literature's <~20 nm, and the whole flagged-C span stays bracketed there.
+    for c in (0.375, 1.0, 2.0):
+        assert 9.0 < ic.equal_resistance_width_nm("Ru", "Cu", c=c) < 21.5
+
+    # It is a genuine root of the model, not a table: the ratio brackets 1 across it.
+    assert ic.resistance_ratio("Ru", "Cu", (w_lo - 1.0) * 1e-3) < 1.0
+    assert ic.resistance_ratio("Ru", "Cu", (w_lo + 1.0) * 1e-3) > 1.0
+
+
+def test_the_FOM_ranks_metals_but_does_NOT_locate_the_crossing():
+    """The deep-limit shortcut is wrong here by ~4×, and the test exists so nobody "simplifies" to it.
+
+    ``ρ_eff → C·ρ₀λ/d`` for **both** metals would put Cu→Ru at ~50 nm. The full form says ~13. The reason
+    is the same short mean free path that makes ruthenium viable at all: at the crossing ``C·λ/W`` ≈ 0.84
+    for Ru — it is **not in its own deep limit**, so the FOM's domain of validity does not contain the
+    width where the sign flips. The FOM is a *screening* metric; treating it as a locator is an error.
+    """
+    t_b = ic.METALS["Cu"].barrier_nm
+    fom = ic.size_effect_ratio_limit("Ru", "Cu")
+    deep_nm = 2.0 * t_b / (1.0 - 1.0 / math.sqrt(fom))       # the tempting closed form — R ∝ ρ₀λ/W_eff²
+    full_nm = ic.equal_resistance_width_nm("Ru", "Cu")
+
+    assert deep_nm == pytest.approx(50.5, abs=0.5)
+    assert full_nm == pytest.approx(12.88, abs=0.05)
+    assert deep_nm > 3.5 * full_nm                           # not a rounding difference — a wrong domain
+
+    ru = ic.METALS["Ru"]
+    assert ic.SIZE_EFFECT_C * ru.mfp_nm / full_nm == pytest.approx(0.84, abs=0.02)   # ≉ ≫ 1
+    assert ic.SIZE_EFFECT_C * ic.METALS["Cu"].mfp_nm / (full_nm - 2 * t_b) > 4.0     # Cu, by contrast, IS
+
+
+def test_the_conductor_floor_is_geometric_and_the_read_refuses_to_extrapolate_through_it():
+    """``W = 2·t_b``: below it a copper line is all barrier — for ANY ρ, L, C or aspect ratio.
+
+    F3's "``EOT > t_IL`` for any κ" in the wire's currency, and prefactor-free the same way. The read
+    raises rather than returning a zero or a negative width (the F3 magnitude trap).
+    """
+    for t_b in (2.0, 2.5, 3.0):
+        assert ic.conductor_floor_width_um("Cu", barrier_nm=t_b) * 1e3 == pytest.approx(2.0 * t_b)
+    assert ic.conductor_floor_width_um("Ru") == 0.0          # barrierless ⇒ no floor at all
+
+    assert ic.conductor_width_um(0.012, "Cu") * 1e3 == pytest.approx(8.0, abs=1e-9)
+    for bad_nm in (4.0, 3.0, 0.5):                           # at the floor and below it
+        with pytest.raises(ValueError):
+            ic.conductor_width_um(bad_nm * 1e-3, "Cu")
+    with pytest.raises(ValueError):
+        ic.narrow_line_resistance("Cu", ic.WireGeometry(width_um=0.003, thickness_um=0.006))
+
+
+def test_the_narrow_wire_reads_refuse_aluminium_and_the_refusal_is_load_bearing():
+    """Al's ρ₀λ ≈ 58 screens BETTER than copper's 65 — and this module may not say so.
+
+    Aluminium's real disqualifier is electromigration, a reliability currency F4 does not carry, so a
+    narrow-wire comparison including Al would be a claim with no support behind it. S3's "the cap is
+    binding, not cosmetic", applied to a metal instead of a width — and the number is checked here so the
+    refusal is understood to be *hiding something*, not merely absent data.
+    """
+    al, cu = ic.METALS["Al"], ic.METALS["Cu"]
+    assert al.rho0_lambda < cu.rho0_lambda                   # the flattering number really is flattering
+    assert al.barrier_nm is None and not al.narrow_wire_candidate
+    assert ic.NARROW_WIRE_METALS == ("Cu", "Ru")             # derived from METALS, never hand-maintained
+
+    geom = ic.WireGeometry(width_um=0.012, thickness_um=0.024)
+    for call in (lambda: ic.narrow_line_resistance("Al", geom),
+                 lambda: ic.resistance_ratio("Al", "Cu", 0.012),
+                 lambda: ic.resistance_ratio("Ru", "Al", 0.012),
+                 lambda: ic.effective_resistivity("Al", 0.012),
+                 lambda: ic.conductor_floor_width_um("Al"),
+                 lambda: ic.size_effect_ratio_limit("Al", "Cu")):
+        with pytest.raises(ValueError, match="electromigration"):
+            call()
+
+
+def test_the_size_effect_coefficient_errs_AGAINST_the_ruthenium_conclusion():
+    """``C`` = 1.0 is round and unfitted, and the direction of its error is the thing to pin.
+
+    It puts copper at ~6.3 µΩ·cm in an 18 nm line where the measurement is ~9 (a ~5× bulk degradation),
+    i.e. it **understates** copper's narrow-line penalty and makes ruthenium's win harder to earn. Along
+    with the width-only ``W_eff``, that is why the crossing band lands *inside* the literature's ~20 nm
+    rather than being tuned onto it. A future re-source may raise ``C``; this test says which way that
+    moves the conclusion (it strengthens it) so the change cannot be mistaken for a fix.
+    """
+    rho_18 = ic.effective_resistivity("Cu", ic.conductor_width_um(0.018, "Cu"))
+    assert rho_18 == pytest.approx(6.32, abs=0.02)
+    assert rho_18 < 9.0                                      # the measured value — we are BELOW it
+    assert rho_18 / ic.METALS["Cu"].rho0_uohm_cm > 3.0       # ...though still a large, real degradation
+
+    # Raising C toward the measurement moves the crossing WIDER, i.e. Ru wins EARLIER: the default is the
+    # conservative end of its own sensitivity, not the middle of it.
+    assert (ic.equal_resistance_width_nm("Ru", "Cu", c=1.6)
+            > ic.equal_resistance_width_nm("Ru", "Cu", c=ic.SIZE_EFFECT_C))
+    assert ic.SIZE_EFFECT_C == 1.0                           # unfitted, and pinned as such
+
+
+def test_the_featured_rung_survives_the_scattering_dimension_convention():
+    """The fourth simplification, priced: ``d`` = the conductor **width**, not a cross-section.
+
+    Real scattering sees both surface pairs and the rates add, so the standard rectangular form is
+    ``1/d = 1/W_eff + 1/H``. This module uses ``d = W_eff`` for two reasons, and a test is the right place
+    for them because the slice's conclusion is a **sign**:
+
+      1. it **errs against ruthenium** — the standard form makes Ru win by *more*, so the published
+         crossing is the conservative one; and
+      2. bringing ``H`` in would put the flagged aspect ratio into :func:`resistance_ratio`, which is
+         prefactor-free precisely because ``H`` cancels.
+
+    Both are checked here against a hand-rolled standard-form calculation, so a future change of
+    convention has to confront the direction rather than discover it.
+    """
+    W, t_b, C = 0.012, 2.0, ic.SIZE_EFFECT_C
+    H = 2.0 * W                                              # the demo's flagged aspect ratio
+
+    def standard_form_ratio() -> float:
+        out = []
+        for name in ("Ru", "Cu"):
+            m = ic.METALS[name]
+            w = W - 2.0 * (m.barrier_nm / 1e3)
+            d = 1.0 / (1.0 / w + 1.0 / H)                    # additive surface-scattering rates
+            rho = m.rho0_uohm_cm * (1.0 + C * m.mfp_nm / (d * 1e3))
+            out.append(rho / (w * H))
+        return out[0] / out[1]
+
+    ours = ic.resistance_ratio("Ru", "Cu", W)
+    standard = standard_form_ratio()
+    assert ours == pytest.approx(0.917, abs=2e-3)
+    assert standard == pytest.approx(0.889, abs=2e-3)
+    assert standard < ours < 1.0                             # BOTH say Ru wins; ours by the smaller margin
+
+    # (2) the reason we keep the width-only form: H and the aspect ratio cancel out of OUR ratio exactly,
+    # and would not out of the standard one. That cancellation is what makes the headline prefactor-free.
+    for thick in (0.006, 0.024, 0.5):
+        geom = ic.WireGeometry(width_um=W, thickness_um=thick)
+        assert (ic.narrow_line_resistance("Ru", geom) / ic.narrow_line_resistance("Cu", geom)
+                == pytest.approx(ours, rel=1e-12))
+
+
+def test_narrow_line_resistance_reduces_to_the_bulk_read_with_both_mechanisms_off():
+    """The seam: both switches off ⇒ byte-for-byte :func:`wire_resistance` at the bulk ρ₀.
+
+    The additive discipline every F4 slice has kept — a new mechanism must have an off position that
+    reproduces the old model exactly, not approximately.
+    """
+    geom = ic.WireGeometry(width_um=0.012, thickness_um=0.024)
+    for name in ic.NARROW_WIRE_METALS:
+        m = ic.METALS[name]
+        assert (ic.narrow_line_resistance(m, geom, size_effect=False, barrier=False)
+                == ic.wire_resistance(m.rho0_uohm_cm, geom.length_um, geom.width_um, geom.thickness_um))
+
+
+def test_slice_4_adds_a_second_path_and_does_not_retire_the_bulk_guard():
+    """``bulk_regime_ok`` still marks the same boundary — it just now has somewhere to point.
+
+    Stated because slices 1 and 3 both wrote "slice 4 removes the need for the guard", and that is not
+    what happened: :func:`delay` and :func:`crossover_width_um` are still bulk-only, so their validity
+    bound is unchanged. What slice 4 added is a *second* read that is valid where the first is not.
+    """
+    cu = ic.METALS["Cu"]
+    assert cu.bulk_regime_ok(0.25)                           # the Al→Cu era — the bulk path speaks
+    assert not cu.bulk_regime_ok(0.012)                      # the Ru era — it does not
+
+    # ...and there, the narrow path does, with a materially different answer than the bulk one would give.
+    bulk_ratio = ic.wire_delay_ratio("Ru", "Cu")             # 4.23 — the bulk path's verdict at any width
+    narrow_ratio = ic.resistance_ratio("Ru", "Cu", 0.012)    # 0.92 — the narrow path's, at 12 nm
+    assert bulk_ratio > 1.0 > narrow_ratio                   # opposite signs: the regime is the claim

@@ -1,11 +1,73 @@
 # Plan — F4 BEOL interconnect (the delay the transistor doesn't set)
 
-> **STATUS: SLICES 1–3 BUILT (2026-07-17)** — `chip/interconnect.py` + `chip/tests/test_interconnect.py`
-> (29 tests); S2 wired the game consumer: `DeviceKnobs.interconnect`, `Die.delay`, `spec.DelayBins`, and
-> `fab_game/tests/test_interconnect_binning.py` (13 tests); **S3 = `chip/demo_beol_history.py` + 11 tests,
-> the 9th timeline rung (B9), both gallery manifests + all four golden HTMLs.**
-> `device.py` still untouched. Cited constants → `memory/beol-interconnect-source.md`.
-> Remaining: **S4 only** (size effects + barrier → Ru).
+> **STATUS: COMPLETE — ALL FOUR SLICES BUILT (S1–S3 2026-07-17, S4 2026-08-10).** `chip/interconnect.py`
+> + `chip/tests/test_interconnect.py` (40 tests); S2 wired the game consumer: `DeviceKnobs.interconnect`,
+> `Die.delay`, `spec.DelayBins`, `fab_game/tests/test_interconnect_binning.py` (14 tests); S3 =
+> `chip/demo_beol_history.py` + tests, the 9th timeline rung (B9); **S4 = the narrow-wire era —
+> `interconnect.py` §6, Ru in the registry, a 4th demo panel, 15 demo tests.**
+> `device.py` untouched throughout. Cited constants → `memory/beol-interconnect-source.md`.
+> **The roadmap card graduated 2026-08-10** (the second to do so, on F3's reading of "shipped" = the
+> *last* slice), and **F4's build RELEASED F8's gate** — CMP now has the layer-thickness reader it was
+> fenced behind, so its card moved from `hold` to `ok` on the same page.
+>
+> **S4's findings — what the plan asserted, and what the build turned into closed form:**
+> 1. **The plan's "two steps, both load-bearing" became two IMPOSSIBILITY RESULTS, on cited constants
+>    only** (advisor). *(a)* The size effect alone **can never** flip Cu→Ru at any width: the no-barrier
+>    ratio falls monotonically from `ρ₀(Ru)/ρ₀(Cu)` = 4.23 to the asymptote `ρ₀λ(Ru)/ρ₀λ(Cu)` = **1.179**,
+>    and 1.179 > 1. *(b)* The barrier alone on bulk ρ flips it only below `2t_b/(1 − ρ₀Cu/ρ₀Ru)` = **5.2 nm**
+>    — a **1.2 nm** window sitting on top of the **4.0 nm** width where copper has no conductor at all.
+>    Both are stronger than the "still losing at 12 nm" the ladder shows, and neither needs `C` or a
+>    geometry. The ladder (**4.23 → 1.90 → 0.92**, barrier-only control **2.82**) is now the *illustration*;
+>    these are the claim.
+> 2. **The geometric floor `W = 2·t_b` is headline, not footnote** — 4–6 nm over the cited barrier range,
+>    for any ρ, L, C or aspect ratio. F3's "`EOT > t_IL` for ANY κ" in the wire's currency, and it sits
+>    *inside* the published roadmap. `conductor_width_um` raises below it rather than extrapolating.
+> 3. **The crossing is a BAND, and the band is the finding.** 12.9 → 17.1 nm over the *cited* `t_b` = 2–3 nm
+>    (≈ a node), ~9.7–21.1 nm over the flagged `C` ∈ [0.375, 2]. ⇒ **where ruthenium wins is set by the
+>    thickness of the layer that stopped scaling.** Literature says <~20 nm; the band sits a node inside it
+>    and **both** Ru-conservative simplifications push that way — so the direction is understood, not tuned.
+>    Status: the IBM ~40% consistency check's.
+> 4. **The `ρ₀λ` FOM ranks metals but does NOT locate the crossing.** The tempting deep-limit closed form
+>    (`R ∝ ρ₀λ/W_eff²` for both) says **50.5 nm** against the full form's **12.9** — wrong by 4×, because at
+>    the crossing Ru is *not in its own deep limit* (`Cλ/W` ≈ 0.84). The short mean free path that makes Ru
+>    viable is exactly what keeps it near-bulk. Pinned by a test so a later slice cannot "simplify" to it.
+> 5. **The S4 gate MIGRATED rather than lifting — and it was a live bug.** `fab_game/steps.py` resolved
+>    the knob straight out of `METALS`, so adding Ru silently made it a game option. What it would return
+>    is not even wrong: at 250 nm Ru really *is* ~4× worse, so the player reads a **true** number as a
+>    false verdict on the metal. New `BULK_ERA_METALS = ("Al","Cu")`, refused by name with the reason.
+> 6. **Aluminium is REFUSED on the narrow axis, and the refusal is load-bearing.** Al's `ρ₀λ` ≈ 58 screens
+>    *better* than copper's 65 — and F4 cannot support that comparison, because Al's real disqualifier is
+>    electromigration, a reliability currency the module does not carry. `barrier_nm=None` ⇒ the narrow
+>    reads raise. (Advisor: do **not** re-source Al — it buys a citation fight, not a claim.) S3's "the cap
+>    is binding, not cosmetic", applied to a metal instead of a width.
+> 7. **FOUR simplifications, each with its DIRECTION named**, because the slice's conclusion is a sign:
+>    `C` = 1.0 is round and unfitted and **errs against Ru** (it puts Cu at 6.3 µΩ·cm in an 18 nm line where
+>    the measurement is ~9); width-only `W_eff` also **errs against Ru**; **the scattering dimension `d` =
+>    the conductor width, not a cross-section** — also **against Ru**; the barrier as perfectly dead area
+>    **errs for Ru**. A single `C` cannot span both ends of the measured range — the grain-boundary term is
+>    named, not built (advisor: splitting `C` adds a lump and no claim).
+> 10. **The fourth simplification was a post-build advisor catch, and its DIRECTION had to be checked
+>     rather than accepted.** The advisor flagged that `effective_resistivity` takes `d` = the conductor
+>     width while real scattering sees both surface pairs — correct, and it was missing from the ladder —
+>     but argued the direction with `d = 2WH/(W+H)`, which flips the 12 nm rung to 1.12 (Ru losing) and
+>     would have cost the panel its punchline. **Measured out, the opposite is true.** The additive-rate
+>     derivation gives `1/d = 1/W_eff + 1/H` (the standard rectangular form), *half* the advisor's `d`:
+>     under it the rung goes 0.917 → **0.889** (Ru wins by MORE) and the crossing 12.9 → 13.4 nm. The tie
+>     is broken on evidence, not taste — at an 18 nm line the three conventions give Cu ρ_eff = 6.3 (ours)
+>     / **8.1** (standard) / 4.9 (the advisor's) against a **measured ~9**, so the advisor's form is the
+>     furthest from the data. Kept width-only for a second reason that is not a preference: bringing `H`
+>     into the scattering would put the **flagged aspect ratio into the headline ratio**, and
+>     `resistance_ratio` is prefactor-free precisely because `H` and `AR` cancel. **A prefactor-free claim
+>     that errs against its own conclusion beats a better-calibrated one that does not.** Pinned by a test
+>     that computes the standard form by hand, so a future convention change confronts the direction.
+> 8. **The guard was NOT retired.** S1 and S3 both wrote "slice 4 removes the need for `bulk_regime_ok`".
+>    Wrong: `delay`/`crossover_width_um` are still bulk-only, so their bound is unchanged. S4 added a
+>    *second path beside* the first. Corrected in both places and pinned by a test.
+> 9. **The node convention EXPIRED, and the 4th panel may not reuse it.** S3's left panel is licensed to
+>    write "W = the node number" because pre-2000 the node name really was ~the metal half-pitch. A modern
+>    "3 nm node" has no 3 nm linewidth, so panel 4's axis is labelled a **drawn linewidth** and never a node.
+>    A source-text test pins both labels — the one thing the golden-HTML currency tests structurally cannot
+>    catch (F3's follow-up commit: they confirm the prose did not *change*, never that it is still *true*).
 >
 > **S3's findings — two of them corrected claims this plan/module were already making:**
 > 1. **Copper bought 0.64 of a node, not "roughly one".** `W_x ∝ √ρ₀`, so Al→Cu's 1.58× in ρ moves the
@@ -266,8 +328,17 @@ node→(W,H) ladder.
   re-packages**. Pre-existing and **identical for both currencies**, so F4 adds no asymmetry — but a demo
   that reworks and then reads a bin histogram would silently under-count either way. (B9 is chip-side and
   reads no bins at all, so this never arose.)
-- **S4 — the honest ceiling: size effect + barrier fraction → Ru.** FS/MS `ρ_eff(d)`, the `ρ₀λ` FOM, the
-  `W_eff = W − 2·t_b` floor. The slice that makes the arc real, exactly as F3's IL did.
+- **S4 — the honest ceiling: size effect + barrier fraction → Ru. ✅ BUILT.** `interconnect.py` §6:
+  `effective_resistivity` (FS/MS `ρ_eff = ρ₀(1+Cλ/d)`), `conductor_width_um`/`conductor_floor_width_um`
+  (the `W_eff = W − 2t_b` floor), `narrow_line_resistance`, `resistance_ratio` (challenger-first, with the
+  `size_effect`/`barrier` switches that *run* the three-rung ladder), `size_effect_ratio_limit` and
+  `barrier_only_flip_width_um` (the two impossibility results), `equal_resistance_width_um`/`_nm`. Ru joins
+  `METALS`; `BULK_ERA_METALS` gates the game knob; `NARROW_WIRE_METALS` is **derived** from `METALS` so a
+  new metal cannot be silently missing and Al cannot silently appear. The demo gains a **fourth panel on
+  its own sub-60 nm axis** — deliberately *not* a continuation of the 0.20 µm ladder, so the era seam stays
+  visible (advisor). Everything in the status block above is the finding; the slice that makes the arc
+  real, exactly as F3's IL did. **No new game knob** — the demo is the consumer and `fab_game` gains only
+  the refusal, which is the F3-slice-4 shape.
 
 **Gallery/manifest note:** both gallery manifests are **glob-anchored** — the demo file and its rungs must
 land in the **same commit** or `assert_manifest_complete()` fails (F3 slice 3's trap).

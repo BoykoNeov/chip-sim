@@ -574,7 +574,9 @@ class DeviceKnobs:
     keys are added only when engaged.
 
     ``interconnect`` (F4, the BEOL wire) names the metal the chip is wired in (a
-    :data:`chip.interconnect.METALS` key — ``"Al"`` | ``"Cu"``) and turns on the **chip delay** readout
+    :data:`chip.interconnect.BULK_ERA_METALS` key — ``"Al"`` | ``"Cu"``; the registry also carries
+    ruthenium, which the knob **refuses** because the fab's single 250 nm-era line is not where Ru's
+    sub-20 nm case is made) and turns on the **chip delay** readout
     ``τ_total = τ_gate(I_Dsat) + τ_wire`` (:func:`chip.interconnect.delay`), on a representative
     **global** line (:class:`chip.interconnect.WireGeometry`'s house geometry — the metal is the only
     knob; the node ladder is a demo-local sweep, since the sim has no node concept). It adds the sim's
@@ -596,7 +598,9 @@ class DeviceKnobs:
     vt_adjust_kind: str | None = None  # "p" acceptor (raises V_t) | "n" donor (lowers) | None
     contact_scheme: str | None = None  # F2 silicide/contact model ("direct-Al"|"salicide"); None = access-only (the seam)
     dielectric: str | None = None      # F3 gate stack ("SiO2"|"HfO2"|"TiO2"); None = t_ox as-is, no leakage (the seam)
-    interconnect: str | None = None    # F4 BEOL wire metal ("Al"|"Cu"); None = no wire, no delay emitted (the seam)
+    interconnect: str | None = None    # F4 BEOL wire metal ("Al"|"Cu" — BULK_ERA_METALS; "Ru" is refused,
+    #                                    it is a sub-20 nm claim and the fab runs one 250 nm line);
+    #                                    None = no wire, no delay emitted (the seam)
 
 
 @dataclass(frozen=True)

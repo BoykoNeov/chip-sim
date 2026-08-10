@@ -137,29 +137,8 @@
   <main>
     <section>
       <h2>Promotable — the consumer is named</h2>
-      <p class="sub">Each of these already has a device observable waiting to read it. F3 (high-κ) has shipped and its card came off; F4 now heads the queue, then F5.</p>
+      <p class="sub">Each of these already has a device observable waiting to read it. F3 (high-κ) and F4 (BEOL interconnect) have both shipped and their cards came off; F5 now heads the queue. F8 joins it from the deferred list — F4&rsquo;s build gave layer thickness its first reader, which is the promotion trigger that card was fenced behind.</p>
       <div class="grid">
-        <article class="card">
-          <a class="shot" href="figures/roadmap-f4.png" title="open the full schematic (a preview, not simulator output)">
-            <span class="ribbon">planned &mdash; schematic</span>
-            <img src="figures/roadmap-f4.png" alt="F4 — BEOL interconnect (RC delay) schematic preview (planned, not simulator output)" loading="lazy">
-          </a>
-          <div class="body">
-            <div class="tagrow">
-              <span class="tag">F4 &middot; 1997 · Cu damascene</span>
-              <span class="status ok">Promotable</span>
-            </div>
-            <p class="blurb"><strong>BEOL interconnect (RC delay).</strong> The back end the sim has never had: subtractive Al → Cu dual-damascene → Ru, with chip speed set by wire RC rather than the transistor.</p>
-            <div class="facts">
-              <div class="row"><span class="k would">Would add</span><p class="v">Delay ∝ R_wire·C_wire — the first output the transistor chain does not set; the richest remaining history arc. Also gives CMP (F8) its missing consumer.</p></div>
-              <div class="row"><span class="k gate">Gated on</span><p class="v">Nothing structural — the biggest build of the promotable three.</p></div>
-            </div>
-            <div class="links">
-              <code>docs/plans/future-steps.md</code>
-              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
-            </div>
-          </div>
-        </article>
         <article class="card">
           <a class="shot" href="figures/roadmap-f5.png" title="open the full schematic (a preview, not simulator output)">
             <span class="ribbon">planned &mdash; schematic</span>
@@ -173,7 +152,28 @@
             <p class="blurb"><strong>SiGe strained source/drain.</strong> The strain era: embedded SiGe pockets squeeze the p-channel (~2 GPa at ~20% Ge), and hole mobility — hence drive current — rises.</p>
             <div class="facts">
               <div class="row"><span class="k would">Would add</span><p class="v">Mobility → I_Dsat through a strain-aware µ model — the channel-strain rung of the era ladder.</p></div>
-              <div class="row"><span class="k gate">Gated on</span><p class="v">A µ(strain) mobility model in device.py — none exists yet; advanced-node, so it queues behind F4.</p></div>
+              <div class="row"><span class="k gate">Gated on</span><p class="v">A µ(strain) mobility model in device.py — none exists yet. With F4 shipped it is now the head of this queue.</p></div>
+            </div>
+            <div class="links">
+              <code>docs/plans/future-steps.md</code>
+              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <a class="shot" href="figures/roadmap-f8.png" title="open the full schematic (a preview, not simulator output)">
+            <span class="ribbon">planned &mdash; schematic</span>
+            <img src="figures/roadmap-f8.png" alt="F8 — CMP / dishing / planarity schematic preview (planned, not simulator output)" loading="lazy">
+          </a>
+          <div class="body">
+            <div class="tagrow">
+              <span class="tag">F8 &middot; enables Cu damascene</span>
+              <span class="status ok">Unblocked by F4</span>
+            </div>
+            <p class="blurb"><strong>CMP / dishing / planarity.</strong> Preston-class removal with pattern-density dishing and erosion — post-CMP thickness non-uniformity.</p>
+            <div class="facts">
+              <div class="row"><span class="k would">Would add</span><p class="v">Post-CMP layer-thickness non-uniformity, now with somewhere to land: F4 made the wire cross-section electrical (R ∝ 1/(W·H) → τ_wire → the delay bins), so dishing and erosion finally reach an observable.</p></div>
+              <div class="row"><span class="k gate">Gated on</span><p class="v">Its old gate is RELEASED — the F4 build gave layer thickness its first reader, which is exactly the trigger recorded for backlog D2. What remains is narrower and structural: F4&#x27;s wire geometry is a module-level house line and its game knob is metal-only, so a per-die CMP variation needs the cross-section to become a per-die quantity first.</p></div>
             </div>
             <div class="links">
               <code>docs/plans/future-steps.md</code>
@@ -237,27 +237,6 @@
       <h2>Deferred — no discriminating consumer yet</h2>
       <p class="sub">The honest NO&rsquo;s, kept visible: each is fenced behind a named consumer that does not exist today, with its promotion trigger recorded.</p>
       <div class="grid">
-        <article class="card">
-          <a class="shot" href="figures/roadmap-f8.png" title="open the full schematic (a preview, not simulator output)">
-            <span class="ribbon">planned &mdash; schematic</span>
-            <img src="figures/roadmap-f8.png" alt="F8 — CMP / dishing / planarity schematic preview (planned, not simulator output)" loading="lazy">
-          </a>
-          <div class="body">
-            <div class="tagrow">
-              <span class="tag">F8 &middot; enables Cu damascene</span>
-              <span class="status hold">Deferred — post-F4</span>
-            </div>
-            <p class="blurb"><strong>CMP / dishing / planarity.</strong> Preston-class removal with pattern-density dishing and erosion — post-CMP thickness non-uniformity.</p>
-            <div class="facts">
-              <div class="row"><span class="k would">Would add</span><p class="v">Post-CMP layer-thickness non-uniformity — IF something read a layer thickness.</p></div>
-              <div class="row"><span class="k gate">Gated on</span><p class="v">No consumer today: nothing in the device or yield path reads a layer thickness (backlog D2). Re-evaluate after F4 makes wire cross-section an RC observable.</p></div>
-            </div>
-            <div class="links">
-              <code>docs/plans/future-steps.md</code>
-              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
-            </div>
-          </div>
-        </article>
         <article class="card">
           <a class="shot" href="figures/roadmap-f9.png" title="open the full schematic (a preview, not simulator output)">
             <span class="ribbon">planned &mdash; schematic</span>

@@ -75,17 +75,15 @@ class Slice:
 # per the page's standing rule: a card is a promise, and built work belongs on the galleries instead
 # (history-mode B8 + chip.high_k). "Shipped" was taken to mean the *interfacial-layer* slice, not the
 # first three — a deliberate call, since without the IL the module's headline win was a ceiling no fab
-# could build. Do not re-add the card; F4 is now the head of the promotable queue.
+# could build.
+#
+# F4 (BEOL interconnect RC) GRADUATED 2026-08-10 the same way, on the same reading of "shipped": the
+# card came off with slice 4, the size-effect + barrier slice that makes the Cu→Ru sign come out right.
+# Without it the module could only rank metals by bulk ρ, which ranks ruthenium LAST — so the arc the
+# card promised was not on the page until the last slice landed. Built work now lives on history-mode
+# B9 + chip.interconnect. Do not re-add either card. F5 heads the promotable queue, and F4's build
+# RELEASED F8's gate — see its card below, which is the first hold on this page to be lifted.
 SLICES = [
-    Slice(
-        fid="F4", era="1997 · Cu damascene", title="BEOL interconnect (RC delay)",
-        status="Promotable", badge="ok",
-        blurb="The back end the sim has never had: subtractive Al → Cu dual-damascene → Ru, with "
-              "chip speed set by wire RC rather than the transistor.",
-        would_add="Delay ∝ R_wire·C_wire — the first output the transistor chain does not set; "
-                  "the richest remaining history arc. Also gives CMP (F8) its missing consumer.",
-        gate="Nothing structural — the biggest build of the promotable three.",
-    ),
     Slice(
         fid="F5", era="~2004 · 90 nm", title="SiGe strained source/drain",
         status="Promotable", badge="ok",
@@ -93,8 +91,8 @@ SLICES = [
               "and hole mobility — hence drive current — rises.",
         would_add="Mobility → I_Dsat through a strain-aware µ model — the channel-strain rung of "
                   "the era ladder.",
-        gate="A µ(strain) mobility model in device.py — none exists yet; advanced-node, so it "
-             "queues behind F4.",
+        gate="A µ(strain) mobility model in device.py — none exists yet. With F4 shipped it is "
+             "now the head of this queue.",
     ),
     Slice(
         fid="F6", era="bipolar epi · CMOS wells", title="Epitaxy (buried layer / retrograde well)",
@@ -118,13 +116,17 @@ SLICES = [
     ),
     Slice(
         fid="F8", era="enables Cu damascene", title="CMP / dishing / planarity",
-        status="Deferred — post-F4", badge="hold",
+        status="Unblocked by F4", badge="ok",
         blurb="Preston-class removal with pattern-density dishing and erosion — post-CMP "
               "thickness non-uniformity.",
-        would_add="Post-CMP layer-thickness non-uniformity — IF something read a layer "
-                  "thickness.",
-        gate="No consumer today: nothing in the device or yield path reads a layer thickness "
-             "(backlog D2). Re-evaluate after F4 makes wire cross-section an RC observable.",
+        would_add="Post-CMP layer-thickness non-uniformity, now with somewhere to land: F4 made "
+                  "the wire cross-section electrical (R ∝ 1/(W·H) → τ_wire → the delay bins), so "
+                  "dishing and erosion finally reach an observable.",
+        gate="Its old gate is RELEASED — the F4 build gave layer thickness its first reader, which "
+             "is exactly the trigger recorded for backlog D2. What remains is narrower and "
+             "structural: F4's wire geometry is a module-level house line and its game knob is "
+             "metal-only, so a per-die CMP variation needs the cross-section to become a per-die "
+             "quantity first.",
     ),
     Slice(
         fid="F9", era="2011 FinFET · 2022 GAA", title="FinFET / gate-all-around",
@@ -152,8 +154,10 @@ SLICES = [
 # The page's sections, in the plan's own order: consumer strength first, the honest NO's last.
 SECTIONS = [
     ("Promotable — the consumer is named",
-     "Each of these already has a device observable waiting to read it. F3 (high-κ) has shipped and "
-     "its card came off; F4 now heads the queue, then F5.",
+     "Each of these already has a device observable waiting to read it. F3 (high-κ) and F4 (BEOL "
+     "interconnect) have both shipped and their cards came off; F5 now heads the queue. F8 joins it "
+     "from the deferred list — F4&rsquo;s build gave layer thickness its first reader, which is the "
+     "promotion trigger that card was fenced behind.",
      [s for s in SLICES if s.badge == "ok"]),
     ("Coupled &amp; partly built",
      "Real physics whose consumer is (partly) already served — built where the consumer exists, "

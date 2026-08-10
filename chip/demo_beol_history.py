@@ -2,7 +2,9 @@
 
 The period back end (aluminium wires, scaled with the node) run against the observable that ended it — the
 **wire/gate crossover** — showing *why chip speed stopped being a transistor property in the mid-1990s, what
-copper actually bought, and why there was no third metal after it*. One figure, three panels:
+copper actually bought, why there was no third metal after it — and then how the axis changed and the
+worst conductor of the three won anyway*. One figure, four panels (a 2×2: the top row is the bulk era,
+the bottom row is its ceiling and then what replaced it):
 
   * **Left — the wall: the node-scaling ladder.** Walk a **global** line's cross-section down the real node
     ladder (1.0 → 0.25 µm, ``W`` = the node, ``H`` = 2``W``) holding the transistor fixed, and read the two
@@ -18,14 +20,25 @@ copper actually bought, and why there was no third metal after it*. One figure, 
     (:attr:`chip.interconnect.Delay.drive_sensitivity`), because ``τ_wire`` is a **common-mode** floor that
     adds a level and no spread. At the featured node an aluminium line leaves a 3%-better transistor worth
     **0.7%**. That is the pre-1997 assumption dying, in one panel.
-  * **Right — the escape, and why there was no third metal.** ``W_x ∝ √ρ₀`` — **prefactor-free**. So
+  * **Bottom-left — the escape, and why there was no third metal.** ``W_x ∝ √ρ₀`` — **prefactor-free**. So
     Al→Cu's 1.58× in resistivity moves the crossover by ``√1.58`` = 0.80×, which is **0.64 of a 0.7× node
     step**: the celebrated 1997 escape bought about *two-thirds of one node*. And the √ is brutal in the
     other direction — buying the **next** node needs ``ρ ≤ 0.82 µΩ·cm``, while **silver, the best
     elemental conductor that exists, is 1.59** and buys 3%. **On the bulk-resistivity axis the ladder is
     out of metals.** That is not "no metal ever beats copper" — it is the *axis* being exhausted, which is
-    exactly why the next move (slice 4) changes the axis: at narrow ``W`` the material enters only through
-    ``ρ₀λ``, and the metal that **loses** on bulk ρ wins on geometry.
+    exactly why the axis then changed, in the panel below.
+  * **Bottom-right — the axis change, and the metal that wins by losing.** Below ~5λ two mechanisms take
+    over that the panels above do not carry, and the panel is drawn on **its own sub-60 nm axis** rather
+    than as a continuation of the ladder — the gap between the two is the era seam, and closing it would
+    fabricate the numbers this panel exists to compute. Surface and grain-boundary scattering make
+    ``ρ_eff = ρ₀(1 + Cλ/d)``, and copper's Ta/TaN barrier has a cited ~2–3 nm floor that **does not
+    scale**, so ``W_eff = W − 2t_b`` is a fixed cut out of a shrinking budget. Barrierless **ruthenium
+    wins below ~13 nm — with 4× copper's bulk ρ and the worse ``ρ₀λ``** — and the panel's real content is
+    that **neither mechanism alone gets that sign right**: 4.23 → 1.90 (size effect) → 0.92 (both) at a
+    12 nm line, with the barrier-alone rung at 2.82 as the control. Both failures are closed forms on
+    cited constants: the size effect asymptotes to ``ρ₀λ(Ru)/ρ₀λ(Cu)`` = 1.18, **above 1, so it never
+    flips at any width**, and the barrier on bulk ρ flips only below 5.2 nm — one nanometre above the
+    4.0 nm width where a copper line is **all barrier and no conductor**.
 
 **The inversion that is the deep point of the arc (prefactor-free, and it cuts the other way):**
 ``W_x ∝ √I_Dsat`` exactly as ``W_x ∝ √ρ₀``. So a **2× better transistor pulls the crossover out to a 1.41×
@@ -60,17 +73,22 @@ The honesty ladder (the ``historical-modes.md`` triad; the F3 slice-3 lessons ap
   **Absolute picoseconds are not a claim this demo makes** — which is why the middle panel's axes are
   *normalised* rather than a fabricated GHz.
 
-Where this demo stops, and what it hands to slice 4
----------------------------------------------------
-The ladder is **capped at W = 0.20 µm** — not for tidiness, but because that is where this model stops
-being honest. :mod:`chip.interconnect` is **bulk-ρ only** (``ρ_eff = ρ₀``), valid for ``W ≫ λ``; copper's
-:meth:`chip.interconnect.Metal.bulk_regime_ok` refuses below ``5λ`` ≈ **0.194 µm**. The next rung of the
-real node ladder is **0.18 µm — and the model may not speak there.** That cap is not a coincidence and it
-is the cleanest possible hand-off: the cited history says the size effect became a **copper** problem at
-sub-200 nm, and that below 130 nm interconnect delay worsens further despite low-κ. **Slice 4 promotes λ
-from a guard to a term** (the ``ρ₀λ`` figure of merit + the un-scalable barrier), which is the only way the
-Cu→Ru sign comes out right. Walking this ladder past its cap would fabricate exactly the number slice 4
-exists to compute — the F3 magnitude trap.
+Where the bulk ladder stops, and why the fourth panel is a separate axis
+-------------------------------------------------------------------------
+The ladder is **capped at W = 0.20 µm** — not for tidiness, but because that is where the **bulk** model
+stops being honest. :func:`chip.interconnect.delay` is bulk-ρ only (``ρ_eff = ρ₀``), valid for ``W ≫ λ``;
+copper's :meth:`chip.interconnect.Metal.bulk_regime_ok` refuses below ``5λ`` ≈ **0.194 µm**, and the next
+rung of the real node ladder is **0.18 µm — already inside that refusal.** The cited history agrees: the
+size effect became a **copper** problem at sub-200 nm, and below 130 nm interconnect delay worsens further
+despite low-κ.
+
+**The fourth panel does not continue this ladder — it starts a new axis at 4.3 nm**, and the gap between
+them is the era seam drawn rather than papered over. It runs
+:func:`chip.interconnect.narrow_line_resistance`, a **second** model beside the bulk one:
+:meth:`~chip.interconnect.Metal.bulk_regime_ok` was **not retired**, since ``delay`` and
+``crossover_width_um`` are still bulk-only and their bound is unchanged. Walking the *bulk* ladder past
+its cap would fabricate exactly the numbers the narrow model computes — the F3 magnitude trap — and
+drawing the two as one curve would hide which model said what.
 
 Named ceilings — the axes this model does not carry (without these it overstates the wall)
 ------------------------------------------------------------------------------------------
@@ -157,6 +175,19 @@ FEATURE_DRIVE_GAIN = 1.03                         # the "3% faster transistor" t
 SILVER = ic.Metal("silver (the bound — never an interconnect metal)", rho0_uohm_cm=1.59, mfp_nm=53.0)
 RHO_SWEEP_UOHM_CM = np.linspace(0.5, 3.0, 200)    # the "is there a better metal?" axis
 
+# --- The fourth panel: the axis change (slice 4) --------------------------------------------------- #
+# A SEPARATE axis, deliberately not a continuation of the ladder above. The left panel walks 1.0 → 0.20 µm
+# and stops where the bulk-ρ model stops; this one starts at 4.3 nm and runs to 60 nm, and the gap between
+# them is the era seam rather than an omission. Two different models, two different eras, two axes.
+#
+# AND THE AXIS MEANS SOMETHING DIFFERENT: the left panel's "W = the node number" convention is a pre-2000
+# fact (the node name really was roughly the metal half-pitch). It EXPIRED. A modern "3 nm node" has no
+# 3 nm linewidth anywhere in it, so this axis is labelled as a drawn linewidth and never as a node — the
+# one place where reusing the ladder's own convention would fabricate a claim.
+NARROW_W_NM = np.geomspace(4.3, 60.0, 320)        # nm — above copper's 4.0 nm conductor floor
+FEATURE_NARROW_W_NM = 12.0                        # nm — where the three-rung ladder is read out
+LITERATURE_CROSSING_NM = 20.0                     # cited: barrierless Ru has the lowest R at CD <~20 nm
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-beol-history.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-beol-history.png"
@@ -185,6 +216,15 @@ class BeolHistoryResult:
     rho_uohm_cm: np.ndarray
     wx_ratio_vs_cu: np.ndarray                  # √(ρ/ρ_Cu) — contains no house constant at all
     rho_for_next_node: float                    # the ρ the NEXT node would need — and nothing has it
+    # fourth — the axis change: R(Ru)/R(Cu) vs drawn linewidth, and the two mechanisms that make the sign
+    narrow_w_nm: np.ndarray                     # the sub-60 nm axis (a LINEWIDTH, never a node name)
+    ru_cu_ratio: dict[str, np.ndarray]          # rung → R(Ru)/R(Cu); "bulk" | "size" | "barrier" | "both"
+    ladder: dict[str, float]                    # the same four rungs read at FEATURE_NARROW_W_NM
+    crossing_nm: dict[float, float]             # cited t_b (nm) → the equal-resistance width (nm)
+    conductor_floor_nm: dict[float, float]      # cited t_b (nm) → 2·t_b, where Cu has no conductor left
+    fom_limit: float                            # ρ₀λ(Ru)/ρ₀λ(Cu) — the size effect's asymptote, > 1
+    barrier_only_flip_nm: float                 # where the barrier on BULK ρ would flip it — below the floor
+    deep_limit_crossing_nm: float               # what the FOM closed form would say — the ~4× error
 
 
 def _period_device() -> tuple[dev.MOSDevice, float, float]:
@@ -250,11 +290,40 @@ def compute() -> BeolHistoryResult:
     wx_ratio = np.sqrt(RHO_SWEEP_UOHM_CM / ic.METALS["Cu"].rho0_uohm_cm)
     rho_next = ic.METALS["Cu"].rho0_uohm_cm * NODE_SHRINK**2             # ρ for one MORE node of W_x
 
+    # Fourth: the axis change. R(Ru)/R(Cu) at a common drawn W — prefactor-free (L, H, AR, c_pul, the
+    # Elmore factor, V_dd and C_load all cancel), so this panel, like the third, contains no house
+    # constant at all except the flagged size-effect C. The four rungs are what make the sign legible:
+    # neither mechanism alone crosses 1, and the two together do.
+    rungs = {"bulk": dict(size_effect=False, barrier=False),
+             "size": dict(size_effect=True, barrier=False),
+             "barrier": dict(size_effect=False, barrier=True),
+             "both": dict(size_effect=True, barrier=True)}
+    ratio_curves = {
+        k: np.array([ic.resistance_ratio("Ru", "Cu", w * 1e-3, **kw) for w in NARROW_W_NM])
+        for k, kw in rungs.items()
+    }
+    ladder = {k: ic.resistance_ratio("Ru", "Cu", FEATURE_NARROW_W_NM * 1e-3, **kw)
+              for k, kw in rungs.items()}
+    crossing = {t_b: ic.equal_resistance_width_nm("Ru", "Cu", barrier_nm=t_b)
+                for t_b in ic.BARRIER_NM_CITED_RANGE}
+    floors = {t_b: ic.conductor_floor_width_um("Cu", barrier_nm=t_b) * 1e3
+              for t_b in ic.BARRIER_NM_CITED_RANGE}
+    fom_limit = ic.size_effect_ratio_limit("Ru", "Cu")
+    # What the FOM's own closed form would say — kept as a NUMBER on the figure, because "the screening
+    # metric does not locate the crossing" is a claim that needs its wrong answer shown next to the right
+    # one. R ∝ ρ₀λ/W_eff² in the deep limit ⇒ crossing at 2t_b/(1 − 1/√FOM). It is ~4× too wide.
+    t_b_default = ic.METALS["Cu"].barrier_nm
+    deep_nm = 2.0 * t_b_default / (1.0 - 1.0 / math.sqrt(fom_limit))
+
     return BeolHistoryResult(
         metals=METALS, mos=mos, i_dsat_A=i_dsat, c_load_F=c_load, tau_gate_s=tau_gate,
         w_um=W_LADDER_UM, tau_wire_s=tau_wire, wire_share=share, crossover_um=crossover,
         feature=feature, drive_ratio=DRIVE_SWEEP, f_ratio=f_ratio,
         rho_uohm_cm=RHO_SWEEP_UOHM_CM, wx_ratio_vs_cu=wx_ratio, rho_for_next_node=rho_next,
+        narrow_w_nm=NARROW_W_NM, ru_cu_ratio=ratio_curves, ladder=ladder, crossing_nm=crossing,
+        conductor_floor_nm=floors, fom_limit=fom_limit,
+        barrier_only_flip_nm=ic.barrier_only_flip_width_um("Ru", "Cu") * 1e3,
+        deep_limit_crossing_nm=deep_nm,
     )
 
 
@@ -325,15 +394,66 @@ def print_summary(r: BeolHistoryResult) -> None:
           f" ρ₀λ ≈ {SILVER.rho0_lambda:.0f}")
     print(f"      is worse than Cu's {ic.METALS['Cu'].rho0_lambda:.0f} — the best bulk conductor is the worst"
           f" scaling metal) [λ handbook, FLAGGED].")
-    print(f"      That is slice 4: the ρ₀λ figure of merit and the barrier that does not scale.\n")
+    print(f"      That is the block below: the ρ₀λ figure of merit and the barrier that does not scale.\n")
 
-    print(f"  Where this demo stops — and it is the hand-off, not tidiness:")
-    print(f"    the ladder is capped at W = {LADDER_FLOOR_UM:.2f} µm because chip.interconnect is BULK-ρ only")
-    print(f"    (ρ_eff = ρ₀, valid for W ≫ λ) and Cu's bulk_regime_ok refuses below 5λ ≈"
-          f" {5*ic.METALS['Cu'].mfp_nm/1e3:.3f} µm.")
-    print(f"    The next real node — {NEXT_NODE_UM} µm — is already off-limits to this model. Cited history"
-          f" agrees:")
-    print(f"    the size effect became a COPPER problem at sub-200 nm, long before Ru was on a roadmap.\n")
+    print(f"  Where the bulk ladder stops — and it is a hand-off, not tidiness:")
+    print(f"    the ladder is capped at W = {LADDER_FLOOR_UM:.2f} µm because the bulk-ρ model (ρ_eff = ρ₀,")
+    print(f"    valid for W ≫ λ) stops there: Cu's bulk_regime_ok refuses below 5λ ≈"
+          f" {5*ic.METALS['Cu'].mfp_nm/1e3:.3f} µm, and the")
+    print(f"    next real node — {NEXT_NODE_UM} µm — is already off-limits to it. Cited history agrees: the size")
+    print(f"    effect became a COPPER problem at sub-200 nm, long before Ru was on a roadmap. Below is the")
+    print(f"    OTHER model, on its own axis. The gap between the two is the era seam, not an omission.\n")
+
+    cu, ru = ic.METALS["Cu"], ic.METALS["Ru"]
+    print(f"  The axis change — where the metal with the WORST bulk ρ wins (this block is prefactor-free")
+    print(f"  except for the flagged size-effect C = {ic.SIZE_EFFECT_C}: L, H, AR, c_pul, Elmore, V_dd, C_load cancel):")
+    print(f"    Ru's bulk ρ₀ = {ru.rho0_uohm_cm} µΩ·cm is {ru.rho0_uohm_cm/cu.rho0_uohm_cm:.2f}× copper's"
+          f" {cu.rho0_uohm_cm}. On the bulk axis it is not a candidate.")
+    print(f"    Two mechanisms change the question, and the point is that NEITHER ONE ALONE gets the sign")
+    print(f"    right — R(Ru)/R(Cu) at a {FEATURE_NARROW_W_NM:.0f} nm drawn line, where < 1 means Ru wins:\n")
+    print(f"      {'what is counted':<44} {'R(Ru)/R(Cu)':>12}   verdict")
+    rung_text = {
+        "bulk": "bulk ρ₀ only (the 1997 currency)",
+        "size": "+ the size effect  ρ_eff = ρ₀(1 + Cλ/d)",
+        "barrier": "+ the barrier only, on bulk ρ  (W−2t_b)",
+        "both": "+ BOTH — the size effect and the barrier",
+    }
+    for k in ("bulk", "size", "barrier", "both"):
+        v = r.ladder[k]
+        print(f"      {rung_text[k]:<44} {v:>12.3f}   {'RU WINS' if v < 1.0 else 'Ru loses'}")
+    print(f"\n    and each 'Ru loses' row is not merely a loss at this width — it is an IMPOSSIBILITY, in")
+    print(f"    closed form, on cited constants alone:")
+    print(f"      · the size effect alone asymptotes to ρ₀λ(Ru)/ρ₀λ(Cu) = {r.fom_limit:.3f} — ABOVE 1, so it")
+    print(f"        never flips at ANY width. The cited FOM buys Ru parity, and parity is not a win.")
+    print(f"        ('Ru wins because its mean free path is short' is the sign error, stated exactly.)")
+    print(f"      · the barrier alone on bulk ρ flips only below W = {r.barrier_only_flip_nm:.2f} nm — and copper's")
+    print(f"        conductor floor 2·t_b is {r.conductor_floor_nm[cu.barrier_nm]:.1f} nm. A"
+          f" {r.barrier_only_flip_nm - r.conductor_floor_nm[cu.barrier_nm]:.1f} nm window, sitting on top of the")
+    print(f"        width at which a copper line is ALL BARRIER AND NO CONDUCTOR. No fab has been there.")
+    print(f"    → the metal with the worst bulk ρ AND the worst ρ₀λ of the three wins anyway, and it takes")
+    print(f"      both currencies to see it. That is F3's interfacial layer, in the wire's currency.\n")
+
+    lo_tb, hi_tb = ic.BARRIER_NM_CITED_RANGE
+    print(f"    WHERE it wins is a BAND, and the band is the finding rather than an error bar:")
+    print(f"      t_b = {lo_tb} nm → Ru wins below {r.crossing_nm[lo_tb]:.1f} nm ·"
+          f"  t_b = {hi_tb} nm → below {r.crossing_nm[hi_tb]:.1f} nm  (≈ a node apart)")
+    print(f"      the cited barrier range ALONE moves it that far ⇒ where ruthenium wins is set by the")
+    print(f"      thickness of the layer that stopped scaling. Literature: barrierless Ru is lowest-R at CD")
+    print(f"      <~{LITERATURE_CROSSING_NM:.0f} nm; this band sits a node or two INSIDE that, and both of the model's")
+    print(f"      simplifications push that way (C = {ic.SIZE_EFFECT_C} understates Cu's narrow-line penalty —"
+          f" ~{ic.effective_resistivity('Cu', ic.conductor_width_um(0.018, 'Cu')):.1f} vs a")
+    print(f"      measured ~9 µΩ·cm at 18 nm — and taking the barrier off the WIDTH ONLY leaves Cu more")
+    print(f"      conductor than it has). A CONSISTENCY check on the constants, NOT a prediction.")
+    print(f"    [and do not use the FOM to locate it: the deep-limit closed form says {r.deep_limit_crossing_nm:.0f} nm,"
+          f" ~{r.deep_limit_crossing_nm/r.crossing_nm[lo_tb]:.0f}× too wide,")
+    print(f"     because at the crossing Ru is NOT in its own deep limit (Cλ/W ="
+          f" {ic.SIZE_EFFECT_C*ru.mfp_nm/r.crossing_nm[lo_tb]:.2f}, not ≫ 1) — the")
+    print(f"     short mean free path that makes Ru viable is what keeps it near-bulk. ρ₀λ RANKS metals; it")
+    print(f"     does not LOCATE the crossing. Aluminium is refused on this axis entirely: its ρ₀λ ≈"
+          f" {ic.METALS['Al'].rho0_lambda:.0f} would")
+    print(f"     screen better than copper's {cu.rho0_lambda:.0f}, and its real disqualifier —"
+          f" electromigration — is a currency this")
+    print(f"     module does not carry, so the reads raise rather than print the flattering number.]\n")
 
     print(f"    [named ceilings, without which this figure overstates the wall: REPEATERS — real chips break")
     print(f"     long wires into segments, making delay ∝ L and NOT L²; this ladder is the un-repeated global")
@@ -354,8 +474,13 @@ def save_figure(r: BeolHistoryResult) -> Path:
     labels = {"Al": "aluminium (period, ρ₀ = 2.65 µΩ·cm)", "Cu": "copper (1997, ρ₀ = 1.68 µΩ·cm)"}
     GATE_COLOR = "tab:blue"
     PREMISE_COLOR = "tab:gray"
+    RU_COLOR = "tab:green"
 
-    fig, axes = plt.subplots(1, 3, figsize=(19.5, 5.4))
+    # 2×2 rather than 1×4: the fourth panel is a different ERA on a different AXIS (a sub-60 nm linewidth,
+    # not a node), so putting it on a second row rather than at the end of a row is the honest layout —
+    # the top row is one continuous story about the bulk era and the bottom row is what replaced it.
+    fig, axes = plt.subplots(2, 2, figsize=(13.8, 11.0))
+    axes = axes.ravel()
 
     # --- Left: the wall — the wire term climbing past the transistor's flat line ---------------------- #
     ax = axes[0]
@@ -392,7 +517,7 @@ def save_figure(r: BeolHistoryResult) -> Path:
     ax.axvspan(guard_um, 0.163, color="tab:purple", alpha=0.13)
     ax.axvline(NEXT_NODE_UM, color="tab:purple", ls="-.", lw=1.1)
     ax.annotate(f"the bulk ρ model refuses\nbelow 5λ_Cu ≈ {guard_um:.2f} µm — and\n"
-                f"the next real node ({NEXT_NODE_UM} µm)\nis already in here → slice 4",
+                f"the next real node ({NEXT_NODE_UM} µm)\nis already in here → the panel\nbelow, on its own axis",
                 xy=(0.988, 0.44), xycoords="axes fraction", fontsize=6.8, color="tab:purple",
                 ha="right", va="top", style="italic", fontweight="bold")
 
@@ -434,7 +559,7 @@ def save_figure(r: BeolHistoryResult) -> Path:
 
     # --- Right: the escape and its ceiling — W_x/W_x(Cu) = √(ρ/ρ_Cu), prefactor-free ------------------ #
     # This panel contains NO house constant at all: L, c_pul, V_dd, C_load, AR and the Elmore factor all
-    # cancel in the ratio. It is the module's tightest claim rendered — and the setup for slice 4.
+    # cancel in the ratio. It is the module's tightest claim rendered — and the setup for the panel below.
     ax = axes[2]
     ax.plot(r.rho_uohm_cm, r.wx_ratio_vs_cu, "-", color="k", lw=2.2)
     ax.set_xlim(3.05, 0.45)                          # inverted: better conductor to the right
@@ -481,8 +606,8 @@ def save_figure(r: BeolHistoryResult) -> Path:
     ax.annotate("…but the AXIS is exhausted, not the search:\n"
                 "below ~5λ the material enters only through ρ₀λ,\n"
                 "where the ordering is NOT the bulk ordering —\n"
-                "that is slice 4, and it is how a metal with 4×\n"
-                "copper's bulk ρ still wins.",
+                "that is the panel to the right, and it is how a\n"
+                "metal with 4× copper's bulk ρ still wins.",
                 xy=(0.585, 0.775), xycoords="axes fraction", fontsize=6.8, color="dimgray",
                 ha="left", va="top", style="italic")
 
@@ -492,11 +617,81 @@ def save_figure(r: BeolHistoryResult) -> Path:
                  "0.64 of a node — and on the bulk-ρ axis there is no third metal", fontsize=9.5)
     ax.grid(True, alpha=0.15)
 
+    # --- Fourth: the axis change — the metal that loses on both resistivity metrics and wins anyway ---- #
+    # Prefactor-free apart from the flagged size-effect C: at a common drawn W and a common H, L, the
+    # aspect ratio, c_pul, the Elmore factor, V_dd and C_load all cancel out of R(Ru)/R(Cu).
+    ax = axes[3]
+    cu, ru = ic.METALS["Cu"], ic.METALS["Ru"]
+    rung_style = {
+        "bulk":    ("bulk ρ₀ only — the 1997 currency", "0.35", "-.", 1.6),
+        "size":    ("+ the size effect alone: ρ_eff = ρ₀(1 + Cλ/d)", "tab:purple", "--", 1.8),
+        "barrier": ("+ the barrier alone, on bulk ρ: W_eff = W − 2t_b", "tab:brown", ":", 1.8),
+        "both":    ("+ BOTH — what a real line does", RU_COLOR, "-", 2.6),
+    }
+    for key, (lab, col, ls, lw) in rung_style.items():
+        ax.semilogx(r.narrow_w_nm, r.ru_cu_ratio[key], ls, color=col, lw=lw, label=lab)
+    ax.set_xlim(62.0, 4.15)                          # inverted: scaling → (and it is a LINEWIDTH, not a node)
+    ax.set_ylim(0.42, 5.6)
+
+    # The decision line, and the half-plane where the challenger wins.
+    ax.axhline(1.0, color="k", lw=1.6)
+    ax.axhspan(0.42, 1.0, color=RU_COLOR, alpha=0.09)
+    ax.annotate("R(Ru) < R(Cu) — ruthenium wins", xy=(0.030, 0.045), xycoords="axes fraction",
+                fontsize=7.4, color=RU_COLOR, fontweight="bold", ha="left", va="bottom")
+
+    # The crossing BAND over the CITED barrier range — the band is the finding, not an error bar.
+    lo_tb, hi_tb = ic.BARRIER_NM_CITED_RANGE
+    ax.axvspan(r.crossing_nm[lo_tb], r.crossing_nm[hi_tb], color=RU_COLOR, alpha=0.16)
+    ax.annotate(f"a BAND, {r.crossing_nm[lo_tb]:.0f}–{r.crossing_nm[hi_tb]:.0f} nm, over the CITED\n"
+                f"t_b = {lo_tb}–{hi_tb} nm: WHERE ruthenium wins is\n"
+                f"set by the thickness of the layer that\n"
+                f"stopped scaling. [lit. <~{LITERATURE_CROSSING_NM:.0f} nm — a consistency\n"
+                f"check on the constants, not a prediction]",
+                xy=(r.crossing_nm[hi_tb], 1.0), xytext=(0.50, 0.985), textcoords="axes fraction",
+                fontsize=6.8, color="darkgreen", ha="left", va="top",
+                arrowprops=dict(arrowstyle="->", color="darkgreen", lw=1.0,
+                                connectionstyle="angle3,angleA=0,angleB=90"))
+
+    # The hard geometric floor: 2·t_b, where a copper line is all barrier. F3's "EOT > t_IL for any κ".
+    ax.axvspan(r.conductor_floor_nm[hi_tb], 4.15, color="tab:red", alpha=0.16)
+    ax.axvline(r.conductor_floor_nm[lo_tb], color="tab:red", ls="-", lw=1.4)
+    ax.annotate(f"W = 2·t_b ({r.conductor_floor_nm[lo_tb]:.0f}–{r.conductor_floor_nm[hi_tb]:.0f} nm):\n"
+                f"copper is ALL BARRIER,\nno conductor at all —\nfor any ρ, any C",
+                xy=(0.980, 0.545), xycoords="axes fraction", fontsize=6.9, color="tab:red",
+                ha="right", va="top", fontweight="bold")
+
+    # The size effect's asymptote — the impossibility result, drawn as the line it never crosses.
+    ax.axhline(r.fom_limit, color="tab:purple", ls=(0, (1, 3)), lw=1.2)
+    ax.annotate(f"ρ₀λ(Ru)/ρ₀λ(Cu) = {r.fom_limit:.2f} — the size effect's\n"
+                f"floor, and it is ABOVE 1: scattering alone\n"
+                f"NEVER flips the sign, at any width. The cited\n"
+                f"figure of merit buys parity, and not a win.",
+                xy=(0.975, 0.705), xycoords="axes fraction", fontsize=6.8, color="tab:purple",
+                ha="right", va="top", style="italic")
+
+    # The featured rung, where print_summary reads the ladder out.
+    ax.plot([FEATURE_NARROW_W_NM], [r.ladder["both"]], "o", color=RU_COLOR, ms=10, zorder=6)
+    ax.annotate(f"at {FEATURE_NARROW_W_NM:.0f} nm:  {r.ladder['bulk']:.2f} → {r.ladder['size']:.2f}"
+                f" → {r.ladder['both']:.2f}\n(the barrier alone: {r.ladder['barrier']:.2f} — also losing)",
+                xy=(FEATURE_NARROW_W_NM, r.ladder["both"]), xytext=(0.975, 0.075),
+                textcoords="axes fraction", fontsize=7.1, color=RU_COLOR, fontweight="bold",
+                ha="right", va="center", arrowprops=dict(arrowstyle="->", color=RU_COLOR, lw=1.0),
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=RU_COLOR, alpha=0.92))
+
+    ax.set_xlabel("drawn linewidth  W  (nm)   [a LINEWIDTH, not a node name — that mapping expired ~2000]")
+    ax.set_ylabel("R(Ru) / R(Cu)   [prefactor-free; < 1 ⇒ ruthenium wins]")
+    ax.set_title("The axis change: the metal with 4× copper's bulk ρ AND the worse\n"
+                 "ρ₀λ wins below ~13 nm — and NEITHER mechanism alone gets that sign",
+                 fontsize=9.5)
+    ax.legend(fontsize=6.8, loc="upper left")
+    ax.grid(True, which="both", alpha=0.15)
+
     fig.suptitle("Historical-modes B9 — the BEOL interconnect: the wire caught the transistor with no help from it "
-                 "(τ_wire ∝ 1/W², τ_gate flat), copper bought two-thirds\nof a node, and the bulk-resistivity axis "
-                 "ran out of metals   ·   an UN-REPEATED global wire: real chips insert repeaters, which make "
-                 "delay ∝ L and not L²", fontsize=10.0)
-    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.94))
+                 "(τ_wire ∝ 1/W², τ_gate flat), copper bought two-thirds of a node,\nthe bulk-resistivity axis ran "
+                 "out of metals — and then the axis changed, and the worst conductor of the three won on geometry"
+                 "   ·   an UN-REPEATED global wire: real chips\ninsert repeaters, which make delay ∝ L and not L²",
+                 fontsize=10.0)
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.945))
     for target in (DOCS_FIGURE, OUTPUT_FIGURE):
         target.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(target, dpi=130)

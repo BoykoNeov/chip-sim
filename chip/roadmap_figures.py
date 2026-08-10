@@ -1,13 +1,13 @@
 """Roadmap schematic previews — the banked figures for the PLANNED, not-yet-built slices.
 
-Draws one figure per unbuilt roadmap slice of ``docs/plans/future-steps.md`` (F4 BEOL, F5 SiGe,
-F6 epitaxy, F7 STI remainder, F8 CMP, F9 FinFET/GAA, F10 EUV) into ``docs/figures/roadmap-*.png``,
-for the ``docs/roadmap.html`` page (:mod:`chip.roadmap_gallery`) to display.
+Draws one figure per unbuilt roadmap slice of ``docs/plans/future-steps.md`` (F5 SiGe, F6 epitaxy,
+F7 STI remainder, F8 CMP, F9 FinFET/GAA, F10 EUV) into ``docs/figures/roadmap-*.png``, for the
+``docs/roadmap.html`` page (:mod:`chip.roadmap_gallery`) to display.
 
 A slice that **ships** loses its schematic here and its card on the page (F3 high-κ graduated
-2026-07-17) — the drawing is a promise, and once the real demo exists the banked artifact on the
-history gallery is the honest picture. Deleting the draw function is what keeps the two in step:
-the manifest guard pins ``FIGURES`` against the page's ``SLICES``.
+2026-07-17; **F4 BEOL interconnect 2026-08-10**) — the drawing is a promise, and once the real demo
+exists the banked artifact on the history gallery is the honest picture. Deleting the draw function
+is what keeps the two in step: the manifest guard pins ``FIGURES`` against the page's ``SLICES``.
 
 **These are illustrations, not results — the honesty rules:**
 
@@ -81,42 +81,6 @@ def _bare(ax, xlim=(0.0, 10.0), ylim=(0.0, 6.0)):
 def _rect(ax, x, y, w, h, fc, ec=INK2, lw=0.9, z=2):
     import matplotlib.patches as mp
     ax.add_patch(mp.Rectangle((x, y), w, h, facecolor=fc, edgecolor=ec, linewidth=lw, zorder=z))
-
-
-# --------------------------------------------------------------------------------------------- #
-# F4 — BEOL interconnect RC (Al → Cu damascene 1997 → Ru)
-# --------------------------------------------------------------------------------------------- #
-def _draw_f4(fig) -> None:
-    _chrome(fig, "F4 — BEOL interconnect: chip speed set by wire RC, not the transistor")
-    ax = _bare(fig.add_axes((0.02, 0.02, 0.96, 0.84)), xlim=(0, 12), ylim=(0, 6.4))
-
-    # period: one wide subtractive-Al wire, relaxed pitch
-    _rect(ax, 0.6, 1.0, 4.0, 0.9, SI_GRAY)
-    ax.text(2.6, 1.45, "oxide", ha="center", va="center", fontsize=8.5, color=MUTED)
-    _rect(ax, 1.3, 1.9, 2.6, 1.1, GATE_GRAY)
-    ax.text(2.6, 2.45, "Al wire (subtractive)", ha="center", va="center", fontsize=9, color=INK)
-    ax.text(2.6, 3.6, "wide, far apart —\nR and C both easy", ha="center", va="bottom",
-            fontsize=9, color=INK2)
-
-    # successor: narrow, dense Cu damascene wires with a barrier liner
-    _rect(ax, 6.8, 1.0, 4.6, 0.9, SI_GRAY)
-    ax.text(9.1, 1.45, "low-κ dielectric", ha="center", va="center", fontsize=8.5, color=MUTED)
-    for i in range(4):
-        x = 7.15 + i * 1.05
-        _rect(ax, x, 1.9, 0.62, 1.35, VIOLET, lw=0.8)            # barrier liner (Ta/TaN → Ru)
-        _rect(ax, x + 0.09, 1.99, 0.44, 1.26, ORANGE, ec=VIOLET, lw=0.6, z=3)   # the Cu core
-    ax.text(9.1, 3.55, "Cu dual-damascene (1997) → Ru (3 nm):\n"
-                       "narrow wire → R = ρL/A rises;  tight pitch → C rises",
-            ha="center", va="bottom", fontsize=9, color=INK)
-    ax.text(7.05, 1.62, "barrier liner", ha="left", va="top", fontsize=8, color=VIOLET)
-
-    ax.annotate("", xy=(6.5, 2.5), xytext=(5.1, 2.5),
-                arrowprops=dict(arrowstyle="-|>", color=INK2, lw=1.4))
-    ax.text(5.8, 2.75, "scaling", ha="center", va="bottom", fontsize=9, color=INK2)
-    ax.text(5.95, 5.9, "the would-be observable is NEW to the sim: delay ∝ R_wire·C_wire —\n"
-                       "the first output the transistor chain does not set (also the step that finally\n"
-                       "gives CMP (F8) a consumer: a layer thickness something reads)",
-            ha="center", va="top", fontsize=9, color=INK2, style="italic")
 
 
 # --------------------------------------------------------------------------------------------- #
@@ -223,11 +187,11 @@ def _draw_f7(fig) -> None:
 
 
 # --------------------------------------------------------------------------------------------- #
-# F8 — CMP / dishing / erosion (deferred; unblocks after F4)
+# F8 — CMP / dishing / erosion (its gate was RELEASED by the F4 build, 2026-08-10)
 # --------------------------------------------------------------------------------------------- #
 def _draw_f8(fig) -> None:
     import numpy as np
-    _chrome(fig, "F8 — CMP planarity: dishing & erosion — deferred until a thickness has a reader (F4)")
+    _chrome(fig, "F8 — CMP planarity: dishing & erosion — the thickness now has a reader (F4 shipped)")
     ax = _bare(fig.add_axes((0.02, 0.02, 0.96, 0.84)), xlim=(0, 12), ylim=(0, 6.4))
 
     # the polished stack: a dense Cu array (left) + one wide Cu line (right) in oxide
@@ -252,8 +216,9 @@ def _draw_f8(fig) -> None:
     ax.text(9.05, 2.5, "dishing (the soft wide\nCu bows out)", ha="center", va="top",
             fontsize=9, color=INK, zorder=5,
             bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="none", alpha=0.75))
-    ax.text(6.0, 5.9, "the missing consumer: nothing in the sim reads a layer thickness — CMP only earns\n"
-                      "a build after BEOL (F4) makes wire cross-section an electrical (RC) observable",
+    ax.text(6.0, 5.9, "the consumer that was missing now exists: BEOL (F4, BUILT) made the wire cross-section\n"
+                      "electrical — R ∝ 1/(W·H) → τ_wire → the delay bins — so dishing and erosion finally reach\n"
+                      "an observable. What is left is that F4's geometry is one house line, not a per-die quantity",
             ha="center", va="top", fontsize=9, color=INK2, style="italic")
 
 
@@ -331,7 +296,8 @@ def _draw_f10(fig) -> None:
 
 # The registry the roadmap page + drift guard anchor on: slice id → its draw function.
 FIGURES = {
-    "F4": _draw_f4,
+    # F4 (BEOL interconnect) GRADUATED 2026-08-10 with its slice-4 build — see roadmap_gallery.SLICES.
+    # The manifest guard pins card ↔ schematic, so this entry and the Slice came out in one commit.
     "F5": _draw_f5,
     "F6": _draw_f6,
     "F7": _draw_f7,

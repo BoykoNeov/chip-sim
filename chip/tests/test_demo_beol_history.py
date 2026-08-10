@@ -29,10 +29,14 @@ import pytest
 
 from chip import device as dev
 from chip import interconnect as ic
+from pathlib import Path
+
+from chip import demo_beol_history
 from chip.demo_beol_history import (
-    ASPECT_RATIO, DRIVE_SWEEP, FEATURE_DRIVE_GAIN, FEATURE_W_UM, LADDER_FLOOR_UM, METALS,
-    NEXT_NODE_UM, NODE_LADDER_UM, NODE_SHRINK, PERIOD_CHANNEL_L_UM, PERIOD_N_A, PERIOD_T_OX_UM,
-    PERIOD_WIDTH_UM, SILVER, W_LADDER_UM, compute, nodes_bought,
+    ASPECT_RATIO, DRIVE_SWEEP, FEATURE_DRIVE_GAIN, FEATURE_NARROW_W_NM, FEATURE_W_UM,
+    LADDER_FLOOR_UM, LITERATURE_CROSSING_NM, METALS, NEXT_NODE_UM, NODE_LADDER_UM, NODE_SHRINK,
+    PERIOD_CHANNEL_L_UM, PERIOD_N_A, PERIOD_T_OX_UM, PERIOD_WIDTH_UM, SILVER, W_LADDER_UM,
+    compute, nodes_bought,
 )
 
 
@@ -202,8 +206,14 @@ def test_the_bulk_axis_is_exhausted_and_the_claim_is_scoped_to_that_axis():
     # the scoping, made structural: on the SCALING axis silver is worse than copper — the bulk ordering
     # is not the ρ₀λ ordering, which is the whole reason slice 4 changes axis rather than shopping metals.
     assert SILVER.rho0_lambda > ic.METALS["Cu"].rho0_lambda
-    # …and ruthenium must not be plottable here: a bulk-only model ranks it LAST (the sign trap inverted).
-    assert "Ru" not in ic.METALS and SILVER.name not in ic.METALS
+    # …and ruthenium must not be plottable ON THESE THREE PANELS: they are bulk-ρ, and a bulk-only model
+    # ranks Ru LAST (the sign trap inverted). Slice 4 put Ru in the registry and gave it its OWN panel on
+    # its OWN axis, so the guard moved from "not in METALS" to "not on the bulk-era ladder" — which is
+    # what the demo's own metals tuple encodes. Silver stays demo-local for the reason it always was:
+    # it was never an interconnect metal, only the answer to "is there a better conductor?".
+    assert METALS == ("Al", "Cu") == ic.BULK_ERA_METALS
+    assert "Ru" in ic.METALS and "Ru" not in METALS
+    assert SILVER.name not in ic.METALS
 
 
 def test_the_transistors_own_progress_pulls_the_wall_in_by_the_same_root():
@@ -220,6 +230,78 @@ def test_the_transistors_own_progress_pulls_the_wall_in_by_the_same_root():
     # …the same √2 a 2× better metal buys, in the opposite direction
     assert ic.crossover_width_ratio(ic.Metal("half-ρ", ic.METALS["Cu"].rho0_uohm_cm / 2.0, 38.7), "Cu") \
         == pytest.approx(1.0 / math.sqrt(2.0))
+
+
+# --------------------------------------------------------------------------- #
+# The fourth panel (slice 4) — the axis change
+# --------------------------------------------------------------------------- #
+def test_the_fourth_panel_is_a_SEPARATE_axis_and_does_not_continue_the_ladder():
+    """The era seam is drawn, not papered over: the two panels do not touch, and that is deliberate.
+
+    The bulk ladder stops at 0.20 µm because the bulk model stops being honest there. The narrow panel
+    starts at 4.3 nm. Continuing the first into the second would fabricate exactly the numbers the second
+    exists to compute — the F3 magnitude trap — so they are two models on two axes with a visible gap.
+    """
+    r = compute()
+    assert r.w_um.min() * 1e3 == pytest.approx(LADDER_FLOOR_UM * 1e3)      # 200 nm — the bulk floor
+    assert r.narrow_w_nm.max() < LADDER_FLOOR_UM * 1e3                     # 60 nm — and they do not meet
+    # the narrow axis stays clear of copper's conductor floor at every sample point
+    assert r.narrow_w_nm.min() > r.conductor_floor_nm[ic.METALS["Cu"].barrier_nm]
+
+
+def test_the_fourth_panels_ladder_needs_BOTH_mechanisms_to_get_the_sign_right():
+    """4.23 → 1.90 → 0.92, with the barrier-only rung at 2.82 as the control that kills the short version.
+
+    The figure and :func:`print_summary` both read these four numbers, so pinning them here is what keeps
+    the drawn story and the printed story the same story (the parity bug F3's follow-up commit fixed).
+    """
+    r = compute()
+    assert r.ladder["bulk"] == pytest.approx(4.226, abs=2e-3)
+    assert r.ladder["size"] == pytest.approx(1.901, abs=2e-3)
+    assert r.ladder["barrier"] == pytest.approx(2.817, abs=2e-3)
+    assert r.ladder["both"] == pytest.approx(0.917, abs=2e-3)
+    assert r.ladder["size"] > 1.0 and r.ladder["barrier"] > 1.0 and r.ladder["both"] < 1.0
+
+    # the curves agree with the read-out at the featured rung, so the marker sits on its own line
+    i = int(np.argmin(np.abs(r.narrow_w_nm - FEATURE_NARROW_W_NM)))
+    assert r.ru_cu_ratio["both"][i] == pytest.approx(r.ladder["both"], rel=1e-2)   # nearest grid sample
+    assert np.allclose(r.ru_cu_ratio["bulk"], r.ladder["bulk"])             # the bulk rung is FLAT in W
+
+
+def test_the_fourth_panel_carries_both_impossibility_results_and_the_band():
+    """What is drawn is the pair of closed forms plus a band — not a single crossing number.
+
+    The asymptote line (> 1, so scattering alone never flips it), the floor band (2·t_b, where copper has
+    no conductor), and the crossing band over the *cited* barrier range. A point estimate would claim a
+    precision the cited inputs do not carry.
+    """
+    r = compute()
+    assert r.fom_limit > 1.0 and r.fom_limit == pytest.approx(1.179, abs=5e-4)
+    assert all(v > r.fom_limit for v in r.ru_cu_ratio["size"])             # the curve never reaches it
+
+    lo_tb, hi_tb = ic.BARRIER_NM_CITED_RANGE
+    assert r.crossing_nm[lo_tb] < r.crossing_nm[hi_tb]                     # a band, and it widens with t_b
+    assert r.conductor_floor_nm[lo_tb] == pytest.approx(2 * lo_tb)
+    assert r.barrier_only_flip_nm > r.conductor_floor_nm[lo_tb]            # …just barely, which is the point
+    assert r.barrier_only_flip_nm - r.conductor_floor_nm[lo_tb] < 2.0      # a ~1 nm window, unusable
+
+    # the whole band sits inside the cited <~20 nm, and the FOM's own shortcut does not
+    assert r.crossing_nm[hi_tb] < LITERATURE_CROSSING_NM
+    assert r.deep_limit_crossing_nm > 2.0 * LITERATURE_CROSSING_NM
+
+
+def test_the_narrow_axis_is_labelled_a_linewidth_because_the_node_convention_expired():
+    """The left panel's ``W`` = the node name is a **pre-2000** fact, and the fourth panel may not reuse it.
+
+    Historically the node name really was roughly the metal half-pitch, which is what licenses the bulk
+    ladder's rungs. That mapping broke around 2000 — a modern "3 nm node" has no 3 nm linewidth in it — so
+    reusing the convention on a sub-60 nm axis would fabricate a claim. This is a statement the figure
+    makes in *words*, and words are exactly what the fast lane otherwise cannot check (F3's follow-up
+    commit: "the currency test only ever confirms the prose did not change, never that it is still true").
+    """
+    src = Path(demo_beol_history.__file__).read_text(encoding="utf-8")
+    assert "a LINEWIDTH, not a node name" in src                  # the narrow panel's axis label
+    assert "= the node; a global line" in src                     # …and the bulk panel's, still opposite
 
 
 def test_figure_builds():

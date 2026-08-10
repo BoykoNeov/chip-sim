@@ -1,6 +1,6 @@
 ---
 name: beol-interconnect-source
-description: "F4 BEOL interconnect RC (source + build state, S1-S3 BUILT, S4 open): cited c_pul≈2 pF/cm AND its geometry-invariance (coax↔80nm line), Al/Cu/Ru ρ₀+λ, the ρ₀λ scaling FOM (Ru≈Cu, NOT better), the 2-3nm barrier floor, IBM 1997 dual-damascene, the mid-90s gate≈wire crossover; S2's exact damping law 1−wire_share + the re-binning trap; S3's node-unit rule (Cu bought 0.64 of a node), the challenger-first sign trap, and the exhausted bulk-ρ axis"
+description: "F4 BEOL interconnect RC (source + build state — COMPLETE, all 4 slices): cited c_pul≈2 pF/cm AND its geometry-invariance (coax↔80nm line), Al/Cu/Ru ρ₀+λ, the ρ₀λ scaling FOM (Ru≈Cu, NOT better), the 2-3nm barrier floor, IBM 1997 dual-damascene, the mid-90s gate≈wire crossover; S2's exact damping law 1−wire_share + the re-binning trap; S3's node-unit rule (Cu bought 0.64 of a node), the challenger-first sign trap, the exhausted bulk-ρ axis; S4's TWO IMPOSSIBILITY RESULTS (size effect alone never flips the sign — asymptote 1.179>1; barrier alone flips only below 5.2nm, atop the 4.0nm no-conductor floor), the crossing as a BAND set by t_b, the FOM-ranks-but-doesn't-locate trap, and the live game-knob Ru gate"
 metadata: 
   node_type: memory
   type: reference
@@ -178,6 +178,72 @@ invariance (tight) and the **`ρ₀λ` figure of merit** (which carries the Cu�
   2nd lump-carrier** (`W_x(Al)` moved 0.49→0.38 µm across a plausible `N_A` range ≈ ¾ of a node). An
   untuned 1 mm line + a period device landing `W_x(Al)` ≈ 0.45 µm (the mid-90s, where cited history puts
   gate ≈ wire) has exactly the **IBM ~40%** status. Lead with the shape + the 1.26 shift.
+
+**S4 BUILT (2026-08-10) — the narrow-wire era. F4 is COMPLETE (4 slices); the card GRADUATED.**
+* **The plan's "two steps, both load-bearing" became TWO IMPOSSIBILITY RESULTS, cited constants only**
+  (advisor — much stronger than the ladder it replaces as the headline).
+  **(a) The size effect ALONE can never flip Cu→Ru at ANY width.** The no-barrier ratio falls
+  *monotonically* from `ρ₀(Ru)/ρ₀(Cu)` = **4.23** to the asymptote `ρ₀λ(Ru)/ρ₀λ(Cu)` = **1.179**, and
+  1.179 > 1. So "Ru wins because its λ is short" is false **in the limit**, not approximately. `C` cancels
+  in the asymptote ⇒ no flagged input.
+  **(b) The barrier ALONE on bulk ρ can't either**, except at `W < 2t_b/(1 − ρ₀Cu/ρ₀Ru)` = **5.24 nm** —
+  a **1.2 nm** window sitting on top of the **4.0 nm** conductor floor. No fab has been there.
+* **The geometric floor `W = 2·t_b` is HEADLINE** (4–6 nm over the cited range): a Cu line narrower than
+  its two liners is **all barrier, no conductor**, for any ρ/L/C/AR. F3's "`EOT > t_IL` for ANY κ" in the
+  wire's currency, and *inside* the roadmap. `conductor_width_um` raises rather than extrapolating.
+* **The three-rung ladder is now the illustration, not the claim** (at 12 nm, C=1, t_b=2):
+  **4.23 → 1.90 → 0.92**, with **barrier-only = 2.82** as the control that kills the one-mechanism version.
+* **The crossing is a BAND and the band IS the finding: 12.9 → 17.1 nm over the CITED t_b = 2–3 nm** (≈ a
+  node); ~9.7–21.1 nm over flagged `C` ∈ [0.375, 2]. ⇒ *where* Ru wins is set by the thickness of the layer
+  that stopped scaling. Lit. <~20 nm; the band sits a node INSIDE it and both conservative simplifications
+  push that way. **Status = the IBM ~40% consistency check's, NOT a prediction.**
+* **THE FOM RANKS METALS BUT DOES NOT LOCATE THE CROSSING.** The deep-limit closed form (`R ∝ ρ₀λ/W_eff²`
+  for both) gives **50.5 nm** vs the full form's **12.9** — **4× wrong**, because at the crossing Ru is
+  *not in its own deep limit* (`Cλ/W` ≈ 0.84, not ≫1): the short λ that makes Ru viable is what keeps it
+  near-bulk. Pinned by a test so a later slice can't "simplify" to it.
+* **THE LIVE BUG THE ADVISOR CAUGHT (blocking): adding Ru to `METALS` reached the GAME KNOB.**
+  `fab_game/steps.py` resolved `knobs.interconnect` straight out of `METALS`. What Ru would have returned
+  is **not even wrong** — at 250 nm Ru really *is* ~4× worse — so a **true** number reads as a **false
+  verdict on the metal**. Fix: `BULK_ERA_METALS = ("Al","Cu")`, refused by name *with the reason*. The S4
+  gate **MIGRATED** (from "not in the registry" to "not offered where it would be misread"), never lifted.
+* **Al is REFUSED on the narrow axis, and the refusal is LOAD-BEARING.** Al's `ρ₀λ` ≈ 58 screens *better*
+  than Cu's 65 — unsupportable here, since Al's real disqualifier (**electromigration**) is a reliability
+  currency F4 doesn't carry. `barrier_nm=None` ⇒ narrow reads raise. **Advisor: do NOT re-source Al** — it
+  buys a citation fight, not a claim. S3's "the cap is binding, not cosmetic", applied to a *metal*.
+* **FOUR simplifications, each with its DIRECTION named** (the conclusion is a sign): `C` = 1.0 round and
+  **unfitted** ⇒ **errs AGAINST Ru** (Cu at 6.3 µΩ·cm in an 18 nm line vs a **measured ~9** — web-verified:
+  an 18 nm line ≈ 9 µΩ·cm, an 80 nm line ≈ near-bulk); width-only `W_eff` ⇒ **also against Ru**; the
+  **scattering dimension `d` = the conductor WIDTH, not a cross-section** ⇒ **also against Ru**; barrier as
+  perfectly dead area ⇒ **for Ru**. A single `C` can't span both ends — the grain-boundary term is NAMED,
+  not built (advisor: splitting `C` = a second lump, no new claim).
+* **THE SCATTERING-DIMENSION CATCH, and the one place the advisor was WRONG on a direction.** Post-build
+  the advisor flagged the missing 4th simplification (right — scattering sees both surface pairs, not just
+  `W`) but argued it with **`d = 2WH/(W+H)`**, which flips the 12 nm rung to **1.12 (Ru LOSING)**. Measured
+  out, the opposite holds: the additive-rate derivation gives **`1/d = 1/W_eff + 1/H`** (the standard
+  rectangular form), **half** the advisor's `d` ⇒ rung **0.917 → 0.889 (Ru wins by MORE)**, crossing
+  12.9 → 13.4 nm. **The tiebreak is EVIDENCE, not taste:** at 18 nm the conventions give Cu ρ_eff = 6.3
+  (ours) / **8.1** (standard) / 4.9 (advisor's) vs a **measured ~9** — the advisor's is furthest off.
+  **Kept width-only anyway, for a reason that is not preference:** bringing `H` in would put the **flagged
+  AR into the headline ratio**, and `resistance_ratio` is prefactor-free *because* `H`/`AR` cancel.
+  **Rule: a prefactor-free claim that errs against its own conclusion beats a better-calibrated one that
+  doesn't.** Pinned by a test that hand-rolls the standard form. *Lesson: when a reviewer's counter-example
+  would cost a headline, re-derive the convention AND check it against a measured datum before conceding.*
+* **The guard was NOT retired.** S1 and S3 both wrote "slice 4 removes the need for `bulk_regime_ok`" —
+  **wrong**: `delay`/`crossover_width_um` are still bulk-only. S4 added a **second path beside** the first.
+  Corrected in both places + pinned.
+* **The node convention EXPIRED.** S3's "W = the node number" is a *pre-2000* fact; a modern "3 nm node"
+  has no 3 nm linewidth, so panel 4's axis is a **drawn linewidth, never a node**. Pinned by a **source-text**
+  test — the one thing golden-HTML currency tests structurally cannot catch.
+* **Shape:** `interconnect.py` §6 (`effective_resistivity`, `conductor_width_um`/`conductor_floor_width_um`,
+  `narrow_line_resistance`, `resistance_ratio` **challenger-first** with `size_effect`/`barrier` switches,
+  `size_effect_ratio_limit`, `barrier_only_flip_width_um`, `equal_resistance_width_um`/`_nm`).
+  **Naming:** `crossover_*` = gate↔wire; **`equal_resistance_*` = metal↔metal** — a deliberate split
+  (advisor), the `Die.tau` collision class. `NARROW_WIRE_METALS` is **derived** from `METALS`. A **4th demo
+  panel on its OWN sub-60 nm axis** — *not* a continuation of the 0.20 µm ladder, so the era seam stays
+  visible. **No new game knob** (the demo is the consumer — F3's slice-4 shape).
+* **F4's build RELEASED F8's gate** — CMP's "nothing reads a layer thickness" (backlog D2) fired: `R ∝
+  1/(W·H)` is now electrical. F8 moved `hold` → `ok` on the roadmap page. Remaining gate is a *shape*
+  problem: F4's geometry is one house line, so per-die dishing needs a per-die cross-section.
 
 **Seam:** the game's `SpeedBins.assign(i_dsat_mA)` (`fab_game/spec.py`) **already** bins on `I_Dsat` as a
 speed proxy — its docstring says "clock speed ∝ drive current" — which is the *era-appropriate and false*

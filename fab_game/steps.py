@@ -410,6 +410,21 @@ def device_step(
     if knobs.interconnect is None:
         wire_delay = None
     else:
+        # The knob is gated to the BULK-ERA metals, and the gate is physics rather than tidiness (F4
+        # slice 4). The game runs ONE house line — a 250 nm-era global wire — through the bulk-ρ model.
+        # Ruthenium at 250 nm genuinely is ~4× worse than copper, so the number that came back would be
+        # *correct* and would still read as a verdict on the metal: exactly the sign inversion the F4 plan
+        # exists to prevent. Ru's case is a sub-20 nm claim about the size effect and the barrier
+        # (chip.interconnect §6), and the game has no node at which to make it. Refuse by name, with the
+        # reason, rather than binning a plausible-looking anachronism.
+        if knobs.interconnect not in ic.BULK_ERA_METALS:
+            raise ValueError(
+                f"interconnect={knobs.interconnect!r} is not available to the game knob: the fab runs a "
+                f"single {ic.WireGeometry().width_um*1e3:.0f} nm-era global line through the bulk-ρ "
+                f"model, where only {ic.BULK_ERA_METALS} are in their regime. A narrow-wire metal would "
+                f"return a correct bulk number that reads as a false verdict on the metal — see "
+                f"chip.interconnect.BULK_ERA_METALS."
+            )
         c_load = ic.gate_load_capacitance(mos.C_ox, knobs.width_um, die.cd_um)
         wire_delay = ic.delay(ic.WireGeometry(), i_dsat, c_load, metal=knobs.interconnect)
     knobs_in = {"gate": knobs.gate, "width_um": knobs.width_um, "overdrive_V": knobs.overdrive_V,

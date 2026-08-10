@@ -97,6 +97,28 @@ def test_interconnect_absent_emits_nothing_at_all():
         assert key not in rec.outputs
 
 
+def test_the_knob_refuses_ruthenium_because_the_fab_has_no_node_at_which_its_case_is_made():
+    """The slice-4 gate, at the game boundary: a **correct** bulk answer that reads as a false verdict.
+
+    Slice 4 put ruthenium in ``chip.interconnect.METALS``, and the game step resolves its metal straight
+    out of that registry — so without this guard "Ru" silently became a knob setting. What it would
+    return is not even wrong: the fab runs one house line, a 250 nm-era global wire, through the bulk-ρ
+    model, and at 250 nm ruthenium really is ~4× worse than copper. The player would read a true number
+    as "ruthenium is a bad wire", which is precisely the sign inversion F4 exists to prevent — its case
+    is a sub-20 nm claim about the size effect and a barrier that stopped scaling, and the game has no
+    node at which to make it. So the knob refuses by name, and says why.
+    """
+    assert "Ru" in ic.METALS and "Ru" not in ic.BULK_ERA_METALS
+    with pytest.raises(ValueError, match="bulk"):
+        device_step(_die(), DeviceKnobs(interconnect="Ru"), _N_A)
+
+    # The two era metals still pass, and an unknown metal still fails the registry lookup as before.
+    for metal in ic.BULK_ERA_METALS:
+        assert device_step(_die(), DeviceKnobs(interconnect=metal), _N_A).delay is not None
+    with pytest.raises((KeyError, ValueError)):
+        device_step(_die(), DeviceKnobs(interconnect="unobtanium"), _N_A)
+
+
 def test_engaging_the_wire_alone_changes_nothing_scored_the_delay_is_read_by_no_one():
     """``interconnect="Cu"`` with no ``delay_bins`` → the delay is emitted and **nothing observable moves**.
 

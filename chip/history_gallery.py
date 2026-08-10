@@ -186,8 +186,17 @@ MODES = [
         "only 0.80× — 0.64 of a 0.7× node step, two-thirds of one generation. It shifted the line rather "
         "than bending it, and the same √ closes the door behind it: one more node needs ρ ≤ 0.82 µΩ·cm "
         "and silver, the best elemental conductor there is, is 1.59. The bulk-resistivity axis ran out of "
-        "metals — which is why the next move changes the axis rather than shopping for a conductor: below "
-        "~5λ the material enters only through ρ₀λ, where the bulk ordering no longer holds.",
+        "metals — so the axis changed. Below ~5λ two things take over: surface and grain-boundary "
+        "scattering, where the material enters only through ρ₀λ, and a copper diffusion barrier with a "
+        "~2–3 nm floor that does not scale, eating a shrinking budget until W = 2·t_b (4–6 nm) leaves a "
+        "line that is all barrier and no conductor. Barrierless ruthenium wins there — with 4× copper's "
+        "bulk ρ AND the worse ρ₀λ — and neither mechanism alone gets that sign right. Scattering alone "
+        "never flips it at any width (the ratio asymptotes to ρ₀λ(Ru)/ρ₀λ(Cu) = 1.18, above 1: the cited "
+        "figure of merit buys parity, not a win), and the barrier alone on bulk ρ flips it only below "
+        "5.2 nm, a nanometre above the width where copper stops being a conductor. Together they cross at "
+        "13–17 nm over the cited barrier range — so *where* ruthenium wins is set by the thickness of the "
+        "layer that stopped scaling. [The crossing's placement is a consistency check on the constants, "
+        "not a prediction; the model's two simplifications both make ruthenium's win harder to earn.]",
     ),
 ]
 

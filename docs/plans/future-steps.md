@@ -30,11 +30,11 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
 | **F1** | **Ion implantation** | 1970s: predep → implant | **buried/retrograde peak** predep can't make; `device.py:78` V_t-adjust; damage→leakage (`lifetime.py`) | **✅ BUILT (2026-07-06 — all 4 slices)** (`ion-implantation.md`) |
 | **F2** | **Silicide / contact resistance** | 1980s salicide | **series R** → `I_Dsat` (the journey's `R_series_ohm` seam already exists!) | **✅ BUILT (2026-07-10) as historical-mode B7** (`contact_resistance.py`); two-term access+TLM-contact, bottleneck flips access→contact |
 | **F3** | **High-κ gate dielectric** | 2007 (45nm): SiO₂ → HfO₂ | **gate tunneling leakage** (exp in `t_phys`) vs **`C_ox`** (linear in EOT) — one thickness, two currencies | **✅ BUILT (2026-07-17 — all 4 slices) as historical-mode B8** (`chip/high_k.py` + the `dielectric` knob + `demo_highk_history.py`); EOT identity (`device.py` untouched), per-material WKB tunneling, and the interfacial layer on **both** currencies → the honest EOT floor. **Roadmap card graduated** |
-| **F4** | **BEOL interconnect (RC delay)** | Al → **Cu damascene (1997)** → Ru (3nm) | **new output: chip speed limited by wire RC, not the transistor** | **PROMOTABLE — best history arc, biggest build** |
+| **F4** | **BEOL interconnect (RC delay)** | Al → **Cu damascene (1997)** → Ru (3nm) | **new output: chip speed limited by wire RC, not the transistor** | **✅ BUILT (2026-08-10 — all 4 slices) as historical-mode B9** (`chip/interconnect.py` + the `interconnect` knob + `spec.DelayBins` + `demo_beol_history.py`); two terms with no shared variable ⇒ `∂ln f/∂ln I_Dsat = 1 − wire_share`; Cu bought 0.64 of a node; then the **axis changed** — size effect + an unscalable barrier put barrierless Ru ahead below ~13 nm with 4× Cu's bulk ρ. **Roadmap card graduated** |
 | **F5** | **SiGe strained source/drain** | ~2004 (90nm): strain era | **mobility → `I_Dsat`** (~2 GPa @ 20% Ge → up to 100% hole-µ) | PROMOTABLE — needs a µ-model in `device.py`; advanced-node |
 | **F6** | **Epitaxy (buried layer / retrograde well)** | bipolar epi; CMOS wells | retrograde profile — **overlaps implant F1** | COUPLED to F1 — defer standalone |
 | **F7** | **Isolation: LOCOS → STI** | LOCOS (1970s) → STI (1998) | bird's-beak narrows active width → geometry; latchup | **✅ bird's-beak BUILT (2026-07-10) as historical-mode B5** (`locos_history.py`); STI/latchup still deferred |
-| **F8** | **CMP / planarity** | enables Cu damascene | nothing reads layer thickness — **unblocks only after F4** | DEFERRED (backlog D2) — reevaluate post-F4 |
+| **F8** | **CMP / planarity** | enables Cu damascene | post-CMP thickness → `R ∝ 1/(W·H)` → `τ_wire` → the delay bins — **the reader F4 built** | **UNBLOCKED by F4 (2026-08-10)** — the D2 trigger fired. Remaining gate is narrower: F4's wire geometry is one house line, so CMP needs the cross-section to become a **per-die** quantity |
 | **F9** | **FinFET / GAA** | 2011 / 2022: 3-D channel | needs the **3-D engine** (deferred B1) + `device_2d` extension | DEFERRED — no 3-D consumer yet |
 | **F10** | **EUV / multipatterning** | 2019 (7nm) | extends litho; **no new observable** (litho already rich) | DEFERRED — no discriminating consumer |
 
@@ -55,15 +55,25 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
    once, which is what makes `EOT > t_IL` (for any κ) the honest floor under the whole escape. Cited:
    Robertson's κ/φ_B table + the κ↔gap inverse correlation, Ando's additive EOT
    (`high-k-dielectric-source.md`).
-4. **F4 — BEOL interconnect** — now the head of the queue. Adds a **back-end output the sim has never
-   had**: chip speed set by interconnect `RC`, not the transistor — plus the richest history arc
-   (subtractive Al → Cu dual-damascene 1997 + CMP → Ru semi-damascene at 3 nm). The biggest build of the
-   promotable set; also *unblocks CMP (F8)* by giving layer-thickness a consumer.
-5. **F5 — SiGe strained S/D** once a mobility model exists in `device.py` (strain → µ → `I_Dsat`).
+4. **F4 — BEOL interconnect** *(✅ BUILT 2026-08-10, all 4 slices, as historical-mode B9).* The first
+   **back-end** output, and the first the transistor chain does not set: `τ_total = τ_gate(I_Dsat) +
+   τ_wire`, where `∂τ_wire/∂I_Dsat = 0`. Slices: the module, the game knob + the binning inversion
+   (`DelayBins` re-grades the *same* wafer on delay and the premium grade collapses — a **grading** loss,
+   never a yield one), the B9 demo, and the **narrow-wire era** — the size effect and a barrier that
+   stopped scaling, which together put barrierless Ru ahead below ~13 nm despite 4× copper's bulk ρ.
+   Neither mechanism alone gets that sign right, and both failures are closed forms. Cited: `c_pul ≈
+   2 pF/cm` **and its geometry-invariance**, the `ρ₀λ` screening FOM, the 2–3 nm barrier floor, IBM 1997
+   (`beol-interconnect-source.md`).
+5. **F5 — SiGe strained S/D** — **now the head of the queue**, once a mobility model exists in `device.py`
+   (strain → µ → `I_Dsat`).
+6. **F8 — CMP / planarity** — **unblocked by F4**, which gave layer thickness its first reader. Its
+   remaining gate is structural rather than conceptual: F4's wire geometry is a module-level house line
+   (the game knob is metal-only), so a per-die dishing/erosion variation needs the cross-section to become
+   a per-die quantity first.
 
-Recommendation: **F1 → F2 → F3 → F4**. The F3-vs-F4 call was taken for F3 — the contained
-oxide-successor — and it has shipped; **F4 is next**, and is the last promotable step whose consumer is
-already named.
+Recommendation: **F1 → F2 → F3 → F4** — all four shipped. **F5 or F8 is next**, and the choice is a real
+one: F5 is the next *era* rung and needs new device physics; F8 is cheaper and now has the consumer F4
+just built for it.
 
 ## The historical/educational spine (the game's timeline)
 
@@ -84,9 +94,13 @@ the sim actually runs, not narrated decoration.
 
 ## Deferred, and why (the spine — honest NO's)
 
-- **CMP (F8), FinFET/GAA (F9), EUV (F10)** — deferred for want of a discriminating consumer *today*. F8
-  unblocks after F4 (multi-metal gives layer thickness a reader); F9 needs the 3-D engine (B1); F10 adds
-  no observable litho doesn't already have.
+- **FinFET/GAA (F9), EUV (F10)** — deferred for want of a discriminating consumer *today*. F9 needs the
+  3-D engine (B1); F10 adds no observable litho doesn't already have.
+- **CMP (F8) — no longer on this list (2026-08-10).** It was fenced behind "nothing reads a layer
+  thickness"; the F4 build made `R ∝ 1/(W·H)` electrical, so the trigger recorded for backlog D2 has
+  fired and F8 moved up to the promotable section. Its remaining gate is a *shape* problem rather than a
+  missing consumer: F4's geometry is one house line, so per-die dishing/erosion needs the cross-section to
+  become a per-die quantity. Kept written down here because a released gate is worth as much as a set one.
 - **LOCOS/STI (F7) — bird's-beak now BUILT (2026-07-10) as historical-mode B5** (`locos_history.py`): under
   the 2026-07-03 pedagogical-consumer reframing, the **active-pitch wall** (min active pitch ∝ field-oxide;
   STI clears it) *is* the consumer that the "geometry-only" framing had marked as too weak. The 2-D engine's

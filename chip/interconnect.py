@@ -1,4 +1,4 @@
-"""BEOL interconnect RC delay — the chip speed the transistor does not set (F4, slice 1).
+"""BEOL interconnect RC delay — the chip speed the transistor does not set (F4, complete: slices 1–4).
 
 The **backward axis** (``docs/plans/beol-interconnect-f4.md``): chip delay is **two terms with no shared
 variable**, and *no single scalar can move both*:
@@ -75,24 +75,101 @@ The honesty ladder (per the F4 plan + the ``historical-modes.md`` triad)
   **not** validate a structural form. F3's (φ_B, m*)-predicts-the-2 Å-slope check was stronger because it
   ran through the *exponential*, so cited inputs predicted a **different functional form's** slope. This
   one is a sanity check on the inputs, and must not be quoted as more.
+* **Tight — the two S4 impossibility results (the narrow-wire era's headline).** Below ``λ`` the ranking
+  metal changes, and *which mechanism* flips Cu→Ru is settled by two closed forms that use **only cited
+  constants** — no ``C``, no barrier thickness, no geometry. **(a) The size effect alone can never flip
+  the sign, at any width whatsoever**: :func:`resistance_ratio` without a barrier falls monotonically from
+  ``ρ₀(Ru)/ρ₀(Cu)`` = 4.23 to the asymptote ``ρ₀λ(Ru)/ρ₀λ(Cu)`` = **1.179**, and 1.179 > 1. So "ruthenium
+  wins because its mean free path is short" is false not approximately but **in the limit** — the cited
+  FOM says *parity*, and parity is not a win. **(b) The barrier alone, on bulk ``ρ``, cannot flip it
+  either**, except in a window no fab could use: ``ρ₀(Ru)/ρ₀(Cu)·(W − 2t_b)/W < 1`` needs
+  ``W < 2t_b/(1 − ρ₀(Cu)/ρ₀(Ru))`` = **5.2 nm** at ``t_b`` = 2 nm — barely a nanometre above ``W = 2t_b``
+  = 4.0 nm, the width at which copper stops having a conductor **at all**. Only the two *together* get the
+  sign right, which is the F3-IL structure exactly.
+* **Tight — the geometric conductor floor.** ``W_eff = W − 2·t_b`` with a **fixed** ``t_b`` has a hard zero
+  at ``W = 2·t_b`` (4–6 nm over the cited 2–3 nm barrier range): a copper line narrower than its own two
+  liners is **all barrier and no conductor**, for any resistivity, any length, any ``C``. This is F3's
+  "``EOT > t_IL`` for **any** κ" in the wire's currency — prefactor-free, and inside the roadmap.
+  :func:`conductor_width_um` raises below it rather than extrapolating through.
 * **Flagged — the magnitudes.** The wire length :data:`GLOBAL_WIRE_LENGTH_UM` (**nothing in the sim carries
   a wire length** — the analogue of F2's ``CONTACT_LENGTH_UM`` and B6's ``SPIKE_CONCENTRATION``; checked:
   B6's ``t_Al`` is a contact-metallization *thickness*, not a line length), the Elmore distributed-line
-  factor :data:`ELMORE_FACTOR`, the supply :data:`V_DD_HOUSE`, and the aluminium ``ρ₀`` (handbook, and a
-  real Al–Cu alloy line runs higher than pure Al). **Absolute picoseconds are therefore NOT a claim this
-  module makes** — only ratios, shares, and the crossover's *shift* are.
+  factor :data:`ELMORE_FACTOR`, the supply :data:`V_DD_HOUSE`, the aluminium ``ρ₀`` (handbook, and a
+  real Al–Cu alloy line runs higher than pure Al), and the size-effect coefficient
+  :data:`SIZE_EFFECT_C`. **Absolute picoseconds are therefore NOT a claim this module makes** — only
+  ratios, shares, the crossover's *shift*, and the two closed forms above are.
 
-Scope — this slice is BULK resistivity only (the S4 gate, stated so the omission is not silent)
------------------------------------------------------------------------------------------------
-``ρ_eff = ρ₀`` here, which is valid **only for wires much wider than the electron mean free path ``λ``**
-(:meth:`Metal.bulk_regime_ok`) — precisely the Al→Cu era this slice serves (250 nm ≫ Cu's 39 nm). Below
-``λ``, surface and grain-boundary scattering make ``ρ_eff ≈ ρ₀·(1 + C·λ/d)`` rise sharply, and the
-material enters **only** through the product ``ρ₀λ`` — the cited screening figure of merit. **Ruthenium is
-deliberately NOT in :data:`METALS`**: its bulk ``ρ₀`` is ~4× *higher* than copper's, so a bulk-only model
-would rank it *last* — and "Ru is the worst wire metal" is the **sign error inverted**, the exact trap the
-F4 plan exists to prevent. Ru arrives in slice 4 **with** the size-effect and barrier-fraction physics that
-make its constants mean anything. ``λ`` is carried here **only as a validity guard** (an honesty device,
-like F3's ladder cap) — slice 4 promotes it from a guard to a term.
+The narrow-wire era (slice 4): where ρ_eff = ρ₀ stops being true, and the ranking metal changes
+-------------------------------------------------------------------------------------------------
+Slices 1–3 are **bulk-``ρ`` only** — ``ρ_eff = ρ₀``, valid for wires much wider than the electron mean free
+path ``λ`` (:meth:`Metal.bulk_regime_ok`), which is precisely the Al→Cu era they serve (250 nm ≫ Cu's
+39 nm). Slice 4 adds the two mechanisms that take over below that, and **promotes ``λ`` from a validity
+guard to a term**. (The guard is *not* retired: it still bounds where :func:`delay` and
+:func:`crossover_width_um` — the bulk functions — may speak. Slice 4 adds a second, narrow-wire path
+beside them rather than widening the first.)
+
+* **The size effect.** Below ``λ``, surface and grain-boundary scattering give
+  ``ρ_eff ≈ ρ₀·(1 + C·λ/d)`` (:func:`effective_resistivity`), so in the narrow limit ``ρ_eff → C·ρ₀λ/d``
+  and the material enters **only** through the product ``ρ₀λ`` — the cited screening figure of merit
+  (:attr:`Metal.rho0_lambda`). **The FOM ordering is not the bulk ordering**, structurally the same finding
+  as F3's "buying κ costs barrier" and F2's two ``R_sh`` exponents. But see the honesty ladder: the FOM
+  buys ruthenium *parity*, never a win.
+* **The barrier — the BEOL's interfacial layer.** Copper needs a Ta/TaN diffusion barrier with a cited
+  **~2–3 nm minimum thickness that does not scale**; ruthenium needs **none**. So a **fixed** thickness
+  eats a **shrinking** budget: ``W_eff = W − 2·t_b``, with the hard floor above. This is what tips an
+  already-near-parity metal over, and it is **geometric, not a materials ride** (A4's lesson).
+
+**The honest Ru claim is therefore two steps, both load-bearing**, and the three-rung ladder
+(:func:`resistance_ratio`, whose ``size_effect``/``barrier`` switches exist to *run* it) is the proof at a
+12 nm line: bulk ``ρ`` alone ranks Ru **4.23× worse**; adding the size effect takes that to **1.90×** —
+better, still losing; adding the barrier on top lands **0.92×**, a win. Neither alone suffices — the
+barrier on *bulk* ``ρ`` is still 2.82× worse at that width. **The metal with the worst bulk ``ρ`` and the
+worst ``ρ₀λ`` of the three wins anyway, and only both currencies together get that sign right.** Do not
+collapse this to "Ru wins because of the liner" (drops the necessary condition) or to "Ru has a shorter
+mean free path" (the sign error this module exists to prevent).
+
+**Aluminium is refused in this regime, and the refusal is load-bearing** (:data:`NARROW_WIRE_METALS`).
+Al's ``ρ₀λ`` ≈ 58 would *screen better than copper's 65* — and printing that number would be a claim this
+module cannot support: aluminium's disqualifier is **electromigration**, a reliability currency this module
+does not carry (a named ceiling, below). So :attr:`Metal.barrier_nm` is ``None`` for Al and the narrow-wire
+reads raise rather than return a competitive-looking figure. That is S3's "the cap is binding, not
+cosmetic", applied to a metal instead of a width.
+
+**Where the crossing lands is a bracketed CONSISTENCY check, never a prediction — and it is a band.**
+:func:`equal_resistance_width_nm` puts Cu→Ru at **12.9 nm** at ``t_b`` = 2 nm and **17.1 nm** at
+``t_b`` = 3 nm — i.e. the *cited* barrier range alone moves it by about a node, which is the finding rather
+than an error bar: **where ruthenium wins is set by the thickness of the layer that stopped scaling.**
+Widening the flagged ``C`` over [0.375 (pure Fuchs–Sondheimer, fully diffuse) … 2.0] spans ~9.7–21.1 nm.
+The literature's crossing is **<~20 nm**; this model's band sits a node or two *inside* it, and the two
+named biases below both push that way, so the direction is understood rather than tuned away. Status: the
+IBM ~40% check's, not F3's.
+
+**The four simplifications, with their directions named** (the module must say which way each errs, since
+the slice's whole conclusion is a sign):
+
+* ``C`` = 1.0 is a round house number, **not fitted** — and it **errs against ruthenium**. It puts copper
+  at **6.3 µΩ·cm** in an 18 nm line, where the measurement is **~9** (a ~5× bulk degradation): the model
+  *understates* copper's narrow-line penalty, making Ru's win harder to earn. A single coefficient also
+  cannot span both ends of the measured range (it over-corrects at 80 nm, where real lines are near bulk);
+  the real model needs a separate grain-boundary term whose grain size tracks the linewidth. Named, not
+  built — splitting ``C`` in two would add a second lump and no new claim.
+* ``W_eff = W − 2·t_b`` takes the barrier off the **width only**, though a damascene liner coats the trench
+  bottom too. That gives copper *more* conductor than it really has ⇒ **also errs against ruthenium**.
+* **The scattering dimension ``d`` is the conductor width alone, not a cross-section.** Scattering in a
+  real rectangular wire sees both surface pairs, and the rates add: the standard form is
+  ``1/d = 1/W_eff + 1/H``. Two reasons this module uses ``d = W_eff`` anyway, and the second is why it is
+  not a free choice: (i) it **errs against ruthenium** — switching to ``1/W_eff + 1/H`` at the featured
+  12 nm rung moves the ratio 0.917 → **0.889** (ruthenium wins by *more*) and the crossing 12.9 → 13.4 nm,
+  and it also lands copper's 18 nm resistivity at 8.1 µΩ·cm against the measured ~9, closer than this
+  module's 6.3; (ii) bringing ``H`` into the scattering would put the **flagged aspect ratio into the
+  headline ratio**, and :func:`resistance_ratio`'s whole value is that ``H`` and ``AR`` cancel exactly.
+  A prefactor-free claim that errs against its own conclusion is worth more here than a better-calibrated
+  one that does not. [Checked, since the conclusion is a sign: the *harmonic mean* ``2WH/(W+H)`` — twice
+  the reciprocal-sum ``d``, and therefore not the additive-rate form — would put the 12 nm rung at 1.12,
+  i.e. Ru losing. It also lands the 18 nm resistivity at 4.9 µΩ·cm, furthest of the three from the
+  measurement, which is what breaks the tie between the conventions on evidence rather than on taste.]
+* The barrier is treated as **perfectly dead area** (TaN is highly resistive but not an insulator), which
+  is the one simplification that **errs in ruthenium's favour**.
 
 **Where the bulk model stops being valid — and a slice-1 claim slice 2 had to correct.** *Where* the
 crossover lands is a statement about the **load**, not a fixed property of this module. At the **game's
@@ -129,7 +206,11 @@ Named scope edges (honest ceilings)
   *lowering* ε). Cited as real and arriving *with* Cu at 250 nm; a separate era knob, not modelled.
 * **Electromigration** — Cu's *other* win over Al (and a real reason Al died): a **reliability** mechanism,
   the wrong currency for a delay observable (the same discipline that kept F3's gate leakage out of
-  ``lifetime.py``).
+  ``lifetime.py``). It is also **aluminium's disqualifier in the narrow-wire regime**, which is why this
+  module refuses Al there instead of reporting its flattering ``ρ₀λ``.
+* **Thinner liners rather than none** — cited and not modelled: RuCo liners cut the barrier ~33% (to 20 Å)
+  for ~25% lower resistance. That is a *third* option between "2–3 nm of TaN" and "nothing", and it moves
+  the crossing the same way ``t_b`` does in the band above (which is the point of reporting a band).
 * **No crosstalk, no inductance, no multi-level RC stack, no via resistance.** Single representative line.
 * **CMP is NOT here** — ``future-steps.md`` gates F8 to unblock *after* F4. This slice's job is to give
   wire cross-section a consumer, not to model planarity.
@@ -179,29 +260,58 @@ GLOBAL_WIRE_LENGTH_UM = 1000.0         # FLAGGED — representative chip-crossin
 # Cancels in the τ_wire/τ_gate ratio's metal comparison and in every crossover ratio.
 V_DD_HOUSE = 3.3                       # FLAGGED — house supply voltage (V)
 
+# The Fuchs–Sondheimer / Mayadas–Shatzkes size-effect coefficient in ρ_eff = ρ₀·(1 + C·λ/d) — FLAGGED, and
+# deliberately NOT fitted. 1.0 is a round number; pure FS with fully diffuse surfaces would give 0.375, and
+# grain-boundary scattering (MS, with the grain size tracking the linewidth) pushes it above 1. The choice
+# matters only for the crossing WIDTH, never for the two impossibility results, which are C-free.
+#
+# ITS DIRECTION IS NAMED, because the slice's conclusion is a sign: C = 1.0 puts copper at 6.3 µΩ·cm in an
+# 18 nm line where the measurement is ~9 µΩ·cm, so this UNDERSTATES copper's narrow-line penalty and makes
+# ruthenium's win HARDER to earn. A single coefficient cannot also reproduce the wide end (~80 nm lines run
+# near bulk while this form gives ~3 µΩ·cm) — that is the named grain-boundary limitation, not a fit error.
+SIZE_EFFECT_C = 1.0                    # FLAGGED — the FS/MS coefficient; errs AGAINST the Ru conclusion
+
+# The copper diffusion-barrier thickness per sidewall (nm) — CITED as a ~2–3 nm floor that DOES NOT SCALE,
+# which is the entire mechanism: a fixed thickness eating a shrinking budget. The default is the thin end,
+# i.e. the value most favourable to copper and least favourable to the ruthenium conclusion. The range is
+# reported as a BAND rather than collapsed to a point, because the band IS the finding — where ruthenium
+# wins is set by the thickness of the layer that stopped scaling.
+BARRIER_NM_CITED_RANGE = (2.0, 3.0)    # CITED — the Ta/TaN minimum-thickness range (nm, per sidewall)
+
 
 # --------------------------------------------------------------------------- #
 # 1. The metal registry — bulk ρ₀ (the era's currency) + λ (carried ONLY as a validity guard at S1)
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class Metal:
-    """An interconnect metal: bulk resistivity ``ρ₀`` (µΩ·cm) and electron mean free path ``λ`` (nm).
+    """An interconnect metal: bulk ``ρ₀`` (µΩ·cm), mean free path ``λ`` (nm), barrier need ``t_b`` (nm).
 
-    ``rho0_uohm_cm`` is what sets ``R_wire`` in this slice (``ρ_eff = ρ₀``, the wide-wire limit).
-    ``mfp_nm`` is **not used in the resistance model here** — it is carried as the **validity guard**
-    (:meth:`bulk_regime_ok`) that says where the bulk model may speak, and as the input to the ``ρ₀λ``
-    figure of merit (:attr:`rho0_lambda`) that slice 4's size-effect model turns into physics.
+    ``rho0_uohm_cm`` sets ``R_wire`` in the **bulk** path (``ρ_eff = ρ₀``, the wide-wire limit — slices
+    1–3). ``mfp_nm`` is unused there; it is the **validity guard** (:meth:`bulk_regime_ok`) saying where
+    the bulk model may speak, and in the **narrow-wire** path (slice 4) it becomes a term, entering through
+    :func:`effective_resistivity` and, in the narrow limit, only through ``ρ₀λ`` (:attr:`rho0_lambda`).
+
+    ``barrier_nm`` is the diffusion barrier this metal needs **per sidewall** — copper's cited ~2–3 nm
+    Ta/TaN floor, and **0.0 for a barrierless metal** such as ruthenium. ``None`` means *this metal is not
+    a narrow-wire candidate at all*, and the narrow-wire reads **refuse** it rather than returning a
+    number: that is aluminium's case, and the refusal is load-bearing (see the module docstring — Al's
+    ``ρ₀λ`` flatters it, while its real disqualifier is electromigration, a currency this module does not
+    carry). ``None`` is the gap-vs-fake-zero rule: a barrierless metal (0.0) and a metal with no modelled
+    narrow-wire case (``None``) are different statements and must not share a value.
     """
 
     name: str
     rho0_uohm_cm: float
     mfp_nm: float
+    barrier_nm: float | None = None
 
     def __post_init__(self) -> None:
         if self.rho0_uohm_cm <= 0.0:
             raise ValueError(f"rho0_uohm_cm must be > 0, got {self.rho0_uohm_cm}")
         if self.mfp_nm <= 0.0:
             raise ValueError(f"mfp_nm must be > 0, got {self.mfp_nm}")
+        if self.barrier_nm is not None and self.barrier_nm < 0.0:
+            raise ValueError(f"barrier_nm must be ≥ 0 or None, got {self.barrier_nm}")
 
     @property
     def rho0_lambda(self) -> float:
@@ -210,7 +320,8 @@ class Metal:
         Below ``λ`` the size effect gives ``ρ_eff → C·ρ₀λ/d``, so the material enters *only* through this
         product — the cited screening FOM for interconnect metals. **The FOM ordering is not the bulk
         ordering**, which is the whole Cu→Ru story: buying a low ``ρ₀`` costs a long ``λ`` (structurally
-        F3's κ↔band-gap inverse correlation). Reported here for the guard/FOM; slice 4 makes it a term.
+        F3's κ↔band-gap inverse correlation). **It ranks metals; it does not locate a crossing** — see
+        :func:`equal_resistance_width_um` on why the deep-limit closed form built from it is ~4× wrong.
         """
         return self.rho0_uohm_cm * self.mfp_nm
 
@@ -218,25 +329,52 @@ class Metal:
         """Whether a line of width ``width_um`` is wide enough for the **bulk** ``ρ_eff = ρ₀`` model.
 
         True when the linewidth exceeds ``margin × λ`` — the wide-wire limit where surface/grain-boundary
-        scattering is a small correction. This slice's model is bulk-only, so this is the honest bound on
-        where it may speak (the F3 ladder-cap discipline). ``margin=5`` keeps the size-effect correction
-        at the ~10–20% level rather than the ~2× level. Slice 4 removes the need for the guard.
+        scattering is a small correction. ``margin=5`` keeps the size-effect correction at the ~10–20%
+        level rather than the ~2× level, and this is the honest bound on where the **bulk** path (
+        :func:`delay`, :func:`crossover_width_um`, :func:`wire_delay_ratio`) may speak — the F3 ladder-cap
+        discipline. **Slice 4 does not retire this guard**: it adds a *second*, narrow-wire path
+        (:func:`narrow_line_resistance`) beside the bulk one rather than widening it, so the guard still
+        marks exactly the same boundary — it just now has somewhere to point.
         """
         return width_um * _NM_PER_UM > margin * self.mfp_nm
 
+    @property
+    def narrow_wire_candidate(self) -> bool:
+        """Whether this metal has a modelled narrow-wire case (i.e. a barrier need, possibly zero)."""
+        return self.barrier_nm is not None
 
-# The two metals of the F4 era transition. RUTHENIUM IS DELIBERATELY ABSENT — see the module docstring's
-# scope note: Ru's bulk ρ₀ (7.1) is ~4× copper's, so a bulk-only model ranks it LAST, which is the sign
-# error inverted. Ru needs slice 4's size-effect + barrier-fraction physics before its constants mean
-# anything, and it must not be plottable before then.
+
+# The three metals of the F4 arc, with the barrier need that decides the second transition.
 #
-# CITED: Cu ρ₀ = 1.68 µΩ·cm, λ ≈ 38.7–39 nm. Al λ ≈ 22 nm and Al ρ₀ ≈ 2.65–2.7 µΩ·cm are FLAGGED (the Al
-# ρ₀ is a handbook value not pinned by the source search, and real Al interconnect was an Al–Cu alloy at
-# ρ ≈ 3.0–3.2, i.e. this pure-Al value UNDERSTATES the historical Cu win — the honest direction to err).
+# CITED: Cu ρ₀ = 1.68 µΩ·cm, λ ≈ 38.7–39 nm, and a Ta/TaN barrier with a ~2–3 nm floor that does not scale.
+# Ru ρ₀ = 7.1 µΩ·cm, λ = 10.8 nm, and it needs NO barrier — which is the whole slice-4 story, because its
+# bulk ρ₀ is ~4× copper's and no bulk model could ever rank it anything but last.
+#
+# Al λ ≈ 22 nm and Al ρ₀ ≈ 2.65–2.7 µΩ·cm are FLAGGED (the Al ρ₀ is a handbook value not pinned by the
+# source search, and real Al interconnect was an Al–Cu alloy at ρ ≈ 3.0–3.2, i.e. this pure-Al value
+# UNDERSTATES the historical Cu win — the honest direction to err). Al's barrier_nm is None ON PURPOSE:
+# its ρ₀λ ≈ 58 would screen BETTER than copper's 65, and this module cannot support that comparison
+# because aluminium's actual disqualifier — electromigration — is a reliability currency it does not
+# carry. The narrow-wire reads refuse Al rather than print the flattering number.
 METALS: dict[str, Metal] = {
-    "Al": Metal("aluminium (subtractive, pre-1997)", rho0_uohm_cm=2.65, mfp_nm=22.0),
-    "Cu": Metal("copper (dual damascene, 1997)", rho0_uohm_cm=1.68, mfp_nm=38.7),
+    "Al": Metal("aluminium (subtractive, pre-1997)", rho0_uohm_cm=2.65, mfp_nm=22.0, barrier_nm=None),
+    "Cu": Metal("copper (dual damascene, 1997)", rho0_uohm_cm=1.68, mfp_nm=38.7,
+                barrier_nm=BARRIER_NM_CITED_RANGE[0]),
+    "Ru": Metal("ruthenium (barrierless, ~3 nm node)", rho0_uohm_cm=7.1, mfp_nm=10.8, barrier_nm=0.0),
 }
+
+# The metals the BULK path may be offered for — and specifically the set the game's `interconnect` knob
+# (fab_game.recipe.DeviceKnobs, slice 2) accepts. THIS IS A GUARD, NOT A TASTE: the game runs ONE house
+# geometry, a 250 nm-era global line, through the bulk-ρ model. Ruthenium at 250 nm really is ~4× worse
+# than copper — the bulk answer is *correct* and reads as a verdict on the metal, which is exactly the
+# sign inversion this module exists to prevent. Ru's case is a sub-20 nm claim; there is no node in the
+# game to make it at. So the knob refuses it by name, with the reason, rather than binning a plausible-
+# looking number. (The narrow-wire reads below have the mirror-image guard in NARROW_WIRE_METALS.)
+BULK_ERA_METALS: tuple[str, ...] = ("Al", "Cu")
+
+# The metals with a modelled narrow-wire case — derived, never hand-maintained, so a metal added to
+# METALS with a barrier_nm can never be silently missing from here (and Al can never silently appear).
+NARROW_WIRE_METALS: tuple[str, ...] = tuple(k for k, m in METALS.items() if m.narrow_wire_candidate)
 
 
 def _resolve(metal: Metal | str) -> Metal:
@@ -545,3 +683,262 @@ def crossover_width_ratio(metal_a: Metal | str, metal_b: Metal | str) -> float:
     for a better conductor.
     """
     return math.sqrt(wire_delay_ratio(metal_a, metal_b))
+
+
+# --------------------------------------------------------------------------- #
+# 6. The narrow-wire era (slice 4) — the size effect, the barrier, and the metal that wins by losing
+# --------------------------------------------------------------------------- #
+# Everything below is about a DIFFERENT crossing from section 5's. Section 5's crossover_* pair is the
+# gate↔wire crossing (a linewidth at which two DELAY TERMS are equal); these are metal↔metal equal
+# RESISTANCE (a linewidth at which two METALS are equal). Same units, unrelated statements — hence the
+# deliberately different name. Conflating them is the same collision class as Die.tau (the carrier
+# lifetime) vs the F4 delay, which slice 2 had to rename around.
+def _narrow(metal: Metal | str) -> Metal:
+    """Resolve a metal for a **narrow-wire** read, refusing one with no modelled narrow-wire case.
+
+    The refusal is the point, not defensive coding: aluminium's ``ρ₀λ`` ≈ 58 screens *better* than
+    copper's 65, and returning that comparison would be a claim this module cannot support — Al's real
+    disqualifier is electromigration, a reliability currency it does not carry. See
+    :data:`NARROW_WIRE_METALS` and the module docstring.
+    """
+    m = _resolve(metal)
+    if m.barrier_nm is None:
+        raise ValueError(
+            f"{m.name!r} has no modelled narrow-wire case (barrier_nm is None), so the size-effect "
+            f"reads refuse it. Aluminium is the live instance: its ρ₀λ ≈ "
+            f"{m.rho0_lambda:.0f} µΩ·cm·nm would screen better than copper's "
+            f"{METALS['Cu'].rho0_lambda:.0f}, but its disqualifier is electromigration — a reliability "
+            f"currency this module does not carry. Narrow-wire metals: {NARROW_WIRE_METALS}."
+        )
+    return m
+
+
+def conductor_floor_width_um(metal: Metal | str, *, barrier_nm: float | None = None) -> float:
+    """``W = 2·t_b`` (µm) — the width at which the line is **all barrier and no conductor**.
+
+    The hard geometric floor, and one of the module's two prefactor-free narrow-wire claims: a fixed
+    barrier thickness eating a shrinking budget reaches zero conductor at twice the liner thickness —
+    **4.0 nm** at the cited ``t_b`` = 2 nm, 6.0 nm at 3 nm — regardless of resistivity, length, aspect
+    ratio or ``C``. This is F3's "``EOT > t_IL`` for any κ" in the wire's currency, and it sits *inside*
+    the published roadmap rather than at some asymptote. Barrierless metals return 0.0: they have no floor.
+    """
+    m = _narrow(metal)
+    t_b = m.barrier_nm if barrier_nm is None else barrier_nm
+    if t_b < 0.0:
+        raise ValueError(f"barrier_nm must be ≥ 0, got {t_b}")
+    return 2.0 * t_b / _NM_PER_UM
+
+
+def conductor_width_um(width_um: float, metal: Metal | str, *, barrier_nm: float | None = None) -> float:
+    """``W_eff = W − 2·t_b`` (µm) — the conductor left once the barrier has taken its fixed cut.
+
+    **Raises at or below the floor** (:func:`conductor_floor_width_um`) rather than returning zero or a
+    negative width: below it the object being described does not exist, and extrapolating through would
+    be F3's magnitude trap. The barrier is taken off the **width only** — a real damascene liner coats the
+    trench bottom too, so this leaves copper *more* conductor than it has, which errs **against** the
+    ruthenium conclusion (the direction is named in the module docstring).
+    """
+    if width_um <= 0.0:
+        raise ValueError(f"width_um must be > 0, got {width_um}")
+    floor_um = conductor_floor_width_um(metal, barrier_nm=barrier_nm)
+    if width_um <= floor_um:
+        raise ValueError(
+            f"width_um = {width_um*_NM_PER_UM:.3g} nm is at or below the conductor floor "
+            f"2·t_b = {floor_um*_NM_PER_UM:.3g} nm for {_resolve(metal).name!r}: the line is all barrier "
+            f"and no conductor. There is no resistance to report, at any resistivity."
+        )
+    return width_um - floor_um
+
+
+def effective_resistivity(metal: Metal | str, d_um: float, *, c: float = SIZE_EFFECT_C) -> float:
+    """``ρ_eff = ρ₀·(1 + C·λ/d)`` (µΩ·cm) — the size effect, with ``d`` the **conducting** dimension.
+
+    Below the mean free path, surface and grain-boundary scattering lift the resistivity without bound.
+    Note the narrow limit: ``ρ_eff → C·ρ₀λ/d``, so the material enters **only** through the product
+    ``ρ₀λ`` (:attr:`Metal.rho0_lambda`) — the cited screening figure of merit, and the reason *the metric
+    that ranks metals at 3 nm is not the metric that ranked them at 250 nm*.
+
+    ``d_um`` is the **conductor** width (i.e. after :func:`conductor_width_um`), not the drawn linewidth:
+    the barrier both removes area and narrows what is left, and the second effect is real. It is a
+    *width*, not a cross-section — the module docstring's fourth simplification, where that choice is
+    priced and its direction (against the ruthenium conclusion) is checked rather than assumed.
+    """
+    m = _narrow(metal)
+    if d_um <= 0.0:
+        raise ValueError(f"d_um must be > 0, got {d_um}")
+    if c < 0.0:
+        raise ValueError(f"c must be ≥ 0, got {c}")
+    return m.rho0_uohm_cm * (1.0 + c * m.mfp_nm / (d_um * _NM_PER_UM))
+
+
+def narrow_line_resistance(
+    metal: Metal | str,
+    geometry: WireGeometry,
+    *,
+    c: float = SIZE_EFFECT_C,
+    barrier_nm: float | None = None,
+    size_effect: bool = True,
+    barrier: bool = True,
+) -> float:
+    """The line resistance (Ω) with the size effect and the barrier — the narrow-wire path.
+
+    ``R = ρ_eff(W_eff)·L/(W_eff·H)``. The two switches are not conveniences: they exist so that
+    :func:`resistance_ratio` can walk the **three-rung ladder** that is this slice's whole argument
+    (bulk → +size effect → +barrier), and so that a test can pin that *neither mechanism alone* flips the
+    Cu→Ru sign. With both off this reduces exactly to :func:`wire_resistance` at the bulk ``ρ₀``.
+    """
+    m = _narrow(metal)
+    w_eff = (conductor_width_um(geometry.width_um, m, barrier_nm=barrier_nm) if barrier
+             else geometry.width_um)
+    rho = effective_resistivity(m, w_eff, c=c) if size_effect else m.rho0_uohm_cm
+    return wire_resistance(rho, geometry.length_um, w_eff, geometry.thickness_um)
+
+
+def resistance_ratio(
+    challenger: Metal | str,
+    incumbent: Metal | str,
+    width_um: float,
+    *,
+    c: float = SIZE_EFFECT_C,
+    barrier_nm: float | None = None,
+    size_effect: bool = True,
+    barrier: bool = True,
+) -> float:
+    """``R(challenger)/R(incumbent)`` at a drawn linewidth — **prefactor-free**, and **< 1 is a win**.
+
+    Length, thickness, aspect ratio, ``c_pul``, the Elmore factor, ``V_dd`` and ``C_load`` all cancel: at
+    a common drawn ``W`` and a common ``H``, only the resistivities and the barrier-reduced widths
+    survive. **The CHALLENGER goes first** — the same argument order as :func:`crossover_width_ratio`, and
+    for the same reason: slice 3 shipped silver as a win-turned-loss from an incumbent-first call, and the
+    reciprocal of a plausible number is another plausible number. Only the sign gives it away.
+
+    **The three-rung ladder this exists to run** (Cu → Ru at a 12 nm line, cited constants plus the
+    flagged ``C`` = 1 and ``t_b`` = 2 nm):
+
+    ========================================  ======  ===================================================
+    rung                                       ratio   what it says
+    ========================================  ======  ===================================================
+    ``size_effect=False, barrier=False``        4.23   bulk ``ρ`` alone: ruthenium is hopeless
+    ``size_effect=True,  barrier=False``        1.90   the size effect closes most of it — still losing
+    ``size_effect=False, barrier=True``         2.82   the barrier on bulk ``ρ``: also still losing
+    ``size_effect=True,  barrier=True``         0.92   **both together: ruthenium wins**
+    ========================================  ======  ===================================================
+
+    That is the payload, and the two middle rows are why it cannot be shortened to one mechanism. See
+    :func:`size_effect_ratio_limit` and :func:`barrier_only_flip_width_um` for the two closed forms that
+    turn "still losing at 12 nm" into "can never win, at any manufacturable width", using cited constants
+    only.
+    """
+    a, b = _narrow(challenger), _narrow(incumbent)
+    geom = WireGeometry(length_um=1.0, width_um=width_um, thickness_um=1.0)   # L and H cancel exactly
+    kw = dict(c=c, size_effect=size_effect, barrier=barrier)
+    # A barrierless metal keeps its 0.0 under a barrier_nm sweep: the sweep is over the CITED Ta/TaN
+    # range, which is a statement about copper's liner and says nothing about a metal that needs none.
+    r_a = narrow_line_resistance(a, geom, barrier_nm=0.0 if a.barrier_nm == 0.0 else barrier_nm, **kw)
+    r_b = narrow_line_resistance(b, geom, barrier_nm=0.0 if b.barrier_nm == 0.0 else barrier_nm, **kw)
+    return r_a / r_b
+
+
+def size_effect_ratio_limit(challenger: Metal | str, incumbent: Metal | str) -> float:
+    """The ``W → 0`` limit of :func:`resistance_ratio` **with no barrier** — i.e. ``ρ₀λ(a)/ρ₀λ(b)``.
+
+    **Impossibility result (a), and it needs no house constant at all:** with the barrier switched off,
+    ``ρ_eff → C·ρ₀λ/d`` for both metals, ``C`` and ``d`` cancel, and the ratio asymptotes to the cited
+    figure-of-merit ratio. For Cu → Ru that is **1.179**, and the approach is monotone from
+    ``ρ₀(Ru)/ρ₀(Cu)`` = 4.23 above — so the ratio is **> 1 at every width**. The size effect alone can
+    therefore **never** flip the sign: not at 20 nm, not at 2 nm, not in the limit. The cited FOM buys
+    ruthenium *parity*, and parity is a necessary condition, never a sufficient one. "Ruthenium wins
+    because its mean free path is short" is false — and this is the function that says so exactly rather
+    than approximately.
+    """
+    a, b = _narrow(challenger), _narrow(incumbent)
+    return a.rho0_lambda / b.rho0_lambda
+
+
+def barrier_only_flip_width_um(
+    challenger: Metal | str, incumbent: Metal | str, *, barrier_nm: float | None = None,
+) -> float:
+    """The width below which the **barrier alone, on bulk ``ρ``**, would flip the sign (µm).
+
+    **Impossibility result (b), also cited-constants-only.** With no size effect, a barrierless challenger
+    wins when ``ρ₀(a)/ρ₀(b)·(W − 2t_b)/W < 1``, i.e.
+
+        ``W < 2·t_b / (1 − ρ₀(b)/ρ₀(a))``
+
+    For Cu → Ru at the cited ``t_b`` = 2 nm that is **5.2 nm** — and copper's conductor floor
+    (:func:`conductor_floor_width_um`) is **4.0 nm**. So the barrier acting on bulk resistivity opens a
+    window barely **1.2 nm** wide, immediately above the width at which copper ceases to be a conductor at
+    all. No fab has ever been there. Together with :func:`size_effect_ratio_limit` this closes the
+    argument: **neither mechanism alone gets the sign right, at any manufacturable width** — the F3-IL
+    structure, where the better barrier is still a pure loss until the other currency is counted too.
+
+    Raises if the challenger's bulk ``ρ₀`` is not the *higher* one (there is then nothing to flip).
+    """
+    a, b = _narrow(challenger), _narrow(incumbent)
+    if a.rho0_uohm_cm <= b.rho0_uohm_cm:
+        raise ValueError(
+            f"{a.name!r} already has the lower bulk ρ₀ ({a.rho0_uohm_cm} vs {b.rho0_uohm_cm}), so there "
+            f"is no bulk-ρ deficit for a barrier to overcome — this read is for the sign-inverted case."
+        )
+    t_b = (b.barrier_nm if barrier_nm is None else barrier_nm) / _NM_PER_UM
+    return 2.0 * t_b / (1.0 - b.rho0_uohm_cm / a.rho0_uohm_cm)
+
+
+def equal_resistance_width_um(
+    challenger: Metal | str,
+    incumbent: Metal | str,
+    *,
+    c: float = SIZE_EFFECT_C,
+    barrier_nm: float | None = None,
+    search_max_um: float = 1.0,
+) -> float:
+    """The drawn linewidth at which the two metals have **equal resistance** (µm) — below it, ``a`` wins.
+
+    Solved numerically on :func:`resistance_ratio`, and **deliberately not in closed form**: the tempting
+    closed form uses the deep-limit ``ρ_eff → C·ρ₀λ/d`` for *both* metals and is **wrong here by a factor
+    of four** (it puts Cu→Ru at ~50 nm against the full form's ~13). The reason is worth keeping: at the
+    crossing, ruthenium is **not in its own deep limit** — ``C·λ/W`` ≈ 0.84, not ≫ 1 — because its short
+    mean free path is exactly what keeps it near-bulk. **The cited ``ρ₀λ`` figure of merit ranks metals but
+    does not locate the crossing**; its domain of validity does not contain the width where the sign
+    flips. A test pins the disagreement so a later slice cannot "simplify" to the wrong one.
+
+    **Report this as a band, never a point.** Over the *cited* ``t_b`` = 2–3 nm range it spans
+    **12.9 → 17.1 nm**, and that spread is the finding rather than an error bar: where ruthenium wins is
+    set by the thickness of the layer that stopped scaling. Over the flagged ``C`` ∈ [0.375, 2] it spans
+    ~9.7–21.1 nm. The literature's crossing is <~20 nm; this band sits a node or two inside it, and both
+    of the module's Ru-conservative simplifications push that way. A **consistency check on the constants**
+    with the IBM ~40% check's status — not a prediction.
+    """
+    def f(w_um: float) -> float:
+        return resistance_ratio(challenger, incumbent, w_um, c=c, barrier_nm=barrier_nm) - 1.0
+
+    floor_um = conductor_floor_width_um(incumbent, barrier_nm=barrier_nm)
+    lo = floor_um * 1.0001 + 1.0e-9
+    hi = search_max_um
+    if f(lo) >= 0.0 or f(hi) <= 0.0:
+        raise ValueError(
+            f"no equal-resistance width bracketed in ({lo*_NM_PER_UM:.3g}, {hi*_NM_PER_UM:.3g}) nm: the "
+            f"ratio is {f(lo)+1.0:.3f} at the floor and {f(hi)+1.0:.3f} at the top of the search range."
+        )
+    for _ in range(200):                                   # bisection — the ratio is monotone in W here
+        mid = 0.5 * (lo + hi)
+        if f(mid) < 0.0:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def equal_resistance_width_nm(
+    challenger: Metal | str,
+    incumbent: Metal | str,
+    *,
+    c: float = SIZE_EFFECT_C,
+    barrier_nm: float | None = None,
+) -> float:
+    """:func:`equal_resistance_width_um` in **nm** — the display currency for a sub-50 nm claim.
+
+    Mirrors the ``tau_total_s``/``tau_total_ps`` pair: µm is the module's length currency, nm is what a
+    3 nm-node statement is legible in.
+    """
+    return equal_resistance_width_um(challenger, incumbent, c=c, barrier_nm=barrier_nm) * _NM_PER_UM
