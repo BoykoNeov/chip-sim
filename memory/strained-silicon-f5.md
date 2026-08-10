@@ -1,6 +1,6 @@
 ---
 name: strained-silicon-f5
-description: "F5 strained silicon — chosen over F8, S1+S2+S3 BUILT 2026-08-10; the carrier fork, the elasticity bound, the first non-additive knob, the falsified roadmap card, and the flattering-direction composition trap"
+description: "F5 strained silicon — COMPLETE (4 slices, card graduated) 2026-08-10; the carrier fork, the elasticity bound, the first non-additive knob, the falsified roadmap card, the flattering-direction trap, and the bracket-not-a-curve finale"
 metadata: 
   node_type: memory
   type: project
@@ -85,7 +85,44 @@ closed): rides `chip.strain` directly, the B7/B8/B9 precedent. What it settled:
 
 The F4 composition stayed **off every axis** (trap #3): stated in `print_summary` as the exact law
 `∂ln f/∂ln I_Dsat = 1 − wire_share`, never evaluated — a 90 nm line is deep inside `interconnect`'s bulk
-refusal. Remaining: **S4 uncommitted**; the F5 roadmap card stays up until it ships (graduation rule).
+refusal.
+
+**S4 BUILT 2026-08-10 — "why the era ended"; F5 COMPLETE and the card GRADUATED** (fast lane
+**1174 → 1180**; the S3 note's 1175 was the same tree counted *including* the one `slow` notebook test —
+same commit, different convention, not an error to correct). The pre-registered candidate (*"a one-time
+boost, not a scaling path"*) survived, but **not in the currency first reached for**:
+
+1. **THE DURABLE ONE — the SECOND flattering-direction slip in two slices, and this time in a helper that
+   was legitimate elsewhere.** S4 was first priced in B9's currency: `nodes_bought = ln(x)/ln(0.7)` ⇒
+   "+20% drive ≈ 0.51 of a node". **Wrong: `I_Dsat ∝ W/L` and a node shrinks BOTH ⇒ `W/L` is invariant
+   and a geometric node buys ZERO drive per device in this model.** The arithmetic silently assumed
+   constant-`W`. B9's use was sound only because a **wire's width is its own dimension** — a drive-current
+   ratio is not that currency. ⇒ **A house helper carries its OWN slice's denominator with it; re-deriving
+   what one node buys IN THE READING SLICE'S CURRENCY is the check.** Dropped entirely: the claim is now
+   *repeatability* (a lever pulled once vs a lever pulled every node), which needs **no denominator**.
+2. **The delivered gain is a BRACKET between two cited endpoints, never a curve.**
+   `delivered_drive_bracket()` takes a mechanism and **no geometry argument** — pinned by a *signature*
+   test, because a function taking an `L` and returning a fraction **is** the forbidden elasticity knob
+   ([[gradual-failure-preferred]]'s fudge shape) wearing a hat. Two papers, two geometries, two µ
+   magnitudes license a **direction and a width**, nothing finer. Model **1.20×** > cited 90 nm **1.10×** >
+   cited 25 nm **1.070×**. An inverted bracket **raises** rather than swapping its ends.
+3. **THE STRUCTURAL RESULT — the model is blind to the decay BY CONSTRUCTION.** In the
+   strained/unstrained ratio, `W`, `L`, `C_ox` and `V_t` **all cancel** ⇒ `MODEL_ELASTICITY` = **1 at every
+   channel length**; the sim reports the same +20% at 90 nm and at 25 nm. Asserted bit-for-bit over four
+   decades of `L`. **That is WHY the bracket must enter as cited data from OUTSIDE the model** — and the
+   third slice running whose payload is a structural zero/invariance (S3's `∂J_g/∂µ = 0`, B9's
+   `∂τ_wire/∂I_Dsat = 0`). The treadmill is its price form: the same +10% drive costs +20% µ at 90 nm and
+   **+28.6%** at 25 nm.
+4. **NECESSITY WAS THE REAL GATE, and it was nearly a NO.** S3's right panel *already drew* both cited
+   elasticity lines ⇒ a re-cut figure would have been a restatement, and the honest alternative was
+   graduating with S4 **named-not-built**. S4 earns its place only because it changes what the **module**
+   can say. **Write that sentence before building a finale slice.**
+5. **Graduation is the bigger half and it is what ends up half-done.** Enumerated before coding:
+   `SLICES`+`FIGURES` cut together (manifest guard), the banked `roadmap-f5.png` **deleted**, the
+   graduation paragraph in the comment block (now three), `future-steps.md`'s **row AND the queue prose**
+   (F8 inherits the head — **by default, not by strength**; its refactor gate is unchanged, so the next
+   pick is worth re-triaging rather than taking from the top), the plan STATUS, and the gate re-check over
+   F6–F10 (`GLOBAL_WIRE_LENGTH_UM` still a house line, `engines/` still 1-D+2-D ⇒ none released).
 
 **The observable:** `µ` is the **one factor in `I_Dsat` no process step has ever moved** — `MU_N_EFF = 450.0`
 has been a module constant since Phase 4. Strain is a *mechanical* state, so F5 is the first device number
