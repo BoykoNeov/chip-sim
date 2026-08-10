@@ -1,6 +1,6 @@
 # Plan — F5 strained silicon (the term the process never touched)
 
-> **STATUS: S1 + S2 BUILT (2026-08-10); S3 open, S4 uncommitted.** Roadmap card `F5`
+> **STATUS: S1 + S2 + S3 BUILT (2026-08-10); S4 uncommitted.** Roadmap card `F5`
 > (`chip/roadmap_gallery.py:88`) is live and stays up
 > until the last slice ships (the F3/F4 graduation rule). Predecessor F4 (BEOL interconnect) completed
 > 2026-08-10 and **F5 is the head of the promotable queue** (`future-steps.md:67`).
@@ -231,10 +231,47 @@ has been re-examined (F8, F5) it had already been released.
     source degeneration is engaged, the one sub-linearizing mechanism the model does carry. The record
     carries `mu_factor` beside `drive_factor_cited` and `drive_overstatement` so the bound travels with the
     number; the overstatement is the **mechanism's** cited ratio, not a correction applied to that die.
-- **S3 — the B10 history mode + demo.** The 10th timeline rung. The era contrast is the **fork**: one node,
-  two processes, opposite signs, because the carriers disagree. **Gallery/manifest note:** both manifests
-  are glob-anchored — the demo file and its rungs must land in the **same commit** or
-  `assert_manifest_complete()` fails (F3 slice 3's trap, re-hit at F4).
+- **S3 — the B10 history mode + demo. ✅ BUILT 2026-08-10.** `chip/demo_strain_history.py` + its test; the
+  10th timeline rung, slotted **between B8 and B6** (the timeline is process order, not chronological —
+  the channel sits after the gate dielectric and before contact metal). Fast lane 1164 → 1174. What the
+  build settled and found:
+  - **The period is a POINT, not a curve — so the panel had to be built around that.** Every prior rung
+    (B5–B9) draws a period *line* the modern one departs from; here the period is the factor `1.0`, and
+    the only way to draw an unstrained channel is as the point both paths leave from. That is what makes
+    the **seam** load-bearing on the figure and not just in the API: `strained_channel(MU_N_EFF, None)`
+    is `saturation_current`'s own default, so the two paths start on one point *by identity*.
+  - **THE WALL IS A COMPOSITION WITH B8, AND THE HONEST CLAIM IS ORTHOGONALITY — NOT AN EXCHANGE RATE.**
+    The first sketch was "the oxide thinning that buys the same +20% drive costs N decades of gate
+    leakage." Review killed the framing: it needs an unverified 90 nm-era `t_ox`/leakage claim, and the
+    naive `I ∝ 1/t_ox` read is wrong **in the flattering direction** (thinning also drops `V_t`, so drive
+    rises *faster* than `1/t_ox` ⇒ less thinning is needed ⇒ the oxide lever is **cheaper** than naive
+    says). The tight claim underneath it is that `high_k.gate_leakage` takes a thickness and a
+    dielectric — **mobility is not one of its arguments**, so `∂J_g/∂µ = 0` **structurally**, the exact
+    shape of B9's `∂τ_wire/∂I_Dsat = 0`. F3/B8's "one thickness, two currencies" read from the other
+    side: **one knob, one currency**. Pinned as a bit-for-bit identity under an *absurd* mobility, so a
+    future path from µ to the gate stack fails the test instead of quietly turning a structural fact into
+    a numerical coincidence.
+  - **The exchange rate survives as a CONSISTENCY note, quoted in the direction that does not flatter the
+    slice.** Two defensible conventions differ by ~2×: fixed channel doping (this demo's ladder — `V_t`
+    sags, an 8% thinning suffices) = **≳0.90 decades**; re-adjusting `V_t` at every rung (what a fab
+    does, `I ∝ C_ox` exactly) = **≳1.88**. The demo headlines the **cheap** one — the reading most
+    favourable to the lever strain is being compared against — and a test pins that ordering, because
+    flipping it would round F5's win up (F4's `floor_decades` rule in the leakage currency). **The band
+    is recipe-carrying; strain's zero is not.**
+  - **The hole leg is marked cited-only ON THE FIGURE, not just in the API.** The plan rejected computing
+    a p-drive current as decoration; two bars side by side would have re-introduced exactly that read at
+    the display layer. The panel captions each mechanism on **its own side of the zero** (the fork drawn
+    literally), labels the hole bars `CITED DATA ONLY (no pMOS)`, and the demo **carries
+    `nmos_mobility`'s raised message verbatim** rather than paraphrasing it.
+  - **No wrapper** — open question 3, answered by the build: the demo rides `chip.strain` directly, as
+    B7/B8/B9 rode their base modules. Both era mechanisms were already registry entries; a
+    `strain_history.py` would have held nothing.
+  - **The F4 composition stayed off every axis** (trap #3): stated in `print_summary` as the exact law
+    `∂ln f/∂ln I_Dsat = 1 − wire_share`, with a test asserting the demo never calls `interconnect.delay`
+    or `crossover_width_um` — a 90 nm line is deep inside the bulk path's refusal.
+  - **Gallery/manifest note (held):** both manifests are glob-anchored — the demo file and its two
+    entries land in the **same commit** or `assert_manifest_complete()` fails (F3 slice 3's trap, re-hit
+    at F4).
 - **S4 — NOT pre-committed.** It should fall out of what S1's sourcing turns up, the way F4's S4 did. The
   structural analogue to F3's IL and F4's axis change would be *"strain is a one-time boost, not a scaling
   path"* — which is why the industry changed the axis again to FinFET, handing off to F9 as F4 handed off
@@ -280,6 +317,7 @@ has been re-examined (F8, F5) it had already been released.
    **non-circular cross-check** — the measured ≈0.5 elasticity is an *independent* quantity the model does
    not compute, which is exactly the leg F4's IBM ~40% comparison could not supply (that one was a
    consistency check, since `R_Al/R_Cu ≡ ρ_Al/ρ_Cu` at fixed geometry).
-3. **Does S3 need a `strain_history.py` wrapper, or does the demo ride `strain.py` directly?** OPEN, but the
-   B7/B8/B9 precedent says **ride the base module** when the period physics is already in it — and here both
-   era mechanisms are registry entries, so almost certainly no wrapper.
+3. **Does S3 need a `strain_history.py` wrapper, or does the demo ride `strain.py` directly? ✅ CLOSED by
+   the S3 build — no wrapper.** The B7/B8/B9 precedent held exactly as expected: both era mechanisms were
+   already registry entries, so `demo_strain_history.py` imports `chip.strain`, `chip.device` and
+   `chip.high_k` directly and a wrapper module would have contained nothing but re-exports.

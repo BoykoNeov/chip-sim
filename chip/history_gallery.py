@@ -150,6 +150,30 @@ MODES = [
         "EOT scaling stalled too, and why the ideal no-IL win is a ceiling rather than a product.",
     ),
     HistoryMode(
+        module="demo_strain_history", tag="B10", stage="Channel", era="≈2000s",
+        period="An unstrained silicon channel. Drive current came from geometry and the gate stack — a "
+        "shorter gate, a wider device, a thinner oxide, a lower threshold — while the carrier mobility of "
+        "the channel itself was a constant of the crystal that no process step touched.",
+        wall="Every one of those levers spends a second currency. Thinning the gate oxide buys drive and "
+        "pays in gate leakage — the same tunnelling wall the high-κ rung above walks — and threshold and "
+        "supply scaling pay in off-state current. Mobility was the one factor in "
+        "I_Dsat = ½·µ·C_ox·(W/L)·(V_GS − V_t)² with no process owner at all, so the term that costs "
+        "nothing to move was the term nobody could move: buying +20% drive by thinning the oxide costs "
+        "≳0.9 decades of gate leakage even on the reading most favourable to it, while mobility's column "
+        "is not merely small but a structural zero — the tunnelling exponent has no mobility in it.",
+        successor="Strained silicon (Intel, 2003, 90 nm) makes the channel material itself a process "
+        "outcome: a tensile silicon-nitride capping layer strains the nMOS channel for +20% electron "
+        "mobility, and selective SiGe source/drain (17% Ge) compresses the pMOS channel for >50% hole "
+        "mobility. Electrons and holes respond to opposite stresses, so one node needed two different "
+        "processes — the simulator is n-channel-only, so only the tensile leg is wired and the "
+        "compressive one is refused by name rather than returned with the wrong sign. And the win does "
+        "not transfer at face value: a long-channel model infers I ∝ µ, an elasticity of 1 by "
+        "construction, while the same paper measured +10% and +25% drive — an elasticity of ≈0.5 on both "
+        "carriers, falling to 0.35 at L = 25 nm as strain increasingly acts through injection velocity "
+        "rather than mobility. Velocity saturation is named here, not built, so the drive read is an "
+        "upper bound whose looseness grows as the era advances.",
+    ),
+    HistoryMode(
         module="demo_metallization_history", tag="B6", stage="Metallization", era="≈1970s",
         period="Evaporated pure-aluminium contacts, sintered sub-eutectically onto the silicon.",
         wall="The Al dissolves silicon and spikes through the shallow (implant-era) junction — a "
