@@ -344,6 +344,34 @@ def print_summary(r: StrainHistoryResult) -> None:
     print(f"      whose LOOSENESS GROWS as the era advances. Velocity saturation is NAMED, not built:")
     print(f"      building it means replacing device.py's I_Dsat, and that is a device-model change.\n")
 
+    low, high = r.channel.delivered_drive_bracket
+    need_90 = st.mobility_factor_for_drive(st.TENSILE_CESL.drive_factor, st.TENSILE_CESL.cited_elasticity)
+    need_25 = st.mobility_factor_for_drive(st.TENSILE_CESL.drive_factor, st.SHORT_CHANNEL_CROSSCHECK)
+    print(f"  Why the era ENDED — the lever is pulled once, and its exchange rate decays:")
+    print(f"      {'the same ' + f'{r.channel.mobility_factor:.2f}× mobility, priced three ways':<48}"
+          f" {'drive':>11}")
+    print(f"      {'this model (long-channel, elasticity 1)':<48} {r.channel.drive_factor_long_channel:>10.3f}×")
+    print(f"      {'the cited 90 nm devices (elasticity ' + f'{st.TENSILE_CESL.cited_elasticity:.3f})':<48}"
+          f" {high:>10.3f}×")
+    print(f"      {'the cited ' + f'{st.SHORT_CHANNEL_L_NM:.0f} nm point (elasticity ' + f'{st.SHORT_CHANNEL_CROSSCHECK:.2f})':<48}"
+          f" {low:>10.3f}×")
+    print(f"    → so the delivered gain is a BRACKET, {low:.3f}–{high:.3f}×, and NOT a curve through those")
+    print(f"      points: two papers, two geometries, two mobility magnitudes. An elasticity(L) fitted")
+    print(f"      between them would be the elasticity KNOB this slice refuses to have, wearing a hat.")
+    print(f"    → read it as a price instead, and it is a treadmill: holding the SAME +"
+          f"{st.TENSILE_CESL.drive_gain*100:.0f}% drive costs")
+    print(f"      +{(need_90-1)*100:.0f}% mobility at 90 nm and +{(need_25-1)*100:.1f}% at"
+          f" {st.SHORT_CHANNEL_L_NM:.0f} nm — {(need_25-1)/(need_90-1):.2f}× the mobility for the same win,")
+    print(f"      one era later. Shrinking L is a lever a fab pulls again every node; straining the channel")
+    print(f"      is a step that is either in the flow or not. THAT is why the axis changed to geometry.")
+    print(f"    → and this model is structurally BLIND to it: in the ratio I(µ·f)/I(µ), W, L, C_ox and V_t")
+    print(f"      all cancel, so the elasticity is {st.MODEL_ELASTICITY:.0f} at EVERY channel length"
+          f" (asserted bit-for-bit over four")
+    print(f"      decades of L). saturation_current reports {r.channel.drive_factor_long_channel:.2f}× at 90 nm"
+          f" and {r.channel.drive_factor_long_channel:.2f}× at {st.SHORT_CHANNEL_L_NM:.0f} nm. The quantity")
+    print(f"      that ended the strain era has no route into this device model — which is exactly why the")
+    print(f"      bracket enters as CITED DATA from outside it, and not as a fitted term inside.\n")
+
     print(f"    [and the wire takes its cut of whatever is left. F4 proved ∂ln f/∂ln I_Dsat = 1 − wire_share,")
     print(f"     EXACT at every I_Dsat, so the honest chain is: +{r.channel.mobility_factor*100-100:.0f}% mobility"
           f" → at most +{r.channel.drive_factor_long_channel*100-100:.0f}% drive")
@@ -484,15 +512,21 @@ def save_figure(r: StrainHistoryResult) -> Path:
     ax.plot(r.mu_axis, r.drive_cited_25nm, ":", color="tab:brown", lw=2.0,
             label=f"…and {st.SHORT_CHANNEL_CROSSCHECK:.2f} at L = {st.SHORT_CHANNEL_L_NM:.0f} nm "
                   f"(independent):\nthe bound LOOSENS as the era advances")
+    # The delivered BRACKET — shaded between the two cited endpoints and deliberately not interpolated.
+    # Two papers, two geometries, two mobility magnitudes: the pair licenses a direction and a width, and
+    # a curve fitted through them would be the elasticity knob this slice refuses to have (plan trap #1.3).
+    ax.fill_between(r.mu_axis, r.drive_cited_25nm, r.drive_cited_90nm, color=STRAIN_COLOR, alpha=0.13,
+                    label="the DELIVERED bracket: cited ENDPOINTS,\nnot a curve fitted between them")
 
     marks = {True: ("o", ELECTRON_COLOR), False: ("s", HOLE_COLOR)}
     for label, mu, drive, wired in r.cited_points:
         marker, color = marks[wired]
         dx, ha = 10, "left"
-        if "25 nm" in label:                          # the rightmost point captions leftward
-            color, dx, ha = "tab:brown", -10, "right"
+        dy = -7
+        if "25 nm" in label:                          # the rightmost point captions leftward, and clear of
+            color, dx, ha, dy = "tab:brown", -10, "right", -17   # its own dotted line, which runs under it
         ax.plot([mu], [drive], marker, color=color, ms=10, zorder=6, mec="k", mew=0.6)
-        ax.annotate(label, xy=(mu, drive), xytext=(dx, -7), textcoords="offset points",
+        ax.annotate(label, xy=(mu, drive), xytext=(dx, dy), textcoords="offset points",
                     fontsize=6.9, color=color, fontweight="bold", ha=ha, va="top")
 
     # the overstatement, read at the wired leg — the number the bound is worth
@@ -509,20 +543,31 @@ def save_figure(r: StrainHistoryResult) -> Path:
     ax.plot([1.0], [1.0], "o", color="k", ms=7, zorder=6)
     ax.annotate("the seam (factor 1.0 exactly)", xy=(1.0, 1.0), xytext=(9, -8),
                 textcoords="offset points", fontsize=6.9, ha="left", va="top")
+    # Why the era ended, read off the same plane: the same mobility is worth less each node, while the
+    # model's reading of it never moves — the gap between the grey line and the band is what this device
+    # model structurally cannot see (MODEL_ELASTICITY is 1 at EVERY L; W, L, C_ox and V_t cancel).
+    low_w, high_w = r.channel.delivered_drive_bracket
+    ax.annotate(f"the same µ, priced by era:\n"
+                f"{r.channel.drive_factor_long_channel:.2f}× (this model, any L)\n"
+                f"→ {high_w:.2f}× (90 nm) → {low_w:.3f}× ({st.SHORT_CHANNEL_L_NM:.0f} nm)\n"
+                f"pulled ONCE, and decaying — while\n"
+                f"the model reads {st.MODEL_ELASTICITY:.0f} at EVERY L",
+                xy=(0.976, 0.026), xycoords="axes fraction", fontsize=7.0, ha="right", va="bottom",
+                bbox=dict(boxstyle="round,pad=0.35", fc="white", ec=STRAIN_COLOR, alpha=0.92))
 
     ax.set_xlim(0.98, 2.22)
     ax.set_ylim(0.94, 2.22)
     ax.set_xlabel("mobility enhancement  µ / µ(unstrained)   [the HEADLINE]")
     ax.set_ylabel("drive-current enhancement  I_Dsat / I_Dsat(unstrained)")
-    ax.set_title("The bound: the wired path reads elasticity 1 and the real\n"
-                 "devices measured 0.5 — so the drive read is an UPPER BOUND", fontsize=9.5)
+    ax.set_title("The bound, and why the era ended: the delivered fraction falls\n"
+                 "with L (0.50 → 0.35) — and this model's is 1 at every L", fontsize=9.5)
     ax.legend(fontsize=6.8, loc="upper left")
     ax.grid(True, alpha=0.15)
 
     fig.suptitle("Historical-modes B10 — strained silicon: µ was the one factor in I_Dsat with no process owner, and the only one that spends no second "
                  "currency (∂J_g/∂µ = 0, structurally)\nthe two carriers want opposite strain signs, so the 90 nm node shipped two processes   ·   and a "
-                 "long-channel model infers I ∝ µ while the same paper measured half of it\n— VELOCITY SATURATION IS NAMED, NOT BUILT, so the wired drive "
-                 "read is an UPPER BOUND",
+                 "long-channel model infers I ∝ µ while the same paper measured half of it\n— VELOCITY SATURATION IS NAMED, NOT BUILT: the wired drive "
+                 "read is an UPPER BOUND, what strain DELIVERS is a cited bracket that decays with L, and this model's elasticity is 1 at every L",
                  fontsize=10.0)
     fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.905))
     for target in (DOCS_FIGURE, OUTPUT_FIGURE):

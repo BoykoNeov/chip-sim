@@ -144,6 +144,105 @@ def test_the_short_channel_crosscheck_shows_the_bound_loosening_with_L():
 
 
 # --------------------------------------------------------------------------- #
+# Why the era ended — and why THIS model is structurally blind to it (S4)
+# --------------------------------------------------------------------------- #
+def test_the_models_elasticity_is_ONE_AT_EVERY_CHANNEL_LENGTH_by_construction():
+    """The structural claim under the whole slice: in ``I_Dsat``'s ratio, **L cancels**.
+
+    ``I_Dsat = ½·µ·C_ox·(W/L)·(V_GS − V_t)²`` ⇒ strained/unstrained at fixed geometry is *exactly* the
+    mobility factor, at any channel length. So the quantity that ended the strain era — the delivered
+    fraction falling as ``L`` shrinks — is one this model has **no route to**: it reports the same +20%
+    drive at 90 nm and at 25 nm. Asserted against the real :mod:`chip.device` over four decades of ``L``,
+    including the two cited geometries, so a future device model that grows an ``L``-dependent µ→I path
+    fails here rather than quietly making ``MODEL_ELASTICITY`` a coincidence.
+    """
+    mech, W = strain.TENSILE_CESL, 10.0
+    mu = strain.strained_mobility(dev.MU_N_EFF, mech)
+    ratios = []
+    for L_um in (10.0, 1.0, 0.25, 0.09, 0.025, 0.005):              # incl. the cited 90 nm and 25 nm
+        m = dev.threshold_voltage(1e17, 0.015, channel_length_um=L_um)
+        Vgs = m.V_t + 1.0
+        I0 = dev.saturation_current(m, Vgs, width_um=W)
+        I = dev.saturation_current(m, Vgs, width_um=W, mu_eff=mu)
+        ratios.append(I / I0)
+        assert I / I0 == pytest.approx(mech.mobility_factor, rel=1e-12)
+    # Not merely "close at each L" — the same number ACROSS them, which is what "L cancels" means. The
+    # residual spread is float rounding in the division (~1 ULP at 1.2), four orders below the smallest
+    # physical L-dependence that could hide here, and it does not trend with L.
+    assert max(ratios) - min(ratios) < 1e-14, f"the µ→I ratio moved with channel length: {ratios}"
+    inferred = strain.elasticity(mech.mobility_factor, ratios[0])
+    assert inferred == pytest.approx(strain.MODEL_ELASTICITY, rel=1e-12) == pytest.approx(1.0)
+
+
+def test_the_delivered_gain_is_a_BRACKET_between_two_cited_points_and_never_a_curve():
+    """Two papers, two geometries ⇒ a direction and a width. The API must not take an ``L``.
+
+    An ``elasticity(L)`` — or any interpolation between the endpoints — is the elasticity knob the module
+    refuses to have, wearing a different hat (plan trap #1.3). The bracket's own ordering is the claim:
+    the model is above the 90 nm measurement, which is above the 25 nm one.
+    """
+    import inspect
+    sig = inspect.signature(strain.delivered_drive_bracket)
+    assert list(sig.parameters) == ["mechanism"], (
+        "delivered_drive_bracket must take a mechanism and nothing else — a geometry argument would make "
+        f"it an interpolation between two cited points from two sources. Got {list(sig.parameters)}"
+    )
+    for mech in strain.MECHANISMS.values():
+        low, high = strain.delivered_drive_bracket(mech)
+        assert high == mech.drive_factor                            # the mechanism's OWN 90 nm datum
+        assert low == pytest.approx(1.0 + strain.SHORT_CHANNEL_CROSSCHECK * mech.mobility_gain)
+        # every rung strictly below the one above it — model > cited 90 nm > cited 25 nm
+        assert mech.long_channel_drive_factor > high > low > 1.0
+    low, high = strain.delivered_drive_bracket("tensile_cesl")
+    assert (round(low, 3), high) == (1.070, 1.10)                   # the wired leg, in numbers
+
+
+def test_the_bracket_refuses_to_silently_swap_its_ends():
+    """An inverted bracket would reverse the era's direction while still returning a tidy pair."""
+    upside_down = strain.StrainMechanism(
+        name="fictional mechanism whose cited elasticity sits below the short-channel point",
+        carrier=strain.ELECTRONS, sign=strain.TENSILE,
+        mobility_factor=2.00, drive_factor=1.20,                    # elasticity 0.20 < 0.35
+        mechanism="not a real mechanism — exists only to invert the endpoints",
+    )
+    assert upside_down.cited_elasticity < strain.SHORT_CHANNEL_CROSSCHECK
+    with pytest.raises(ValueError, match="inverted"):
+        strain.delivered_drive_bracket(upside_down)
+
+
+def test_holding_a_drive_gain_FIXED_costs_more_mobility_as_the_elasticity_falls():
+    """*Strain is not a scaling path* in its exact form: the same win, 1.43× the mobility, one era later.
+
+    The 2003 cap bought +10% drive with +20% mobility (elasticity 0.500). At the cited 25 nm point the
+    same +10% needs +28.6%. A lever whose exchange rate decays cannot be scheduled per node — which is
+    why the axis changed to geometry, not to more strain.
+    """
+    mech = strain.TENSILE_CESL
+    at_90nm = strain.mobility_factor_for_drive(mech.drive_factor, mech.cited_elasticity)
+    at_25nm = strain.mobility_factor_for_drive(mech.drive_factor, strain.SHORT_CHANNEL_CROSSCHECK)
+    assert at_90nm == pytest.approx(mech.mobility_factor, rel=1e-12)     # round-trips its own pair
+    assert at_25nm == pytest.approx(1.2857, abs=5e-5)
+    assert (at_25nm - 1.0) / (at_90nm - 1.0) == pytest.approx(1.0 / strain.SHORT_CHANNEL_CROSSCHECK * 0.5,
+                                                              rel=1e-9)
+    # and the model, whose elasticity is 1, prices that same win at the smallest mobility of all
+    assert strain.mobility_factor_for_drive(mech.drive_factor, strain.MODEL_ELASTICITY) < at_90nm < at_25nm
+    with pytest.raises(ValueError):
+        strain.mobility_factor_for_drive(1.10, 1.5)                      # above the long-channel ceiling
+    with pytest.raises(ValueError):
+        strain.mobility_factor_for_drive(1.0, 0.5)                       # no gain to deliver
+
+
+def test_the_bracket_travels_on_the_record_and_is_absent_at_the_seam():
+    """A consumer reading ``drive_factor_cited`` must see it is the HIGH end of a range, not a point."""
+    c = strain.strained_channel(dev.MU_N_EFF, "tensile_cesl")
+    assert c.delivered_drive_bracket == strain.delivered_drive_bracket("tensile_cesl")
+    assert c.drive_factor_cited == c.delivered_drive_bracket[1]
+    assert c.drive_factor_long_channel > c.drive_factor_cited > c.drive_factor_short_channel
+    seam = strain.strained_channel(dev.MU_N_EFF, None)
+    assert seam.delivered_drive_bracket is None and seam.drive_factor_short_channel is None
+
+
+# --------------------------------------------------------------------------- #
 # The carrier fork — opposite signs, and the refusal that keeps the sign honest
 # --------------------------------------------------------------------------- #
 def test_the_two_cited_mechanisms_carry_opposite_signs():

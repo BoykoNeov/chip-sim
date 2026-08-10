@@ -137,29 +137,8 @@
   <main>
     <section>
       <h2>Promotable — the consumer is named</h2>
-      <p class="sub">Each of these already has a device observable waiting to read it. F3 (high-κ) and F4 (BEOL interconnect) have both shipped and their cards came off; F5 now heads the queue. F8 joins it from the deferred list — F4&rsquo;s build gave layer thickness its first reader, which is the promotion trigger that card was fenced behind.</p>
+      <p class="sub">Each of these already has a device observable waiting to read it. F3 (high-κ), F4 (BEOL interconnect) and F5 (strained silicon) have all shipped and their cards came off; F8 now heads the queue, promoted from the deferred list — F4&rsquo;s build gave layer thickness its first reader, which is the trigger that card was fenced behind.</p>
       <div class="grid">
-        <article class="card">
-          <a class="shot" href="figures/roadmap-f5.png" title="open the full schematic (a preview, not simulator output)">
-            <span class="ribbon">planned &mdash; schematic</span>
-            <img src="figures/roadmap-f5.png" alt="F5 — Strained silicon (SiGe S/D + tensile cap) schematic preview (planned, not simulator output)" loading="lazy">
-          </a>
-          <div class="body">
-            <div class="tagrow">
-              <span class="tag">F5 &middot; 2003–04 · 90 nm</span>
-              <span class="status ok">Planned — not built</span>
-            </div>
-            <p class="blurb"><strong>Strained silicon (SiGe S/D + tensile cap).</strong> The strain era: embedded SiGe pockets put the p-channel under uniaxial compression (17% Ge) and hole mobility — hence drive current — rises. The n-channel wants the opposite sign, so one node needed two processes.</p>
-            <div class="facts">
-              <div class="row"><span class="k would">Would add</span><p class="v">Mobility → I_Dsat: the one factor in I_Dsat no process step has ever moved (µ has been a module constant since Phase 4). The channel-strain rung of the era ladder, and the first device number that moves without changing a dopant, a thickness or a length.</p></div>
-              <div class="row"><span class="k gate">Gated on</span><p class="v">PLANNED 2026-08-10 (docs/plans/strained-silicon-f5.md) — the gate this card used to record is LIFTED. It read &#x27;a µ(strain) model in device.py, none exists yet&#x27;; in fact saturation_current has taken a defaulted mu_eff since P4, so the seam predates the slice and device.py needs no change. What remains is the build.</p></div>
-            </div>
-            <div class="links">
-              <code>docs/plans/future-steps.md</code>
-              <a class="src" href="http://localhost:8888/lab/tree/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
-            </div>
-          </div>
-        </article>
         <article class="card">
           <a class="shot" href="figures/roadmap-f8.png" title="open the full schematic (a preview, not simulator output)">
             <span class="ribbon">planned &mdash; schematic</span>

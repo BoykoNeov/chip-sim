@@ -62,6 +62,28 @@ where the claim is made: a test pins each registry entry's cited ``drive_factor`
 ``mobility_factor``, so a later slice that starts treating the long-channel read as *the* drive result
 confronts the ratio head-on.
 
+Why the era ended — the lever is pulled once, and its exchange rate decays
+--------------------------------------------------------------------------
+Strain is not a *scaling path*, and that is the reason the axis changed to geometry (FinFET) rather than
+to more strain. Two independent things say so, and both are arithmetic on the cited pairs above:
+
+* **It is pulled once.** A mechanism carries one factor. Shrinking the channel is a lever a fab pulls
+  again at every node; putting the channel under stress is a step that is either in the flow or not.
+  There is no compounding here and no API to stack mechanisms, because there is no cited licence for one.
+* **What it delivers decays.** The delivered fraction is **0.500** at the 90 nm node and **0.35** at the
+  cited 25 nm geometry, so holding a drive gain *fixed* costs ``1/elasticity`` in mobility and that price
+  rises as the era advances (:func:`mobility_factor_for_drive`): the +10% drive the 2003 cap bought with
+  +20% mobility needs **+28.6%** one era later. Hence :func:`delivered_drive_bracket` — the delivered
+  gain is reported as a **bracket between two cited endpoints, never as a curve through them**. Two
+  points from two papers at two geometries license a direction and a width, not an ``elasticity(L)``;
+  a function taking an ``L`` and returning a fraction *would be* the forbidden elasticity knob.
+
+**And this model is structurally blind to all of it.** At fixed geometry the strained-to-unstrained ratio
+of ``I_Dsat`` is exactly the mobility factor — ``W``, ``L``, ``C_ox`` and ``V_t`` all cancel — so
+:data:`MODEL_ELASTICITY` is **1 at every channel length**, and ``saturation_current`` reports the same
++20% drive at 90 nm and at 25 nm. The quantity that ended the strain era is one the long-channel form has
+no route to; the bracket is how it enters, from **outside** the model, as cited data.
+
 The seam — and it predates the slice
 -------------------------------------
 ``saturation_current(mos, V_GS, width_um, mu_eff=MU_N_EFF, R_series_ohm=0.0)`` has taken a **defaulted**
@@ -312,6 +334,16 @@ SHORT_CHANNEL_DRIVE_FACTOR = 1.35       # CITED — 35% saturation drive enhance
 SHORT_CHANNEL_CROSSCHECK = elasticity(SHORT_CHANNEL_MOBILITY_FACTOR, SHORT_CHANNEL_DRIVE_FACTOR)  # 0.35
 
 
+# The model's own elasticity, as a named constant rather than a fact buried in a docstring — because the
+# S4 result is a statement ABOUT it. ``I_Dsat = ½·µ·C_ox·(W/L)·(V_GS − V_t)²``, so at fixed geometry the
+# ratio of a strained read to an unstrained one is EXACTLY the mobility factor: W, L, C_ox and V_t all
+# cancel. **The channel length cancels — so the model's elasticity is 1 at EVERY L, by construction.**
+# That is the structural reason this simulator cannot reproduce the end of the strain era: the quantity
+# that ended it (the delivered fraction falling as L shrinks) is one the long-channel form has no route
+# to. Asserted bit-for-bit against the real chip.device across four decades of L.
+MODEL_ELASTICITY = 1.0
+
+
 def _resolve(mechanism: StrainMechanism | str) -> StrainMechanism:
     """Registry key → :class:`StrainMechanism` (or pass one straight through)."""
     return MECHANISMS[mechanism] if isinstance(mechanism, str) else mechanism
@@ -381,6 +413,66 @@ def drive_overstatement(mechanism: StrainMechanism | str) -> float:
 
 
 # --------------------------------------------------------------------------- #
+# 2b. The delivered-drive BRACKET — two cited endpoints, and deliberately not a curve
+# --------------------------------------------------------------------------- #
+def delivered_drive_bracket(mechanism: StrainMechanism | str) -> tuple[float, float]:
+    """What this mechanism's mobility gain actually **delivers** as drive current — as a *bracket*.
+
+    Two cited elasticities, from two sources at two geometries, applied to the same mobility gain:
+
+    * the **high** end is the mechanism's own measurement — its cited ``drive_factor``, at the 90 nm node
+      the paper reports (elasticity **0.500**);
+    * the **low** end applies the independent short-geometry point (``SHORT_CHANNEL_CROSSCHECK`` =
+      **0.35** at L = 25 nm / W = 77 nm) to the same gain.
+
+    **This is a bracket, not a curve, and there is deliberately no ``L`` argument.** Two points from two
+    papers, at two mobility magnitudes and two measurement geometries, do not license an
+    ``elasticity(L)`` interpolation — and a function that took an ``L`` and returned a fraction *would be
+    the elasticity knob* this module refuses to have (see the module docstring), wearing a different hat.
+    What the pair does license is a **direction and a width**: the delivered gain is somewhere in here,
+    it is nowhere near the model's, and the end it approaches is the **low** one as the era advances.
+
+    So for the wired +20% nMOS cap: the model says **1.20**, the 90 nm devices measured **1.10**, and the
+    same gain at the 25 nm point would deliver **1.07**. Every one of those is below the one before it.
+
+    Raises if a mechanism's own cited elasticity ever fell *below* the short-channel point — that would
+    invert the bracket, and silently swapping the ends would turn "the bound loosens as L shrinks" into
+    its opposite while still returning a tidy-looking pair.
+    """
+    mech = _resolve(mechanism)
+    if mech.cited_elasticity <= SHORT_CHANNEL_CROSSCHECK:
+        raise ValueError(
+            f"{mech.name} cites an elasticity of {mech.cited_elasticity:.3f}, at or below the "
+            f"short-geometry point {SHORT_CHANNEL_CROSSCHECK:.3f} — the bracket would be inverted. The "
+            "cited endpoints are ordered (90 nm above 25 nm) because the delivered fraction FALLS with L; "
+            "a mechanism that breaks that ordering needs its own sourcing, not a swapped pair."
+        )
+    return (1.0 + SHORT_CHANNEL_CROSSCHECK * mech.mobility_gain, mech.drive_factor)
+
+
+def mobility_factor_for_drive(drive_factor: float, elasticity_value: float) -> float:
+    """The mobility factor a mechanism would need to deliver ``drive_factor`` at a given elasticity.
+
+    The inverse of :func:`elasticity`, and the exact form of *"strain is not a scaling path"*: holding a
+    drive gain fixed costs ``1/elasticity`` in mobility, and the elasticity **falls as L shrinks**. The
+    +10% drive the 2003 nMOS cap bought with **+20%** mobility would need **+28.6%** at the cited 25 nm
+    point — the same win, 1.43× the mobility, one era later. A lever whose exchange rate decays is not a
+    lever a node can be scheduled around; the industry changed the axis to geometry instead (F9).
+
+    **And the model cannot see any of that** — :data:`MODEL_ELASTICITY` is 1 at every L, so
+    ``saturation_current`` reports the same +20% drive for this mechanism at 90 nm and at 25 nm.
+    """
+    if drive_factor <= 1.0:
+        raise ValueError(f"drive_factor must be > 1 (1.0 = unstrained), got {drive_factor}")
+    if not 0.0 < elasticity_value <= 1.0:
+        raise ValueError(
+            f"elasticity must be in (0, 1] — 1 is the long-channel ceiling (MODEL_ELASTICITY) and a "
+            f"non-positive fraction is not a fraction of a gain, got {elasticity_value}"
+        )
+    return 1.0 + (drive_factor - 1.0) / elasticity_value
+
+
+# --------------------------------------------------------------------------- #
 # 3. The bundled reading (the record a demo or the game knob reports)
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
@@ -410,11 +502,24 @@ class StrainedChannel:
     cited_elasticity: float | None
     drive_overstatement: float | None
     mobility_is_floor: bool = False
+    drive_factor_short_channel: float | None = None
 
     @property
     def is_strained(self) -> bool:
         """Whether any strain was applied — ``False`` is the seam (every factor exactly ``1.0``)."""
         return self.mobility_factor != 1.0
+
+    @property
+    def delivered_drive_bracket(self) -> tuple[float, float] | None:
+        """The cited delivered-drive **bracket** — ``(25 nm point, this mechanism's 90 nm measurement)``.
+
+        :func:`delivered_drive_bracket`'s pair, carried on the record so a consumer that reads
+        ``drive_factor_cited`` sees it is the **high** end of a range and not a point. ``None`` at the
+        seam: no gain, so there is no delivered fraction of one (the gap-vs-fake-value rule).
+        """
+        if not self.is_strained or self.drive_factor_short_channel is None:
+            return None
+        return (self.drive_factor_short_channel, self.drive_factor_cited)
 
 
 def strained_channel(
@@ -449,4 +554,5 @@ def strained_channel(
         cited_elasticity=mech.cited_elasticity,
         drive_overstatement=mech.drive_overstatement,
         mobility_is_floor=mech.mobility_is_floor,
+        drive_factor_short_channel=delivered_drive_bracket(mech)[0],
     )

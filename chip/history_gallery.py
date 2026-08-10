@@ -171,7 +171,14 @@ MODES = [
         "construction, while the same paper measured +10% and +25% drive — an elasticity of ≈0.5 on both "
         "carriers, falling to 0.35 at L = 25 nm as strain increasingly acts through injection velocity "
         "rather than mobility. Velocity saturation is named here, not built, so the drive read is an "
-        "upper bound whose looseness grows as the era advances.",
+        "upper bound whose looseness grows as the era advances — which is also why the era ended. "
+        "Shrinking the gate is a lever a fab pulls again at every node; straining the channel is a step "
+        "that is either in the flow or not, and what it delivers decays: holding the same +10% drive "
+        "costs +20% mobility at 90 nm and +28.6% at 25 nm. The delivered gain is reported as a bracket "
+        "between two cited endpoints rather than a curve through them, because two papers at two "
+        "geometries license a direction and a width and nothing finer. This model is structurally blind "
+        "to that decay — in the strained-to-unstrained ratio W, L, C_ox and V_t all cancel, so its "
+        "elasticity is 1 at every channel length — and the next move was to change the axis to geometry.",
     ),
     HistoryMode(
         module="demo_metallization_history", tag="B6", stage="Metallization", era="≈1970s",

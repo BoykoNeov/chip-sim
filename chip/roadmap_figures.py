@@ -1,11 +1,12 @@
 """Roadmap schematic previews — the banked figures for the PLANNED, not-yet-built slices.
 
-Draws one figure per unbuilt roadmap slice of ``docs/plans/future-steps.md`` (F5 SiGe, F6 epitaxy,
+Draws one figure per unbuilt roadmap slice of ``docs/plans/future-steps.md`` (F6 epitaxy,
 F7 STI remainder, F8 CMP, F9 FinFET/GAA, F10 EUV) into ``docs/figures/roadmap-*.png``, for the
 ``docs/roadmap.html`` page (:mod:`chip.roadmap_gallery`) to display.
 
 A slice that **ships** loses its schematic here and its card on the page (F3 high-κ graduated
-2026-07-17; **F4 BEOL interconnect 2026-08-10**) — the drawing is a promise, and once the real demo
+2026-07-17; **F4 BEOL interconnect and F5 strained silicon, both 2026-08-10**) — the drawing is a
+promise, and once the real demo
 exists the banked artifact on the history gallery is the honest picture. Deleting the draw function
 is what keeps the two in step: the manifest guard pins ``FIGURES`` against the page's ``SLICES``.
 
@@ -83,51 +84,9 @@ def _rect(ax, x, y, w, h, fc, ec=INK2, lw=0.9, z=2):
     ax.add_patch(mp.Rectangle((x, y), w, h, facecolor=fc, edgecolor=ec, linewidth=lw, zorder=z))
 
 
-# --------------------------------------------------------------------------------------------- #
-# F5 — strained silicon; SiGe S/D is the pMOS half (2003–04, 90 nm)
-#
-# CORRECTED 2026-08-10 when the F5 plan was written (docs/plans/strained-silicon-f5.md). Three claims
-# stamped into this figure had gone stale or were never sourced at the house bar:
-#   * "gated on a µ(strain) model in device.py (none exists yet)" — FALSE. saturation_current has taken a
-#     defaulted mu_eff since P4, so the seam predates the slice and device.py needs no change at all.
-#   * "up to ~2× at ~20% Ge" — the BIAXIAL range top. The cited uniaxial S/D result is >50% at 17% Ge;
-#     the house rule is never to round a win up (F4's floor_decades, in mobility's currency).
-#   * "compressive strain ~2 GPa" — not pinned by any source at this project's bar. Dropped, not softened.
-# The mechanism drawing is unchanged; only the claims are. Keep the caption honest about the carrier fork:
-# SiGe is the pMOS half and the simulator is n-channel-only, so the WIRED leg is the nMOS tensile cap.
-# --------------------------------------------------------------------------------------------- #
-def _draw_f5(fig) -> None:
-    _chrome(fig, "F5 — strained silicon (2003–04, 90 nm): strain → mobility → I_Dsat")
-    ax = _bare(fig.add_axes((0.02, 0.02, 0.96, 0.84)), xlim=(0, 12), ylim=(0, 6.4))
-
-    _rect(ax, 1.2, 0.8, 9.6, 1.9, SI_GRAY)                        # substrate
-    ax.text(10.55, 1.1, "Si substrate", ha="right", va="center", fontsize=9, color=INK2)
-    # embedded SiGe pockets (recessed, refilled epitaxially)
-    for x0, xd in ((2.2, 4.4), (7.6, 9.8)):
-        import matplotlib.patches as mp
-        ax.add_patch(mp.Polygon([(x0, 2.7), (xd, 2.7), (xd - 0.35, 1.75), (x0 + 0.35, 1.75)],
-                                closed=True, facecolor=ORANGE, edgecolor=INK2, linewidth=0.9, zorder=3))
-    ax.text(3.3, 3.0, "SiGe S/D (17% Ge)", ha="center", va="bottom", fontsize=9, color=INK)
-    ax.text(8.7, 3.0, "SiGe S/D", ha="center", va="bottom", fontsize=9, color=INK)
-    # the channel + gate stack
-    _rect(ax, 4.4, 2.7, 3.2, 0.16, BLUE_PALE)                     # gate oxide
-    _rect(ax, 4.75, 2.86, 2.5, 1.15, GATE_GRAY)                   # gate
-    ax.text(6.0, 3.43, "gate", ha="center", va="center", fontsize=9, color=INK)
-    ax.text(6.0, 2.35, "p-channel", ha="center", va="center", fontsize=8.5, color=INK2)
-    # the strain arrows — the pockets squeeze the channel
-    ax.annotate("", xy=(5.35, 2.25), xytext=(4.35, 2.25),
-                arrowprops=dict(arrowstyle="-|>", color=RED, lw=2.0))
-    ax.annotate("", xy=(6.65, 2.25), xytext=(7.65, 2.25),
-                arrowprops=dict(arrowstyle="-|>", color=RED, lw=2.0))
-    ax.text(6.0, 1.35, "the larger Ge atom squeezes the channel —\nuniaxial compressive strain",
-            ha="center", va="top", fontsize=9, color=RED)
-    ax.text(6.0, 5.9, "the would-be observable: hole mobility µ↑ (>50% at 17% Ge) → I_Dsat ↑ — the one\n"
-                      "factor in I_Dsat no process step has ever moved. NOT gated on device.py: mu_eff\n"
-                      "has been a defaulted argument since P4. SiGe is the pMOS half; the sim is\n"
-                      "n-channel-only, so the wired leg would be the nMOS tensile cap (+20% µ).",
-            ha="center", va="top", fontsize=8.5, color=INK2, style="italic")
-
-
+# F5 (strained silicon) GRADUATED 2026-08-10 with its slice-4 build — its schematic came off with its
+# card, in one commit, because the manifest guard pins card <-> schematic. Built work lives on
+# history-mode B10 + chip.strain; the banked roadmap-f5.png went with it.
 # --------------------------------------------------------------------------------------------- #
 # F6 — epitaxy: buried layer / retrograde well (coupled to F1)
 # --------------------------------------------------------------------------------------------- #
@@ -308,9 +267,9 @@ def _draw_f10(fig) -> None:
 
 # The registry the roadmap page + drift guard anchor on: slice id → its draw function.
 FIGURES = {
-    # F4 (BEOL interconnect) GRADUATED 2026-08-10 with its slice-4 build — see roadmap_gallery.SLICES.
-    # The manifest guard pins card ↔ schematic, so this entry and the Slice came out in one commit.
-    "F5": _draw_f5,
+    # F4 (BEOL interconnect) and then F5 (strained silicon) GRADUATED 2026-08-10 with their slice-4 builds
+    # — see roadmap_gallery.SLICES. The manifest guard pins card ↔ schematic, so each entry and its Slice
+    # came out in one commit.
     "F6": _draw_f6,
     "F7": _draw_f7,
     "F8": _draw_f8,

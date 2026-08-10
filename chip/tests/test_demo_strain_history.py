@@ -209,6 +209,35 @@ def test_the_figure_says_what_the_bound_and_the_composition_are():
     )
 
 
+def test_the_era_ENDING_is_read_off_cited_endpoints_and_never_interpolated():
+    """S4 on the page: the delivered gain is a bracket, the treadmill is priced, and the model is blind.
+
+    The demo may report the two cited endpoints and the price of holding a gain fixed between them; what
+    it may **not** do is put a value *between* them at some other geometry. That would be an
+    ``elasticity(L)`` — the elasticity knob the slice refuses to have (plan trap #1.3) — arriving through
+    the display layer, which is exactly how S3's flattering-direction composition got in.
+    """
+    r = compute()
+    low, high = r.channel.delivered_drive_bracket
+    assert (low, high) == st.delivered_drive_bracket(WIRED_MECHANISM)      # the module owns the pair
+    assert r.channel.drive_factor_long_channel > high > low > 1.0          # model > 90 nm > 25 nm
+    # the treadmill, from the module's own inverse — the same win costs more mobility one era later
+    need_90 = st.mobility_factor_for_drive(st.TENSILE_CESL.drive_factor, st.TENSILE_CESL.cited_elasticity)
+    need_25 = st.mobility_factor_for_drive(st.TENSILE_CESL.drive_factor, st.SHORT_CHANNEL_CROSSCHECK)
+    assert need_25 > need_90 == pytest.approx(st.TENSILE_CESL.mobility_factor)
+
+    src = Path(demo_strain_history.__file__).read_text(encoding="utf-8")
+    assert "not a curve fitted between them" in src                        # the figure says so, in words
+    assert "at EVERY L" in src
+    # Code-shaped tokens only — the demo's own prose names `elasticity(L)` in order to reject it, so a
+    # blacklist that matched the phrase would fire on the sentence doing the right thing.
+    for banned in ("np.interp(st.", "interp(mu_axis", "elasticity_at(", "fit_elasticity"):
+        assert banned not in src, f"the demo must not interpolate between the cited endpoints: {banned}"
+    # the one np.interp in this demo is B8's OXIDE ladder readout — a curve the demo itself computed —
+    # and there must still be exactly one, so a second interpolation cannot arrive unnoticed.
+    assert src.count("np.interp(") == 1
+
+
 def test_figure_builds():
     r = compute()
     pytest.importorskip("matplotlib")               # the figure is not in the correctness path (ADR 0002)

@@ -1,9 +1,10 @@
 # Plan — F5 strained silicon (the term the process never touched)
 
-> **STATUS: S1 + S2 + S3 BUILT (2026-08-10); S4 uncommitted.** Roadmap card `F5`
-> (`chip/roadmap_gallery.py:88`) is live and stays up
-> until the last slice ships (the F3/F4 graduation rule). Predecessor F4 (BEOL interconnect) completed
-> 2026-08-10 and **F5 is the head of the promotable queue** (`future-steps.md:67`).
+> **STATUS: COMPLETE — all four slices BUILT 2026-08-10.** The roadmap card `F5` **GRADUATED** with S4,
+> on F3's and F4's reading of "shipped" (the last slice, not the first working one): `SLICES` and
+> `FIGURES` cut together, the banked `roadmap-f5.png` deleted, both HTML editions regenerated. Built work
+> now lives on **history-mode B10 + `chip.strain`**. **F8 (CMP) inherits the head of the promotable
+> queue** — by default rather than by strength, since its refactor gate is unchanged.
 >
 > **Scope note on the name.** The roadmap card is titled *"SiGe strained source/drain"*, which is the
 > **pMOS** half of the strain era. The simulator has no p-MOSFET (`device.py:9` — "textbook long-channel
@@ -273,13 +274,50 @@ has been re-examined (F8, F5) it had already been released.
   - **Gallery/manifest note (held):** both manifests are glob-anchored — the demo file and its two
     entries land in the **same commit** or `assert_manifest_complete()` fails (F3 slice 3's trap, re-hit
     at F4).
-- **S4 — NOT pre-committed.** It should fall out of what S1's sourcing turns up, the way F4's S4 did. The
-  structural analogue to F3's IL and F4's axis change would be *"strain is a one-time boost, not a scaling
-  path"* — which is why the industry changed the axis again to FinFET, handing off to F9 as F4 handed off
-  to F8. **Candidate only**, and note trap #2 kills the most obvious mechanism for it.
+- **S4 — why the era ended. ✅ BUILT 2026-08-10** (`chip.strain`'s delivered-drive bracket + the
+  `L`-invariance proof; `demo_strain_history.py`'s fourth summary block and the right panel's band). Fast
+  lane **1174 → 1180**, measured at HEAD in a worktree — +6, all in the two F5 test files. (S3's note said
+  1175 for the same commit: that count included the one `slow`-marked notebook test, which the fast lane
+  deselects. Same tree, different convention — recorded so the next slice does not "correct" a correct
+  number.) The
+  pre-registered candidate — *"strain is a one-time boost, not a scaling path"* — survived, but **not in
+  the currency first reached for**. What the build settled:
+  - **The node-equivalence framing was wrong, and wrong in the flattering direction.** The first sketch
+    priced strain in B9's currency: `nodes_bought = ln(x)/ln(0.7)`, so +20% drive ≈ 0.51 of a node. But
+    `I_Dsat ∝ W/L` and a node shrinks **both** `W` and `L` — so `W/L` is *invariant* and a geometric node
+    buys **zero** drive per device in this model. The arithmetic silently assumed constant-`W`, i.e. it
+    laundered a convention through a helper that was legitimate for B9 only because a wire's width is its
+    own dimension. **Dropped entirely**: the claim is stated as *repeatability* (a lever pulled once vs a
+    lever pulled every node), which needs no denominator. Second instance in two slices of a display-layer
+    composition overstating with cited inputs — see S3's trap.
+  - **The delivered gain is a BRACKET between two cited endpoints, never a curve through them.**
+    `delivered_drive_bracket()` takes a mechanism and **no geometry argument**, and a test pins that
+    signature: a function taking an `L` and returning a fraction *is* trap #1.3's forbidden elasticity
+    knob wearing a hat. Two papers, two geometries, two mobility magnitudes license a direction and a
+    width and nothing finer. For the wired +20% cap: model **1.20×**, cited 90 nm **1.10×**, cited 25 nm
+    **1.070×**. An inverted bracket raises rather than silently swapping its ends.
+  - **The scaling-path claim, in its exact form: a treadmill.** `mobility_factor_for_drive()` is
+    `elasticity()`'s inverse, so holding a drive gain *fixed* costs `1/elasticity` in mobility — the same
+    +10% the 2003 cap bought with +20% needs **+28.6%** at the cited 25 nm point, **1.43× the mobility for
+    the same win, one era later**.
+  - **THE STRUCTURAL RESULT — this model is blind to the decay, by construction.** In the strained /
+    unstrained ratio of `saturation_current`, `W`, `L`, `C_ox` and `V_t` all cancel, so
+    `MODEL_ELASTICITY` is **1 at every channel length**: the sim reports the same +20% drive at 90 nm and
+    at 25 nm. Asserted bit-for-bit against the real `device.py` over four decades of `L` (including both
+    cited geometries), so a future `L`-dependent µ→I path fails a test rather than turning the constant
+    into a coincidence. **That is why the bracket enters as cited data from *outside* the model** — and
+    why the industry changed the axis to geometry (F9) rather than to more strain.
+  - **Necessity, stated before building** (the honest alternative was graduating with S4 named-not-built):
+    S3's right panel *already drew* both cited elasticity lines, so a re-cut figure would have been a
+    restatement. S4 earns its place by changing what the **module** can say — the bracket is reachable
+    from `chip.strain`, travels on `StrainedChannel` (and so into the game record), and is `None` at the
+    seam rather than a fake `1.0`.
 
-**Roadmap card graduation** (`roadmap_gallery.py:88`) lands with the **last** slice, on F3's reading of
-"shipped" — `SLICES` and `FIGURES` cut together (the manifest guard pins card↔schematic).
+**Roadmap card graduation — ✅ DONE with S4.** `SLICES` and `FIGURES` cut together (the manifest guard
+pins card↔schematic), `docs/figures/roadmap-f5.png` deleted, `_draw_f5` removed, both HTML editions
+regenerated, and the queue prose re-pointed at F8. The gate re-check the F5 build itself made a standing
+rule was run over the remaining cards (F6–F10) before graduating: none of their gates were released by
+this build.
 
 ## Scope discipline (the honest NO's)
 

@@ -1,7 +1,7 @@
 """The roadmap page generator — the visual front door for the PLANNED, not-yet-built slices.
 
 Builds ``docs/roadmap.html`` (and the ``…local.html`` JupyterLab edition): one card per unbuilt
-slice of ``docs/plans/future-steps.md`` (F4 BEOL … F10 EUV), each showing its **schematic
+slice of ``docs/plans/future-steps.md`` (F6 epitaxy … F10 EUV), each showing its **schematic
 preview** (:mod:`chip.roadmap_figures`), its **triage status** verbatim with the plan
 (PROMOTABLE / COUPLED / partly built / DEFERRED), the **observable it would add**, and the
 **named consumer that gates it** — the repo's anti-over-build bar made browsable.
@@ -81,8 +81,17 @@ class Slice:
 # card came off with slice 4, the size-effect + barrier slice that makes the Cu→Ru sign come out right.
 # Without it the module could only rank metals by bulk ρ, which ranks ruthenium LAST — so the arc the
 # card promised was not on the page until the last slice landed. Built work now lives on history-mode
-# B9 + chip.interconnect. Do not re-add either card. F5 heads the promotable queue, and F4's build
-# RELEASED F8's gate — see its card below, which is the first hold on this page to be lifted.
+# B9 + chip.interconnect. Do not re-add either card. F4's build also RELEASED F8's gate — see its card
+# below, which is the first hold on this page to be lifted.
+#
+# F5 (strained silicon) GRADUATED 2026-08-10 with its slice 4, on the same reading of "shipped" as F3 and
+# F4: the last slice, not the first working one. Slices 1–3 could say what strain buys (+20% electron
+# mobility, a structural zero in the leakage currency, the carrier fork) but not why the era ENDED — and a
+# card promising "the strain rung of the era ladder" that stopped at the win would leave the page claiming
+# an arc the modules did not carry. Slice 4 is the delivered-drive BRACKET and the proof that this model's
+# µ→I elasticity is 1 at every channel length, so the decay that ended the era is named as cited data from
+# outside a model that is structurally blind to it. Built work now lives on history-mode B10 +
+# chip.strain. Do not re-add this card, or F3's, or F4's. F8 (CMP) now heads the promotable queue.
 #
 # A GATE IS A CLAIM ABOUT THE CURRENT TREE, AND THE TREE MOVES UNDER IT (2026-08-10). Writing the F5
 # plan falsified F5's own card: it recorded "a µ(strain) model in device.py — none exists yet", but
@@ -94,21 +103,6 @@ class Slice:
 # picked up, RE-CHECK ITS GATE AGAINST THE TREE FIRST. Corrections land here and in roadmap_figures.py
 # together, since the stale claims are stamped into the schematic too.
 SLICES = [
-    Slice(
-        fid="F5", era="2003–04 · 90 nm", title="Strained silicon (SiGe S/D + tensile cap)",
-        status="Planned — not built", badge="ok",
-        blurb="The strain era: embedded SiGe pockets put the p-channel under uniaxial compression "
-              "(17% Ge) and hole mobility — hence drive current — rises. The n-channel wants the "
-              "opposite sign, so one node needed two processes.",
-        would_add="Mobility → I_Dsat: the one factor in I_Dsat no process step has ever moved "
-                  "(µ has been a module constant since Phase 4). The channel-strain rung of the "
-                  "era ladder, and the first device number that moves without changing a dopant, "
-                  "a thickness or a length.",
-        gate="PLANNED 2026-08-10 (docs/plans/strained-silicon-f5.md) — the gate this card used to "
-             "record is LIFTED. It read 'a µ(strain) model in device.py, none exists yet'; in fact "
-             "saturation_current has taken a defaulted mu_eff since P4, so the seam predates the "
-             "slice and device.py needs no change. What remains is the build.",
-    ),
     Slice(
         fid="F6", era="bipolar epi · CMOS wells", title="Epitaxy (buried layer / retrograde well)",
         status="Coupled to F1", badge="part",
@@ -169,10 +163,10 @@ SLICES = [
 # The page's sections, in the plan's own order: consumer strength first, the honest NO's last.
 SECTIONS = [
     ("Promotable — the consumer is named",
-     "Each of these already has a device observable waiting to read it. F3 (high-κ) and F4 (BEOL "
-     "interconnect) have both shipped and their cards came off; F5 now heads the queue. F8 joins it "
-     "from the deferred list — F4&rsquo;s build gave layer thickness its first reader, which is the "
-     "promotion trigger that card was fenced behind.",
+     "Each of these already has a device observable waiting to read it. F3 (high-κ), F4 (BEOL "
+     "interconnect) and F5 (strained silicon) have all shipped and their cards came off; F8 now heads "
+     "the queue, promoted from the deferred list — F4&rsquo;s build gave layer thickness its first "
+     "reader, which is the trigger that card was fenced behind.",
      [s for s in SLICES if s.badge == "ok"]),
     ("Coupled &amp; partly built",
      "Real physics whose consumer is (partly) already served — built where the consumer exists, "
