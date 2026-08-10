@@ -589,6 +589,35 @@ class DeviceKnobs:
     that inverts the ``SpeedBin`` premise "clock speed ∝ drive current" this module's own docstring still
     states. Defaults to ``None`` → **no delay is emitted at all** (the seam; the G1–G7 banked demos and the
     journey are unchanged), and the ``interconnect``/``τ`` record keys are added only when engaged.
+
+    ``strain`` (F5, strained silicon) names the cited strain mechanism the channel is built with (a
+    :data:`chip.strain.WIRED_MECHANISMS` key — today just ``"tensile_cesl"``, the 2003 tensile
+    silicon-nitride capping layer) and multiplies the **carrier mobility** the drive-current read uses:
+    ``mu_eff = MU_N_EFF · factor`` (:func:`chip.strain.strained_channel`), fed to the ``mu_eff`` argument
+    :func:`chip.device.saturation_current` has taken **since Phase 4**. So ``device.py`` is untouched for
+    the fourth consecutive slice, and :data:`chip.device.MU_N_EFF` is never rescaled in place (multiply and
+    pass — the ``R_series_ohm``/``t_ox_um``/``τ_gate`` read-time discipline).
+
+    **This is the first knob that is NOT additive, and that is the slice.** ``bv_V``, ``t_rr``, ``j_gate``
+    and ``τ`` all bolt a *new* output onto an unchanged device — engaging them alone changes nothing
+    scored. Strain moves ``I_Dsat`` itself, the currency :class:`fab_game.spec.SpeedBins` has graded on
+    since G6, so this knob **re-grades the wafer with no new scoring surface at all**. F4 needed the
+    *pair* (knob + delay binning) to change an outcome; F5 does not, because strain is a **process**
+    change to a **device** term rather than a new reading beside one.
+
+    **Read the drive gain as an upper bound.** :func:`chip.device.saturation_current` is long-channel, so
+    it carries ``I ∝ µ`` — a µ→I elasticity of exactly 1 — while the cited 90 nm devices measured ≈0.5
+    (+20% mobility → +10% drive). The record therefore carries the mechanism's cited ``drive_factor`` and
+    ``drive_overstatement`` (≈2.0) **beside** the realized ``i_dsat``, so the bound travels with the
+    number; there is deliberately no elasticity knob to tune it back (see :mod:`chip.strain`).
+
+    The knob **refuses the hole leg by name**: ``"sige_sd"`` is a pMOS technique and
+    :mod:`chip.device` is n-channel-only, so its compressive strain would have the **wrong sign** on an
+    electron channel (:func:`chip.strain.nmos_mobility` raises, and that refusal is the era's teaching
+    point — the two carriers want opposite strain signs). Defaults to ``None`` → the seam: the mechanism
+    factor is exactly ``1.0``, so ``mu_eff`` is ``MU_N_EFF`` and every device number is **byte-for-byte**
+    unchanged (the G1–G7 banked demos and the journey included); the ``strain``/``mu_factor`` record keys
+    are added only when engaged.
     """
 
     gate: str = "n+poly"               # n⁺-poly gate (φ_gate = +0.55 V)
@@ -601,6 +630,9 @@ class DeviceKnobs:
     interconnect: str | None = None    # F4 BEOL wire metal ("Al"|"Cu" — BULK_ERA_METALS; "Ru" is refused,
     #                                    it is a sub-20 nm claim and the fab runs one 250 nm line);
     #                                    None = no wire, no delay emitted (the seam)
+    strain: str | None = None          # F5 channel strain ("tensile_cesl" — WIRED_MECHANISMS; the pMOS
+    #                                    "sige_sd" is refused, wrong sign on an n-channel);
+    #                                    None = mobility factor 1.0, MU_N_EFF unchanged (the seam)
 
 
 @dataclass(frozen=True)

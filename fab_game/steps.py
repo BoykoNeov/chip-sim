@@ -30,6 +30,7 @@ from chip import litho
 from chip import device as dev
 from chip import lifetime as life
 from chip import reverse_recovery as rr
+from chip import strain as st
 from chip.junction import analyze_junction
 from chip.purification import Contamination, getter_metals, sodium_oxide_charge
 from chip.wafer_prep import WaferGeometry
@@ -336,7 +337,46 @@ def device_step(
 
     It lives in the device step because that is where ``I_Dsat`` and ``C_ox`` are — there is no BEOL step
     in this line, and inventing one would be a bigger claim than F4 makes (the wire here is a *reading* of
-    a representative line, not a modelled metallization the recipe builds)."""
+    a representative line, not a modelled metallization the recipe builds).
+
+    **Strained silicon (F5)** — with ``knobs.strain`` set, the channel's **carrier mobility** is multiplied
+    by the cited mechanism's enhancement factor (:func:`chip.strain.strained_channel`) and the result is
+    passed to the ``mu_eff`` argument :func:`chip.device.saturation_current` has taken **since Phase 4**.
+    ``µ`` was the one factor in ``I_Dsat = ½·µ·C_ox·(W/L)·(V_GS − V_t)²`` that no step in this line had
+    ever moved (``C_ox`` from the furnace and F3, ``W/L`` from the litho CD, ``V_t`` from the doping and
+    the adjust implant — and ``MU_N_EFF``, a module constant, from nothing). ``device.py`` is untouched,
+    the fourth consecutive slice, and ``MU_N_EFF`` is **never rescaled in place**.
+
+    **It is the first knob here that is not additive, and that is the point.** ``bv_V``/``t_rr``/``j_gate``/
+    ``τ`` each add a *new* output to an unchanged device, so engaging one alone changes nothing scored;
+    strain moves ``I_Dsat``, which :class:`fab_game.spec.SpeedBins` has graded on since G6 — so it
+    **re-grades the wafer with no new scoring surface**. F4 needed the knob *plus* delay binning to change
+    an outcome; F5 needs only the knob, because it is a process change to a device *term*, not a new
+    reading beside one.
+
+    **The realized gain, and the bound it must be read under.** On the ideal-contact path
+    (``sd_contact_squares = 0``, the default) the long-channel form gives ``I ∝ µ`` exactly: the mobility
+    factor lands on ``I_Dsat`` **unattenuated** (+20% µ → +20% drive), a µ→I elasticity of 1 *by
+    construction*. With source degeneration engaged (``R_series_ohm > 0``) the quadratic sub-linearizes it
+    on its own, so the realized gain falls strictly below the factor — the same direction as the physics
+    the model does **not** carry. The cited 90 nm devices measured ≈**0.5** (+20% µ → +10% drive, velocity
+    saturation: named, not built), so the wired drive gain is an **upper bound**, and the record carries
+    the mechanism's cited ``drive_factor`` and ``drive_overstatement`` beside the realized ``i_dsat`` so
+    the bound travels with the number rather than living in prose.
+
+    **And the win runs into a window written before it existed.** ``DEFAULT_SPECS``'s ``I_Dsat`` ceiling
+    exists to catch *CD-collapse over-current* — on an unstrained line the only way to be 20% over-current
+    was for the geometry to be wrong. Strain lifts the whole histogram by exactly that much with the
+    geometry bit-for-bit correct, so a loose-CD wafer that yielded 89/89 yields **77/89**, every loss a
+    parametric ``I_Dsat``-high fail. That is a **spec** artefact rather than a physical consequence, and
+    re-centring the window is a market decision (F4's binning-edge class) — recorded here, not tuned away.
+
+    The **hole leg is refused by name** (``"sige_sd"`` — a pMOS technique, and this device is n-channel:
+    its compressive strain would invert the sign while looking like a result), which is the era's actual
+    teaching point rather than a guard rail. ``strain = None`` → factor exactly ``1.0`` → ``mu_eff`` is
+    ``MU_N_EFF`` and every number is byte-for-byte today's (the seam; G1–G7 and the journey unchanged).
+    Passing the seam value rather than branching around it means **the default run exercises the strain
+    module's own seam on every die**."""
     if die.t_ox_um is None or die.cd_um is None or die.resolved is False:
         reason = ("litho image not resolved" if die.resolved is False
                   else "missing upstream t_ox/CD")
@@ -377,8 +417,17 @@ def device_step(
                 scheme=knobs.contact_scheme).R_series_ohm                    # two-term access + contact
     else:
         R_series_ohm = 0.0
+    # F5 (strain set): the channel's carrier mobility — the ONE I_Dsat factor no step in this line had ever
+    # moved. strained_channel multiplies MU_N_EFF by the cited mechanism's enhancement factor and the result
+    # rides the mu_eff argument saturation_current has taken since P4 (device.py untouched; MU_N_EFF is
+    # never rescaled in place — multiply and pass). The hole leg ("sige_sd") RAISES here: it is a pMOS
+    # technique and this device is n-channel, so its compressive strain would carry the wrong sign.
+    # strain None → factor exactly 1.0 → mu_eff == MU_N_EFF → byte-for-byte the prior I_Dsat (the seam),
+    # and passing it rather than branching means the default run exercises chip.strain's own seam per die.
+    channel = st.strained_channel(dev.MU_N_EFF, knobs.strain)
     i_dsat = dev.saturation_current(
-        mos, mos.V_t + knobs.overdrive_V, knobs.width_um, R_series_ohm=R_series_ohm)
+        mos, mos.V_t + knobs.overdrive_V, knobs.width_um,
+        mu_eff=channel.mu_strained_cm2_Vs, R_series_ohm=R_series_ohm)
     # G4b/A1: the SRH lifetime → junction reverse leakage. Two contributors on the same channel — the
     # deep-level metals (G4b) and a slow-pull grown-in dislocation population (A1, ξ < ξ_t) — both add to
     # 1/τ; clean feed grown on the vacancy side ⇒ τ_bulk + baseline (the seam, dislocation_density = 0).
@@ -444,6 +493,9 @@ def device_step(
         knobs_in["t_phys_um"] = stack.t_phys_um             # what was physically deposited (EOT·K/3.9)
     if wire_delay is not None:                               # F4 fingerprint — only when the wire is specified
         knobs_in["interconnect"] = knobs.interconnect        # (so an unwired device record is byte-unchanged)
+    if channel.is_strained:                                  # F5 fingerprint — only when a mechanism is set
+        knobs_in["strain"] = knobs.strain                   # (so an unstrained device record is byte-unchanged)
+        knobs_in["mu_eff"] = channel.mu_strained_cm2_Vs     # what was actually passed (MU_N_EFF · factor)
     if mos.vt_adjust != 0.0:                                 # §5 fingerprint — only when a V_t-adjust implant is set
         knobs_in["vt_adjust"] = mos.vt_adjust                # (so a no-implant device record is byte-unchanged)
     outputs = {"V_t": mos.V_t, "i_dsat": i_dsat, "C_ox": mos.C_ox,
@@ -460,6 +512,14 @@ def device_step(
         outputs["tau_gate_ps"] = wire_delay.tau_gate_s * 1.0e12   # the transistor's term (∝ 1/I_Dsat)
         outputs["wire_share"] = wire_delay.wire_share        # who sets the speed (graded, prefactor-free-ish)
         outputs["drive_sensitivity"] = wire_delay.drive_sensitivity   # ∂ln f/∂ln I_Dsat = 1 − wire_share
+    if channel.is_strained:                                  # F5 — the headline and the bound, together
+        outputs["mu_factor"] = channel.mobility_factor       # the HEADLINE: what strain actually buys (µ)
+        # The two drive currencies side by side, which is the whole reason the registry stores both. These
+        # are the MECHANISM's cited numbers, not a correction applied to this die: i_dsat above already
+        # moved by the full mu_factor (long-channel I ∝ µ), and drive_overstatement says by how much that
+        # read overstates what the real 90 nm devices measured. The bound travels with the number.
+        outputs["drive_factor_cited"] = channel.drive_factor_cited        # what the cited devices measured
+        outputs["drive_overstatement"] = channel.drive_overstatement     # µ_gain / drive_gain (≈2.0)
     return die.record(
         "device",
         knobs_in=knobs_in,

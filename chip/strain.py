@@ -324,8 +324,9 @@ def mobility_factor(mechanism: StrainMechanism | str | None) -> float:
     """The dimensionless mobility enhancement factor — **``1.0`` when there is no strain (the seam)**.
 
     ``None`` returns exactly ``1.0``, so a consumer that multiplies unconditionally still reproduces
-    today's numbers **byte-for-byte** (``MU_N_EFF · 1.0 == MU_N_EFF``, and the F5 game knob's ``None``
-    path skips passing ``mu_eff`` at all).
+    today's numbers **byte-for-byte** (``MU_N_EFF · 1.0 == MU_N_EFF`` exactly). The F5 game knob therefore
+    **passes the seam value rather than branching around it** — one call site, and every default run
+    exercises this seam on every die.
     """
     return 1.0 if mechanism is None else _resolve(mechanism).mobility_factor
 

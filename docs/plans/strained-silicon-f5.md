@@ -1,6 +1,7 @@
 # Plan — F5 strained silicon (the term the process never touched)
 
-> **STATUS: PLANNED (2026-08-10).** Roadmap card `F5` (`chip/roadmap_gallery.py:88`) is live and stays up
+> **STATUS: S1 + S2 BUILT (2026-08-10); S3 open, S4 uncommitted.** Roadmap card `F5`
+> (`chip/roadmap_gallery.py:88`) is live and stays up
 > until the last slice ships (the F3/F4 graduation rule). Predecessor F4 (BEOL interconnect) completed
 > 2026-08-10 and **F5 is the head of the promotable queue** (`future-steps.md:67`).
 >
@@ -189,13 +190,47 @@ has been re-examined (F8, F5) it had already been released.
   mobility enhancement, **and its cited drive-current enhancement** (open question 2, decided below). The
   elasticity bound (trap #1) is **enforced by a test, not by API shape** — see open question 1. `device.py`
   untouched. Pure, cited, unit-tested. **Also S1: the falsified roadmap card** (the section above).
-- **S2 — the game knob.** `DeviceKnobs.strain` (`None` = seam) resolved at `steps.py:380`, where the
-  `saturation_current` call already sits next to `R_series_ohm` and `C_ox` — no new step invented (there is
-  no strain step, and inventing one would claim more than F5 models; the F4 knob precedent). **S2's payload
-  is the knob and the seam, full stop.** The F4 composition (`1 − wire_share` damps the strain win) is
-  **one sentence, not a panel**: F4's own S2 earned its inversion by overturning a *false premise sitting in
-  the tree* (`SpeedBin`'s `f ∝ I_Dsat` docstring), and **F5's S2 has no premise to overturn**. Do not
-  inflate it into one.
+- **S2 — the game knob. ✅ BUILT 2026-08-10.** `DeviceKnobs.strain` (`None` = seam) resolved at the
+  `saturation_current` call, which already sat next to `R_series_ohm` and `C_ox` — no new step invented
+  (there is no strain step, and inventing one would claim more than F5 models; the F4 knob precedent).
+  `device.py`, `spec.py` and `state.py` all untouched. What the build settled and found:
+  - **The knob passes the seam value rather than branching around it.** `strained_channel(MU_N_EFF, None)`
+    returns `MU_N_EFF` exactly, and that *is* `saturation_current`'s own default — so one call site, and
+    **every default run exercises `chip.strain`'s seam on every die** (`test_seam.py`'s
+    `d.i_dsat == demo_device.compute().i_dsat` is now standing proof of it). A branch would have left that
+    path untested from the consumer side. The `strain.py` docstring clause promising the opposite is fixed.
+  - **THE STRUCTURAL BREAK — the first knob here that is not additive.** `bv_V`, `t_rr`, `j_gate`, `τ_total`
+    each bolt a *new* output onto an unchanged device, so engaging one alone changes nothing scored; F4
+    needed the **pair** (knob + delay binning). Strain moves `I_Dsat`, which `SpeedBins` has graded since
+    G6, so the knob **alone re-grades the wafer with no new scoring surface at all**. That is a property of
+    strain being a *process* change to a *device term*, not a new reading beside one.
+  - **And the re-grading is a statement about the LADDER, not about sorting.** Strain is common-mode and
+    **multiplicative**: every die by exactly the same factor ⇒ the coefficient of variation is unchanged and
+    the rank order is exactly preserved. The **mirror of F4**, whose common-mode τ_wire was *additive* and
+    therefore *compressed* the relative spread. At the G6 ladder the whole graded population lands on
+    `premium` — because the level moved under fixed edges, not because the line learned to sort.
+    **The control that proves there is nothing else in it** (F4's `τ_wire = 0` identity, in F5's currency):
+    scale the `I_Dsat` window *and* every bin edge by the same factor — what a fab does when it qualifies a
+    new process — and the wafer comes back **grade for grade and verdict for verdict identical**. So both
+    game-level effects are a level shift and nothing more; the construction puts no thumb on the scale.
+  - **THE UNCOMFORTABLE HALF (recorded, not tuned away): the win costs yield against a window written before
+    it existed.** `DEFAULT_SPECS`'s `I_Dsat` ceiling exists to catch *CD-collapse over-current* — on an
+    unstrained line the only way to be 20% over-current was for the geometry to be wrong. Strain lifts the
+    histogram by exactly that much with the geometry bit-for-bit correct: a loose-CD wafer goes **89/89 →
+    77/89**, every loss a parametric `I_Dsat`-high fail and no new failure mode. A **spec** artefact, not a
+    physical consequence; re-centring the window is a market decision (F4's binning-edge class), and
+    re-centring it quietly so the slice reads better is the fudge shape this project rejects.
+  - The F4 composition stayed **one test, not a panel** (F4's own S2 earned its inversion by overturning a
+    *false premise sitting in the tree* — `SpeedBin`'s `f ∝ I_Dsat` docstring — and F5's S2 has none to
+    overturn). Asserted as the **structural identities**, not F4's `∂ln f/∂ln I = 1 − wire_share`: that is
+    an exact *derivative*, so a finite +20% step would need a tolerance and prove less. `τ_wire`
+    byte-identical, `τ_gate` scaling by exactly the inverse drive ratio, speed gain strictly under the
+    drive gain.
+  - The realized gain is the **full factor** on the ideal-contact path (`sd_contact_squares = 0`, the game's
+    default) — elasticity 1 end-to-end, which is *why* it is an upper bound — and strictly **below** it once
+    source degeneration is engaged, the one sub-linearizing mechanism the model does carry. The record
+    carries `mu_factor` beside `drive_factor_cited` and `drive_overstatement` so the bound travels with the
+    number; the overstatement is the **mechanism's** cited ratio, not a correction applied to that die.
 - **S3 — the B10 history mode + demo.** The 10th timeline rung. The era contrast is the **fork**: one node,
   two processes, opposite signs, because the carriers disagree. **Gallery/manifest note:** both manifests
   are glob-anchored — the demo file and its rungs must land in the **same commit** or
