@@ -31,7 +31,7 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
 | **F2** | **Silicide / contact resistance** | 1980s salicide | **series R** → `I_Dsat` (the journey's `R_series_ohm` seam already exists!) | **✅ BUILT (2026-07-10) as historical-mode B7** (`contact_resistance.py`); two-term access+TLM-contact, bottleneck flips access→contact |
 | **F3** | **High-κ gate dielectric** | 2007 (45nm): SiO₂ → HfO₂ | **gate tunneling leakage** (exp in `t_phys`) vs **`C_ox`** (linear in EOT) — one thickness, two currencies | **✅ BUILT (2026-07-17 — all 4 slices) as historical-mode B8** (`chip/high_k.py` + the `dielectric` knob + `demo_highk_history.py`); EOT identity (`device.py` untouched), per-material WKB tunneling, and the interfacial layer on **both** currencies → the honest EOT floor. **Roadmap card graduated** |
 | **F4** | **BEOL interconnect (RC delay)** | Al → **Cu damascene (1997)** → Ru (3nm) | **new output: chip speed limited by wire RC, not the transistor** | **✅ BUILT (2026-08-10 — all 4 slices) as historical-mode B9** (`chip/interconnect.py` + the `interconnect` knob + `spec.DelayBins` + `demo_beol_history.py`); two terms with no shared variable ⇒ `∂ln f/∂ln I_Dsat = 1 − wire_share`; Cu bought 0.64 of a node; then the **axis changed** — size effect + an unscalable barrier put barrierless Ru ahead below ~13 nm with 4× Cu's bulk ρ. **Roadmap card graduated** |
-| **F5** | **SiGe strained source/drain** | ~2004 (90nm): strain era | **mobility → `I_Dsat`** (~2 GPa @ 20% Ge → up to 100% hole-µ) | PROMOTABLE — needs a µ-model in `device.py`; advanced-node |
+| **F5** | **Strained silicon** (card: SiGe S/D) | 2003–04 (90nm): strain era | **mobility → `I_Dsat`** — the one factor in `I_Dsat` no process step has ever moved | **📋 PLANNED (2026-08-10)** — `strained-silicon-f5.md`. Needs **no** `device.py` change: `mu_eff` has been a defaulted arg since P4 |
 | **F6** | **Epitaxy (buried layer / retrograde well)** | bipolar epi; CMOS wells | retrograde profile — **overlaps implant F1** | COUPLED to F1 — defer standalone |
 | **F7** | **Isolation: LOCOS → STI** | LOCOS (1970s) → STI (1998) | bird's-beak narrows active width → geometry; latchup | **✅ bird's-beak BUILT (2026-07-10) as historical-mode B5** (`locos_history.py`); STI/latchup still deferred |
 | **F8** | **CMP / planarity** | enables Cu damascene | post-CMP thickness → `R ∝ 1/(W·H)` → `τ_wire` → the delay bins — **the reader F4 built** | **UNBLOCKED by F4 (2026-08-10)** — the D2 trigger fired. Remaining gate is narrower: F4's wire geometry is one house line, so CMP needs the cross-section to become a **per-die** quantity |
@@ -64,16 +64,26 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
    Neither mechanism alone gets that sign right, and both failures are closed forms. Cited: `c_pul ≈
    2 pF/cm` **and its geometry-invariance**, the `ρ₀λ` screening FOM, the 2–3 nm barrier floor, IBM 1997
    (`beol-interconnect-source.md`).
-5. **F5 — SiGe strained S/D** — **now the head of the queue**, once a mobility model exists in `device.py`
-   (strain → µ → `I_Dsat`).
+5. **F5 — strained silicon** — **head of the queue; PLANNED 2026-08-10** (`strained-silicon-f5.md`). Its
+   gate turned out to be already lifted: `saturation_current(..., mu_eff=MU_N_EFF)` has carried a defaulted
+   mobility argument since P4, so the seam predates the slice and `device.py` stays untouched for the
+   **fourth** consecutive slice. Two things the plan settles up front: the **carrier fork** (SiGe S/D is a
+   *pMOS* technique and the sim is n-channel-only, so the module returns carrier-generic **enhancement
+   factors** and the *wired* leg is the nMOS tensile nitride cap — both legs cited from the same Intel 90 nm
+   paper), and the **magnitude bound** (the long-channel form carries a µ→I elasticity of 1; the source
+   measures **≈0.5 on both carriers**, so the drive-current read is an upper bound ~2× high at 90 nm and
+   looser as `L` shrinks — velocity saturation named-not-built, and explicitly **no** elasticity knob).
 6. **F8 — CMP / planarity** — **unblocked by F4**, which gave layer thickness its first reader. Its
    remaining gate is structural rather than conceptual: F4's wire geometry is a module-level house line
    (the game knob is metal-only), so a per-die dishing/erosion variation needs the cross-section to become
    a per-die quantity first.
 
-Recommendation: **F1 → F2 → F3 → F4** — all four shipped. **F5 or F8 is next**, and the choice is a real
-one: F5 is the next *era* rung and needs new device physics; F8 is cheaper and now has the consumer F4
-just built for it.
+Recommendation: **F1 → F2 → F3 → F4** — all four shipped. **F5 was chosen over F8 (2026-08-10)** and is
+planned. The choice was real but not close in the end: F8's *conceptual* gate is released, but its
+remaining gate is a **refactor** (F4's wire geometry is a module-level house line, so per-die dishing needs
+the cross-section to become a per-die quantity *before* any CMP physics lands), whereas F5's gate was
+already lifted by a defaulted argument written at P4. F8 gets genuinely cheap once something else forces
+per-die geometry.
 
 ## The historical/educational spine (the game's timeline)
 
