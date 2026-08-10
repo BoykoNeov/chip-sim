@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: a2c43319-403d-4ea8-b282-cb56454922b7
-  modified: 2026-08-10T05:33:23.636Z
+  modified: 2026-08-10T05:46:44.274Z
 ---
 
 **F5 = strained silicon** (roadmap card title: "SiGe strained source/drain"), **PLANNED 2026-08-10**,
@@ -50,10 +50,17 @@ discipline).
 **Also flagged:** the "~2 GPa @ ~20% Ge" and "up to 100% hole-µ" figures on the roadmap card are a *biaxial*
 range top and an unsourced GPa — do not headline either. Cited Ge% is **17%**.
 
-**LIVE FINDING — a published card's `gate` had already been falsified.** `roadmap_gallery.py:88` **and the
-stamped schematic** (`roadmap_figures.py:87–115`) both claim *"a µ(strain) model in `device.py` — none
-exists yet"*. False. This is F4-S4's named failure mode: **the golden-HTML tests confirm the prose did not
-CHANGE, never that it is still TRUE**. **Nothing pins gate↔reality** — the manifest guard pins
-card↔schematic and the goldens pin page↔renderer. **Both times a gate has been re-examined (F8, F5) it had
-already been released.** Booked as an **S1 task** (regenerates a figure + both HTML editions), not slipped
-into the plan commit. Card stays up until the last slice per [[roadmap-page]]'s graduation rule.
+**FINDING — a published card's `gate` had already been falsified; FIXED 2026-08-10 (commit `9ece311`).**
+`roadmap_gallery.py` **and the stamped schematic** both claimed *"a µ(strain) model in `device.py` — none
+exists yet"* (false), *"up to ~2× at ~20% Ge"* (biaxial range top), and *"~2 GPa"* (unsourced) — all three
+corrected, card status → *Planned*, card itself stays up until the last slice per [[roadmap-page]]'s
+graduation rule. Fixed **immediately rather than at S1** because editing the `future-steps.md` triage row
+had already broken the card↔triage **verbatim** pairing (`roadmap_gallery.py:61`), and deferring would ship
+a knowingly-broken invariant.
+
+**⇒ THE DURABLE RULE (recorded in the `SLICES` header): a card's `gate` is a claim about the CURRENT TREE,
+and the tree moves under it. When a slice is picked up, RE-CHECK ITS GATE AGAINST THE TREE FIRST.** This
+was the **second** gate found already-released (F8's by the F4 build), and **both times it was found by
+someone going to build the slice, never by a test**. Nothing pins gate↔reality: the manifest guard pins
+card↔schematic, the goldens pin page↔renderer, so between them they confirm the prose did not **CHANGE**,
+never that it is still **TRUE** — F4-S4's named failure mode.

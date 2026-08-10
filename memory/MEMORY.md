@@ -72,7 +72,7 @@ the topic file and cut the line back (this index has a hard read limit).
 ## Doc surfaces
 
 - [Gallery local edition](gallery-local-edition.md) — **project (2026-06-12 → 2026-06-14):** TWO galleries, each public + local (4 pages) from `chip/gallery.py` + `fab_game/gallery.py`. All golden-tested; don't mix github↔localhost.
-- [Roadmap page](roadmap-page.md) — **project (2026-07-14; rule first FIRED 2026-07-17):** `docs/roadmap.html` — the 4th page, PLANNED-slice schematics stamped in-image "not simulator output", verdicts verbatim with `future-steps.md`. **Graduation rule = the card comes OFF when the slice ships** — F3 went first; the manifest guard pins card↔schematic, so `SLICES`+`FIGURES` cut together.
+- [Roadmap page](roadmap-page.md) — **project (2026-07-14; rule first FIRED 2026-07-17):** `docs/roadmap.html` — the 4th page, PLANNED-slice schematics stamped in-image "not simulator output", verdicts verbatim with `future-steps.md`. **Graduation rule = the card comes OFF when the slice ships** — F3 went first; the manifest guard pins card↔schematic, so `SLICES`+`FIGURES` cut together. **2026-08-10: nothing pins gate↔REALITY — re-check a slice's gate against the tree before building it** (see [[strained-silicon-f5]]).
 
 ## Cited sources (and the claims they license)
 
