@@ -83,16 +83,31 @@ class Slice:
 # card promised was not on the page until the last slice landed. Built work now lives on history-mode
 # B9 + chip.interconnect. Do not re-add either card. F5 heads the promotable queue, and F4's build
 # RELEASED F8's gate — see its card below, which is the first hold on this page to be lifted.
+#
+# A GATE IS A CLAIM ABOUT THE CURRENT TREE, AND THE TREE MOVES UNDER IT (2026-08-10). Writing the F5
+# plan falsified F5's own card: it recorded "a µ(strain) model in device.py — none exists yet", but
+# saturation_current has taken a defaulted mu_eff since P4, so that gate had been open the whole time.
+# That is the SECOND gate on this page found already-released, after F8's — and both times it was found
+# by someone going to build the slice, never by a test. Nothing here pins gate↔reality: the manifest
+# guard pins card↔schematic and the golden tests pin page↔renderer, so between them they confirm the
+# prose did not CHANGE, never that it is still TRUE (F4-S4's named failure mode). ⇒ when a slice is
+# picked up, RE-CHECK ITS GATE AGAINST THE TREE FIRST. Corrections land here and in roadmap_figures.py
+# together, since the stale claims are stamped into the schematic too.
 SLICES = [
     Slice(
-        fid="F5", era="~2004 · 90 nm", title="SiGe strained source/drain",
-        status="Promotable", badge="ok",
-        blurb="The strain era: embedded SiGe pockets squeeze the p-channel (~2 GPa at ~20% Ge), "
-              "and hole mobility — hence drive current — rises.",
-        would_add="Mobility → I_Dsat through a strain-aware µ model — the channel-strain rung of "
-                  "the era ladder.",
-        gate="A µ(strain) mobility model in device.py — none exists yet. With F4 shipped it is "
-             "now the head of this queue.",
+        fid="F5", era="2003–04 · 90 nm", title="Strained silicon (SiGe S/D + tensile cap)",
+        status="Planned — not built", badge="ok",
+        blurb="The strain era: embedded SiGe pockets put the p-channel under uniaxial compression "
+              "(17% Ge) and hole mobility — hence drive current — rises. The n-channel wants the "
+              "opposite sign, so one node needed two processes.",
+        would_add="Mobility → I_Dsat: the one factor in I_Dsat no process step has ever moved "
+                  "(µ has been a module constant since Phase 4). The channel-strain rung of the "
+                  "era ladder, and the first device number that moves without changing a dopant, "
+                  "a thickness or a length.",
+        gate="PLANNED 2026-08-10 (docs/plans/strained-silicon-f5.md) — the gate this card used to "
+             "record is LIFTED. It read 'a µ(strain) model in device.py, none exists yet'; in fact "
+             "saturation_current has taken a defaulted mu_eff since P4, so the seam predates the "
+             "slice and device.py needs no change. What remains is the build.",
     ),
     Slice(
         fid="F6", era="bipolar epi · CMOS wells", title="Epitaxy (buried layer / retrograde well)",

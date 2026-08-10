@@ -84,10 +84,20 @@ def _rect(ax, x, y, w, h, fc, ec=INK2, lw=0.9, z=2):
 
 
 # --------------------------------------------------------------------------------------------- #
-# F5 — SiGe strained source/drain (~2004, 90 nm)
+# F5 — strained silicon; SiGe S/D is the pMOS half (2003–04, 90 nm)
+#
+# CORRECTED 2026-08-10 when the F5 plan was written (docs/plans/strained-silicon-f5.md). Three claims
+# stamped into this figure had gone stale or were never sourced at the house bar:
+#   * "gated on a µ(strain) model in device.py (none exists yet)" — FALSE. saturation_current has taken a
+#     defaulted mu_eff since P4, so the seam predates the slice and device.py needs no change at all.
+#   * "up to ~2× at ~20% Ge" — the BIAXIAL range top. The cited uniaxial S/D result is >50% at 17% Ge;
+#     the house rule is never to round a win up (F4's floor_decades, in mobility's currency).
+#   * "compressive strain ~2 GPa" — not pinned by any source at this project's bar. Dropped, not softened.
+# The mechanism drawing is unchanged; only the claims are. Keep the caption honest about the carrier fork:
+# SiGe is the pMOS half and the simulator is n-channel-only, so the WIRED leg is the nMOS tensile cap.
 # --------------------------------------------------------------------------------------------- #
 def _draw_f5(fig) -> None:
-    _chrome(fig, "F5 — SiGe strained S/D (~2004, 90 nm): strain → mobility → I_Dsat")
+    _chrome(fig, "F5 — strained silicon (2003–04, 90 nm): strain → mobility → I_Dsat")
     ax = _bare(fig.add_axes((0.02, 0.02, 0.96, 0.84)), xlim=(0, 12), ylim=(0, 6.4))
 
     _rect(ax, 1.2, 0.8, 9.6, 1.9, SI_GRAY)                        # substrate
@@ -97,7 +107,7 @@ def _draw_f5(fig) -> None:
         import matplotlib.patches as mp
         ax.add_patch(mp.Polygon([(x0, 2.7), (xd, 2.7), (xd - 0.35, 1.75), (x0 + 0.35, 1.75)],
                                 closed=True, facecolor=ORANGE, edgecolor=INK2, linewidth=0.9, zorder=3))
-    ax.text(3.3, 3.0, "SiGe S/D (~20% Ge)", ha="center", va="bottom", fontsize=9, color=INK)
+    ax.text(3.3, 3.0, "SiGe S/D (17% Ge)", ha="center", va="bottom", fontsize=9, color=INK)
     ax.text(8.7, 3.0, "SiGe S/D", ha="center", va="bottom", fontsize=9, color=INK)
     # the channel + gate stack
     _rect(ax, 4.4, 2.7, 3.2, 0.16, BLUE_PALE)                     # gate oxide
@@ -109,11 +119,13 @@ def _draw_f5(fig) -> None:
                 arrowprops=dict(arrowstyle="-|>", color=RED, lw=2.0))
     ax.annotate("", xy=(6.65, 2.25), xytext=(7.65, 2.25),
                 arrowprops=dict(arrowstyle="-|>", color=RED, lw=2.0))
-    ax.text(6.0, 1.35, "the larger Ge atom squeezes the channel —\ncompressive strain ~2 GPa",
+    ax.text(6.0, 1.35, "the larger Ge atom squeezes the channel —\nuniaxial compressive strain",
             ha="center", va="top", fontsize=9, color=RED)
-    ax.text(6.0, 5.9, "the would-be observable: hole mobility µ↑ (up to ~2× at ~20% Ge) → I_Dsat ↑ —\n"
-                      "gated on a strain-aware mobility model µ(strain) in device.py (none exists yet)",
-            ha="center", va="top", fontsize=9, color=INK2, style="italic")
+    ax.text(6.0, 5.9, "the would-be observable: hole mobility µ↑ (>50% at 17% Ge) → I_Dsat ↑ — the one\n"
+                      "factor in I_Dsat no process step has ever moved. NOT gated on device.py: mu_eff\n"
+                      "has been a defaulted argument since P4. SiGe is the pMOS half; the sim is\n"
+                      "n-channel-only, so the wired leg would be the nMOS tensile cap (+20% µ).",
+            ha="center", va="top", fontsize=8.5, color=INK2, style="italic")
 
 
 # --------------------------------------------------------------------------------------------- #
