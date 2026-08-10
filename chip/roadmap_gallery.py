@@ -125,14 +125,15 @@ SLICES = [
     ),
     Slice(
         fid="F8", era="enables Cu damascene", title="CMP / dishing / planarity",
-        status="Unblocked by F4", badge="ok",
+        status="Head of the queue — unblocked by F4", badge="ok",
         blurb="Preston-class removal with pattern-density dishing and erosion — post-CMP "
               "thickness non-uniformity.",
         would_add="Post-CMP layer-thickness non-uniformity, now with somewhere to land: F4 made "
                   "the wire cross-section electrical (R ∝ 1/(W·H) → τ_wire → the delay bins), so "
                   "dishing and erosion finally reach an observable.",
         gate="Its old gate is RELEASED — the F4 build gave layer thickness its first reader, which "
-             "is exactly the trigger recorded for backlog D2. What remains is narrower and "
+             "is exactly the trigger recorded for backlog D2, and F5's graduation left it at the head "
+             "of the queue by default rather than by strength. What remains is narrower and "
              "structural: F4's wire geometry is a module-level house line and its game knob is "
              "metal-only, so a per-die CMP variation needs the cross-section to become a per-die "
              "quantity first.",

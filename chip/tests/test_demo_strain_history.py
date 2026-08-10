@@ -235,7 +235,12 @@ def test_the_era_ENDING_is_read_off_cited_endpoints_and_never_interpolated():
         assert banned not in src, f"the demo must not interpolate between the cited endpoints: {banned}"
     # the one np.interp in this demo is B8's OXIDE ladder readout — a curve the demo itself computed —
     # and there must still be exactly one, so a second interpolation cannot arrive unnoticed.
-    assert src.count("np.interp(") == 1
+    assert src.count("np.interp(") == 1, (
+        "a second np.interp appeared in this demo. If it interpolates a curve the demo COMPUTED (as B8's "
+        "oxide ladder does), raising this count is correct; if it interpolates between the two CITED "
+        "elasticity endpoints, it is the elasticity knob and the count is doing its job. Read which "
+        "before editing the number."
+    )
 
 
 def test_figure_builds():
