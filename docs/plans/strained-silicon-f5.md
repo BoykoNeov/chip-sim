@@ -40,6 +40,12 @@ written before the slice existed. So:
 **`device.py` stays untouched — the fourth consecutive slice** (F2 rode `R_series_ohm`, F3 rode the EOT
 identity, F4 read `I_Dsat` as a loose scalar). The house discipline holds without an argument.
 
+**Scoped honestly: "the seam predates the slice" is a claim about `device.py`, not about the game wiring.**
+S2 still has to resolve a knob to a number at `steps.py:380`, which today passes `R_series_ohm=` only — so
+it costs a `DeviceKnobs` field, a resolution branch, and a `None` path that reproduces the prior value
+exactly. That is precisely the shape of the F2 block sitting immediately above it (`steps.py:371–379`).
+Cheap, and it still leaves `device.py` alone — but **not free**, and the plan should not read as if it were.
+
 **Mechanical, and it is a real trap:** do **not** rescale `MU_N_EFF` in place. `test_device.py:300`
 computes `beta = 0.5 * dev.MU_N_EFF * m.C_ox * (W/L)` **by hand** to pin the source-degeneration
 quadratic; mutating the constant silently re-baselines that test instead of failing it. Multiply and pass.
@@ -180,14 +186,16 @@ has been re-examined (F8, F5) it had already been released.
 
 - **S1 — `chip/strain.py`.** Carrier-generic mobility enhancement: a registry of cited strain mechanisms
   (`tensile_cesl` → electrons; `sige_sd` → holes), each carrying its sign, its mechanism, its cited
-  mobility enhancement, and its cited **drive-current** enhancement. The elasticity bound (trap #1) is
-  **part of S1's API surface**, not a later correction: the module should make it hard to read a
-  drive-current number without meeting the bound. `device.py` untouched. Pure, cited, unit-tested.
+  mobility enhancement, **and its cited drive-current enhancement** (open question 2, decided below). The
+  elasticity bound (trap #1) is **enforced by a test, not by API shape** — see open question 1. `device.py`
+  untouched. Pure, cited, unit-tested. **Also S1: the falsified roadmap card** (the section above).
 - **S2 — the game knob.** `DeviceKnobs.strain` (`None` = seam) resolved at `steps.py:380`, where the
   `saturation_current` call already sits next to `R_series_ohm` and `C_ox` — no new step invented (there is
-  no strain step, and inventing one would claim more than F5 models; the F4 knob precedent). Composes with
-  F4's `DelayBins` for free: the strain win is damped by exactly `1 − wire_share`, which is the first time
-  the game prices one era's gain against another era's wall.
+  no strain step, and inventing one would claim more than F5 models; the F4 knob precedent). **S2's payload
+  is the knob and the seam, full stop.** The F4 composition (`1 − wire_share` damps the strain win) is
+  **one sentence, not a panel**: F4's own S2 earned its inversion by overturning a *false premise sitting in
+  the tree* (`SpeedBin`'s `f ∝ I_Dsat` docstring), and **F5's S2 has no premise to overturn**. Do not
+  inflate it into one.
 - **S3 — the B10 history mode + demo.** The 10th timeline rung. The era contrast is the **fork**: one node,
   two processes, opposite signs, because the carriers disagree. **Gallery/manifest note:** both manifests
   are glob-anchored — the demo file and its rungs must land in the **same commit** or
@@ -220,15 +228,23 @@ has been re-examined (F8, F5) it had already been released.
 - **`I_Dsat` keeps its meaning.** `mu_eff` is passed at the read, never written back into `MOSDevice` —
   the F2 (`die.R_s`) / F3 (`die.t_ox_um`) / F4 (`τ_gate`) discipline.
 
-## Open questions (to settle before/at S1)
+## Open questions
 
-1. **Where the elasticity bound lives in the API.** A returned `(mobility_factor, drive_factor_bound)`
-   pair? A function that refuses to hand back a drive number without the bound attached? The requirement is
-   that reading only the optimistic number should take *effort*, not be the default path.
-2. **Does the registry carry the cited drive-current enhancements as data** (allowing the module to expose
-   the measured ≈0.5 elasticity as a **cited cross-check** on its own bound), or are those demo-only?
-   Leaning: carry them — it makes the bound self-documenting and gives S1 a non-circular check, which is
-   the leg F4's IBM ~40% comparison could not supply.
-3. **Does S3 need a `strain_history.py` wrapper, or does the demo ride `strain.py` directly?** The B7/B8/B9
-   precedent says **ride the base module** when the period physics is already in it — and here both era
-   mechanisms are registry entries, so almost certainly no wrapper.
+1. **Where the elasticity bound is enforced. ✅ DECIDED — by a TEST, not by API shape.** The tempting
+   framing ("make reading only the optimistic number take *effort*") asks for something the seam cannot
+   give: **the wired path *is* the optimistic number.** `mu_eff = MU_N_EFF · enhancement` fed to a
+   long-channel `I_Dsat` yields elasticity 1 **by construction**, and F5 is not touching
+   `saturation_current` — so no `strain.py` API can refuse to produce the number that another module
+   computes. Enforcement therefore belongs **where the claim is made**: a test pinning that each registry
+   entry's cited `drive_factor` is **≈ half** its cited `mobility_factor`, so any later slice that starts
+   treating the long-channel read as *the* drive result confronts the ratio head-on. This is F4's
+   standard-form test (the one that made a convention change confront its own direction), not an API trying
+   to be un-misreadable.
+2. **Does the registry carry the cited drive-current enhancements as data? ✅ DECIDED — yes.** It makes the
+   bound self-documenting, it is what open question 1's test asserts against, and it gives S1 a
+   **non-circular cross-check** — the measured ≈0.5 elasticity is an *independent* quantity the model does
+   not compute, which is exactly the leg F4's IBM ~40% comparison could not supply (that one was a
+   consistency check, since `R_Al/R_Cu ≡ ρ_Al/ρ_Cu` at fixed geometry).
+3. **Does S3 need a `strain_history.py` wrapper, or does the demo ride `strain.py` directly?** OPEN, but the
+   B7/B8/B9 precedent says **ride the base module** when the period physics is already in it — and here both
+   era mechanisms are registry entries, so almost certainly no wrapper.
