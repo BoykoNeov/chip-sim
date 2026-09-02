@@ -1,6 +1,6 @@
 ---
 name: cmp-planarity-f8
-description: "F8 CMP / planarity — S1 (module, the s/(1−s) law, the erosion-not-dishing finding) + S2 (the game knob: the wire's first per-die spread, the damascene refusal, the short graded by radius); S3/S4 open"
+description: "F8 CMP / planarity — S1 (module, the s/(1−s) law, the erosion-not-dishing finding) + S2 (the game knob: the wire's first per-die spread, the damascene refusal, the short graded by radius) + S3 (B11 demo: one transistor, many delays; the window closes; two levers and a non-lever); S4 open"
 metadata:
   node_type: memory
   type: project
@@ -59,5 +59,18 @@ its 25–90 % band match as a cross-check would be the F5-S3 flattering-directio
 9. **Step order = readout order:** CMP runs after the etch and BEFORE the device step (where `τ_total` is
    computed). Litho rework re-reads the same polished wire (die state).
 
-**S3** = B11 demo + the timeline rung (`copper cannot be plasma-etched` ⇒ damascene ⇒ CMP is the ENABLING
-step of F4's era, the reverse dependency). **S4** not pre-committed; card graduates then.
+**S3 BUILT 2026-09-02** (`chip/demo_cmp_history.py` → `chip-cmp-history.png`; `test_demo_cmp_history.py`
+10 tests; B11 rung after B9; `hist·B11` gallery card; 4 pages regenerated). Three panels: **the wall** (window
+in overburdens; floor `1/(1−s)` = `s/(1−s)` above "just cleared"; `s_crit` **0.275** @ +10 % R-budget, 0.455
+@ +25 % — the budget moves the crossing, the closure is structural), **the payload** (B9's own period
+transistor by value, `τ_gate` ONE float on every curve; Al flat at 1.39× off-scale; uniform Cu = F4
+bit-for-bit; the real polish bends +0.9/+1.8/+4.3 % at s=0.05/0.10/0.20; a 10 %-short polish shorts the disc
+`r < 0.71`, half the area, while the rim is STILL over-polished), **the successor** (`loss = η(d)·2s/(1−s)·
+t_over/H₀` — two levers: uniformity, which MUST be pressure (`V ≡ ω·d`), and density (design-rule windows /
+slotting / dummy fill over the cited 50–100 µm planarization length); **"polish less" is NOT A LEVER**, on
+the figure). The float knife-edge moved INTO `chip.cmp.polish` (the demo hit it too). Suptitle pins the
+enabling claim + the `s`-is-a-house-number flag.
+
+**S4** not pre-committed; after S3 the live candidates are (a) the scale gap made mechanical (the source's
+own planned sub-micron mask) or (b) the composition with the game's grading (a banked "grading by position"
+artifact). Card graduates with it.

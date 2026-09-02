@@ -74,7 +74,7 @@ jobs:
       - name: Full gate — the whole suite
         # The canonical full gate. -rs prints every skip reason so a silent-skip regression is
         # visible in this log (the chip.ipynb CI-skip shows here). -n auto (pytest-xdist) runs
-        # the ~850 CPU-bound tests in parallel — safe here because the slow notebook test
+        # the ~1260 CPU-bound tests in parallel — safe here because the slow notebook test
         # self-skips under CI, so it is never co-scheduled with them (THE PIN, ADR 0003
         # amendment). If you ever set CHIP_NOTEBOOK_FORCE_CI=1 to actually exercise the notebook
         # on the runner, run that test SERIALLY (`-m slow -n0`) in a separate step — parallel

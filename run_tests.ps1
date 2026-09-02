@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # Test runner. Args pass through to pytest, so the tiered gate (ADR 0003) is one flag away:
-#   ./run_tests.ps1 -m "not slow" -n auto    # routine fast lane (~850 tests), PARALLEL
+#   ./run_tests.ps1 -m "not slow" -n auto    # routine fast lane (~1260 tests), PARALLEL
 #   ./run_tests.ps1                          # full gate, SERIAL — adds the slow notebook test (always safe)
 #   ./run_tests.ps1 chip                     # scope to the simulator
 #   ./run_tests.ps1 -k erfc                  # filter by name (serial — no -n, so -s / pdb work)

@@ -484,6 +484,18 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   (loose)* = the O(1) operating-point factor `ln(1+I_F/I_R)`, flagged. The transit-limited **fall time** `t_f`
   (does not scale with `τ`), constant-`I_R` switching, and high-injection ambipolar effects are named scope
   edges. Reads the same `τ` the G4b leakage does, opposite way. Cited: `[[reverse-recovery-source]]`.
+- **Roadmap slice F8 — CMP / planarity (historical-mode B11): S1–S3 BUILT** (2026-08-19 → 2026-09-02).
+  `cmp.py` — Preston removal, the clear-everywhere requirement as a closed form (`overpolish/t_over =
+  s/(1−s)`, no house constant, exactly zero for a uniform polish), the two-sided window and its collapse at
+  `s_crit = L/(2+L)`, the kinematic identity (`|v_rel| = ω·d` at every point at matched speeds — so
+  pressure, not speed, carries the radius), the cited pattern legs on their primary axes (dishing crosses
+  zero below ~1 µm pitch ⇒ a sub-micron line is an **erosion** story), a quarantined calibration
+  (`DISH_SCALE`), and the radial pressure chain the game rides (`fab_game`'s `CmpKnobs`: the wire's first
+  per-die spread — one transistor, many delays; the short graded by radius; CMP refused by name on an Al
+  line). + `demo_cmp_history.py` (`docs/figures/chip-cmp-history.png`), the B11 timeline rung. Plan and
+  findings: `docs/plans/cmp-planarity-f8.md`. Earlier roadmap slices (F1 implant, F2/B7 silicide, F3/B8
+  high-κ, F4/B9 BEOL, F5/B10 strain) are written up in their plans under `docs/plans/` and on the
+  [era timeline](../docs/history.html).
 - **Experimentation surface — the teaching notebook: BUILT** (2026-06-09). `chip.ipynb` — the single
   interactive surface chip's pedagogy calls for (plan §9 / ADR 0002: chip is *not* the flagship, so
   **no Streamlit app**). One section per phase, each with `ipywidgets` sliders re-running the validated

@@ -368,7 +368,8 @@ a market-segmentation slice, so it lives in the scope-edge promotions above, not
   cell-geometry helpers; G4 added the wafer-level **`contamination`** vector and the per-die
   **`tau`** / **`j_leak`** (G4b); G5 added per-die **`gate_height_nm`** + **`voided`**; D1 added
   **`bridged`** (the under-etch short); G6 added **`assembled`** + **`bin`** (the back-end scrap flag
-  + the speed grade).
+  + the speed grade); F8 added **`metal_thickness_nm`** (the post-CMP copper thickness — the first per-die
+  *wire* quantity), **`shorted`** (the under-polish residual short) and **`polished_out`**.
 - **`recipe.py`** — the per-step knob dataclasses; `DEFAULT_RECIPE` **is** `chip.demo_device`'s
   coherent n-MOSFET recipe (the seam anchor). G2 added **`CzochralskiKnobs`**; G3 added
   **`WaferPrepKnobs`**; G4 added **`PurificationKnobs`** + the derived `contamination` /
@@ -381,7 +382,9 @@ a market-segmentation slice, so it lives in the scope-edge promotions above, not
   `osf_ring_radius`; A1 `interstitial_dislocation_density`; C1 `oxygen_conc_cm3` /
   `thermal_donor_anneal_min` → `thermal_donor_density`), plus D1's `EtchDepositionKnobs.under_etch_frac`
   (a `__post_init__` guards the two-`G` and over-vs-under conflicts) and E1's
-  `DiffusionKnobs.drivein_program`.
+  `DiffusionKnobs.drivein_program`. F8 added **`CmpKnobs`** (`polish_s`, default `None` = no step at all — the
+  seam; Preston `K·P·V·t` → the radial pressure chain → `chip.cmp.polish`; the trench depth is F4's house
+  `WireGeometry`, never a second number) and `DeviceKnobs.interconnect` gained its damascene partner.
 - **`variation.py`** — the seeded stochastic spread: a center-to-edge trend routed *through the
   physics* + die-to-die output scatter. `NO_VARIATION` collapses to one physics call (the seam).
   Magnitudes are **flagged house defaults**, not cited. G5 added the **conditional** etch-rate channel
@@ -394,16 +397,21 @@ a market-segmentation slice, so it lives in the scope-edge promotions above, not
   killer-defect **functional** gate and the wafer-level **`GeometrySpec`** (TTV/bow) scrap gate; G4b
   added the *optional* **leakage** window; G5 added the **deposition-void** functional gate; D1 added
   the **bridge** (under-etch short) gate; G6 added **`SpeedBins`** / **`SpeedBin`** — the deterministic
-  final-test binning partition (a grading policy, *not* physics; default one open `"pass"` bin = the seam).
+  final-test binning partition (a grading policy, *not* physics; default one open `"pass"` bin = the seam);
+  F8 added the **CMP short** and **polished-out** functional gates.
 - **`steps.py`** — the deterministic step wrappers; G3 added `wafer_prep_step`; G4 wired the **device
   step's contamination reads** (Na→`Q_ox`→`V_t`; G4b Fe/Cu→`chip.lifetime`→the leakage field), all
   *inside* `device_step`; G5 added **`etch_deposition_step`** (etch overwrites `cd_nm`, depo sets
   `voided`, D1 sets `bridged`); C1/A1 thread the thermal-donor / dislocation reads into `device_step`
-  (both call sites); G6 added **`packaging_step`** (after the front-end `test` step).
+  (both call sites); G6 added **`packaging_step`** (after the front-end `test` step); F8 added
+  **`cmp_step`** (between the etch and the device read — the device step is the readout of the finished
+  wafer, so the wire has to exist first) and the device step now builds *this die's* `WireGeometry`
+  from `metal_thickness_nm` (F4's house line when no polish ran — byte-for-byte).
 - **`pipeline.py`** — `run_line` (the driver, one seeded RNG in fixed die order; purification +
   wafer-prep run first, the etch/depo step between litho and the device, **packaging last**),
   `wafer_yield`, `diagnose` (the failure trail — killer-defect / `Q_ox` / metal-SRH-leakage /
-  dislocation-leakage / etch-bias / void / under-etch-bridge / assembly-scrap / bin-out branches),
+  dislocation-leakage / etch-bias / void / under-etch-bridge / CMP-short / over-polish / assembly-scrap /
+  bin-out branches), the F8 damascene refusal (`_require_damascene` — CMP on an Al line is refused by name),
   `rework_litho`, `rework_polish`, `rework_deposition` (**both rework loops now skip dies that reached
   the back end** — a cracked die stays dead), the A2 radial `density_fn` wiring, `_package_wafer`, and
   `run_batch`.

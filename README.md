@@ -40,7 +40,7 @@ python -m fab_game.tui                  # …or play the fab-line game (TUI; nee
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow" -n auto     # routine fast lane (~850 tests), PARALLEL
+./run_tests.ps1 -m "not slow" -n auto     # routine fast lane (~1260 tests), PARALLEL
 ./run_tests.ps1                           # full gate, SERIAL (adds the slow notebook smoke-test)
 ```
 
@@ -53,7 +53,7 @@ and CI — where it self-skips). The full gate stays **serial**, so the notebook
 xdist (the pin is structural, not a convention). It also self-skips under CI (a known infra hang
 on the GitHub runner — the kernel goes idle but `nbclient` never returns, not a content failure).
 `-n auto` is the blessed *command*, not baked into config, so single-test `-s`/pdb stays serial.
-The suite is **~850 tests** (the fast lane + 1 slow notebook smoke-test), all green; optional
+The suite is **~1260 tests** (the fast lane + 1 slow notebook smoke-test), all green; optional
 stacks are importorskip-gated, so a headless checkout skips rather than errors.
 
 ## Demonstrations
@@ -115,6 +115,8 @@ guarded by `chip/tests/test_roadmap_gallery.py`).
 | `chip.demo_silicide_history` | **hist·B7** — silicide / contact resistance: the source series-R is two terms with different `R_sh` exponents (access linear + TLM contact sublinear); salicide shunts the sheet so access collapses and the bottleneck flips to the contact | [chip-silicide-history.png](docs/figures/chip-silicide-history.png) |
 | `chip.demo_highk_history` | **hist·B8** — high-κ gate dielectric: one thickness feeds two currencies — SiO₂ scales into a tunnelling wall at `EOT ≈ 1.5 nm`, and HfO₂ clears it with a 6.4× thicker barrier at the *same* electrical gate (`V_t` / `C_ox` byte-identical); the interfacial layer floors the escape at `EOT > t_IL` for any κ | [chip-highk-history.png](docs/figures/chip-highk-history.png) |
 | `chip.demo_beol_history` | **hist·B9** — BEOL interconnect: `τ_wire ∝ 1/W²` climbs past a transistor that never moved, so past the crossover a +3% device buys a +0.7% part; copper bought 0.64 of a node, the bulk-ρ axis ran out of metals — then the axis changed, and barrierless ruthenium wins below ~13 nm with 4× copper's bulk ρ | [chip-beol-history.png](docs/figures/chip-beol-history.png) |
+| `chip.demo_strain_history` | **hist·B10** — strained silicon: `µ` was the one `I_Dsat` factor with no process owner and the only drive lever that spends no second currency (`∂J_g/∂µ = 0` structurally); the two carriers want opposite strain signs, so one node shipped two processes; a long-channel model infers `I ∝ µ` where the cited devices measured half of it — the delivered gain is a bracket that decays with `L` | [chip-strain-history.png](docs/figures/chip-strain-history.png) |
+| `chip.demo_cmp_history` | **hist·B11** — CMP / planarity: copper cannot be plasma-etched, so the polish defines the wire; clearing everywhere forces over-polishing somewhere (`s/(1−s)` overburdens, no house constant, 0 at `s = 0`), so the wire gains a spread of its own — one transistor, many delays — inside a window that closes at `s_crit = L/(2+L)`; at this pitch the loss is all erosion, a product of two levers (uniformity, through pressure; pattern density) and polishing less is neither | [chip-cmp-history.png](docs/figures/chip-cmp-history.png) |
 
 *(v1.5–v1.6 are engine-internal amendments — native nonlinear `D(u)` and explicit stepping — with no
 chip demo of their own; they surface through `engines/diffusion`'s own test suite.)*

@@ -1,6 +1,6 @@
 # Plan — F8 CMP / planarity (the step that gave the wire a spread of its own)
 
-> **STATUS: IN BUILD — S1 ✅ 2026-08-19, S2 ✅ 2026-09-02 (S3/S4 open).** Chosen off the post-F5 re-triage. Historical mode reserved: **B11**
+> **STATUS: IN BUILD — S1 ✅ 2026-08-19, S2 ✅ 2026-09-02, S3 ✅ 2026-09-02 (S4 open; the card graduates with it).** Chosen off the post-F5 re-triage. Historical mode reserved: **B11**
 > (B10 = F5 strain is the current highest — `chip/demo_strain_history.py`). Roadmap card `F8` graduates
 > on the last slice, on the F3/F4/F5 reading of "shipped".
 
@@ -274,13 +274,52 @@ tests + 10 chip-side; fast lane 1218 → 1252). What it settled beyond the plan:
 on, the delay histogram has a component the `I_Dsat` histogram cannot explain** — measured, not asserted.
 Knob `None` ⇒ byte-for-byte the current delay.
 
-**S3 — B11 demo + the history gallery.** The era spine, from the source's own first paragraph: *copper
-cannot be plasma-etched* ⇒ damascene ⇒ CMP is **not an optimisation, it is the enabling step** — F4's Cu
-era literally does not exist without F8. Period → wall → successor, glob-anchored per H0.
+**S3 — B11 demo + the history gallery. ✅ BUILT 2026-09-02** (`chip/demo_cmp_history.py` →
+`docs/figures/chip-cmp-history.png`; `chip/tests/test_demo_cmp_history.py`, 10 tests; the B11 rung in
+`chip/history_gallery.py` after B9 and the `hist·B11` card in `chip/gallery.py`; all four pages regenerated).
+What it settled beyond the plan:
+
+* **The figure is three panels and the middle one is the slice.** *Left — the wall:* the window in
+  overburdens, floor `1/(1−s)` (the clear-everywhere requirement; the floor sits exactly `s/(1−s)` above
+  "just cleared", no constant), a resistance-budget ceiling, and the closure at `s_crit = L/(2+L)` —
+  **0.275** at a +10 % wire-R budget, 0.455 at +25 %: the *budget* moves the crossing, the closure is
+  structural. *Middle — one transistor, many delays:* B9's own period transistor held fixed (`τ_gate` one
+  float on every curve), the subtractively-etched Al line flat at 1.39× (off-scale, said so), uniformly
+  polished Cu flat at F4's number bit-for-bit (the seam), and the real polish at the clear-everywhere time
+  bending upward toward the rim — +0.9 / +1.8 / +4.3 % at `s` = 0.05 / 0.10 / 0.20 — plus the other side of
+  the window: a polish 10 % short shorts the centre disc `r < r* = 0.71` (half the wafer's area) while the
+  rim is *still* over-polished. *Right — the successor:* the rim loss as `η(d) · 2s/(1−s) · t_over/H₀`, a
+  product of two levers swept over density, with dishing exactly 0 at this pitch and the cited 50–100 µm
+  planarization length named.
+* **The successor is stated as the two factors, not as a model.** Uniformity has to be a *pressure* fix
+  (the identity: `V ≡ ω·d` at matched speeds, so the zoned-pressure head and endpoint detection are where
+  the work went), and density control is design-rule density windows, slotting and dummy fill (cited
+  practice, no numbers claimed). **"Polish less" is named as *not a lever*** — the S1 headline on the
+  figure — because it lowers neither factor, it only fails to clear.
+* **The period transistor is B9's, by value.** Same four constants as `demo_beol_history`, so the two rungs
+  read one device through the untouched `device.py`; on this figure it is a bystander, and the test pins
+  `τ_gate` as one float across every curve because `delay()` reads `I_Dsat` in the gate term only.
+* **The knife-edge moved into the physics.** The demo hit the same float boundary S2 had (the `s = 0.05`
+  centre read as shorted by a 1e-17 µm residual), so the snap now lives in `chip.cmp.polish` — the S1 seam
+  test "exactly clearing costs nothing" is exactly this point — and `cmp_step` no longer carries its own.
+* **What is on the suptitle, pinned by the words test:** the enabling claim (COPPER CANNOT BE PLASMA-ETCHED),
+  the flag (THE RADIAL AMPLITUDE `s` IS A HOUSE NUMBER — the source averaged nine dies per wafer), and the
+  two closed forms by name.
+
+*Original plan text for S3:* The era spine, from the source's own first paragraph: *copper cannot be
+plasma-etched* ⇒ damascene ⇒ CMP is **not an optimisation, it is the enabling step** — F4's Cu era
+literally does not exist without F8. Period → wall → successor, glob-anchored per H0.
 
 **S4 — not pre-committed.** Candidates, to be chosen from what S1–S3 actually turn up: the wall (why
 polishing longer cannot close the window); the scale gap (what the sub-micron regime the source could not
-measure would change); or the composition with F4's `wire_share`.
+measure would change); or the composition with F4's `wire_share`. *After S3 (2026-09-02):* the wall and
+the composition are now both on the B11 figure (the window's closure; `τ_gate` fixed while `τ_wire`
+spreads), so the live candidates narrow to (a) **the scale gap made mechanical** — the sub-micron regime is
+erosion-only here *because* the cited dishing trend crosses zero, and a slice that asks what the source's
+own planned sub-micron mask would have changed is the honest next question; or (b) **the composition with
+the game's grading** — a per-die `wire_share` means F4's `DelayBins` inversion now has a radial signature,
+and S2's "grading by position" is measured but not yet a banked fab-game artifact. Either graduates the
+card; neither is pre-committed.
 
 ## Scope discipline (the honest NO's)
 

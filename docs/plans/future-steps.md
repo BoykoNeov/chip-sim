@@ -34,7 +34,7 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
 | **F5** | **Strained silicon** (card: SiGe S/D) | 2003–04 (90nm): strain era | **mobility → `I_Dsat`** — the one factor in `I_Dsat` no process step has ever moved | **✅ BUILT (2026-08-10 — all 4 slices) as historical-mode B10** (`chip/strain.py` + the `strain` knob + `demo_strain_history.py`); `device.py` untouched (`mu_eff` defaulted since P4 — the seam predates the slice); carrier-generic enhancement factors with the hole leg **refused** on the n-channel device; the first game knob that re-grades the wafer on its own; and the era's ending — a delivered-drive **bracket** between two cited endpoints, decaying with `L`, against a model whose elasticity is 1 at every `L`. **Roadmap card graduated** |
 | **F6** | **Epitaxy (buried layer / retrograde well)** | bipolar epi; CMOS wells | retrograde profile — **overlaps implant F1** | COUPLED to F1 — defer standalone |
 | **F7** | **Isolation: LOCOS → STI** | LOCOS (1970s) → STI (1998) | bird's-beak narrows active width → geometry; latchup | **✅ bird's-beak BUILT (2026-07-10) as historical-mode B5** (`locos_history.py`); STI/latchup still deferred |
-| **F8** | **CMP / planarity** | enables Cu damascene | post-CMP thickness → `R ∝ 1/(W·H)` → `τ_wire` → the delay bins — **the reader F4 built** | **HEAD OF THE QUEUE (2026-08-10, on F5's graduation) — unblocked by F4**; the D2 trigger fired. Remaining gate is narrower: F4's wire geometry is one house line, so CMP needs the cross-section to become a **per-die** quantity |
+| **F8** | **CMP / planarity** | enables Cu damascene | post-CMP thickness → `R ∝ 1/(W·H)` → `τ_wire` → the delay bins — **the reader F4 built** | **IN BUILD — S1–S3 shipped (2026-08-19 → 2026-09-02) as historical-mode B11** (`chip/cmp.py` + the `cmp` knob + `demo_cmp_history.py`; `cmp-planarity-f8.md`): the `s/(1−s)` forced overpolish, the wire's first per-die spread (one transistor, many delays), the damascene-only refusal, the short graded by radius, the window closing at `s_crit = L/(2+L)`. The published gate was **false on re-check** (the geometry was already an argument); S4 open, the card graduates with it |
 | **F9** | **FinFET / GAA** | 2011 / 2022: 3-D channel | needs the **3-D engine** (deferred B1) + `device_2d` extension | DEFERRED — no 3-D consumer yet |
 | **F10** | **EUV / multipatterning** | 2019 (7nm) | extends litho; **no new observable** (litho already rich) | DEFERRED — no discriminating consumer |
 
@@ -80,11 +80,19 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
    never a curve through them** — while this model's own elasticity is 1 at *every* channel length, since
    `W`, `L`, `C_ox` and `V_t` all cancel in the ratio. The quantity that ended the era has no route into
    the device model, which is why the axis changed to geometry (F9).
-6. **F8 — CMP / planarity** — **head of the queue (2026-08-10, on F5's graduation)**; unblocked by F4,
-   which gave layer thickness its first reader. Its
-   remaining gate is structural rather than conceptual: F4's wire geometry is a module-level house line
-   (the game knob is metal-only), so a per-die dishing/erosion variation needs the cross-section to become
-   a per-die quantity first.
+6. **F8 — CMP / planarity** — **in build: S1–S3 shipped 2026-08-19 → 2026-09-02** as historical-mode
+   B11 (`cmp-planarity-f8.md`). The gate written above ("the cross-section has to become a per-die
+   quantity first") was **already released when re-checked against the tree**: `delay()` took the
+   geometry as an argument and `Die` carried `radius_frac`, so the work was a die field and a call-site
+   change — the third roadmap gate found already-open by someone going to build. What the slices
+   settled: the forced overpolish `s/(1−s)` (no house constant; exactly zero for a uniform polish, so
+   dishing is bought by non-uniformity and the fix is uniformity, never polishing less); Preston's `V`
+   barred from carrying a radial signature (`|v_rel| = ω·d` everywhere at matched speeds, derived) so
+   pressure must; at the sim's pitch the loss is **erosion** (the cited dishing trend crosses zero at
+   ~1 µm); the game knob that gives the wire its first per-die spread — one transistor, many delays — with
+   the under-polish short graded by radius in closed form and CMP refused by name on a subtractively
+   etched (Al) line; and the two-sided window that closes at `s_crit = L/(2+L)`. S4 is open and not
+   pre-committed; the roadmap card graduates with it.
 
 Recommendation: **F1 → F2 → F3 → F4 → F5** — all five shipped. F5 was chosen over F8 (2026-08-10) and
 then built the same day; the choice was real but not close in the end: F8's *conceptual* gate is released,
