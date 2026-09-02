@@ -545,6 +545,13 @@ def polish(removal_um: float, overburden_um: float, trench_depth_um: float,
     if trench_depth_um <= 0.0:
         raise ValueError(f"trench_depth_um must be > 0, got {trench_depth_um}")
 
+    # Clearing is a BOUNDARY (removal == overburden ⇒ residual 0, overpolish 0), and a recipe set to it
+    # reaches it through K·P·V·t float arithmetic: a 1e-17 µm residual is rounding, not copper bridging a
+    # trench, and reading it as a short would make the clear-everywhere time a knife-edge for every
+    # consumer. Snap a removal within float tolerance of the overburden onto it; nothing physical is that
+    # close, and the seam test ("exactly clearing costs nothing") is exactly this point.
+    if math.isclose(removal_um, overburden_um, rel_tol=1e-12, abs_tol=0.0):
+        removal_um = overburden_um
     residual = max(0.0, overburden_um - removal_um)
     overpolish = max(0.0, removal_um - overburden_um)
     dish = dishing_efficiency(pattern) * overpolish / trench_depth_um

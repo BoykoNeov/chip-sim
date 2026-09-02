@@ -229,6 +229,36 @@ MODES = [
         "layer that stopped scaling. [The crossing's placement is a consistency check on the constants, "
         "not a prediction; the model's two simplifications both make ruthenium's win harder to earn.]",
     ),
+    HistoryMode(
+        module="demo_cmp_history", tag="B11", stage="Planarization (CMP)", era="≈1990s",
+        period="Aluminium wiring, subtractively etched: deposit the film, print the lines, etch the metal "
+        "away between them. Every wire on the wafer is as thick as the film that was deposited, so the "
+        "wire's contribution to chip delay is common-mode — the same picoseconds on every die — which is "
+        "exactly the premise the B9 rung above is derived under (τ_wire contributes no spread of its own).",
+        wall="Copper cannot be plasma-etched. So the copper line is made the other way round — cut the "
+        "trench, flood it with copper, and polish the excess off — and the polish is what sets the wire's "
+        "thickness. It must clear residual copper everywhere on the wafer or adjacent lines short, and "
+        "removal is not uniform (the wafer edge cuts into the pad), so clearing the slowest site forces an "
+        "over-polish of s/(1−s) overburdens on the typical one: a closed form with no house constant in it, "
+        "exactly zero for a uniform polish. Dishing is therefore the price of not shorting, not a defect. "
+        "The over-polished rim loses trench copper, R ∝ 1/(W·H) rises, and for the first time the wire has "
+        "a spread of its own: one transistor, many delays, graded by where the die sat on the polisher. "
+        "And the polish is caught in a two-sided window — too short and a centre disc of dies shorts, too "
+        "long and the rim is slow — that closes in closed form at s_crit = L/(2+L), past which no polish "
+        "time exists at all. Polishing less lowers nothing: it does not reduce the non-uniformity, it only "
+        "fails to clear.",
+        successor="The fix went into the two factors the loss is a product of. Uniformity — and it had to "
+        "be pressure: at matched carrier and platen speeds the pad–wafer speed is ω·d at every point on the "
+        "wafer (derived), so Preston's V is structurally barred from carrying a centre-to-edge signature and "
+        "the zoned-pressure carrier head and endpoint detection are where the work went. And pattern "
+        "density — at a sub-micron pitch the loss is all oxide erosion (the cited dishing trend crosses zero "
+        "at ~1 µm; dishing is a bond-pad and power-rail problem), and erosion diverges as the oxide that "
+        "carries the pad load runs out, so damascene design rules carry density windows, slotting and dummy "
+        "fill to hold the layout inside a band the polish can planarize over its 50–100 µm planarization "
+        "length. [The radial amplitude is a house number — the source averaged nine dies per wafer and "
+        "supplies no radial profile; the two closed forms, the seam, the monotone legs and the velocity "
+        "identity are the claims.]",
+    ),
 ]
 
 

@@ -263,12 +263,9 @@ def cmp_step(die: Die, knobs: CmpKnobs) -> Die:
     """
     pressure = knobs.pressure_factor_at(die.radius_frac)
     removal = knobs.removal_at(die.radius_frac)
-    # The clear time is a BOUNDARY (removal == overburden ⇒ residual 0, overpolish 0), and a recipe set to it
-    # reaches it through K·P·V·t float arithmetic: a 1e-17 µm residual is not copper bridging a trench, it
-    # is rounding, and reading it as a functional short would make CmpKnobs.clear_time_s a knife-edge.
-    # Snap a removal within float tolerance of the overburden onto it; nothing physical is that close.
-    if math.isclose(removal, knobs.overburden_um, rel_tol=1e-12, abs_tol=0.0):
-        removal = knobs.overburden_um
+    # (The clear time is a float boundary — a recipe set to CmpKnobs.clear_time_s reaches removal ==
+    # overburden through K·P·V·t arithmetic — and chip.cmp.polish snaps a removal within float tolerance of
+    # the overburden onto it, so a 1e-17 µm rounding residual never reads as a functional short here.)
     knobs_in = {"polish_s": knobs.polish_s, "down_force_psi": knobs.down_force_psi,
                 "pressure_factor": pressure, "removal_um": removal,
                 "nonuniformity": knobs.nonuniformity, "overburden_um": knobs.overburden_um,

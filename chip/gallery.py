@@ -121,6 +121,8 @@ DEEPENINGS = [
          "BEOL interconnect — τ_wire ∝ 1/W² climbs past a transistor that never moved, so a +3% device buys a +0.7% part; copper bought 0.64 of a node, the bulk-ρ axis ran out of metals — and then the axis changed, and barrierless ruthenium wins below ~13 nm with 4× copper's bulk ρ."),
     Demo("demo_strain_history", "hist·B10",
          "Strained silicon — µ was the one I_Dsat factor with no process owner, and the only drive lever that spends no second currency (thinning the oxide buys +20% drive for ≳0.9 decades of gate leakage; strain buys it for a structural zero); the two carriers want opposite strain signs, and a long-channel model infers I ∝ µ where the same paper measured half of it — the delivered gain is a cited bracket (1.07–1.10× for +20% µ) that decays as L shrinks, while this model's elasticity is 1 at every L, which is why the axis had to change."),
+    Demo("demo_cmp_history", "hist·B11",
+         "CMP / planarity — copper cannot be plasma-etched, so the line is cut, flooded and polished back: the polish defines the wire, and B9's copper era does not exist without it. Clearing everywhere forces over-polishing somewhere — s/(1−s) overburdens, no house constant, exactly 0 at s = 0 — so the wire gains a spread of its own (one transistor, many delays) and the polish is caught in a window that closes at s_crit = L/(2+L). At this pitch the loss is all erosion (dishing is exactly zero), a product of two levers — uniformity, which has to be pressure because V ≡ ω·d at matched speeds, and pattern density — and polishing less is neither."),
 ]
 
 ALL_DEMOS = SPINE + DEEPENINGS
