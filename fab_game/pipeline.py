@@ -18,6 +18,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
+from chip.cmp import DAMASCENE_METALS
 from chip.czochralski import Boule
 from chip.wafer_prep import prep_geometry
 
@@ -26,6 +27,7 @@ from .recipe import DEFAULT_RECIPE, Recipe
 from .spec import DEFAULT_SPECS, SpecSet
 from .state import Die, StepRecord, Verdict, WaferState, build_die_map
 from .steps import (
+    cmp_step,
     device_step,
     diffusion_junction,
     etch_deposition_step,
@@ -81,6 +83,35 @@ def _die_contamination(contamination, na_factor: float):
     if na_factor == 1.0:
         return contamination
     return replace(contamination, Na=contamination.Na * na_factor)
+
+
+
+def _require_damascene(recipe: Recipe) -> None:
+    """Refuse a CMP recipe on a line whose wire the polish does not define (F8, refused by name).
+
+    CMP sets a **damascene** wire's thickness: copper cannot be plasma-etched, so the trench is cut,
+    flooded and polished back, and the polish is what the wire's ``H`` *is*. Aluminium is subtractively
+    etched — CMP on an Al level planarizes the dielectric and never touches the wire — so the observable
+    this step exists for (a per-die wire thickness reaching ``τ_wire``) does not exist there, and a number
+    that came back would read as a verdict on a process that never ran. With no ``interconnect`` at all
+    there is no metal level to polish. Both are the source's own first paragraph, not guard rails.
+    """
+    metal = recipe.device.interconnect
+    if metal in DAMASCENE_METALS:
+        return
+    if metal is None:
+        raise ValueError(
+            "cmp.polish_s is set but DeviceKnobs.interconnect is None: CMP defines a damascene wire's "
+            "thickness, and there is no wire to define — set interconnect to one of "
+            f"{DAMASCENE_METALS} (chip.cmp.DAMASCENE_METALS)"
+        )
+    raise ValueError(
+        f"cmp.polish_s is set on an interconnect={metal!r} line, which CMP does not define: {metal} is "
+        "subtractively etched, so polishing planarizes the dielectric and never sets the wire thickness "
+        "— the per-die τ_wire this step exists for does not exist on that line. Copper cannot be "
+        "plasma-etched, which is why damascene + CMP defines the copper line and only the copper line "
+        f"(chip.cmp.DAMASCENE_METALS = {DAMASCENE_METALS})."
+    )
 
 
 def run_line(
@@ -229,6 +260,39 @@ def run_line(
                     "over_etch_frac": recipe.etch_deposition.over_etch_frac,
                     "conformality": recipe.etch_deposition.conformality},
                    _aggregate(dies, "cd_nm")), dies)
+
+    # 3c. CMP (F8) — per die, ONLY when engaged (polish_s set; the seam is "no step at all"). The first
+    #     back-end step and the first upstream of F4's wire: this die's radius → the pressure hot spot →
+    #     Preston removal → what the polish left of the trench copper. Too short and the slow centre keeps
+    #     residual copper bridging the lines (shorted, a functional kill graded by radius); too long and the
+    #     fast rim is thinned (metal_thickness_nm < nominal → the device step's τ_wire rises). Deterministic
+    #     (a knob-level radial profile, like the OSF ring — no RNG draw, the determinism contract holds).
+    #     Refused by name on a non-damascene line (Al is subtractively etched; nothing here to polish).
+    if recipe.cmp.engaged:
+        _require_damascene(recipe)
+        knobs = recipe.cmp
+        dies = tuple(cmp_step(d, knobs) for d in wafer.dies)
+        thick = [d.metal_thickness_nm for d in dies if d.metal_thickness_nm is not None]
+        cmp_summary = {
+            "removal_rate_um_s": knobs.removal_rate_um_s,
+            "mean_removal_um": knobs.mean_removal_um,
+            "clear_time_s": knobs.clear_time_s,                     # the window's lower edge, spec-free
+            "forced_overpolish_ratio": knobs.forced_overpolish_ratio,   # s/(1−s), the headline, no constant
+            "shorted_radius_frac": knobs.shorted_radius_frac,      # the closed-form edge of the shorted disc
+            "n_shorted": sum(1 for d in dies if d.shorted),
+            "n_polished_out": sum(1 for d in dies if d.polished_out),
+            "nominal_thickness_nm": knobs.trench_depth_um * 1.0e3,
+            "min_thickness_nm": min(thick) if thick else None,
+            "max_thickness_nm": max(thick) if thick else None,
+        }
+        cmp_summary.update(_aggregate(dies, "metal_thickness_nm"))
+        wafer = wafer.with_step(
+            StepRecord("cmp",
+                       {"polish_s": knobs.polish_s, "down_force_psi": knobs.down_force_psi,
+                        "relative_speed_m_s": knobs.relative_speed_m_s,
+                        "nonuniformity": knobs.nonuniformity, "overburden_um": knobs.overburden_um,
+                        "pitch_um": knobs.pitch_um, "density": knobs.pattern.density},
+                       cmp_summary), dies)
 
     # 4. Device — per die, reading the inherited t_ox + cd + the wafer contamination (the propagation:
     #    Na → Q_ox → V_t; the residual-dopant net shift is already in effective_channel_N_A).
@@ -470,6 +534,30 @@ def diagnose(die: Die) -> str:
             lines.append(f"    ↳ etch/depo: etch bias {bias:.1f} nm shrank the resist CD "
                          f"{etch.outputs.get('resist_cd_nm', float('nan')):.1f} → gate CD "
                          f"{etch.outputs.get('cd_nm', float('nan')):.1f} nm (over-etch / low anisotropy)")
+    # The CMP fingerprint (F8): an under-polish that left residual copper bridging the trenches (a
+    # functional short, graded by radius — the slow centre of a non-uniform polish), a runaway over-polish
+    # that removed the trench (no conductor), or an over-polish that merely thinned the copper (a slower
+    # wire — named only when it actually cost thickness, so a polish that exactly cleared is silent).
+    polish = next((r for r in die.history if r.step == "cmp"), None)
+    if polish is not None:
+        k, o = polish.knobs_in, polish.outputs
+        if o.get("shorted") is True:
+            lines.append(f"    ↳ CMP: under-polish SHORT — {o.get('residual_um', float('nan'))*1e3:.0f} nm of "
+                         f"copper still bridges the trenches at r={die.radius_frac:.2f} (removal "
+                         f"{k.get('removal_um', float('nan')):.3f} µm < the {k.get('overburden_um', float('nan')):.3f} µm "
+                         f"overburden: the SLOW site of a {k.get('nonuniformity', 0.0):.0%} non-uniform polish; a "
+                         f"functional kill — polish to the clear-everywhere time, which over-polishes the fast "
+                         f"rim, or fix the uniformity)")
+        elif o.get("polished_out") is True:
+            lines.append(f"    ↳ CMP: over-polish POLISHED OUT the trench at r={die.radius_frac:.2f} (removal "
+                         f"{k.get('removal_um', float('nan')):.3f} µm — no conductor remains; a functional kill "
+                         f"— shorten the polish)")
+        elif o.get("loss_fraction", 0.0) > 0.0:
+            lines.append(f"    ↳ CMP: over-polish {o['overpolish_um']:.3f} µm thinned the copper line to "
+                         f"{o['thickness_um']*1e3:.0f} nm (−{o['loss_fraction']:.1%}: erosion "
+                         f"{o['erosion_loss']:.1%} + dishing {o['dish_loss']:.1%}) → wire R ×"
+                         f"{o['resistance_factor']:.3f} → τ_wire up at r={die.radius_frac:.2f} (a slower part, "
+                         f"not a dead one — the price of clearing the slow centre)")
     if device is not None and "refused" in device.outputs:
         lines.append(f"    ↳ device: refused ({device.outputs['refused']}) — no working transistor")
     elif device is not None:

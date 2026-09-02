@@ -200,12 +200,24 @@ from dataclasses import dataclass
 # --------------------------------------------------------------------------- #
 # House constants — every one of these is FLAGGED (see the honesty ladder)
 # --------------------------------------------------------------------------- #
-PRESTON_K = 1.67e-2        # FLAGGED — Preston coefficient, µm/(s·psi·(m/s)); scales removal, no headline
+PRESTON_K = 2.4e-3         # FLAGGED — Preston coefficient, µm/(s·psi·(m/s)). At the house 3.5 psi and 1 m/s it
+#                            gives ≈0.5 µm/min, inside the typical copper-CMP removal band; it scales every
+#                            removal and every time, and no headline reads it. (Slice 2 re-set it from 1.67e-2,
+#                            which put a full clear at ~10 s — a rate, never a claim, so nothing quotable moved.)
 DISH_ZERO_PITCH_UM = 1.0   # FLAGGED — pitch at which the cited log-linear dishing trend reaches zero
 DISH_DECADE_SLOPE = 0.33   # FLAGGED — normalized dishing gained per decade of pitch (Fig. 5: ~0.9/2.7)
 DISH_SCALE = 5.0           # CALIBRATED (see `the calibration, named as one` in the docstring) — converts
 #                            the source's NORMALIZED dishing into a trench-recession efficiency
 EROSION_COEFF = 0.12       # FLAGGED — shape-fit prefactor on d/(1−d) (Fig. 7)
+EDGE_PROFILE_EXPONENT = 2  # FLAGGED — the radial pressure profile's SHAPE (r²: a thin fast rim, not a linear
+#                            bowl); the SIGN of the edge effect is cited, the shape and amplitude are house
+
+# The metals whose LINE is defined by the polish. Copper cannot be plasma-etched (the source's first
+# paragraph), so the trench is cut, flooded and polished back: CMP is what sets a copper wire's thickness.
+# Aluminium is subtractively etched — CMP on an Al level planarizes the DIELECTRIC and never touches the
+# wire — so the observable this module exists for (a per-die wire thickness) does not exist there. A
+# consumer that polishes an Al line is refusing by name, not guarding a corner case.
+DAMASCENE_METALS = ("Cu",)
 
 # --------------------------------------------------------------------------- #
 # The cited experiment, kept as data so the demo and tests quote rather than recall
@@ -549,3 +561,72 @@ def polish(removal_um: float, overburden_um: float, trench_depth_um: float,
         dish_loss=dish, erosion_loss=erode, loss_fraction=loss,
         thickness_um=trench_depth_um * (1.0 - loss),
     )
+
+
+# --------------------------------------------------------------------------- #
+# 5. The across-wafer signature — the pressure chain a consumer rides (slice 2)
+# --------------------------------------------------------------------------- #
+def radial_pressure_factor(radius_frac: float, nonuniformity: float) -> float:
+    """``P(r)/P̄ = 1 + s·(2r² − 1)`` — the wafer-edge hot spot as a profile whose **sign** is cited and whose
+    amplitude ``s`` belongs to the caller (a FLAGGED house number in the game, a swept axis in the demo).
+
+    Built so the closed forms above apply **without translation**: the centre sees ``1 − s``, the edge
+    ``1 + s``, and ``r² = ½`` exactly 1 — so local removal spans ``R̄·[1−s, 1+s]`` and the ``s`` here *is*
+    the ``s`` of :func:`forced_overpolish_ratio` and :func:`critical_nonuniformity`. Two things make this
+    factor the whole radial story rather than one of several: Preston is **linear** in ``P``
+    (:func:`preston_removal_um`), so the removal profile is this profile with no exponent to soften it;
+    and ``V`` is position-independent at matched speeds (:func:`velocity_is_uniform`), so pressure is the
+    *only* factor of the product that can carry a signature. The centre is the **slow** site (it clears
+    last and shorts first) and the edge the **fast** one (it clears first and dishes most) — the cited
+    direction of the edge hot spot.
+
+    The ``r²`` shape (a thin fast rim rather than a linear bowl) is a FLAGGED convention, the same one the
+    game's sodium rim uses and for the same reason — an edge effect is a rim, not a slope.
+    """
+    if not 0.0 <= radius_frac <= 1.0:
+        raise ValueError(f"radius_frac must be in [0, 1], got {radius_frac}")
+    if not 0.0 <= nonuniformity < 1.0:
+        raise ValueError(f"nonuniformity must be in [0, 1), got {nonuniformity}")
+    return 1.0 + nonuniformity * (2.0 * radius_frac ** EDGE_PROFILE_EXPONENT - 1.0)
+
+
+def radial_removal_um(radius_frac: float, nonuniformity: float, mean_removal_um: float) -> float:
+    """Local blanket removal ``R̄ · P(r)/P̄`` (µm) — Preston's linearity in ``P`` applied to the profile.
+
+    ``mean_removal_um`` is the removal at the profile's unit point (``r² = ½``), i.e. the ``R̄`` of the
+    closed forms. The kinematic identity is what licenses multiplying by a pressure factor alone: at
+    matched speeds there is no velocity factor to multiply by.
+    """
+    if mean_removal_um < 0.0:
+        raise ValueError(f"mean_removal_um must be ≥ 0, got {mean_removal_um}")
+    return mean_removal_um * radial_pressure_factor(radius_frac, nonuniformity)
+
+
+def shorted_radius_frac(nonuniformity: float, mean_removal_um: float, overburden_um: float) -> float:
+    """The radius inside which the polish has **not** cleared — "graded by radius", in closed form.
+
+    A site clears iff ``R̄·(1 + s(2r² − 1)) ≥ t_over``, i.e. iff ``r² ≥ (t_over/R̄ − 1 + s)/(2s)``. Returns
+    that boundary ``r*`` clamped to ``[0, 1]``: **0** when every site clears (``R̄(1−s) ≥ t_over``), **1**
+    when none does (``R̄(1+s) < t_over``), and in between the fraction of the wafer's *area* still bridged
+    is exactly ``r*²``. That is the gradual-failure structure as a closed form: an under-polish shorts a
+    **centre disc of dies, grouped by radius**, never the whole wafer at a threshold — and it gets there by
+    moving the offending quantity (removal) across the wafer, not by inflating an unrelated one.
+
+    At ``s = 0`` there is no radial structure to grade by: the wafer clears everywhere or nowhere.
+    """
+    if not 0.0 <= nonuniformity < 1.0:
+        raise ValueError(f"nonuniformity must be in [0, 1), got {nonuniformity}")
+    if mean_removal_um < 0.0:
+        raise ValueError(f"mean_removal_um must be ≥ 0, got {mean_removal_um}")
+    if overburden_um <= 0.0:
+        raise ValueError(f"overburden_um must be > 0, got {overburden_um}")
+    if mean_removal_um == 0.0:
+        return 1.0
+    if nonuniformity == 0.0:
+        return 0.0 if mean_removal_um >= overburden_um else 1.0
+    r_sq = (overburden_um / mean_removal_um - 1.0 + nonuniformity) / (2.0 * nonuniformity)
+    if r_sq <= 0.0:
+        return 0.0
+    if r_sq >= 1.0:
+        return 1.0
+    return math.sqrt(r_sq)

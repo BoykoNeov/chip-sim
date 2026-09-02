@@ -321,3 +321,60 @@ def test_the_source_supplies_no_radial_profile():
     """It averaged nine dies per wafer to remove exactly the variation slice 2 needs ⇒ that amplitude is
     a house number, and this pins the reason in the test suite rather than only in prose."""
     assert cmp.CITED.dies_averaged == 9
+
+
+# --------------------------------------------------------------------------- #
+# Slice 2 — the radial pressure chain (the only Preston factor that can carry a signature)
+# --------------------------------------------------------------------------- #
+def test_the_pressure_profile_spans_exactly_the_closed_forms_band():
+    """Centre ``1−s``, edge ``1+s``, unit at ``r² = ½`` — so the ``s`` here IS the ``s`` of s/(1−s)."""
+    s = 0.15
+    assert cmp.radial_pressure_factor(0.0, s) == 1.0 - s
+    assert cmp.radial_pressure_factor(1.0, s) == 1.0 + s
+    assert cmp.radial_pressure_factor(math.sqrt(0.5), s) == pytest.approx(1.0)
+    rs = [i / 20 for i in range(21)]
+    fs = [cmp.radial_pressure_factor(r, s) for r in rs]
+    assert fs == sorted(fs)                                              # the centre is the slow site (cited sign)
+    assert all(cmp.radial_pressure_factor(r, 0.0) == 1.0 for r in rs)   # s = 0: no radial structure at all
+
+
+@pytest.mark.parametrize("r, s", [(-0.1, 0.1), (1.1, 0.1), (0.5, 1.0), (0.5, -0.1)])
+def test_the_pressure_profile_refuses_out_of_range_inputs(r, s):
+    with pytest.raises(ValueError):
+        cmp.radial_pressure_factor(r, s)
+
+
+def test_removal_is_the_profile_times_the_mean_because_preston_is_linear_in_p():
+    for r in (0.0, 0.3, 0.9):
+        assert cmp.radial_removal_um(r, 0.1, 0.6) == 0.6 * cmp.radial_pressure_factor(r, 0.1)
+
+
+def test_the_shorted_radius_is_the_boundary_where_removal_equals_the_overburden():
+    s, over = 0.1, 0.5
+    R = over / (1.0 - s) * 0.95                                          # a little short of clearing the centre
+    r_star = cmp.shorted_radius_frac(s, R, over)
+    assert 0.0 < r_star < 1.0
+    assert cmp.radial_removal_um(r_star, s, R) == pytest.approx(over)    # exactly cleared AT the boundary
+    assert cmp.polish(cmp.radial_removal_um(0.99 * r_star, s, R), over, 0.5, cmp.PatternGeometry(0.5)).cleared is False
+    assert cmp.polish(cmp.radial_removal_um(1.01 * r_star, s, R), over, 0.5, cmp.PatternGeometry(0.5)).cleared is True
+
+
+def test_the_shorted_radius_clamps_to_the_two_wafer_wide_answers():
+    s, over = 0.1, 0.5
+    assert cmp.shorted_radius_frac(s, over / (1.0 - s), over) == 0.0     # the clear-everywhere removal
+    assert cmp.shorted_radius_frac(s, over / (1.0 + s) * 0.99, over) == 1.0   # not even the rim clears
+    assert cmp.shorted_radius_frac(0.0, over, over) == 0.0               # uniform: everywhere…
+    assert cmp.shorted_radius_frac(0.0, 0.99 * over, over) == 1.0        # …or nowhere
+    assert cmp.shorted_radius_frac(s, 0.0, over) == 1.0
+
+
+def test_the_damascene_registry_is_a_subset_of_the_bulk_era_metals_and_excludes_aluminium():
+    """Copper cannot be plasma-etched (the source's first paragraph); aluminium is subtractively etched."""
+    assert set(cmp.DAMASCENE_METALS) <= set(ic.BULK_ERA_METALS)
+    assert "Cu" in cmp.DAMASCENE_METALS and "Al" not in cmp.DAMASCENE_METALS
+
+
+def test_the_house_preston_rate_sits_in_the_typical_copper_cmp_band():
+    """FLAGGED constant, sanity-bounded rather than claimed: ~0.2–1 µm/min at the source's mid down-force."""
+    rate_um_min = cmp.preston_removal_um(3.5, 1.0, 60.0)
+    assert 0.2 <= rate_um_min <= 1.0

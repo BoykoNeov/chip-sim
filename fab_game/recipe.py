@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from chip import cmp
+from chip import interconnect as ic
 from chip.czochralski import Boule
 from chip.diffusion_dopant import ThermalProgram
 from chip.purification import FEEDSTOCK_GRADES, Contamination, zone_refine
@@ -532,6 +534,144 @@ class EtchDepositionKnobs:
 
 
 @dataclass(frozen=True)
+class CmpKnobs:
+    """Copper-damascene CMP knobs → :mod:`chip.cmp` (F8) — the step that gives the wire a thickness of its own.
+
+    **Why the line has this step at all.** Aluminium wires were subtractively etched; copper cannot be
+    plasma-etched, so a copper line is made the other way round — trench first, flood with copper, then
+    **polish** the excess off. The polish is what defines the wire's thickness, and it defines it
+    *non-uniformly*: by where the die sits on the wafer (the pressure hot spot at the wafer edge) and by
+    what is printed around the line (dishing on wide features, erosion in dense arrays). So this is the
+    first step upstream of F4's wire, and the one that makes :class:`chip.interconnect.WireGeometry` a
+    **per-die** quantity — F4's ``∂ln f/∂ln I_Dsat = 1 − wire_share`` was derived under "``τ_wire``
+    contributes no spread of its own", and this knob is the step that ends that clause.
+
+    ``polish_s`` is the knob: the polish time (s). Preston's equation turns it into a wafer-mean blanket
+    removal ``K·P·V·t`` (:attr:`mean_removal_um`); the radial pressure profile
+    (:func:`chip.cmp.radial_pressure_factor`, amplitude :attr:`nonuniformity`) turns *that* into a per-die
+    removal; and :func:`chip.cmp.polish` turns the per-die removal into what is left of the trench copper.
+    Two failure directions read the **same** number: too short and the slow centre keeps residual copper
+    bridging the trenches (a **functional short**, graded by radius — a centre disc of dies, never the
+    whole wafer); too long and the fast rim is over-polished, its copper thinned, its ``R ∝ 1/(W·H)``
+    up and its ``τ_wire`` up (a *slower* part, not a dead one). Clearing the slowest site forces an
+    overpolish of exactly ``s/(1−s)`` overburdens on the typical one (:attr:`forced_overpolish_ratio`) —
+    the module's headline, with no house constant in it — which is why the fix for dishing is polish
+    **uniformity** and never polish *less*.
+
+    **The seam.** ``polish_s = None`` (the default) ⇒ **no CMP step runs at all**: no per-die record, no
+    wafer record, ``Die.metal_thickness_nm`` stays ``None`` and the device step reads the house
+    ``WireGeometry()`` exactly as before — byte-for-byte today's wafer, the G1–G7 banked demos and the
+    journey included. The step is added to the flow only when engaged, the way F4 emits no delay until
+    ``interconnect`` is set.
+
+    **The refusal.** Engaging CMP on anything but a damascene metal (:data:`chip.cmp.DAMASCENE_METALS`,
+    today ``"Cu"``) is refused **by name** in the pipeline: on an ``"Al"`` line CMP planarizes the
+    dielectric and never touches the wire, so the observable this step exists for does not exist there;
+    with no ``interconnect`` at all there is no metal level to polish. That refusal is the era's teaching
+    point (the source's own first paragraph), not a guard rail.
+
+    **What is flagged.** :attr:`nonuniformity` (the radial amplitude — the source averaged nine dies per
+    wafer and supplies **no** radial profile; its sign is cited, its size is a house number),
+    :attr:`overburden_um` (the plated copper standing above the field oxide), :attr:`pitch_um` (the layout
+    around the house line — the sim has never carried a pattern density; the line *width* is F4's, so
+    the density ``W/pitch`` follows the source's own definition rather than being a second number), and
+    Preston's ``K`` inside the rate. The **trench depth is not a knob**: it is
+    :class:`chip.interconnect.WireGeometry`'s nominal thickness, so "no loss" and "the F4 wire" are the same
+    number by construction rather than by agreement.
+    """
+
+    polish_s: float | None = None      # F8 polish time (s); None = no CMP step, the house WireGeometry() (the seam)
+    down_force_psi: float = 3.5        # Preston P̄ — the source's Table 1a mid value (2.0 / 3.5 / 5.0 psi)
+    relative_speed_m_s: float = 1.0    # Preston V = ω·d at matched carrier/platen speeds: ONE number for the whole
+    #                                    wafer (the kinematic identity), so it cannot carry a radial signature
+    nonuniformity: float = 0.10        # s — FLAGGED radial amplitude: removal(r) = R̄·(1 + s·(2r² − 1)) ∈ R̄·[1−s, 1+s]
+    overburden_um: float = 0.5         # FLAGGED — plated copper above the field oxide that must come off to clear
+    pitch_um: float = 0.5              # FLAGGED — the layout pitch the house 250 nm line sits on (density = W/pitch)
+
+    def __post_init__(self) -> None:
+        if self.polish_s is not None and self.polish_s < 0.0:
+            raise ValueError(f"polish_s must be ≥ 0 (or None for no CMP step), got {self.polish_s}")
+        if self.down_force_psi <= 0.0:
+            raise ValueError(f"down_force_psi must be > 0, got {self.down_force_psi}")
+        if self.relative_speed_m_s <= 0.0:
+            raise ValueError(f"relative_speed_m_s must be > 0, got {self.relative_speed_m_s}")
+        if not 0.0 <= self.nonuniformity < 1.0:
+            raise ValueError(
+                f"nonuniformity must be in [0, 1), got {self.nonuniformity} — at s = 1 the slowest site "
+                "removes nothing and no polish time clears the wafer (chip.cmp.forced_overpolish_ratio)"
+            )
+        if self.overburden_um <= 0.0:
+            raise ValueError(f"overburden_um must be > 0, got {self.overburden_um}")
+        if self.pitch_um <= self.line_width_um:
+            raise ValueError(
+                f"pitch_um must exceed the house line width {self.line_width_um} µm, got {self.pitch_um} — "
+                "at density ≥ 1 no oxide is left standing to carry the pad load (chip.cmp.PatternGeometry)"
+            )
+
+    @property
+    def engaged(self) -> bool:
+        """Whether the CMP step runs at all (``polish_s`` set). ``False`` ⇒ the seam: no step, no record."""
+        return self.polish_s is not None
+
+    @property
+    def line_width_um(self) -> float:
+        """The wire width the polish sees — F4's house line, never a second number."""
+        return ic.WireGeometry().width_um
+
+    @property
+    def trench_depth_um(self) -> float:
+        """The nominal copper thickness = the trench depth = F4's house ``WireGeometry().thickness_um``."""
+        return ic.WireGeometry().thickness_um
+
+    @property
+    def pattern(self) -> cmp.PatternGeometry:
+        """The layout the polish sees: the house pitch at density ``W/pitch`` (the source's definition)."""
+        return cmp.PatternGeometry(self.pitch_um, density=self.line_width_um / self.pitch_um)
+
+    @property
+    def removal_rate_um_s(self) -> float:
+        """Preston's blanket removal rate ``K·P̄·V`` (µm/s) at the wafer-mean pressure."""
+        return cmp.preston_removal_um(self.down_force_psi, self.relative_speed_m_s, 1.0)
+
+    @property
+    def mean_removal_um(self) -> float | None:
+        """The wafer-mean blanket removal ``K·P̄·V·t`` (µm) — the ``R̄`` of the closed forms; ``None`` when off."""
+        return None if self.polish_s is None else self.removal_rate_um_s * self.polish_s
+
+    @property
+    def clear_time_s(self) -> float:
+        """The polish time that clears the **slowest** site (the centre): ``t_over / ((1−s)·rate)``.
+
+        The lower edge of the two-sided window, in the knob's own unit. Independent of ``polish_s`` — it
+        is what the recipe *should* be set to, at minimum, and it already implies the forced overpolish.
+        """
+        return self.overburden_um / ((1.0 - self.nonuniformity) * self.removal_rate_um_s)
+
+    @property
+    def forced_overpolish_ratio(self) -> float:
+        """``s/(1−s)`` — the overpolish (in overburdens) the clear-everywhere requirement forces on the
+        typical site, :func:`chip.cmp.forced_overpolish_ratio`. Zero at ``s = 0``, no house constant."""
+        return cmp.forced_overpolish_ratio(self.nonuniformity)
+
+    def pressure_factor_at(self, radius_frac: float) -> float:
+        """``P(r)/P̄`` at this die — the only Preston factor that can vary across the wafer."""
+        return cmp.radial_pressure_factor(radius_frac, self.nonuniformity)
+
+    def removal_at(self, radius_frac: float) -> float:
+        """This die's blanket removal (µm): the mean removal × its pressure factor (Preston is linear in P)."""
+        if self.mean_removal_um is None:
+            raise ValueError("CMP is not engaged (polish_s is None) — there is no removal to evaluate")
+        return cmp.radial_removal_um(radius_frac, self.nonuniformity, self.mean_removal_um)
+
+    @property
+    def shorted_radius_frac(self) -> float:
+        """The radius inside which this polish leaves residual copper (0 = clears everywhere, 1 = nowhere)."""
+        if self.mean_removal_um is None:
+            raise ValueError("CMP is not engaged (polish_s is None) — nothing is shorted or cleared")
+        return cmp.shorted_radius_frac(self.nonuniformity, self.mean_removal_um, self.overburden_um)
+
+
+@dataclass(frozen=True)
 class DeviceKnobs:
     """Device-read knobs → :func:`chip.device.threshold_voltage` / :func:`chip.device.saturation_current`.
 
@@ -691,6 +831,7 @@ class Recipe:
     oxidation: OxidationKnobs = field(default_factory=OxidationKnobs)
     litho: LithoKnobs = field(default_factory=LithoKnobs)
     etch_deposition: EtchDepositionKnobs = field(default_factory=EtchDepositionKnobs)
+    cmp: CmpKnobs = field(default_factory=CmpKnobs)          # F8 — off by default (no step runs; the seam)
     device: DeviceKnobs = field(default_factory=DeviceKnobs)
     packaging: PackagingKnobs = field(default_factory=PackagingKnobs)
 

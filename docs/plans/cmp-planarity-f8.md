@@ -1,6 +1,6 @@
 # Plan — F8 CMP / planarity (the step that gave the wire a spread of its own)
 
-> **STATUS: PLANNED (2026-08-19).** Chosen off the post-F5 re-triage. Historical mode reserved: **B11**
+> **STATUS: IN BUILD — S1 ✅ 2026-08-19, S2 ✅ 2026-09-02 (S3/S4 open).** Chosen off the post-F5 re-triage. Historical mode reserved: **B11**
 > (B10 = F5 strain is the current highest — `chip/demo_strain_history.py`). Roadmap card `F8` graduates
 > on the last slice, on the F3/F4/F5 reading of "shipped".
 
@@ -217,11 +217,62 @@ form (the polish range that clears residue without over-thinning). The derived k
 asserted invariant. No game wiring. Tests pin: the seam (zero overpolish ⇒ nominal thickness), the
 monotone dependences, `1/(1−loss)` resistance, and the window's collapse as spread grows.
 
-**S2 — the game knob + the per-die wire (the payload).** `cmp` knob; `Die.metal_thickness_nm`; the
-`radius_frac` → pressure → removal → thickness chain; `WireGeometry(thickness_um=…)` per die at
-`steps.py:478`; under-polish residual → `bridged`-style functional short, graded by radius. The assertion
-that earns the slice: **with the knob on, the delay histogram has a component the `I_Dsat` histogram
-cannot explain** — measured, not asserted. Knob `None` ⇒ byte-for-byte the current delay.
+**S2 — the game knob + the per-die wire (the payload). ✅ BUILT 2026-09-02** (`fab_game/recipe.py`
+`CmpKnobs` + `Recipe.cmp`; `fab_game/steps.py` `cmp_step` + the device-step read; `Die.metal_thickness_nm` /
+`shorted` / `polished_out`; two verdict gates; the pipeline's 3c step, the damascene refusal and the
+`diagnose` branch; `chip/cmp.py` §5 the radial pressure chain; `fab_game/tests/test_cmp_knob.py`, 24
+tests + 10 chip-side; fast lane 1218 → 1252). What it settled beyond the plan:
+
+* **The earning assertion holds in its sharpest form.** With *zero* variation every transistor on the
+  wafer is the same transistor — one `I_Dsat`, one `τ_gate` — and the chip delay still spreads, monotone
+  in radius, because the wire under the rim was polished thinner. `1 − wire_share` is a per-die number
+  now; F4's clause is gone. Measured on the wafer, not asserted from the module.
+* **The seam is "no step at all", and there is a second seam inside the engaged run.** `polish_s=None`
+  adds nothing to the flow (no per-die or wafer record — the bookkeeping test's step list is untouched),
+  the way F4 emits no delay until `interconnect` is set. Engaged and set to the clear-everywhere time, the
+  **centre die is byte-for-byte F4**: the slowest site removes exactly the overburden, so the forced
+  overpolish `s/(1−s)` lands on *every other die* — the headline law seen from the wafer. And a uniform
+  polish (`s=0`) at the clear time reproduces F4 on every die: the two-sided window's seam, wafer-wide.
+* **The refusal is the era's teaching point, and it lives in the registry.** `chip.cmp.DAMASCENE_METALS
+  = ("Cu",)`: copper cannot be plasma-etched, so damascene + CMP defines the copper line and *only* the
+  copper line; aluminium is subtractively etched, so a polish there planarizes the dielectric and never
+  sets the wire — the observable F8 exists for does not exist on an Al line. The pipeline refuses `"Al"`
+  and `None` **by name**, the F4 (Ru) / F5 (SiGe) pattern one slice on.
+* **The trench depth is not a knob.** It is `WireGeometry().thickness_um`, and the line width is
+  `WireGeometry().width_um`, so the pattern density is `W/pitch` — the source's own definition — and the
+  slice adds **one** house layout number (the pitch), not two. "No loss" and "the F4 wire" are the same
+  number by construction rather than by agreement.
+* **The short is graded by radius in closed form.** `chip.cmp.shorted_radius_frac` gives the edge `r*` of
+  the centre disc that has not cleared (`r² < (t_over/R̄ − 1 + s)/(2s)`); the pipeline's shorted set is
+  exactly `{r < r*}`, the shorted trench is untouched (nominal thickness — the failure is copper left
+  standing *between* the lines), and shortening the polish grows the disc ring by ring, never
+  nothing→everything (the [[gradual-failure-preferred]] structure, delivered by moving the offending
+  quantity across the wafer). A runaway polish that removes the trench is a third, graceful outcome
+  (`polished_out`: no conductor ⇒ no delay ⇒ a functional kill, not a divide).
+* **Grading by position.** Anchor F4's `DelayBins.from_speed_bins` on the centre part and run a wafer of
+  identical transistors: at `s=0.2` the outer 40 of 89 dies fall from `typical` to `value`, monotone
+  outward, with the `I_Dsat` histogram a single value. That is a speed grade set by where the die sat
+  on the polisher — the first grading signature in the game with no transistor behind it.
+* **The magnitudes, flagged as they were promised to be.** At the clear time the rim loses 1.2 / 2.5 /
+  5.7 % of its copper for `s` = 0.05 / 0.10 / 0.20 (delay +0.9 / +1.9 / +4.3 %). All erosion: at the house
+  0.5 µm pitch `dish_loss` is *exactly* 0.0 on every die (S1's zero crossing), so the whole per-die
+  spread is oxide erosion — and its lever is pattern **density**, which is what S3's successor (dummy
+  fill) is about. `PRESTON_K` was re-set 1.67e-2 → 2.4e-3 so the house 3.5 psi / 1 m/s gives ≈0.5 µm/min
+  and a clear at ~1 min rather than ~10 s; a rate, no headline reads it (the S1 quotable-leg invariance
+  test still passes untouched).
+* **A numerical knife-edge, closed.** The clear time is a boundary (residual 0, overpolish 0) reached
+  through `K·P·V·t` float arithmetic; a 1e-17 µm residual is rounding, not copper, and would have read as
+  a functional short. `cmp_step` snaps a removal within float tolerance of the overburden onto it.
+* **Step order is readout order.** CMP runs after the gate etch and *before* the device step, because the
+  device step is where `τ_total` is computed and the wire it reads has to exist — the device step is the
+  readout of the finished wafer, not the transistor's chronology. Litho rework re-reads the same polished
+  wire (die state), which is also what a strip-and-re-expose physically does.
+
+*Original plan text for S2:* `cmp` knob; `Die.metal_thickness_nm`; the `radius_frac` → pressure → removal
+→ thickness chain; `WireGeometry(thickness_um=…)` per die at `steps.py:478`; under-polish residual →
+`bridged`-style functional short, graded by radius. The assertion that earns the slice: **with the knob
+on, the delay histogram has a component the `I_Dsat` histogram cannot explain** — measured, not asserted.
+Knob `None` ⇒ byte-for-byte the current delay.
 
 **S3 — B11 demo + the history gallery.** The era spine, from the source's own first paragraph: *copper
 cannot be plasma-etched* ⇒ damascene ⇒ CMP is **not an optimisation, it is the enabling step** — F4's Cu

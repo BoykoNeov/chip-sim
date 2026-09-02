@@ -257,7 +257,9 @@ class SpecSet:
     litho image, where the device never formed); (2) a litho image that **never resolved**; (3) a
     **deposition void / pinch-off** (G5 — a poor step coverage failed to fill the gate gap); (3b) an
     **under-etch residual bridge** (D1 — an incomplete clear left residual film shorting the gate lines,
-    the mirror of the void's open). A
+    the mirror of the void's open); (3c) a **CMP under-polish residual short** (F8 — copper left standing
+    between the trenches bridges the wires, the same failure one metal level up) or a **polished-out
+    trench** (a runaway over-polish that left no conductor). A
     wafer-level **geometry** scrap (TTV/bow out, passed in as ``geometry_reason``) is the outermost
     gate — it fails every die. Otherwise the parametric chain: the defocus chain rides **NILS** (the
     printability floor) and **CD/I_Dsat** (the channel-length chain); ``V_t`` rides the
@@ -318,6 +320,10 @@ class SpecSet:
             return Verdict(False, ("deposition void / pinch-off (functional fail)",))
         if die.bridged is True:                                # D1 — an under-etch residual short
             return Verdict(False, ("under-etch residual bridge / short (functional fail)",))
+        if die.shorted is True:                                # F8 — a CMP under-polish residual short
+            return Verdict(False, ("CMP under-polish residual copper short (functional fail)",))
+        if die.polished_out is True:                           # F8 — a runaway over-polish, no conductor left
+            return Verdict(False, ("CMP over-polish — trench polished out, no conductor (functional fail)",))
         reasons = [
             r for r in (
                 self.nils.check(die.nils),

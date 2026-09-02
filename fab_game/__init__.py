@@ -39,6 +39,7 @@ from .state import (
 )
 from .recipe import (
     DEFAULT_RECIPE,
+    CmpKnobs,
     CzochralskiKnobs,
     DeviceKnobs,
     DiffusionKnobs,

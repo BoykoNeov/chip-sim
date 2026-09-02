@@ -20,6 +20,7 @@ from __future__ import annotations
 import math
 
 from chip import breakdown as bd
+from chip import cmp
 from chip import contact_resistance as cr
 from chip import diffusion_dopant as dd
 from chip import etch_deposition as ed
@@ -36,6 +37,7 @@ from chip.purification import Contamination, getter_metals, sodium_oxide_charge
 from chip.wafer_prep import WaferGeometry
 
 from .recipe import (
+    CmpKnobs,
     DeviceKnobs,
     DiffusionKnobs,
     EtchDepositionKnobs,
@@ -229,6 +231,67 @@ def etch_deposition_step(
     )
 
 
+def cmp_step(die: Die, knobs: CmpKnobs) -> Die:
+    """Copper-damascene CMP on one die (F8) — the polish that sets the wire's thickness, and sets it per die.
+
+    The line's first **back-end** step, and the first step upstream of F4's wire: it runs after the gate
+    stack is etched and before the device step *reads* the finished die, because the device step is where
+    the chip delay ``τ_total = τ_gate + τ_wire`` is computed and the wire it reads has to exist first (the
+    device step is the readout of the finished wafer, not the transistor's own chronology).
+
+    The chain, each link a :mod:`chip.cmp` call and nothing else: this die's radius → the pressure factor
+    ``P(r)/P̄`` (:func:`chip.cmp.radial_pressure_factor` — the *only* Preston factor that can vary across
+    the wafer, since ``V`` is position-independent at matched speeds) → this die's blanket removal
+    (Preston is linear in ``P``) → :func:`chip.cmp.polish` against the overburden, the trench depth and
+    the layout, which returns what is left of the trench copper. Two outcomes read the same number:
+
+    * **removal < overburden** (the slow centre of a non-uniform polish) → residual copper still bridges
+      the trenches → ``shorted`` → a **functional** kill, graded by radius (a centre disc of dies, its edge
+      at :attr:`CmpKnobs.shorted_radius_frac` — never the whole wafer at once);
+    * **removal > overburden** (the fast rim) → the excess comes out of the trench (erosion at this pitch;
+      dishing is exactly zero below 1 µm, :func:`chip.cmp.dishing_efficiency`) → ``metal_thickness_nm``
+      below nominal → the device step's ``R ∝ 1/(W·H)`` rises → a **slower** part, never a dead one.
+
+    A runaway polish that removes the whole trench is a third, graceful outcome (``polished_out`` — no
+    conductor, a functional kill rather than a crash: :func:`chip.cmp.polish` raises there rather than
+    returning a zero that would divide downstream, and the step catches it the way the etch step catches
+    a consumed gate line). Runs on every die regardless of its transistor's state — the wafer is polished
+    whole, and a die whose litho never resolved still has copper to clear.
+
+    The seam is *upstream* of this function: with ``polish_s = None`` the pipeline never calls it, so no
+    die carries a ``cmp`` record and the device step reads the house line exactly as before.
+    """
+    pressure = knobs.pressure_factor_at(die.radius_frac)
+    removal = knobs.removal_at(die.radius_frac)
+    # The clear time is a BOUNDARY (removal == overburden ⇒ residual 0, overpolish 0), and a recipe set to it
+    # reaches it through K·P·V·t float arithmetic: a 1e-17 µm residual is not copper bridging a trench, it
+    # is rounding, and reading it as a functional short would make CmpKnobs.clear_time_s a knife-edge.
+    # Snap a removal within float tolerance of the overburden onto it; nothing physical is that close.
+    if math.isclose(removal, knobs.overburden_um, rel_tol=1e-12, abs_tol=0.0):
+        removal = knobs.overburden_um
+    knobs_in = {"polish_s": knobs.polish_s, "down_force_psi": knobs.down_force_psi,
+                "pressure_factor": pressure, "removal_um": removal,
+                "nonuniformity": knobs.nonuniformity, "overburden_um": knobs.overburden_um,
+                "pitch_um": knobs.pitch_um, "density": knobs.pattern.density}
+    try:
+        p = cmp.polish(removal, knobs.overburden_um, knobs.trench_depth_um, knobs.pattern)
+    except ValueError as exc:
+        # The trench is polished out — no conductor remains, so no thickness (and no resistance) exists to
+        # report. A functional kill, recorded as one; the device step then emits no wire delay for it.
+        return die.record(
+            "cmp", knobs_in=knobs_in, outputs={"functional_fail": str(exc), "polished_out": True},
+            polished_out=True, shorted=False,
+        )
+    outputs = {"residual_um": p.residual_um, "overpolish_um": p.overpolish_um,
+               "dish_loss": p.dish_loss, "erosion_loss": p.erosion_loss, "loss_fraction": p.loss_fraction,
+               "thickness_um": p.thickness_um, "resistance_factor": p.resistance_factor,
+               "shorted": not p.cleared, "polished_out": False}
+    return die.record(
+        "cmp", knobs_in=knobs_in, outputs=outputs,
+        metal_thickness_nm=p.thickness_um * 1.0e3, shorted=not p.cleared, polished_out=False,
+    )
+
+
 def device_step(
     die: Die, knobs: DeviceKnobs, channel_N_A: float, contamination: Contamination | None = None,
     thermal_donor_density: float = 0.0, dislocation_density: float = 0.0,
@@ -376,7 +439,19 @@ def device_step(
     teaching point rather than a guard rail. ``strain = None`` → factor exactly ``1.0`` → ``mu_eff`` is
     ``MU_N_EFF`` and every number is byte-for-byte today's (the seam; G1–G7 and the journey unchanged).
     Passing the seam value rather than branching around it means **the default run exercises the strain
-    module's own seam on every die**."""
+    module's own seam on every die**.
+
+    **CMP (F8)** — the wire the F4 delay reads is no longer the house line on every die: when the CMP step
+    ran upstream, ``die.metal_thickness_nm`` carries *this die's* post-polish copper thickness and the
+    :class:`chip.interconnect.WireGeometry` passed to :func:`chip.interconnect.delay` is built from it
+    (width and length unchanged — erosion and dishing thin the copper, they do not move the trench
+    sidewalls the etch cut, and F4's cited invariance keeps ``C`` off ``W``/``H`` entirely). So
+    ``τ_wire`` becomes **per-die**, and F4's law ``∂ln f/∂ln I_Dsat = 1 − wire_share`` loses the clause it
+    was derived under ("the wire contributes no spread of its own"): the delay histogram gains a component
+    the ``I_Dsat`` histogram cannot explain, because it comes from where the die sat on the polisher. A
+    ``polished_out`` die has no conductor and gets **no** delay (the gap-vs-fake-zero rule). With no CMP
+    record (``metal_thickness_nm is None``) the geometry is ``WireGeometry()`` exactly — byte-for-byte
+    F4 (the seam)."""
     if die.t_ox_um is None or die.cd_um is None or die.resolved is False:
         reason = ("litho image not resolved" if die.resolved is False
                   else "missing upstream t_ox/CD")
@@ -456,8 +531,8 @@ def device_step(
     # (∂τ_wire/∂I_Dsat = 0 — a common-mode floor, the same ps on every die). Purely additive: never
     # written back, never moves V_t/I_Dsat, scored only by specs.delay_bins. interconnect None → no delay
     # emitted (the seam). Requires I_Dsat > 0 (gate_delay's guard) — a refused device never reaches here.
-    if knobs.interconnect is None:
-        wire_delay = None
+    if knobs.interconnect is None or die.polished_out is True:
+        wire_delay = None                                    # no wire specified — or no conductor left (F8)
     else:
         # The knob is gated to the BULK-ERA metals, and the gate is physics rather than tidiness (F4
         # slice 4). The game runs ONE house line — a 250 nm-era global wire — through the bulk-ρ model.
@@ -475,7 +550,12 @@ def device_step(
                 f"chip.interconnect.BULK_ERA_METALS."
             )
         c_load = ic.gate_load_capacitance(mos.C_ox, knobs.width_um, die.cd_um)
-        wire_delay = ic.delay(ic.WireGeometry(), i_dsat, c_load, metal=knobs.interconnect)
+        # F8: the cross-section is per die once CMP has run — the polished thickness replaces the house
+        # thickness and NOTHING else moves (W and L are the etch's and the lump's; C never read H). With no
+        # CMP record this is WireGeometry() exactly, so an unpolished wafer reads byte-for-byte F4.
+        geometry = (ic.WireGeometry() if die.metal_thickness_nm is None
+                    else ic.WireGeometry(thickness_um=die.metal_thickness_um))
+        wire_delay = ic.delay(geometry, i_dsat, c_load, metal=knobs.interconnect)
     knobs_in = {"gate": knobs.gate, "width_um": knobs.width_um, "overdrive_V": knobs.overdrive_V,
                 "Q_ox": Q_ox, "N_A": channel_N_A}
     if thermal_donor_density > 0.0:                          # C1 fingerprint — only when donors are present
@@ -493,6 +573,8 @@ def device_step(
         knobs_in["t_phys_um"] = stack.t_phys_um             # what was physically deposited (EOT·K/3.9)
     if wire_delay is not None:                               # F4 fingerprint — only when the wire is specified
         knobs_in["interconnect"] = knobs.interconnect        # (so an unwired device record is byte-unchanged)
+        if die.metal_thickness_nm is not None:               # F8 fingerprint — only when CMP set the thickness
+            knobs_in["metal_thickness_um"] = geometry.thickness_um   # what the wire was actually read at
     if channel.is_strained:                                  # F5 fingerprint — only when a mechanism is set
         knobs_in["strain"] = knobs.strain                   # (so an unstrained device record is byte-unchanged)
         knobs_in["mu_eff"] = channel.mu_strained_cm2_Vs     # what was actually passed (MU_N_EFF · factor)
@@ -512,6 +594,9 @@ def device_step(
         outputs["tau_gate_ps"] = wire_delay.tau_gate_s * 1.0e12   # the transistor's term (∝ 1/I_Dsat)
         outputs["wire_share"] = wire_delay.wire_share        # who sets the speed (graded, prefactor-free-ish)
         outputs["drive_sensitivity"] = wire_delay.drive_sensitivity   # ∂ln f/∂ln I_Dsat = 1 − wire_share
+        if die.metal_thickness_nm is not None:               # F8 — the per-die wire, only when CMP ran
+            # R/R_nominal = H_nominal/H — exact (R ∝ 1/(W·H), only H moved); == chip.cmp's 1/(1−loss)
+            outputs["wire_R_factor"] = ic.WireGeometry().thickness_um / geometry.thickness_um
     if channel.is_strained:                                  # F5 — the headline and the bound, together
         outputs["mu_factor"] = channel.mobility_factor       # the HEADLINE: what strain actually buys (µ)
         # The two drive currencies side by side, which is the whole reason the registry stores both. These

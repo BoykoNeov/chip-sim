@@ -116,6 +116,11 @@ class Die:
     j_gate: float | None = None                 # direct-tunnelling gate-leakage density (A/cm²) — set by the device step (F3); None ⇒ dielectric knob off
     delay: float | None = None                  # chip switching delay τ_total = τ_gate + τ_wire (s) — set by the device step (F4); None ⇒ interconnect knob off
     #                                             NOTE: `tau` above is the minority-carrier LIFETIME (G4b) — a different quantity entirely. This is a delay.
+    metal_thickness_nm: float | None = None     # post-CMP copper line thickness (nm) — set by the CMP step (F8); None ⇒ CMP knob off ⇒
+    #                                             the device step reads the house WireGeometry() line, the same on every die (the seam)
+    shorted: bool | None = None                 # set by CMP (F8); True ⇒ under-polish residual copper bridges the lines → functional fail
+    #                                             (the mirror of D1's `bridged`, one metal level up)
+    polished_out: bool | None = None            # set by CMP (F8); True ⇒ a runaway over-polish removed the whole trench → no conductor → functional fail
     defects: tuple[DefectEvent, ...] = ()       # killer particles caught at wafer prep (G3)
     killed_by_defect: bool | None = None        # set by wafer prep; True ⇒ a functional fail
     voided: bool | None = None                  # set by etch/depo (G5); True ⇒ a depo void → functional fail
@@ -160,6 +165,13 @@ class Die:
         only a gate delay, and the pre-1997 premise reads that off ``I_Dsat`` already.
         """
         return None if self.delay is None else self.delay * 1.0e12
+
+    @property
+    def metal_thickness_um(self) -> float | None:
+        """Post-CMP copper line thickness in **µm** (``metal_thickness_nm·1e-3``) — the cross-module length
+        currency :class:`chip.interconnect.WireGeometry` takes. ``None`` until the CMP step runs (the
+        gap-vs-fake-zero rule): a die with no polish record has the *house* thickness, not a measured one."""
+        return None if self.metal_thickness_nm is None else self.metal_thickness_nm * 1.0e-3
 
     def record(self, step: str, knobs_in: dict, outputs: dict, **updates) -> "Die":
         """Return a new die with ``updates`` applied and a :class:`DieStepRecord` appended (append-only)."""
