@@ -37,6 +37,8 @@ from pathlib import Path
 from chip.gallery import (
     _STYLE,
     _nav,
+    figure_img,
+    head_meta,
     _BLOB,
     _REPO_URL,
     _LAB,
@@ -213,7 +215,7 @@ def _card(s: Slice, plan_href: str) -> str:
     return f"""        <article class="card">
           <a class="shot" href="{fig}" title="open the full schematic (a preview, not simulator output)">
             <span class="ribbon">planned &mdash; schematic</span>
-            <img src="{fig}" alt="{fid} — {title} schematic preview (planned, not simulator output)" loading="lazy">
+            {figure_img(fig, f"{fid} — {title} schematic preview (planned, not simulator output)")}
           </a>
           <div class="body">
             <div class="tagrow">
@@ -278,6 +280,9 @@ def render_html(local: bool = False) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title}</title>
+  {head_meta(title, "The planned-but-unbuilt slices of chip-sim, each with a schematic preview (stamped "
+                    "in-image as not simulator output) and the named consumer that gates its build.",
+             local)}
   <style>
 {_STYLE}
   </style>

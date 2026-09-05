@@ -1,0 +1,314 @@
+{
+ "chip-beol-history.webp": {
+  "digest": "26f9f5cdc77f9b95",
+  "height": 606,
+  "source": "chip-beol-history.png",
+  "width": 760
+ },
+ "chip-car.webp": {
+  "digest": "c976a1e5d2294eb6",
+  "height": 351,
+  "source": "chip-car.png",
+  "width": 760
+ },
+ "chip-cmp-history.webp": {
+  "digest": "a7454029667f60a6",
+  "height": 276,
+  "source": "chip-cmp-history.png",
+  "width": 760
+ },
+ "chip-defocus.webp": {
+  "digest": "bdf31568efcb137d",
+  "height": 351,
+  "source": "chip-defocus.png",
+  "width": 760
+ },
+ "chip-device-2d.webp": {
+  "digest": "3414160b30b0c431",
+  "height": 351,
+  "source": "chip-device-2d.png",
+  "width": 760
+ },
+ "chip-device.webp": {
+  "digest": "9dde274cad9b364f",
+  "height": 563,
+  "source": "chip-device.png",
+  "width": 760
+ },
+ "chip-doping-history.webp": {
+  "digest": "49dded9433c3ce1a",
+  "height": 270,
+  "source": "chip-doping-history.png",
+  "width": 760
+ },
+ "chip-highconc.webp": {
+  "digest": "60ebd4d18a48566b",
+  "height": 345,
+  "source": "chip-highconc.png",
+  "width": 760
+ },
+ "chip-highk-history.webp": {
+  "digest": "a40e5255ab1644f2",
+  "height": 201,
+  "source": "chip-highk-history.png",
+  "width": 760
+ },
+ "chip-implant-channeling.webp": {
+  "digest": "32a7ba3a7136747a",
+  "height": 269,
+  "source": "chip-implant-channeling.png",
+  "width": 760
+ },
+ "chip-implant-damage.webp": {
+  "digest": "cb638c5ce9928411",
+  "height": 269,
+  "source": "chip-implant-damage.png",
+  "width": 760
+ },
+ "chip-implant-pearson.webp": {
+  "digest": "11e850a0eec7cd28",
+  "height": 466,
+  "source": "chip-implant-pearson.png",
+  "width": 760
+ },
+ "chip-implant.webp": {
+  "digest": "74353b0daae81ef2",
+  "height": 223,
+  "source": "chip-implant.png",
+  "width": 760
+ },
+ "chip-junction.webp": {
+  "digest": "51ed30fe313f430b",
+  "height": 351,
+  "source": "chip-junction.png",
+  "width": 760
+ },
+ "chip-lateral-diffusion.webp": {
+  "digest": "0cbfc4c21842db15",
+  "height": 351,
+  "source": "chip-lateral-diffusion.png",
+  "width": 760
+ },
+ "chip-litho-history.webp": {
+  "digest": "8d4adfb7d83bd4c4",
+  "height": 270,
+  "source": "chip-litho-history.png",
+  "width": 760
+ },
+ "chip-litho.webp": {
+  "digest": "dbac97b45efa140e",
+  "height": 351,
+  "source": "chip-litho.png",
+  "width": 760
+ },
+ "chip-locos-history.webp": {
+  "digest": "063f70e34db14761",
+  "height": 270,
+  "source": "chip-locos-history.png",
+  "width": 760
+ },
+ "chip-metallization-history.webp": {
+  "digest": "3d677bad21e5f64c",
+  "height": 270,
+  "source": "chip-metallization-history.png",
+  "width": 760
+ },
+ "chip-oed-segregation.webp": {
+  "digest": "6c9081f3ac1e6f2b",
+  "height": 345,
+  "source": "chip-oed-segregation.png",
+  "width": 760
+ },
+ "chip-oxidation-history.webp": {
+  "digest": "96774989477ef174",
+  "height": 270,
+  "source": "chip-oxidation-history.png",
+  "width": 760
+ },
+ "chip-oxidation.webp": {
+  "digest": "1dca2bfb1b111c4f",
+  "height": 351,
+  "source": "chip-oxidation.png",
+  "width": 760
+ },
+ "chip-peb.webp": {
+  "digest": "a87ae1e0898deaf4",
+  "height": 351,
+  "source": "chip-peb.png",
+  "width": 760
+ },
+ "chip-resist-history.webp": {
+  "digest": "31c8ac3d6d37e865",
+  "height": 270,
+  "source": "chip-resist-history.png",
+  "width": 760
+ },
+ "chip-silicide-history.webp": {
+  "digest": "e214c8cc3e71a3f9",
+  "height": 270,
+  "source": "chip-silicide-history.png",
+  "width": 760
+ },
+ "chip-strain-history.webp": {
+  "digest": "79a6624bfecd1df7",
+  "height": 276,
+  "source": "chip-strain-history.png",
+  "width": 760
+ },
+ "chip-thin-oxide.webp": {
+  "digest": "7d46783e632d9f26",
+  "height": 351,
+  "source": "chip-thin-oxide.png",
+  "width": 760
+ },
+ "chip-zernike.webp": {
+  "digest": "c966da19b2824d86",
+  "height": 232,
+  "source": "chip-zernike.png",
+  "width": 760
+ },
+ "fab-game-a1.webp": {
+  "digest": "50caf46d1f944710",
+  "height": 238,
+  "source": "fab-game-a1.png",
+  "width": 760
+ },
+ "fab-game-a2.webp": {
+  "digest": "0a5569fc6dd33e98",
+  "height": 238,
+  "source": "fab-game-a2.png",
+  "width": 760
+ },
+ "fab-game-c1.webp": {
+  "digest": "e54143d904a1385c",
+  "height": 238,
+  "source": "fab-game-c1.png",
+  "width": 760
+ },
+ "fab-game-cg1.webp": {
+  "digest": "8555b971cd1713e8",
+  "height": 238,
+  "source": "fab-game-cg1.png",
+  "width": 760
+ },
+ "fab-game-cg2.webp": {
+  "digest": "5ff1d23214a4f223",
+  "height": 238,
+  "source": "fab-game-cg2.png",
+  "width": 760
+ },
+ "fab-game-cg3.webp": {
+  "digest": "b24b475f4c054730",
+  "height": 238,
+  "source": "fab-game-cg3.png",
+  "width": 760
+ },
+ "fab-game-d1.webp": {
+  "digest": "c1f4ce395d0c8056",
+  "height": 238,
+  "source": "fab-game-d1.png",
+  "width": 760
+ },
+ "fab-game-e1.webp": {
+  "digest": "3702ffa9caff218c",
+  "height": 292,
+  "source": "fab-game-e1.png",
+  "width": 760
+ },
+ "fab-game-g1.webp": {
+  "digest": "3118302210f83d0c",
+  "height": 684,
+  "source": "fab-game-g1.png",
+  "width": 760
+ },
+ "fab-game-g2.webp": {
+  "digest": "3f8956d3fb771409",
+  "height": 233,
+  "source": "fab-game-g2.png",
+  "width": 760
+ },
+ "fab-game-g3.webp": {
+  "digest": "fc6899a246bca367",
+  "height": 243,
+  "source": "fab-game-g3.png",
+  "width": 760
+ },
+ "fab-game-g4.webp": {
+  "digest": "47df840e58413fa9",
+  "height": 238,
+  "source": "fab-game-g4.png",
+  "width": 760
+ },
+ "fab-game-g4b.webp": {
+  "digest": "d888c48989b533c3",
+  "height": 238,
+  "source": "fab-game-g4b.png",
+  "width": 760
+ },
+ "fab-game-g5.webp": {
+  "digest": "bee7d823aa293100",
+  "height": 238,
+  "source": "fab-game-g5.png",
+  "width": 760
+ },
+ "fab-game-g6.webp": {
+  "digest": "ad7ca498857d5361",
+  "height": 243,
+  "source": "fab-game-g6.png",
+  "width": 760
+ },
+ "fab-game-g7.webp": {
+  "digest": "16c6010833fdfaa9",
+  "height": 238,
+  "source": "fab-game-g7.png",
+  "width": 760
+ },
+ "fab-game-journey.webp": {
+  "digest": "ffb46caaee3c6d65",
+  "height": 1140,
+  "source": "fab-game-journey.png",
+  "width": 760
+ },
+ "fab-game-s4.webp": {
+  "digest": "5c65297ca3c7d9bd",
+  "height": 238,
+  "source": "fab-game-s4.png",
+  "width": 760
+ },
+ "fab-game-s5.webp": {
+  "digest": "b3e31b7152a99d83",
+  "height": 238,
+  "source": "fab-game-s5.png",
+  "width": 760
+ },
+ "roadmap-f10.webp": {
+  "digest": "c47d5a66ff98a695",
+  "height": 301,
+  "source": "roadmap-f10.png",
+  "width": 760
+ },
+ "roadmap-f6.webp": {
+  "digest": "109e896a4db80e24",
+  "height": 301,
+  "source": "roadmap-f6.png",
+  "width": 760
+ },
+ "roadmap-f7.webp": {
+  "digest": "f129ee9d1438a2a4",
+  "height": 301,
+  "source": "roadmap-f7.png",
+  "width": 760
+ },
+ "roadmap-f8.webp": {
+  "digest": "bbe647c6c4a009f9",
+  "height": 301,
+  "source": "roadmap-f8.png",
+  "width": 760
+ },
+ "roadmap-f9.webp": {
+  "digest": "faa02a6d2d5f083e",
+  "height": 301,
+  "source": "roadmap-f9.png",
+  "width": 760
+ }
+}

@@ -31,6 +31,8 @@ import importlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import thumbnails
+
 # --- repo coordinates (absolute links — Pages serves /docs, so anything OUTSIDE /docs,
 #     i.e. the demo .py files / the notebook / the ADRs, must be linked absolutely) ---------
 REPO = "BoykoNeov/chip-sim"
@@ -157,6 +159,52 @@ def figure_relpath(demo: Demo, pkg: str = "chip") -> str:
     return Path(mod.DOCS_FIGURE).relative_to(DOCS_DIR).as_posix()  # e.g. "figures/chip-oed-segregation.png"
 
 
+# The public Pages origin — only for the Open Graph tags of the public editions (a shared link
+# unfurls with a title, a blurb and a figure). The local editions carry none (nothing remote).
+_PAGES_URL = "https://boikoneov.github.io/chip-sim"
+
+
+def figure_img(fig: str, alt: str) -> str:
+    """The ``<img>`` for a banked figure, shared by all four pages.
+
+    Displays the figure's **WebP thumbnail** (``docs/figures/thumbs/``, :mod:`chip.thumbnails`) — ~20 KB
+    instead of the 100–600 KB original the card *links* to — with its pixel size declared, so the
+    browser reserves the image box before the bytes arrive and a lazily-loading page no longer
+    re-flows card-by-card (the layout jump the first render of every gallery used to show). The size
+    comes from the thumbnail manifest (pure JSON), so rendering stays image-library-free.
+    """
+    w, h = thumbnails.thumb_size(fig)
+    return (f'<img src="{thumbnails.thumb_relpath(fig)}" width="{w}" height="{h}" alt="{alt}" '
+            f'loading="lazy" decoding="async">')
+
+
+def head_meta(title: str, description: str, local: bool = False, og_image: str | None = None) -> str:
+    """The ``<head>`` metadata shared by all four pages (after the charset/viewport lines).
+
+    ``color-scheme`` lets the browser's own chrome (form controls, scrollbars, the default canvas
+    behind the page) follow the dark palette the stylesheet already implements; ``theme-color``
+    tints the mobile toolbar to match. The public editions also carry Open Graph tags so a shared
+    link unfurls with the page's title, blurb and a representative figure; the local editions
+    (``file://`` / ``localhost``) carry no remote reference at all.
+    """
+    desc = html.escape(description, quote=True)
+    lines = [
+        f'<meta name="description" content="{desc}">',
+        '<meta name="color-scheme" content="light dark">',
+        '<meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">',
+        '<meta name="theme-color" content="#10151b" media="(prefers-color-scheme: dark)">',
+    ]
+    if not local:
+        lines += [
+            '<meta property="og:type" content="website">',
+            f'<meta property="og:title" content="{title}">',
+            f'<meta property="og:description" content="{desc}">',
+        ]
+        if og_image is not None:
+            lines.append(f'<meta property="og:image" content="{_PAGES_URL}/{og_image}">')
+    return "\n  ".join(lines)
+
+
 def _card(demo: Demo, local: bool = False, pkg: str = "chip") -> str:
     fig = figure_relpath(demo, pkg)
     label = html.escape(demo.label)
@@ -166,7 +214,7 @@ def _card(demo: Demo, local: bool = False, pkg: str = "chip") -> str:
     tgt = ' target="_blank" rel="noopener"' if local else ""   # launch in a new tab, keep the gallery open
     return f"""        <article class="card">
           <a class="shot" href="{fig}" title="open the full figure">
-            <img src="{fig}" alt="{label} — {html.escape(demo.module)} figure" loading="lazy">
+            {figure_img(fig, f"{label} — {html.escape(demo.module)} figure")}
           </a>
           <div class="body">
             <span class="tag">{label}</span>
@@ -380,6 +428,10 @@ def render_html(local: bool = False) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title}</title>
+  {head_meta(title, "Process recipe in, device out: an educational microchip-fabrication simulator. "
+                    "Every fab step ships a demo that prints a cited validation table and banks a figure; "
+                    "this gallery is the clickable front door to all of them.",
+             local, og_image="figures/chip-device.png")}
   <style>
 {_STYLE}
   </style>

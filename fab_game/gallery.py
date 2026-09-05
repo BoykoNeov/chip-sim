@@ -37,6 +37,7 @@ from chip.gallery import (
     _grid,
     _nav,
     figure_relpath,
+    head_meta,
     _BLOB,
     _TREE,
     _REPO_URL,
@@ -206,6 +207,9 @@ def render_html(local: bool = False) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title}</title>
+  {head_meta(title, "The fab-line game layered on chip-sim: the whole line from sand to a binned, packaged "
+                    "chip, scored as a roguelike. Recipe in, yield out, and you can see why a die died.",
+             local, og_image="figures/fab-game-journey.png")}
   <style>
 {_STYLE}
   </style>

@@ -78,6 +78,7 @@ from typing import Callable, Union
 
 import numpy as np
 from scipy.linalg import solve_banded
+from scipy.linalg.lapack import get_lapack_funcs
 
 # ``D`` may be a scalar, a length-N array (cell-centered D(x)), or a callable of
 # time returning either (covers D(t), and D(T) when the consumer closes over a
@@ -270,6 +271,37 @@ class Diffusion1D:
         # distance between adjacent cell centers (length N-1) — the face widths
         # over which the interior gradient is taken.
         self._dx_face = np.diff(grid.centers)
+        # The autonomous fast path. When nothing in the operator depends on time or on the
+        # field — D a number/array (not D(t), not StateDependent), every BC parameter a number,
+        # the source a number/array — the semidiscrete operator ``A, b`` is the SAME at every
+        # step, and so is the implicit matrix ``(I − θ dt A)`` for a fixed ``dt``. Assemble it once
+        # and factorize it once (LAPACK ``gttrf``; each step is then one ``gttrs`` back-solve),
+        # instead of rebuilding and re-eliminating per step. The result is BIT-IDENTICAL to the
+        # per-step ``solve_banded`` (both are the same partial-pivoting tridiagonal elimination —
+        # asserted by ``test_fast_path.py``); only the wall-clock changes (~5× per step on the
+        # consumers' ~600-step marches). Configuration is construction-time (module docstring,
+        # ADR 0001), so the caches never go stale; the cached arrays are read-only for safety.
+        self._autonomous = self._is_autonomous()
+        self._D_cache: Union[np.ndarray, None] = None            # cell-centered D (autonomous)
+        self._op_cache: Union[tuple, None] = None                # (sub, diag, sup, b) (autonomous)
+        self._fac_cache: Union[tuple, None] = None               # (dt, gttrf factors) (autonomous)
+
+    def _is_autonomous(self) -> bool:
+        """True iff the operator is time- and field-independent (see ``__init__``)."""
+        if isinstance(self._D, StateDependent) or callable(self._D):
+            return False
+        if callable(self._source):
+            return False
+        for bc in (self.bc_left, self.bc_right):
+            if isinstance(bc, Neumann):
+                params = (bc.flux,)
+            elif isinstance(bc, Dirichlet):
+                params = (bc.value,)
+            else:
+                params = (bc.h, bc.u_ext)
+            if any(callable(p) for p in params):
+                return False
+        return True
 
     # -- coefficient assembly ------------------------------------------------ #
     def _D_cells(self, t: float, u: Union[np.ndarray, None] = None) -> np.ndarray:
@@ -278,6 +310,8 @@ class Diffusion1D:
         Evaluated at time ``t`` for the linear forms (scalar / array / callable ``D(t)``); for a
         :class:`StateDependent` ``D`` it is evaluated at the supplied field ``u`` (``func(u)``).
         """
+        if self._autonomous and self._D_cache is not None:
+            return self._D_cache
         if isinstance(self._D, StateDependent):
             if u is None:
                 raise ValueError("a StateDependent D requires the current field u to evaluate")
@@ -291,6 +325,10 @@ class Diffusion1D:
             D = np.full(self.grid.n, float(D))
         if D.shape != (self.grid.n,):
             raise ValueError(f"D must be scalar or length {self.grid.n}, got shape {D.shape}")
+        if self._autonomous:
+            D = D.copy()
+            D.flags.writeable = False
+            self._D_cache = D
         return D
 
     def _source_vec(self, t: float) -> Union[np.ndarray, None]:
@@ -313,7 +351,21 @@ class Diffusion1D:
         the diagonal contributions of Dirichlet/Robin boundaries; ``b`` carries
         their inhomogeneous parts, the Neumann flux, and the source. For a
         :class:`StateDependent` ``D`` the diffusivity is frozen at the iterate ``u``.
+
+        An autonomous operator (see ``__init__``) is assembled once and served from a
+        read-only cache thereafter — callers never mutate the returned diagonals.
         """
+        if self._autonomous:
+            if self._op_cache is None:
+                parts = self._assemble(t)
+                for arr in parts:
+                    arr.flags.writeable = False
+                self._op_cache = parts
+            return self._op_cache
+        return self._assemble(t, u)
+
+    def _assemble(self, t: float, u: Union[np.ndarray, None] = None):
+        """The uncached assembly behind :meth:`_operator` (fresh arrays every call)."""
         g = self.grid
         n = g.n
         dx = g.widths
@@ -412,9 +464,37 @@ class Diffusion1D:
             rhs += (1.0 - theta) * dt * diag0 * u0
             rhs += dt * (theta * b1 + (1.0 - theta) * b0)
 
+        return self._solve_implicit(sub1, diag1, sup1, rhs, dt, theta)
+
+    def _solve_implicit(self, sub1, diag1, sup1, rhs: np.ndarray, dt: float, theta: float) -> np.ndarray:
+        """Solve  (I − θ dt A)·u = rhs  for the tridiagonal ``A`` given by its three diagonals.
+
+        The autonomous fast path factorizes the matrix once per ``dt`` (LAPACK ``gttrf``) and
+        back-solves per step (``gttrs``); the general path is the one-shot ``solve_banded``. The two
+        are the same partial-pivoting tridiagonal elimination and return bit-identical results
+        (``test_fast_path.py``) — the cache buys wall-clock, never a different number.
+        """
+        n = self.grid.n
+        if self._autonomous and n >= 3:
+            fac = self._fac_cache
+            if fac is None or fac[0] != dt:
+                dl = -dt * theta * sub1[1:]
+                d = 1.0 - dt * theta * diag1
+                du = -dt * theta * sup1[:-1]
+                gttrf, gttrs = get_lapack_funcs(("gttrf", "gttrs"), (d,))
+                dl, d, du, du2, ipiv, info = gttrf(dl, d, du, overwrite_dl=True, overwrite_d=True,
+                                                   overwrite_du=True)
+                if info != 0:
+                    raise np.linalg.LinAlgError("singular implicit operator (I - theta*dt*A)")
+                fac = (dt, gttrs, (dl, d, du, du2, ipiv))
+                self._fac_cache = fac
+            _, gttrs, factors = fac
+            x, info = gttrs(*factors, rhs)
+            if info != 0:
+                raise np.linalg.LinAlgError("tridiagonal back-solve failed")
+            return x
         # Implicit operator  (I − θ dt A)  in scipy banded storage (l=u=1):
         #   ab[0, 1:]  = super-diagonal,  ab[1, :] = diagonal,  ab[2, :-1] = sub.
-        n = self.grid.n
         ab = np.zeros((3, n))
         ab[0, 1:] = -dt * theta * sup1[:-1]
         ab[1, :] = 1.0 - dt * theta * diag1

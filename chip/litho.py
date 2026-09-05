@@ -260,6 +260,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from functools import lru_cache
 
 import numpy as np
 
@@ -477,6 +478,24 @@ def defocus_phase(f_total, imaging: Imaging, defocus_nm: float):
     return np.exp(1j * phase)
 
 
+@lru_cache(maxsize=64)
+def _carrier(f_bytes: bytes, x_bytes: bytes, n_m: int) -> np.ndarray:
+    """The carrier matrix ``exp(2πi·f_m·x)`` (``n_m × n_x``), memoized on the raw bytes of ``f_m`` and ``x``.
+
+    The one expensive piece of :func:`abbe_image` is this complex exponential, and it depends only on
+    the mask's order frequencies and the sample grid — not on the source, the focus or the
+    aberrations. A sweep (through focus, over a σ ladder, or the fab-game's per-die exposures at one
+    pitch) re-images the same grating on the same ``x`` thousands of times, so the matrix is computed
+    once per distinct ``(f_m, x)`` and reused. Keyed on bytes (hashable, exact — no float rounding in
+    the key); the returned array is shared, so callers only ever READ it (a matmul operand).
+    """
+    f_m = np.frombuffer(f_bytes, dtype=float).reshape(n_m)
+    x = np.frombuffer(x_bytes, dtype=float)
+    carrier = np.exp(2j * np.pi * np.outer(f_m, x))
+    carrier.flags.writeable = False
+    return carrier
+
+
 def abbe_image(x_nm, orders, imaging: Imaging, source_fs=None, n_source: int = 21,
                defocus_nm: float = 0.0, aberrations: "Aberrations | None" = None):
     """Partially-coherent aerial image by the **Abbe sum over source points** (not Hopkins TCC).
@@ -506,13 +525,30 @@ def abbe_image(x_nm, orders, imaging: Imaging, source_fs=None, n_source: int = 2
     source_fs = np.atleast_1d(np.asarray(source_fs, dtype=float))
     cutoff = imaging.f_cut * (1.0 + _F_TOL)
     x = np.asarray(x_nm, dtype=float)
-    total = np.zeros(x.shape, dtype=float)
-    for fs in source_fs:
-        passed = [(f, c * defocus_phase(f + fs, imaging, defocus_nm)
-                   * zernike_phase(f + fs, imaging, aberrations))
-                  for (f, c) in orders if abs(f + fs) <= cutoff]
-        total = total + coherent_image(x, passed)
-    return total / len(source_fs)
+    n_s = len(source_fs)
+    if len(orders) == 0:
+        return np.zeros(x.shape, dtype=float)
+    f_m = np.array([f for f, _ in orders], dtype=float)
+    c_m = np.array([c for _, c in orders], dtype=complex)
+    # Every (source point, order) pair at once: its full pupil coordinate f_m + f_s, and whether
+    # the pupil passes it. A blocked order simply carries zero amplitude; the pupil phases are
+    # evaluated ONLY on the collected orders (never on a coordinate outside the pupil).
+    f_tot = source_fs[:, None] + f_m[None, :]                        # (n_s, n_m)
+    passed = np.abs(f_tot) <= cutoff
+    amp = np.zeros(f_tot.shape, dtype=complex)
+    ft = f_tot[passed]
+    amp[passed] = (np.broadcast_to(c_m, f_tot.shape)[passed]
+                   * defocus_phase(ft, imaging, defocus_nm)
+                   * zernike_phase(ft, imaging, aberrations))
+    # The carrier matrix exp(2πi·f_m·x) is built once; each source point's coherent field
+    # |Σ_m a_m e^{2πi f_m x}| (the same sum :func:`coherent_image` forms) is then one row of a single
+    # matrix product, and the partially-coherent image is the mean of the squared moduli. One
+    # vectorized pass replaces the per-source-point, per-order Python loop (~5× faster per image;
+    # the game's litho step calls this thousands of times per wafer sweep).
+    carrier = _carrier(f_m.tobytes(), x.tobytes(), len(f_m))          # (n_m, n_x)
+    E = amp @ carrier                                                  # (n_s, n_x)
+    total = np.einsum("ij,ij->j", E.real, E.real) + np.einsum("ij,ij->j", E.imag, E.imag)
+    return (total / n_s).reshape(x.shape)
 
 
 def transmitted_power(orders, imaging: Imaging, source_fs=None, n_source: int = 21) -> float:

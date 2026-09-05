@@ -42,9 +42,16 @@ from chip.demo_strain_history import (
 )
 
 
-def test_the_period_device_is_the_real_untouched_device_chain():
+@pytest.fixture(scope="module")
+def r():
+    """``compute()`` once per module -- the demo's full sweep is the expensive part; every test
+    below only READS the result (the cmp/voronkov/game test modules set the pattern)."""
+    return compute()
+
+
+def test_the_period_device_is_the_real_untouched_device_chain(r):
     """The unstrained rung is a genuine ``device.py`` read — which is what "untouched" *demonstrates*."""
-    r = compute()
+    r = r
     mos = dev.threshold_voltage(
         PERIOD_N_A, PERIOD_T_OX_UM, channel_length_um=PERIOD_CHANNEL_L_UM,
         implant_dose=PERIOD_VT_ADJUST_DOSE, implant_kind=PERIOD_VT_ADJUST_KIND,
@@ -56,13 +63,13 @@ def test_the_period_device_is_the_real_untouched_device_chain():
     assert r.mos.V_t < V_GS_CITED                                   # …and the device actually turns on
 
 
-def test_both_paths_leave_the_same_point_because_the_seam_is_the_default():
+def test_both_paths_leave_the_same_point_because_the_seam_is_the_default(r):
     """**The seam, end-to-end.** No mechanism ⇒ ``mu_eff == MU_N_EFF`` ⇒ the period ``I_Dsat`` bit-for-bit.
 
     This is what makes the left panel a *comparison*: the strained curve starts on the unstrained point
     rather than beside it. Asserted through the demo's own period read, not through ``chip.strain`` alone.
     """
-    r = compute()
+    r = r
     seam = st.strained_channel(dev.MU_N_EFF, None)
     assert seam.mu_strained_cm2_Vs == dev.MU_N_EFF                  # exactly — not approximately
     assert dev.saturation_current(r.mos, V_GS=V_GS_CITED, width_um=PERIOD_WIDTH_UM,
@@ -71,7 +78,7 @@ def test_both_paths_leave_the_same_point_because_the_seam_is_the_default():
     assert r.j_gate_oxide[0] == r.j_gate_A_cm2
 
 
-def test_the_strain_path_leaves_the_leakage_bit_for_bit_and_the_zero_is_STRUCTURAL():
+def test_the_strain_path_leaves_the_leakage_bit_for_bit_and_the_zero_is_STRUCTURAL(r):
     """**The left panel's whole claim.** ``∂J_g/∂µ = 0`` — mobility is not an argument of the leakage model.
 
     The B9 shape (``I_Dsat`` reaches the wire term nowhere), in F5's currency. Pinned as an identity under
@@ -79,7 +86,7 @@ def test_the_strain_path_leaves_the_leakage_bit_for_bit_and_the_zero_is_STRUCTUR
     "strain costs no leakage" would silently become a numerical coincidence instead of a structural fact,
     and this panel's headline would be wrong without any number visibly moving.
     """
-    r = compute()
+    r = r
     assert r.j_gate_strained_A_cm2 == r.j_gate_A_cm2                # bit-for-bit, not pytest.approx
     assert r.strain_decades == 0.0
     for absurd_factor in (1.20, 3.0, 100.0):
@@ -89,9 +96,9 @@ def test_the_strain_path_leaves_the_leakage_bit_for_bit_and_the_zero_is_STRUCTUR
         assert hk.gate_leakage(PERIOD_T_OX_UM, GATE_DIELECTRIC) == r.j_gate_A_cm2   # … and the leakage cannot
 
 
-def test_the_oxide_lever_moves_BOTH_currencies_and_both_monotonically():
+def test_the_oxide_lever_moves_BOTH_currencies_and_both_monotonically(r):
     """The other half of the contrast: one knob, two currencies — B8's wall read from F5's side."""
-    r = compute()
+    r = r
     assert all(b > a for a, b in zip(r.drive_gain_oxide, r.drive_gain_oxide[1:]))
     assert all(b > a for a, b in zip(r.j_gate_oxide, r.j_gate_oxide[1:]))
     # the drive rises FASTER than 1/t_ox on this convention, because V_t sags as the oxide thins — which
@@ -100,7 +107,7 @@ def test_the_oxide_lever_moves_BOTH_currencies_and_both_monotonically():
     assert r.drive_gain_oxide[-1] > ratio_c_ox
 
 
-def test_the_exchange_rate_is_quoted_in_the_direction_that_does_not_flatter_strain():
+def test_the_exchange_rate_is_quoted_in_the_direction_that_does_not_flatter_strain(r):
     """**Never round a win up** (F4's ``floor_decades`` rule, in the leakage currency).
 
     Two defensible conventions for "what the oxide lever costs to buy the same drive", and they differ by
@@ -109,7 +116,7 @@ def test_the_exchange_rate_is_quoted_in_the_direction_that_does_not_flatter_stra
     costs about twice as much. The demo headlines the **cheap** one — the reading least favourable to the
     slice it is selling — and reports the other beside it. Flip these and the figure overstates strain.
     """
-    r = compute()
+    r = r
     assert r.oxide_decades_to_match < r.oxide_decades_to_match_fixed_vt, (
         "the headlined exchange rate must be the one that flatters the OXIDE lever, not strain"
     )
@@ -128,13 +135,13 @@ def test_the_exchange_rate_is_quoted_in_the_direction_that_does_not_flatter_stra
     )
 
 
-def test_the_wired_leg_reaches_the_real_device_and_reads_exactly_the_mobility_factor():
+def test_the_wired_leg_reaches_the_real_device_and_reads_exactly_the_mobility_factor(r):
     """The chain the slice exists for: a cited mechanism → ``mu_eff`` → the real long-channel ``I_Dsat``.
 
     Elasticity **1 by construction** on the ideal-contact path — which is the *reason* the drive read is a
     bound, so it is pinned here on the demo's own device rather than only on a synthetic one.
     """
-    r = compute()
+    r = r
     assert r.channel.mechanism == st.TENSILE_CESL.name and r.channel.carrier == st.ELECTRONS
     assert r.i_dsat_strained_A / r.i_dsat_A == pytest.approx(r.channel.mobility_factor, rel=1e-12)
     assert r.i_dsat_strained_A / r.i_dsat_A == pytest.approx(r.channel.drive_factor_long_channel)
@@ -143,14 +150,14 @@ def test_the_wired_leg_reaches_the_real_device_and_reads_exactly_the_mobility_fa
     assert r.drive_overstatement == pytest.approx(2.0)
 
 
-def test_the_bound_panel_draws_the_model_line_without_calling_elasticity():
+def test_the_bound_panel_draws_the_model_line_without_calling_elasticity(r):
     """The model's diagonal is ``drive == µ``; the cited lines sit strictly under it, and 25 nm under 90.
 
     :func:`chip.strain.elasticity` **raises** at ``mobility_factor <= 1``, and the axis starts at exactly
     1.0 — so the panel must be built from ``long_channel_drive_factor`` and the cited elasticities, never
     by sweeping the elasticity function itself.
     """
-    r = compute()
+    r = r
     assert MU_FACTOR_AXIS[0] == 1.0
     with pytest.raises(ValueError):
         st.elasticity(MU_FACTOR_AXIS[0], 1.0)                       # the trap the panel must not walk into
@@ -164,14 +171,14 @@ def test_the_bound_panel_draws_the_model_line_without_calling_elasticity():
         assert float(np.interp(mu, r.mu_axis, line)) == pytest.approx(drive, rel=2e-3), label
 
 
-def test_the_hole_leg_is_marked_cited_only_and_is_never_computed_as_a_result():
+def test_the_hole_leg_is_marked_cited_only_and_is_never_computed_as_a_result(r):
     """The plan's rejected "decoration" option, guarded at the FIGURE level as well as the API level.
 
     The refusal itself is ``test_strain.py``'s; what this pins is that the demo *carries the refusal*
     rather than paraphrasing it, and that the hole point is flagged unwired everywhere it is drawn — two
     bars side by side would otherwise read as two results the simulator produced.
     """
-    r = compute()
+    r = r
     assert st.SIGE_SD.name in r.hole_leg_refused and "n-channel-only" in r.hole_leg_refused
     assert r.wired == ("tensile_cesl",) == st.WIRED_MECHANISMS
     assert WIRED_MECHANISM in r.wired and "sige_sd" not in r.wired
@@ -209,7 +216,7 @@ def test_the_figure_says_what_the_bound_and_the_composition_are():
     )
 
 
-def test_the_era_ENDING_is_read_off_cited_endpoints_and_never_interpolated():
+def test_the_era_ENDING_is_read_off_cited_endpoints_and_never_interpolated(r):
     """S4 on the page: the delivered gain is a bracket, the treadmill is priced, and the model is blind.
 
     The demo may report the two cited endpoints and the price of holding a gain fixed between them; what
@@ -217,7 +224,7 @@ def test_the_era_ENDING_is_read_off_cited_endpoints_and_never_interpolated():
     ``elasticity(L)`` — the elasticity knob the slice refuses to have (plan trap #1.3) — arriving through
     the display layer, which is exactly how S3's flattering-direction composition got in.
     """
-    r = compute()
+    r = r
     low, high = r.channel.delivered_drive_bracket
     assert (low, high) == st.delivered_drive_bracket(WIRED_MECHANISM)      # the module owns the pair
     assert r.channel.drive_factor_long_channel > high > low > 1.0          # model > 90 nm > 25 nm
@@ -243,8 +250,7 @@ def test_the_era_ENDING_is_read_off_cited_endpoints_and_never_interpolated():
     )
 
 
-def test_figure_builds():
-    r = compute()
+def test_figure_builds(r):
     pytest.importorskip("matplotlib")               # the figure is not in the correctness path (ADR 0002)
     from chip.demo_strain_history import save_figure
     assert save_figure(r).is_file()

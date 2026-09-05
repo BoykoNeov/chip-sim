@@ -33,7 +33,14 @@ from chip.demo_highk_history import (
 )
 
 
-def test_the_device_is_byte_for_byte_identical_across_every_material():
+@pytest.fixture(scope="module")
+def r():
+    """``compute()`` once per module — the demo's full sweep is the expensive part; every test
+    below only READS the result (the cmp/voronkov/game test modules set the pattern)."""
+    return compute()
+
+
+def test_the_device_is_byte_for_byte_identical_across_every_material(r):
     """The F3 discriminator, through the real ``device.py``: at one EOT, the material never reaches V_t.
 
     Not ``approx`` — **exactly** equal. The demo feeds each stack's ``eot_um`` (all the same float, by
@@ -41,7 +48,7 @@ def test_the_device_is_byte_for_byte_identical_across_every_material():
     "same input → same output". It still earns its keep: had the demo fed ``t_phys`` — the plausible
     mistake, and the one the whole module is built to avoid — every one of these would fail.
     """
-    r = compute()
+    r = r
     assert {r.mos[m].V_t for m in MATERIALS} == {r.mos["SiO2"].V_t}, "V_t moved with the material"
     assert {r.mos[m].C_ox for m in MATERIALS} == {r.mos["SiO2"].C_ox}, "C_ox moved with the material"
     # ...and it is the *real* device model, not a stand-in: the same call reproduces it.
@@ -52,9 +59,9 @@ def test_the_device_is_byte_for_byte_identical_across_every_material():
     ).V_t
 
 
-def test_the_other_currency_moves_while_the_device_does_not():
+def test_the_other_currency_moves_while_the_device_does_not(r):
     """The split that no scalar can fake: same electrical gate, ``t_phys`` and leakage far apart."""
-    r = compute()
+    r = r
     sio2, hfo2 = r.stacks["SiO2"], r.stacks["HfO2"]
     assert sio2.t_phys_um == pytest.approx(FEATURE_EOT_UM)          # the κ=3.9 seam: EOT *is* t_phys
     assert hfo2.thickness_gain == pytest.approx(25.0 / 3.9)         # 6.4× the barrier, same gate
@@ -62,9 +69,9 @@ def test_the_other_currency_moves_while_the_device_does_not():
     assert hfo2.decades_saved_vs_sio2 > 0.0
 
 
-def test_the_wall_is_monotone_and_lands_where_sio2_stopped_scaling():
+def test_the_wall_is_monotone_and_lands_where_sio2_stopped_scaling(r):
     """The honest payload is the *shape*: leakage rises monotonically as the electrical gate scales down."""
-    r = compute()
+    r = r
     j = r.j_gate["SiO2"]
     assert all(b > a for a, b in zip(j, j[1:])), "SiO₂ leakage must rise monotonically as EOT scales down"
     assert j[-1] > WALL_J_A_CM2 > j[0], "the ladder must actually cross the usability line"
@@ -73,9 +80,9 @@ def test_the_wall_is_monotone_and_lands_where_sio2_stopped_scaling():
     assert hk.gate_leakage(r.wall_eot_um, "SiO2") == pytest.approx(WALL_J_A_CM2, rel=1e-2)
 
 
-def test_more_kappa_is_not_better_the_counterexample_is_flat():
+def test_more_kappa_is_not_better_the_counterexample_is_flat(r):
     """TiO₂ (κ=80, φ_B=0): 20× the physical thickness, and the ladder does not move it at all."""
-    r = compute()
+    r = r
     j = r.j_gate["TiO2"]
     assert all(x == j[0] for x in j), "a zero-barrier dielectric must be flat at every EOT"
     assert j[0] == pytest.approx(hk.J0_REFERENCE)                   # it leaks the prefactor, always
@@ -98,7 +105,7 @@ def test_the_ladder_stays_inside_the_validated_regime():
     assert 3.9 <= saved <= 9.5, f"the featured win ({saved:.1f} dec) escaped the flagged m* band"
 
 
-def test_the_headline_claim_is_floored_never_rounded_up():
+def test_the_headline_claim_is_floored_never_rounded_up(r):
     """A "≳ N decades" claim rounded *up* is not a ≳ claim — the featured win may never be overstated.
 
     This is not hypothetical: the featured HfO₂ win is **5.565** decades, which plain ``f"{x:.1f}"``
@@ -106,7 +113,7 @@ def test_the_headline_claim_is_floored_never_rounded_up():
     :func:`chip.demo_highk_history.floor_decades`, and hence this assert being on the **formatted string
     the reader actually sees** rather than on the float behind it.
     """
-    saved = compute().stacks["HfO2"].decades_saved_vs_sio2
+    saved = r.stacks["HfO2"].decades_saved_vs_sio2
     assert float(floor_decades(saved)) <= saved, (
         f"the displayed claim ≳{floor_decades(saved)} overstates the computed win ({saved!r})"
     )
@@ -118,7 +125,7 @@ def test_the_headline_claim_is_floored_never_rounded_up():
     assert floor_decades(5.565) == "5.5" and floor_decades(5.99) == "5.9" and floor_decades(6.0) == "6.0"
 
 
-def test_the_demo_does_not_present_the_idealized_stack_as_the_shipped_product():
+def test_the_demo_does_not_present_the_idealized_stack_as_the_shipped_product(r):
     """**An honesty guard.** The figure carries two HfO₂ leakages; the 45 nm one must be the *as-built* one.
 
     The idealized no-IL win (≳5.5 decades, 1.8e-3 A/cm²) is a **ceiling**, not a product: no fab builds a
@@ -126,7 +133,7 @@ def test_the_demo_does_not_present_the_idealized_stack_as_the_shipped_product():
     this demo did before the IL was modelled — states the ceiling as the shipped number. Both are now
     plotted, and this pins that the real one exists, is distinct, and is the worse of the two.
     """
-    r = compute()
+    r = r
     ideal, real = r.stacks["HfO2"], r.real_stack
     assert real.has_interfacial_layer and real.t_il_um == FEATURE_T_IL_UM
     assert real.eot_um == ideal.eot_um                          # the same electrical gate …
@@ -137,13 +144,13 @@ def test_the_demo_does_not_present_the_idealized_stack_as_the_shipped_product():
     assert 2.0 <= ideal.decades_saved_vs_sio2 <= 6.0
 
 
-def test_the_il_panel_is_prefactor_free_and_linear_to_the_floor():
+def test_the_il_panel_is_prefactor_free_and_linear_to_the_floor(r):
     """The right panel's payload: the win falls **linearly** to exactly zero at the EOT floor.
 
     Prefactor-free by construction (a ratio cancels the house J₀), so this panel contains no flagged
     magnitude at all — which is why it is allowed to carry the slice's headline.
     """
-    r = compute()
+    r = r
     d = r.decades_saved_vs_t_il
     assert all(b < a for a, b in zip(d, d[1:])), "the IL must monotonically destroy the win"
     steps = np.diff(d)
@@ -155,9 +162,9 @@ def test_the_il_panel_is_prefactor_free_and_linear_to_the_floor():
     assert at_floor == pytest.approx(0.0, abs=1e-7)
 
 
-def test_the_eot_floor_is_real_and_the_demo_never_walks_through_it():
+def test_the_eot_floor_is_real_and_the_demo_never_walks_through_it(r):
     """The floor is a **refusal**, not a curve that keeps going: below t_IL the stack cannot be built."""
-    r = compute()
+    r = r
     assert r.real_stack.eot_floor_um == FEATURE_T_IL_UM         # SiO₂ IL ⇒ the floor IS its thickness
     with pytest.raises(ValueError, match="floor"):
         hk.gate_stack(FEATURE_T_IL_UM * 0.9, "HfO2", t_il_um=FEATURE_T_IL_UM)
@@ -178,8 +185,7 @@ def test_the_representative_il_is_one_a_fab_could_actually_grow():
     assert FEATURE_T_IL_UM < FEATURE_EOT_UM, "the featured stack must be buildable at the featured EOT"
 
 
-def test_figure_builds():
-    r = compute()
+def test_figure_builds(r):
     pytest.importorskip("matplotlib")               # the figure is not in the correctness path (ADR 0002)
     from chip.demo_highk_history import save_figure
     assert save_figure(r).is_file()

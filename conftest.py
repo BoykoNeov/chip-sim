@@ -25,6 +25,10 @@ pytest raises ``PluginValidationError`` at collection for an "unknown hook" if t
 is absent. xdist is in the ``[test]`` extra, so this only matters in a bare ``pytest`` env.
 """
 import os
+import sys
+from pathlib import Path
+
+import pytest
 
 try:
     import xdist  # noqa: F401  — only to gate the hook below; see module docstring.
@@ -34,3 +38,26 @@ try:
 
 except ImportError:
     pass
+
+
+@pytest.fixture(autouse=True)
+def _bank_test_figures_in_tmp(request, monkeypatch, tmp_path):
+    """Keep the test suite from re-banking figures into the repo tree.
+
+    A demo's ``save_figure`` writes to its module-level ``DOCS_FIGURE`` / ``OUTPUT_FIGURE`` paths —
+    the committed ``docs/figures/*.png`` the galleries display. The ``test_demo_*`` modules that call
+    ``save_figure`` (a "the figure builds" smoke test) were therefore rewriting committed PNGs on every
+    run (a dirty tree after ``pytest``, and — since the thumbnail drift guard hashes those PNGs —
+    an order-dependent red). For those modules only, every ``*FIGURE*`` path attribute of every
+    imported ``chip.demo_*`` / ``fab_game.demo_*`` module is redirected into ``tmp_path`` for the
+    test's duration. The gallery drift guards (``test_gallery.py`` & co.) are NOT ``test_demo_*``
+    modules and keep seeing the real paths — they introspect them to locate the committed figures.
+    """
+    if not request.module.__name__.rsplit(".", 1)[-1].startswith("test_demo_"):
+        return
+    for name, mod in list(sys.modules.items()):
+        if not (name.startswith("chip.demo_") or name.startswith("fab_game.demo_")):
+            continue
+        for attr, value in list(vars(mod).items()):
+            if "FIGURE" in attr and isinstance(value, Path):
+                monkeypatch.setattr(mod, attr, tmp_path / value.name)

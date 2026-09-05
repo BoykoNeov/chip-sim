@@ -41,7 +41,9 @@ from pathlib import Path
 from chip.gallery import (
     _STYLE,
     _nav,
+    figure_img,
     figure_relpath,
+    head_meta,
     _BLOB,
     _TREE,
     _REPO_URL,
@@ -332,7 +334,7 @@ def _rung(mode: HistoryMode, local: bool = False) -> str:
           </div>
           <div class="contrast">
             <a class="shot" href="{fig}" title="open the full modern-vs-period figure">
-              <img src="{fig}" alt="{tag} — {stage} modern-vs-period contrast" loading="lazy">
+              {figure_img(fig, f"{tag} — {stage} modern-vs-period contrast")}
             </a>
             <div class="story">
               <div class="row"><span class="k period">Period</span><p class="v">{period}</p></div>
@@ -381,6 +383,10 @@ def render_html(local: bool = False) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title}</title>
+  {head_meta(title, "The backward axis: each fab step re-run in the period mode whose limitation motivated "
+                    "its successor, laid on the process spine with the wall it hit and the modern step "
+                    "that cleared it.",
+             local, og_image="figures/chip-doping-history.png")}
   <style>
 {_STYLE}
 {_TIMELINE_CSS}

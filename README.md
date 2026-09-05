@@ -40,7 +40,7 @@ python -m fab_game.tui                  # …or play the fab-line game (TUI; nee
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow" -n auto     # routine fast lane (~1260 tests), PARALLEL
+./run_tests.ps1 -m "not slow" -n auto     # routine fast lane (~1300 tests), PARALLEL
 ./run_tests.ps1                           # full gate, SERIAL (adds the slow notebook smoke-test)
 ```
 
@@ -53,7 +53,7 @@ and CI — where it self-skips). The full gate stays **serial**, so the notebook
 xdist (the pin is structural, not a convention). It also self-skips under CI (a known infra hang
 on the GitHub runner — the kernel goes idle but `nbclient` never returns, not a content failure).
 `-n auto` is the blessed *command*, not baked into config, so single-test `-s`/pdb stays serial.
-The suite is **~1260 tests** (the fast lane + 1 slow notebook smoke-test), all green; optional
+The suite is **~1300 tests** (the fast lane + 1 slow notebook smoke-test), all green; optional
 stacks are importorskip-gated, so a headless checkout skips rather than errors.
 
 ## Demonstrations
@@ -76,7 +76,11 @@ the full figures, each with its run command and source — is generated to
 Pages → `main` / `/docs`*) to serve it at `https://boikoneov.github.io/chip-sim/`. The page is
 generated from the demo modules (figure paths introspected, never hand-typed) and guarded by a
 fast-lane test (`chip/tests/test_gallery.py`), so it can't drift: add a demo and the gate stays red
-until the page is rebuilt. A nav strip links it to the other three pages: the
+until the page is rebuilt. The cards display **WebP thumbnails** (`docs/figures/thumbs/`, cut by
+`python -m chip.thumbnails`, ~20 KB each with their pixel size declared — so a page loads ~6× lighter
+and never re-flows as images land) and link to the full PNGs; a second guard
+(`chip/tests/test_thumbnails.py`) hashes each figure into the thumbnail manifest, so re-banking a
+figure without re-cutting its thumbnail is red too. A nav strip links it to the other three pages: the
 [fab-line game gallery](docs/fab-game.html), the [era timeline](docs/history.html), and the
 [roadmap](docs/roadmap.html) — the planned-but-unbuilt slices of `docs/plans/future-steps.md`,
 each with a *schematic preview* (stamped in-image as **not simulator output**) plus the consumer

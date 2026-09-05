@@ -176,14 +176,27 @@ def test_roguelike_screen_drives_the_session_exactly_like_the_headless_model():
             await app.push_screen(screen)
             await pilot.pause()
 
+            async def click(selector: str) -> None:
+                """Click, then wait out the button's pressed animation before the next click.
+
+                Textual's ``Button`` IGNORES a click while it still carries the ``-active`` class (its
+                ~0.2 s pressed effect). While a turn took seconds inside the handler the effect had long
+                expired by the next click; once the line got fast (the engine's factorization cache +
+                the vectorized Abbe image) a back-to-back click on the same button was silently dropped
+                and the screen fell a turn behind the model. Waiting for the class to clear is the
+                honest sequencing — a human never clicks inside the animation either.
+                """
+                await pilot.click(selector)
+                await pilot.pause()
+                button = screen.query_one(selector, Button)
+                while button.has_class("-active"):
+                    await pilot.pause(0.05)
+
             screen.query_one("#in-oxide", Input).value = "20"   # turn 0: process at the seam oxide
-            await pilot.click("#process")
-            await pilot.pause()
+            await click("#process")
             screen.query_one("#in-oxide", Input).value = "17"   # turn 1: adapt — thin the gate oxide
-            await pilot.click("#process")
-            await pilot.pause()
-            await pilot.click("#scrap")                          # turn 2: scrap the doomed tail
-            await pilot.pause()
+            await click("#process")
+            await click("#scrap")                                # turn 2: scrap the doomed tail
 
             expected = play(new_session(cfg, seed=5), decisions)
             assert screen.session.budget == expected.budget
