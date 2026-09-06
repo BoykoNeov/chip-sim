@@ -178,7 +178,31 @@ def figure_img(fig: str, alt: str) -> str:
             f'loading="lazy" decoding="async">')
 
 
-def head_meta(title: str, description: str, local: bool = False, og_image: str | None = None) -> str:
+# The tab icon, shared by all eight pages: a wafer (a disc with the orientation flat cut off the
+# bottom) carrying one die. Inlined as an SVG data URI rather than a docs/favicon.svg file, so the
+# LOCAL editions keep their defining property — a page opened over file:// fetches nothing at all,
+# not even from its own directory — and so a page is still one self-contained file.
+#
+# The percent-encoding is load-bearing, not cosmetic: an unescaped "#" inside a data URI terminates
+# it as a fragment identifier, which would leave a *silently* iconless tab. "<" and ">" are encoded
+# for the same class of reason (they are fine in an attribute value today, but fragile to any later
+# escaping pass). No golden test can catch either mistake — the goldens compare the page to itself,
+# so a broken URI goldens exactly as happily as a working one; this one is checked in a browser.
+_ACCENT = "%232f6db5"                                   # "#2f6db5" — --accent, URI-encoded
+_FAVICON = (
+    "data:image/svg+xml,"
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E"
+    # The disc: a major arc (large-arc-flag 1) from the left end of the flat to the right end, closed
+    # by the flat itself. sweep-flag 1 — checked by rendering, not reasoned: with SVG's y-axis
+    # pointing down, sweep 0 takes the arc round the BOTTOM and leaves a sliver, not a wafer.
+    f"%3Cpath d='M7.7 26A13 13 0 1 1 24.3 26Z' fill='{_ACCENT}'/%3E"
+    "%3Crect x='12' y='12' width='8' height='8' rx='1.2' fill='%23ffffff'/%3E"   # one die
+    "%3C/svg%3E"
+)
+
+
+def head_meta(title: str, description: str, local: bool = False, og_image: str | None = None,
+              canonical_slug: str | None = None) -> str:
     """The ``<head>`` metadata shared by all four pages (after the charset/viewport lines).
 
     ``color-scheme`` lets the browser's own chrome (form controls, scrollbars, the default canvas
@@ -186,6 +210,13 @@ def head_meta(title: str, description: str, local: bool = False, og_image: str |
     tints the mobile toolbar to match. The public editions also carry Open Graph tags so a shared
     link unfurls with the page's title, blurb and a representative figure; the local editions
     (``file://`` / ``localhost``) carry no remote reference at all.
+
+    ``canonical_slug`` (a ``_PAGES`` slug, so it cannot be a new string typed here) adds the public
+    edition's ``rel="canonical"``. The local editions never get one **by construction**: it is the
+    one tag here that would name the Pages origin, and a local edition's whole contract is that it
+    references nothing remote. That contract is now asserted against ``_PAGES_URL`` rather than only
+    ``"github.com"`` — the canonical is a ``github.io`` URL, so it would have walked straight through
+    the older assertion.
     """
     desc = html.escape(description, quote=True)
     lines = [
@@ -193,8 +224,11 @@ def head_meta(title: str, description: str, local: bool = False, og_image: str |
         '<meta name="color-scheme" content="light dark">',
         '<meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">',
         '<meta name="theme-color" content="#10151b" media="(prefers-color-scheme: dark)">',
+        f'<link rel="icon" href="{_FAVICON}">',
     ]
     if not local:
+        if canonical_slug is not None:
+            lines.append(f'<link rel="canonical" href="{_PAGES_URL}/{canonical_slug}.html">')
         lines += [
             '<meta property="og:type" content="website">',
             f'<meta property="og:title" content="{title}">',
@@ -218,7 +252,7 @@ def _card(demo: Demo, local: bool = False, pkg: str = "chip") -> str:
           </a>
           <div class="body">
             <span class="tag">{label}</span>
-            <p class="blurb">{blurb}</p>
+            <details class="expand"><summary><span class="blurb">{blurb}</span></summary></details>
             <div class="links">
               <code>{run}</code>
               <a class="src" href="{src}"{tgt}>source&nbsp;&#8599;</a>
@@ -239,6 +273,7 @@ _STYLE = """\
       :root {
         --bg: #f6f7f9; --card: #ffffff; --ink: #1c2530; --muted: #5b6772;
         --line: #e2e6ea; --accent: #2f6db5; --code: #0b3a66; --shot-bg: #fafbfc;
+        --frame: #e2e6ea;
         --tag-bg: #eaf2fb; --code-bg: #eef3f8; --head-glow: #ffffff;
         --note-bg: #fff7e6; --note-line: #f0d8a8;
         --wall: #b23c2f; --next: #2e7d46;
@@ -250,6 +285,7 @@ _STYLE = """\
         :root {
           --bg: #10151b; --card: #171e26; --ink: #e3e8ee; --muted: #97a3ae;
           --line: #2a333d; --accent: #6ea8e0; --code: #a8c7e8; --shot-bg: #fafbfc;
+          --frame: #c3ccd6;
           --tag-bg: #1d2f42; --code-bg: #1c2733; --head-glow: #141b23;
           --note-bg: #2b2416; --note-line: #5a4a22;
           --wall: #e07a6d; --next: #58b878;
@@ -293,14 +329,47 @@ _STYLE = """\
               transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease; }
       .card:hover { box-shadow: var(--shadow); transform: translateY(-2px);
                     border-color: var(--accent); }
+      /* The frame is an OUTLINE, never a border: figure_img declares the thumbnail's pixel size so
+         the browser reserves the box before the bytes arrive, and a 1-px border would add 2 px to
+         that box and re-introduce the very layout jump the declared size removed. An outline takes
+         no layout space, and (painted after descendants) it draws over the image instead of under
+         it — which an inset box-shadow would not. No radius: .shot sits at the top of a card that
+         is already `overflow: hidden` with a 12-px radius, so its top corners are clipped for it,
+         and rounding only the bottom pair reads as a seam in the middle of the card. */
       .shot { display: block; position: relative; background: var(--shot-bg);
-              border-bottom: 1px solid var(--line); }
+              border-bottom: 1px solid var(--line);
+              outline: 1px solid var(--frame); outline-offset: -1px; }
       .shot img { display: block; width: 100%; height: auto; }
       .body { padding: .9rem 1rem 1rem; display: flex; flex-direction: column; gap: .55rem; flex: 1; }
       .tag { align-self: flex-start; font-weight: 700; font-size: .76rem; letter-spacing: .03em;
              text-transform: uppercase; color: var(--accent); background: var(--tag-bg);
              border-radius: 999px; padding: .12rem .6rem; }
+      /* The blurb is clamped so one long card cannot stretch its whole grid row, and every card is
+         the SAME shape — a <details> whose <summary> holds the clamped text — rather than only the
+         long ones, which would need a "how long is long" constant nobody can justify. There is no
+         "more" affordance for the same reason: a marker or a "read on" line would be honest on the
+         three cards that overflow and pure noise on the forty that do not, and no CSS can tell the
+         two apart. A clamped card cuts off mid-sentence, which is the cue; `cursor: pointer` and the
+         native disclosure behaviour do the rest, and a short card is byte-for-byte what it was.
+         The clamp lives on the inner <span>, not on <summary>: -webkit-line-clamp needs
+         `display: -webkit-box`, and a <summary> is `display: list-item` — clamping it directly is
+         the way this fails. (The span is also why the markup is valid: <summary> takes phrasing
+         content, so the old <p> could not simply move inside it.) */
+      .expand { flex: 1; }
+      .expand > summary { display: block; cursor: pointer; list-style: none; }
+      .expand > summary::-webkit-details-marker { display: none; }
+      .expand > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px;
+                                        border-radius: 4px; }
+      /* `flex: 1` stays here as well as on `.expand`: the roadmap's `.blurb` is still a direct flex
+         child of `.body` and is what pushes its links to the card bottom. Inside a gallery card the
+         `.blurb` is wrapped in a `<summary>` (display: block), so it is not a flex item there and
+         the declaration is inert — `.expand` carries the growth instead. */
       .blurb { margin: 0; flex: 1; }
+      /* Scoped to `.expand` on purpose: docs/roadmap.html also uses `.blurb`, in a plain <p> with no
+         <details> around it, and an unscoped clamp would truncate those cards with nothing to click. */
+      .expand .blurb { display: -webkit-box; -webkit-box-orient: vertical;
+                       -webkit-line-clamp: 5; overflow: hidden; }
+      .expand[open] .blurb { display: block; -webkit-line-clamp: unset; }
       .links { display: flex; align-items: center; justify-content: space-between; gap: .6rem;
                margin-top: .2rem; padding-top: .6rem; border-top: 1px dashed var(--line); }
       .links code { color: var(--code); background: var(--code-bg); border-radius: 6px;
@@ -431,7 +500,7 @@ def render_html(local: bool = False) -> str:
   {head_meta(title, "Process recipe in, device out: an educational microchip-fabrication simulator. "
                     "Every fab step ships a demo that prints a cited validation table and banks a figure; "
                     "this gallery is the clickable front door to all of them.",
-             local, og_image="figures/chip-device.png")}
+             local, og_image="figures/chip-device.png", canonical_slug="index")}
   <style>
 {_STYLE}
   </style>

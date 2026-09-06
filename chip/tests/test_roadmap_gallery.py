@@ -10,6 +10,7 @@ All import + file-existence only — no matplotlib (:mod:`chip.roadmap_figures` 
 inside ``main``) — so these ride the fast lane and never skip away.
 """
 from chip import roadmap_figures
+from chip.gallery import _PAGES_URL
 from chip import roadmap_gallery as rg
 
 
@@ -81,6 +82,11 @@ def test_local_edition_is_all_local_no_github():
     """The standing gallery rule: the local edition links only into the running JupyterLab."""
     local = rg.render_html(local=True)
     assert "github.com" not in local, "the local roadmap must not link to GitHub anywhere"
+    assert _PAGES_URL not in local, (
+        "the local roadmap must name no remote origin at all — the Pages URL is a github.IO host, so "
+        "the github.com assert above does not catch it (rel=canonical would have walked straight "
+        "through)."
+    )
     assert f"localhost:{rg._LOCAL_PORT}" in local, "the local roadmap must link into the running JupyterLab"
 
 
@@ -94,3 +100,9 @@ def test_pages_cross_link():
     """The nav strip: the roadmap links back to all three built-work pages, both editions."""
     assert 'href="index.html"' in rg.render_html()
     assert 'href="index.local.html"' in rg.render_html(local=True)
+
+
+def test_public_canonical_names_the_file_it_is_served_as():
+    """``rel=canonical`` must point at this page's own Pages URL, not a sibling page's."""
+    public = rg.render_html()
+    assert f'<link rel="canonical" href="{_PAGES_URL}/{rg.OUTPUT_HTML.name}">' in public

@@ -85,6 +85,28 @@ The lesson worth keeping: **a work order written from a profile is a hypothesis,
 Every number in §2 that was carried over rather than re-measured turned out to be wrong, in both
 directions. Re-measure the item before you build it.
 
+### 1f. The third batch (2026-09-06) — the doc-surface pass (N8, then N7 + N3)
+
+Three items, two commits. N8 first and alone, because it touches 45 demo modules and no shared HTML;
+N7 and N3 together, because both edit the one shared stylesheet and `head_meta`, so they regenerate
+all eight pages **once** instead of three times.
+
+* **N8 — the `outputs/` duplicate write is gone.** 48 constants, 48 two-target save loops, 45 demo
+  modules. The item's cost estimate was low by 2-3x on the large figures: `savefig` re-renders the
+  canvas every call, so the duplicate cost the same as the original (0.4 s small, ~1.4 s large).
+* **N7 — favicon, figure frame, canonical links.** Two of the three landed as written; the frame's
+  dark-theme half did not, and needed a new `--frame` token because the plan's `var(--line)` is a
+  dark line drawn between a white tile and a dark card. Two failures here are structurally invisible
+  to the golden tests (a `#` in a data URI, a wrong SVG sweep flag) — one is now asserted, the other
+  was settled by rendering four candidates in a browser and looking.
+* **N3 — the blurb clamp.** Applied to **every** card and with **no** expander affordance, which is
+  what makes it threshold-free: no "how long is long" constant, and nothing added to the forty cards
+  that do not overflow. The history page's equivalent row was checked and deliberately left alone.
+
+The pass also found a **real gap in an existing guard**: all four pages asserted their local edition
+contains no `"github.com"`, but the Pages origin is a `github.io` host — a canonical link leaking
+into a local edition would have passed every one of those asserts. Now pinned against `_PAGES_URL`.
+
 ## 2. Next — the remaining work, in priority order
 
 Each item: *why → what → where → test → measure*. Work them top-down; each is independent.
@@ -207,20 +229,59 @@ not to widen the tolerance.
 *Status:* closed, no code change. The 4.2 s quoted below was a `--durations` line, not a
 `compute()` wall; measured directly the demo is ~5.9 s (min of 3), on a box that was 100% busy.
 
-### N3. Blurbs on the later gallery cards are paragraphs
+### ~~N3. Blurbs on the later gallery cards are paragraphs~~ - **DONE 2026-09-06. The design question this item left open was "which cards", and the answer is: all of them, with no affordance**
 
-*Why:* the B9/B10/B11 blurbs in `chip/gallery.py` `DEEPENINGS` run 6–10 lines inside a 330-px card
-(see `docs/index.html`, the last three cards). They are kept verbatim with the README catalog on
-purpose, so do not shorten the text.
-*What:* clamp visually — in `_STYLE` add `.blurb { display:-webkit-box; -webkit-line-clamp: 5;
--webkit-box-orient: vertical; overflow: hidden; }` and wrap each long blurb in a `<details>` whose
-`<summary>` shows the clamped text and whose open state shows all of it (pure HTML/CSS, no JS).
-Apply the same in `fab_game/gallery.py` (it reuses `_card`, so the change lands automatically) and
-check `chip/history_gallery.py`'s `.story .v` cells, which have the same problem for B11.
-*Test:* regenerate all eight HTML files (`python -m chip.gallery && python -m fab_game.gallery &&
-python -m chip.history_gallery && python -m chip.roadmap_gallery`); the golden tests then pass;
-add an assertion in `test_gallery.py` that every blurb text is still present verbatim in the page.
-*Measure:* open `docs/index.html` in a browser at 1280 px wide — every card row aligns.
+*Why:* the B9/B10/B11 blurbs run 6-10 lines inside a 330-px card, and the grid equalizes row heights,
+so **one** long card stretches the whole row - the two cards beside it get a block of dead space. The
+text is kept verbatim with the README catalog, so shortening it was never on the table.
+
+**What was actually decided.** This item said "wrap each *long* blurb", which needs a threshold -
+*how long is long* - and produces two different card shapes in one grid. Neither is justifiable, so
+the `<details>` is applied to **every** card. That immediately raises the opposite problem: an
+expander normally advertises itself, and a "more" line would be honest on the three cards that
+overflow and pure noise on the forty that do not - and **no CSS can tell those two apart** (there is
+no overflow selector). So there is no affordance at all: the native marker is hidden, nothing is
+added, and a short card renders byte-for-byte what it rendered before. The cue on a long card is
+that the text stops mid-sentence with the clamp's own ellipsis; `cursor: pointer` and the native
+disclosure behaviour do the rest. Uniform markup, no threshold, no noise - the item's three
+constraints turned out not to conflict once the affordance was dropped.
+
+*What:* in `chip/gallery.py`, `_card` renders
+`<details class="expand"><summary><span class="blurb">...</span></summary></details>`, and `_STYLE`
+clamps `.expand .blurb` to 5 lines. `fab_game/gallery.py` reuses `_card`, so its 20 cards changed
+with it.
+
+Three details that are the difference between working and silently not:
+
+* **The clamp is on the inner `<span>`, never on the `<summary>`.** `-webkit-line-clamp` only
+  applies with `display: -webkit-box`, and a `<summary>` is `display: list-item`; clamping it
+  directly is how this fails. The span is also what makes the markup valid - `<summary>` takes
+  phrasing content, so the old `<p>` could not simply move inside it.
+* **`flex: 1` had to be on `.expand`, not only `.blurb`.** That declaration is what pushes `.links`
+  to the card bottom so the link rows line up; once the blurb is wrapped, the flex child is the
+  `<details>`. It stays on `.blurb` as well, because `docs/roadmap.html`'s `.blurb` is still a
+  direct flex child of `.body` and relies on it.
+* **The clamp is scoped to `.expand .blurb`.** The roadmap page also uses the `.blurb` class, in a
+  plain `<p>` with no `<details>` around it - an unscoped clamp would have truncated those four
+  cards at 5 lines with nothing to click. Verified in the browser: roadmap blurbs report
+  `display: block`, not clipped, not inside a `<details>`.
+
+*Test:* `test_blurbs_survive_the_clamp_verbatim` (both galleries, both editions) asserts every
+manifest blurb still appears **character for character** in the page - compared against
+`html.escape(blurb)`, since `_card` escapes before interpolating. That is the assert that pins
+"clamped visually, never truncated in the source".
+*Measured (browser, 1280 px, both themes):* the B9/B10/B11 row's cards are equal height and their
+link rows align. Closed, the B11 blurb box is 124 px against a 372 px scroll height (clipped);
+clicking the summary opens it to the full 372 px with `display: block`. Light and dark both correct.
+
+**The history page's B11 row: deliberately out of scope.** This item asked to check
+`chip/history_gallery.py`'s `.story .v` cells for the same problem. They are not the same problem.
+Measured rung heights on `docs/history.html`: B9 **1158 px**, B10 **1181 px**, B11 **1135 px** - B11
+is not an outlier, it is the page's normal shape for a modern rung. And the timeline is one rung per
+row, so a tall rung stretches nothing but itself; there is no neighbouring card being handed dead
+space, which is the entire reason the gallery cards needed clamping. Most of all, the wall text *is*
+the rung - the era timeline exists to say what broke and what replaced it, so putting that behind a
+click would hide the thing the reader came for. Left as prose.
 
 ### N4. `srcset` for high-density displays and narrow phones
 
@@ -267,17 +328,68 @@ On the fab-line journey (152,400 engine steps, the largest call count in the pro
 engine's share is **~0.25 s of a ~6 s wall**. That does not pay for a new public engine method whose
 signature has to carry the flux accumulation. *Closed: measured, negative, no code change.*
 
-### N7. Gallery pages — small polish items (do in one pass)
+### ~~N7. Gallery pages - small polish items (do in one pass)~~ - **DONE 2026-09-06 (2 of 3 as written; the frame's dark-theme half needed a new token)**
 
-* `docs/*.html` have no favicon; add an inline SVG data-URI `<link rel="icon">` in `head_meta`
-  (a wafer disc in the accent colour).
-* The dark theme shows figures as bright white tiles (`--shot-bg` is white in both themes). Leave
-  the figures white (they are PNGs with white backgrounds) but soften the tile: give `.shot` a 1-px
-  inner border of `var(--line)` and 4-px radius so the white reads as a framed image, not a hole.
-* Add `<link rel="canonical">` to the public editions pointing at
-  `https://boikoneov.github.io/chip-sim/<page>.html` (the local editions get none — keep the
-  "local has no remote reference" tests green).
-*Test:* regenerate the eight pages; golden tests. Check both themes in a browser.
+All three land in `chip.gallery`'s shared `head_meta` / `_STYLE`, so one code pass regenerated all
+eight pages once.
+
+**The favicon** - an inline SVG data URI in `head_meta`, on **all eight** pages including the local
+editions: a data URI is not a remote reference, so the local editions keep their defining property
+(a page opened over `file://` fetches nothing, not even from its own directory). A wafer: a disc
+with the orientation flat cut off the bottom, carrying one white die.
+
+Two things here that **no golden test can catch**, because the goldens compare each page to itself
+and a broken icon goldens exactly as happily as a working one:
+
+* A raw `#` inside a `data:` URI terminates it as a **fragment identifier** - the tab silently shows
+  no icon. Every colour is percent-encoded (`%232f6db5`), and `<`/`>` with it. This one *is* now
+  tested - `test_favicon_data_uri_carries_no_raw_hash` asserts `"#" not in _FAVICON` - which is the
+  cheap half of the problem.
+* The arc's **sweep flag was wrong on the first try**, and reasoning about it a second time did not
+  fix it. With SVG's y-axis pointing down, `sweep-flag 0` takes the major arc round the *bottom* and
+  renders a thin sliver, not a wafer. Settled by rendering all four candidate paths side by side in
+  a browser and looking: `sweep-flag 1`. The lesson is in the code comment - this is checked by
+  rendering, not derived.
+
+**The `.shot` frame** - the dark theme showed each figure as a bright white tile punched into a dark
+card (`--shot-bg` is white in both themes, because the PNGs have white backgrounds). The plan asked
+for "a 1-px inner border and 4-px radius". What shipped is an **outline**, and **no radius**:
+
+* Not a `border`: `figure_img` declares the thumbnail's pixel size so the browser reserves the image
+  box before the bytes arrive (the anti-reflow fix from section 1d). A 1-px border adds 2 px to that
+  box and gives the jump straight back. An outline takes no layout space at all.
+* Not an inset `box-shadow` either: `.shot`'s content is the `<img>`, and an inset shadow paints
+  under it. An outline is painted after the element's descendants, so it draws **over** the image -
+  confirmed by temporarily setting it to `6px solid red` and watching the frame appear on top of the
+  figure.
+* No radius: `.shot` sits at the top of a card that is already `overflow: hidden` with a 12-px
+  radius, so its top corners are clipped for it; rounding only the bottom pair reads as a seam in the
+  middle of the card.
+
+**The half that needed more than the plan said.** The plan's colour was `var(--line)`. In dark mode
+`--line` is `#2a333d` - a dark line, drawn between a white tile and a dark card, which reads as part
+of the gap rather than as a frame: cosmetically inert, exactly the failure the item was written to
+fix. So there is a new token, `--frame`: `#e2e6ea` in light (unchanged behaviour, same as `--line`)
+and `#c3ccd6` in dark, a grey that has contrast against the *white* it is drawn on. It is a
+deliberately quiet hairline - a matte edge on a photo, not a picture frame - so the figure reads as
+a framed image rather than a hole. Honest caveat: at 1 px it is subtle enough that the A/B is hard
+to see in a compressed screenshot; what was *verified* is that it paints in the right place, over
+the image, without moving the box.
+
+**The canonical links** - `rel="canonical"` on the four public editions only, pointing at
+`https://boikoneov.github.io/chip-sim/<page>.html`. `head_meta` grew a `canonical_slug` argument,
+**appended** to the signature because three of the four call sites pass `local` positionally.
+
+This turned up a **real gap in the local-edition guards**. All four pages assert
+`"github.com" not in local` - and the Pages origin is a **github.IO** host, so a canonical link
+leaking into a local edition would have walked straight through every one of them. All four now also
+assert `_PAGES_URL not in local`. Each page additionally asserts its canonical names the file it is
+actually served as (`OUTPUT_HTML.name`), so the one hand-typed slug in the head cannot drift from the
+page it sits on.
+
+*Test:* the eight golden tests, plus the four new asserts above.
+*Measured:* checked in a browser at 1280 px in **both** themes - the favicon renders, the frame
+paints over the figure, and no card box moved.
 
 ### ~~N8. Retire the `outputs/` duplicate write~~ — **DONE 2026-09-06, and the second write was costing more than this item claimed**
 

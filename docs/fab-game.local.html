@@ -8,10 +8,12 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#10151b" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M7.7 26A13 13 0 1 1 24.3 26Z' fill='%232f6db5'/%3E%3Crect x='12' y='12' width='8' height='8' rx='1.2' fill='%23ffffff'/%3E%3C/svg%3E">
   <style>
       :root {
         --bg: #f6f7f9; --card: #ffffff; --ink: #1c2530; --muted: #5b6772;
         --line: #e2e6ea; --accent: #2f6db5; --code: #0b3a66; --shot-bg: #fafbfc;
+        --frame: #e2e6ea;
         --tag-bg: #eaf2fb; --code-bg: #eef3f8; --head-glow: #ffffff;
         --note-bg: #fff7e6; --note-line: #f0d8a8;
         --wall: #b23c2f; --next: #2e7d46;
@@ -23,6 +25,7 @@
         :root {
           --bg: #10151b; --card: #171e26; --ink: #e3e8ee; --muted: #97a3ae;
           --line: #2a333d; --accent: #6ea8e0; --code: #a8c7e8; --shot-bg: #fafbfc;
+          --frame: #c3ccd6;
           --tag-bg: #1d2f42; --code-bg: #1c2733; --head-glow: #141b23;
           --note-bg: #2b2416; --note-line: #5a4a22;
           --wall: #e07a6d; --next: #58b878;
@@ -66,14 +69,47 @@
               transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease; }
       .card:hover { box-shadow: var(--shadow); transform: translateY(-2px);
                     border-color: var(--accent); }
+      /* The frame is an OUTLINE, never a border: figure_img declares the thumbnail's pixel size so
+         the browser reserves the box before the bytes arrive, and a 1-px border would add 2 px to
+         that box and re-introduce the very layout jump the declared size removed. An outline takes
+         no layout space, and (painted after descendants) it draws over the image instead of under
+         it — which an inset box-shadow would not. No radius: .shot sits at the top of a card that
+         is already `overflow: hidden` with a 12-px radius, so its top corners are clipped for it,
+         and rounding only the bottom pair reads as a seam in the middle of the card. */
       .shot { display: block; position: relative; background: var(--shot-bg);
-              border-bottom: 1px solid var(--line); }
+              border-bottom: 1px solid var(--line);
+              outline: 1px solid var(--frame); outline-offset: -1px; }
       .shot img { display: block; width: 100%; height: auto; }
       .body { padding: .9rem 1rem 1rem; display: flex; flex-direction: column; gap: .55rem; flex: 1; }
       .tag { align-self: flex-start; font-weight: 700; font-size: .76rem; letter-spacing: .03em;
              text-transform: uppercase; color: var(--accent); background: var(--tag-bg);
              border-radius: 999px; padding: .12rem .6rem; }
+      /* The blurb is clamped so one long card cannot stretch its whole grid row, and every card is
+         the SAME shape — a <details> whose <summary> holds the clamped text — rather than only the
+         long ones, which would need a "how long is long" constant nobody can justify. There is no
+         "more" affordance for the same reason: a marker or a "read on" line would be honest on the
+         three cards that overflow and pure noise on the forty that do not, and no CSS can tell the
+         two apart. A clamped card cuts off mid-sentence, which is the cue; `cursor: pointer` and the
+         native disclosure behaviour do the rest, and a short card is byte-for-byte what it was.
+         The clamp lives on the inner <span>, not on <summary>: -webkit-line-clamp needs
+         `display: -webkit-box`, and a <summary> is `display: list-item` — clamping it directly is
+         the way this fails. (The span is also why the markup is valid: <summary> takes phrasing
+         content, so the old <p> could not simply move inside it.) */
+      .expand { flex: 1; }
+      .expand > summary { display: block; cursor: pointer; list-style: none; }
+      .expand > summary::-webkit-details-marker { display: none; }
+      .expand > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px;
+                                        border-radius: 4px; }
+      /* `flex: 1` stays here as well as on `.expand`: the roadmap's `.blurb` is still a direct flex
+         child of `.body` and is what pushes its links to the card bottom. Inside a gallery card the
+         `.blurb` is wrapped in a `<summary>` (display: block), so it is not a flex item there and
+         the declaration is inert — `.expand` carries the growth instead. */
       .blurb { margin: 0; flex: 1; }
+      /* Scoped to `.expand` on purpose: docs/roadmap.html also uses `.blurb`, in a plain <p> with no
+         <details> around it, and an unscoped clamp would truncate those cards with nothing to click. */
+      .expand .blurb { display: -webkit-box; -webkit-box-orient: vertical;
+                       -webkit-line-clamp: 5; overflow: hidden; }
+      .expand[open] .blurb { display: block; -webkit-line-clamp: unset; }
       .links { display: flex; align-items: center; justify-content: space-between; gap: .6rem;
                margin-top: .2rem; padding-top: .6rem; border-top: 1px dashed var(--line); }
       .links code { color: var(--code); background: var(--code-bg); border-radius: 6px;
@@ -149,7 +185,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">G1</span>
-            <p class="blurb">One bad knob → a dead die, with the failure trail: defocus → NILS collapse → off-spec → the wafer yield drops, and the trail names defocus as the cause.</p>
+            <details class="expand"><summary><span class="blurb">One bad knob → a dead die, with the failure trail: defocus → NILS collapse → off-spec → the wafer yield drops, and the trail names defocus as the cause.</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_fab_game</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_fab_game.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -162,7 +198,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">G2</span>
-            <p class="blurb">Czochralski + the Scheil axial boule → a V_t spread down the boule (k≈0.8, the tail scraps) — the difficulty curve of a run.</p>
+            <details class="expand"><summary><span class="blurb">Czochralski + the Scheil axial boule → a V_t spread down the boule (k≈0.8, the tail scraps) — the difficulty curve of a run.</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_boule</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_boule.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -175,7 +211,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">G3</span>
-            <p class="blurb">The die map made physical: killer particles → the defect-limited yield law Y=exp(−D₀A) + the TTV/bow geometry scrap gate.</p>
+            <details class="expand"><summary><span class="blurb">The die map made physical: killer particles → the defect-limited yield law Y=exp(−D₀A) + the TTV/bow geometry scrap gate.</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_wafer_prep</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_wafer_prep.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -188,7 +224,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">G4</span>
-            <p class="blurb">Silicon purification (Pfann single-pass zone refining) → Na contamination → Q_ox → a V_t hit, recovered by rework.</p>
+            <details class="expand"><summary><span class="blurb">Silicon purification (Pfann single-pass zone refining) → Na contamination → Q_ox → a V_t hit, recovered by rework.</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_purification</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_purification.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -201,7 +237,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">G4b</span>
-            <p class="blurb">Deep-level metals (Fe/Cu) → SRH lifetime killed → generation leakage → a leaky diode (the optional leakage spec window).</p>
+            <details class="expand"><summary><span class="blurb">Deep-level metals (Fe/Cu) → SRH lifetime killed → generation leakage → a leaky diode (the optional leakage spec window).</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_lifetime</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_lifetime.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -214,7 +250,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">G5</span>
-            <p class="blurb">The mid-line etch &amp; deposition: etch bias shrinks CD; a gap above the aspect-ratio limit voids the deposition (a functional kill).</p>
+            <details class="expand"><summary><span class="blurb">The mid-line etch &amp; deposition: etch bias shrinks CD; a gap above the aspect-ratio limit voids the deposition (a functional kill).</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_etch</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_etch.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -227,7 +263,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">G6</span>
-            <p class="blurb">The back end: the cumulative assembly-yield funnel Y=Πyᵢ + speed binning into value grades (the bin-out tail).</p>
+            <details class="expand"><summary><span class="blurb">The back end: the cumulative assembly-yield funnel Y=Πyᵢ + speed binning into value grades (the bin-out tail).</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_packaging</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_packaging.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -240,7 +276,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">G7</span>
-            <p class="blurb">A roguelike run down one boule: thin the gate oxide against the rising Scheil V_t drift — a Goldilocks lever (over-thinning hits the I_Dsat ceiling).</p>
+            <details class="expand"><summary><span class="blurb">A roguelike run down one boule: thin the gate oxide against the rising Scheil V_t drift — a Goldilocks lever (over-thinning hits the I_Dsat ceiling).</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_game</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_game.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -253,7 +289,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">J1</span>
-            <p class="blurb">The staged sand→chip journey (phases 1–5): purify a feed (refine → the graded Na edge ring), grow the boule (the two-sided Voronkov pull window — leakage rim ↔ void core), cut a wafer (where down the boule — a graded Scheil V_t centre core, how deep set by the phase-2 pull), diffuse the S/D (the predep dose → R_s → a series-resistance-starved, centre-weighted I_Dsat core), then grow the gate oxide (the two-sided t_ox window — too thin → an edge ring, too thick → a centre core, the only stage failing at opposite radii) — commit each decision and finish to a scored wafer.</p>
+            <details class="expand"><summary><span class="blurb">The staged sand→chip journey (phases 1–5): purify a feed (refine → the graded Na edge ring), grow the boule (the two-sided Voronkov pull window — leakage rim ↔ void core), cut a wafer (where down the boule — a graded Scheil V_t centre core, how deep set by the phase-2 pull), diffuse the S/D (the predep dose → R_s → a series-resistance-starved, centre-weighted I_Dsat core), then grow the gate oxide (the two-sided t_ox window — too thin → an edge ring, too thick → a centre core, the only stage failing at opposite radii) — commit each decision and finish to a scored wafer.</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_journey</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_journey.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -274,7 +310,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">CG-1</span>
-            <p class="blurb">Pull rate → the Burton–Prim–Slichter effective segregation k_eff(v) → flattens the Scheil doping drift (one-sided: faster only helps).</p>
+            <details class="expand"><summary><span class="blurb">Pull rate → the Burton–Prim–Slichter effective segregation k_eff(v) → flattens the Scheil doping drift (one-sided: faster only helps).</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_crystal_growth</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_crystal_growth.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -287,7 +323,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">CG-2</span>
-            <p class="blurb">The Voronkov V/G criterion → grown-in voids/COPs above ξ_t feed the same G3 defect map — the in-model brake on pulling faster.</p>
+            <details class="expand"><summary><span class="blurb">The Voronkov V/G criterion → grown-in voids/COPs above ξ_t feed the same G3 defect map — the in-model brake on pulling faster.</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_voronkov</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_voronkov.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -300,7 +336,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">CG-3</span>
-            <p class="blurb">The Stefan interface heat balance supplies CG-2&#x27;s gradient G → ξ=V/G_s saturates at ξ_max, capping the vacancy cost.</p>
+            <details class="expand"><summary><span class="blurb">The Stefan interface heat balance supplies CG-2&#x27;s gradient G → ξ=V/G_s saturates at ξ_max, capping the vacancy cost.</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_stefan</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_stefan.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -313,7 +349,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">C1</span>
-            <p class="blurb">Crucible oxygen → thermal donors (initial rate ∝[Oᵢ]⁴) compensate the p-substrate (N_A−N_TD) → V_t down — the crystal-growth electrical deepening.</p>
+            <details class="expand"><summary><span class="blurb">Crucible oxygen → thermal donors (initial rate ∝[Oᵢ]⁴) compensate the p-substrate (N_A−N_TD) → V_t down — the crystal-growth electrical deepening.</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_thermal_donors</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_thermal_donors.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -326,7 +362,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">D1</span>
-            <p class="blurb">Under-etch → a residual film bridges the gate lines into a functional short — the mirror of the deposition void&#x27;s open (the etch process window).</p>
+            <details class="expand"><summary><span class="blurb">Under-etch → a residual film bridges the gate lines into a functional short — the mirror of the deposition void&#x27;s open (the etch process window).</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_under_etch</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_under_etch.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -339,7 +375,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">A2</span>
-            <p class="blurb">The OSF ring: CG-2 made radial → a dead vacancy core + a clean rim. The ring is where the kills stop, not a ring of kills.</p>
+            <details class="expand"><summary><span class="blurb">The OSF ring: CG-2 made radial → a dead vacancy core + a clean rim. The ring is where the kills stop, not a ring of kills.</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_osf_ring</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_osf_ring.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -352,7 +388,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">A1</span>
-            <p class="blurb">The interstitial side of Voronkov: slow pull (ξ&lt;ξ_t) → dislocations → junction leakage — the two-sided window (optimum at ξ_t).</p>
+            <details class="expand"><summary><span class="blurb">The interstitial side of Voronkov: slow pull (ξ&lt;ξ_t) → dislocations → junction leakage — the two-sided window (optimum at ξ_t).</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_dislocation</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_dislocation.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -365,7 +401,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">E1</span>
-            <p class="blurb">A spike/RTA anneal&#x27;s thermal budget ∫D(T(t))dt → a faster ramp → a smaller budget → a shallower x_j (why RTA, the OED effective_Dt twin).</p>
+            <details class="expand"><summary><span class="blurb">A spike/RTA anneal&#x27;s thermal budget ∫D(T(t))dt → a faster ramp → a smaller budget → a shallower x_j (why RTA, the OED effective_Dt twin).</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_thermal_budget</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_thermal_budget.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -378,7 +414,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">S4</span>
-            <p class="blurb">Crucible oxygen&#x27;s dual-use: internal gettering traps the deep-level metals (leakage down) while the same oxygen makes donors (V_t down) — a Goldilocks within one device.</p>
+            <details class="expand"><summary><span class="blurb">Crucible oxygen&#x27;s dual-use: internal gettering traps the deep-level metals (leakage down) while the same oxygen makes donors (V_t down) — a Goldilocks within one device.</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_internal_gettering</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_internal_gettering.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -391,7 +427,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">S5</span>
-            <p class="blurb">The lifetime inversion: reverse recovery t_rr ∝ τ reads the SAME lifetime the leakage does, opposite way — a short τ is a leaky logic reject but a fast power rectifier (the killer is the feature).</p>
+            <details class="expand"><summary><span class="blurb">The lifetime inversion: reverse recovery t_rr ∝ τ reads the SAME lifetime the leakage does, opposite way — a short τ is a leaky logic reject but a fast power rectifier (the killer is the feature).</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_reverse_recovery</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_reverse_recovery.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>
@@ -404,7 +440,7 @@ python -m fab_game.demo_fab_game   <span class="c"># prints the trail, banks doc
           </a>
           <div class="body">
             <span class="tag">F8</span>
-            <p class="blurb">One wafer graded three ways: the polished wire withdraws the rescue F4&#x27;s ideal wire gave the slow tail, so parts stop shipping — a yield loss neither the transistor spread nor the polisher causes alone.</p>
+            <details class="expand"><summary><span class="blurb">One wafer graded three ways: the polished wire withdraws the rescue F4&#x27;s ideal wire gave the slow tail, so parts stop shipping — a yield loss neither the transistor spread nor the polisher causes alone.</span></summary></details>
             <div class="links">
               <code>python -m fab_game.demo_cmp_grading</code>
               <a class="src" href="http://localhost:8888/lab/tree/fab_game/demo_cmp_grading.py" target="_blank" rel="noopener">source&nbsp;&#8599;</a>

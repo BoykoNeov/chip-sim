@@ -386,7 +386,7 @@ def render_html(local: bool = False) -> str:
   {head_meta(title, "The backward axis: each fab step re-run in the period mode whose limitation motivated "
                     "its successor, laid on the process spine with the wall it hit and the modern step "
                     "that cleared it.",
-             local, og_image="figures/chip-doping-history.png")}
+             local, og_image="figures/chip-doping-history.png", canonical_slug="history")}
   <style>
 {_STYLE}
 {_TIMELINE_CSS}

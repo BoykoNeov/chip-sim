@@ -17,6 +17,7 @@ Five asserts make currency structural rather than a chore:
 
 All import + file-existence only — no matplotlib — so they ride the fast lane and never skip away.
 """
+from chip.gallery import _PAGES_URL
 from chip import history_gallery as hg
 
 
@@ -60,6 +61,11 @@ def test_local_edition_is_all_local_no_github():
     """The local edition's whole point: every link is local (a running JupyterLab), none to GitHub."""
     local = hg.render_html(local=True)
     assert "github.com" not in local, "the local timeline must not link to GitHub anywhere"
+    assert _PAGES_URL not in local, (
+        "the local timeline must name no remote origin at all — the Pages URL is a github.IO host, so "
+        "the github.com assert above does not catch it (rel=canonical would have walked straight "
+        "through)."
+    )
     assert f"localhost:{hg._LOCAL_PORT}" in local, "the local timeline must link into the running JupyterLab"
 
 
@@ -67,3 +73,9 @@ def test_public_edition_still_points_to_github():
     """Guard the split: the public Pages timeline keeps its GitHub links (localhost would dead-end there)."""
     public = hg.render_html()
     assert "github.com" in public and "localhost" not in public
+
+
+def test_public_canonical_names_the_file_it_is_served_as():
+    """``rel=canonical`` must point at this page's own Pages URL, not a sibling page's."""
+    public = hg.render_html()
+    assert f'<link rel="canonical" href="{_PAGES_URL}/{hg.OUTPUT_HTML.name}">' in public

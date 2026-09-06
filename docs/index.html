@@ -8,6 +8,8 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#10151b" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M7.7 26A13 13 0 1 1 24.3 26Z' fill='%232f6db5'/%3E%3Crect x='12' y='12' width='8' height='8' rx='1.2' fill='%23ffffff'/%3E%3C/svg%3E">
+  <link rel="canonical" href="https://boikoneov.github.io/chip-sim/index.html">
   <meta property="og:type" content="website">
   <meta property="og:title" content="chip-sim — visualization &amp; demo gallery">
   <meta property="og:description" content="Process recipe in, device out: an educational microchip-fabrication simulator. Every fab step ships a demo that prints a cited validation table and banks a figure; this gallery is the clickable front door to all of them.">
@@ -16,6 +18,7 @@
       :root {
         --bg: #f6f7f9; --card: #ffffff; --ink: #1c2530; --muted: #5b6772;
         --line: #e2e6ea; --accent: #2f6db5; --code: #0b3a66; --shot-bg: #fafbfc;
+        --frame: #e2e6ea;
         --tag-bg: #eaf2fb; --code-bg: #eef3f8; --head-glow: #ffffff;
         --note-bg: #fff7e6; --note-line: #f0d8a8;
         --wall: #b23c2f; --next: #2e7d46;
@@ -27,6 +30,7 @@
         :root {
           --bg: #10151b; --card: #171e26; --ink: #e3e8ee; --muted: #97a3ae;
           --line: #2a333d; --accent: #6ea8e0; --code: #a8c7e8; --shot-bg: #fafbfc;
+          --frame: #c3ccd6;
           --tag-bg: #1d2f42; --code-bg: #1c2733; --head-glow: #141b23;
           --note-bg: #2b2416; --note-line: #5a4a22;
           --wall: #e07a6d; --next: #58b878;
@@ -70,14 +74,47 @@
               transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease; }
       .card:hover { box-shadow: var(--shadow); transform: translateY(-2px);
                     border-color: var(--accent); }
+      /* The frame is an OUTLINE, never a border: figure_img declares the thumbnail's pixel size so
+         the browser reserves the box before the bytes arrive, and a 1-px border would add 2 px to
+         that box and re-introduce the very layout jump the declared size removed. An outline takes
+         no layout space, and (painted after descendants) it draws over the image instead of under
+         it — which an inset box-shadow would not. No radius: .shot sits at the top of a card that
+         is already `overflow: hidden` with a 12-px radius, so its top corners are clipped for it,
+         and rounding only the bottom pair reads as a seam in the middle of the card. */
       .shot { display: block; position: relative; background: var(--shot-bg);
-              border-bottom: 1px solid var(--line); }
+              border-bottom: 1px solid var(--line);
+              outline: 1px solid var(--frame); outline-offset: -1px; }
       .shot img { display: block; width: 100%; height: auto; }
       .body { padding: .9rem 1rem 1rem; display: flex; flex-direction: column; gap: .55rem; flex: 1; }
       .tag { align-self: flex-start; font-weight: 700; font-size: .76rem; letter-spacing: .03em;
              text-transform: uppercase; color: var(--accent); background: var(--tag-bg);
              border-radius: 999px; padding: .12rem .6rem; }
+      /* The blurb is clamped so one long card cannot stretch its whole grid row, and every card is
+         the SAME shape — a <details> whose <summary> holds the clamped text — rather than only the
+         long ones, which would need a "how long is long" constant nobody can justify. There is no
+         "more" affordance for the same reason: a marker or a "read on" line would be honest on the
+         three cards that overflow and pure noise on the forty that do not, and no CSS can tell the
+         two apart. A clamped card cuts off mid-sentence, which is the cue; `cursor: pointer` and the
+         native disclosure behaviour do the rest, and a short card is byte-for-byte what it was.
+         The clamp lives on the inner <span>, not on <summary>: -webkit-line-clamp needs
+         `display: -webkit-box`, and a <summary> is `display: list-item` — clamping it directly is
+         the way this fails. (The span is also why the markup is valid: <summary> takes phrasing
+         content, so the old <p> could not simply move inside it.) */
+      .expand { flex: 1; }
+      .expand > summary { display: block; cursor: pointer; list-style: none; }
+      .expand > summary::-webkit-details-marker { display: none; }
+      .expand > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px;
+                                        border-radius: 4px; }
+      /* `flex: 1` stays here as well as on `.expand`: the roadmap's `.blurb` is still a direct flex
+         child of `.body` and is what pushes its links to the card bottom. Inside a gallery card the
+         `.blurb` is wrapped in a `<summary>` (display: block), so it is not a flex item there and
+         the declaration is inert — `.expand` carries the growth instead. */
       .blurb { margin: 0; flex: 1; }
+      /* Scoped to `.expand` on purpose: docs/roadmap.html also uses `.blurb`, in a plain <p> with no
+         <details> around it, and an unscoped clamp would truncate those cards with nothing to click. */
+      .expand .blurb { display: -webkit-box; -webkit-box-orient: vertical;
+                       -webkit-line-clamp: 5; overflow: hidden; }
+      .expand[open] .blurb { display: block; -webkit-line-clamp: unset; }
       .links { display: flex; align-items: center; justify-content: space-between; gap: .6rem;
                margin-top: .2rem; padding-top: .6rem; border-top: 1px dashed var(--line); }
       .links code { color: var(--code); background: var(--code-bg); border-radius: 6px;
@@ -149,7 +186,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">Phase 1a</span>
-            <p class="blurb">A pn junction from a two-step boron diffusion: junction depth x_j + sheet resistance R_s.</p>
+            <details class="expand"><summary><span class="blurb">A pn junction from a two-step boron diffusion: junction depth x_j + sheet resistance R_s.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_junction</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_junction.py">source&nbsp;&#8599;</a>
@@ -162,7 +199,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">Phase 2</span>
-            <p class="blurb">Deal–Grove thermal oxide, wet vs dry, the linear→parabolic bend.</p>
+            <details class="expand"><summary><span class="blurb">Deal–Grove thermal oxide, wet vs dry, the linear→parabolic bend.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_oxidation</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_oxidation.py">source&nbsp;&#8599;</a>
@@ -175,7 +212,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">Phase 3</span>
-            <p class="blurb">The aerial image assembling from its diffraction orders + contrast-vs-pitch.</p>
+            <details class="expand"><summary><span class="blurb">The aerial image assembling from its diffraction orders + contrast-vs-pitch.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_litho</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_litho.py">source&nbsp;&#8599;</a>
@@ -188,7 +225,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">Phase 4</span>
-            <p class="blurb">The whole process→device chain → MOS threshold voltage V_t.</p>
+            <details class="expand"><summary><span class="blurb">The whole process→device chain → MOS threshold voltage V_t.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_device</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_device.py">source&nbsp;&#8599;</a>
@@ -210,7 +247,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">v1.1</span>
-            <p class="blurb">Massoud thin-dry oxide correction — gate-oxide before/after, the V_t shift.</p>
+            <details class="expand"><summary><span class="blurb">Massoud thin-dry oxide correction — gate-oxide before/after, the V_t shift.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_thin_oxide</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_thin_oxide.py">source&nbsp;&#8599;</a>
@@ -223,7 +260,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">v1.2</span>
-            <p class="blurb">Phase 1↔2 back-coupling: OED deepening + segregation (boron depletes / phosphorus piles up).</p>
+            <details class="expand"><summary><span class="blurb">Phase 1↔2 back-coupling: OED deepening + segregation (boron depletes / phosphorus piles up).</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_coupling</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_coupling.py">source&nbsp;&#8599;</a>
@@ -236,7 +273,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">v1.3</span>
-            <p class="blurb">Concentration-dependent diffusivity D(N) — the high-concentration box.</p>
+            <details class="expand"><summary><span class="blurb">Concentration-dependent diffusivity D(N) — the high-concentration box.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_diffusion_highconc</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_diffusion_highconc.py">source&nbsp;&#8599;</a>
@@ -249,7 +286,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">v1.4</span>
-            <p class="blurb">Lithographic defocus — the depth of focus &amp; the Bossung curve.</p>
+            <details class="expand"><summary><span class="blurb">Lithographic defocus — the depth of focus &amp; the Bossung curve.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_defocus</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_defocus.py">source&nbsp;&#8599;</a>
@@ -262,7 +299,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">v1.7</span>
-            <p class="blurb">PEB acid-diffusion blur: the latent image dissolving + the PEB window.</p>
+            <details class="expand"><summary><span class="blurb">PEB acid-diffusion blur: the latent image dissolving + the PEB window.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_peb</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_peb.py">source&nbsp;&#8599;</a>
@@ -275,7 +312,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">v1.8</span>
-            <p class="blurb">2-D lateral diffusion under a mask edge — the junction curving under the mask.</p>
+            <details class="expand"><summary><span class="blurb">2-D lateral diffusion under a mask edge — the junction curving under the mask.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_lateral_diffusion</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_lateral_diffusion.py">source&nbsp;&#8599;</a>
@@ -288,7 +325,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">v1.9</span>
-            <p class="blurb">CAR reaction–diffusion PEB — the chemically-amplified bake.</p>
+            <details class="expand"><summary><span class="blurb">CAR reaction–diffusion PEB — the chemically-amplified bake.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_car</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_car.py">source&nbsp;&#8599;</a>
@@ -301,7 +338,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">v1.10</span>
-            <p class="blurb">Zernike aberrations (coma / astigmatism / spherical) — a pupil phase.</p>
+            <details class="expand"><summary><span class="blurb">Zernike aberrations (coma / astigmatism / spherical) — a pupil phase.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_zernike</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_zernike.py">source&nbsp;&#8599;</a>
@@ -314,7 +351,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">v1.11</span>
-            <p class="blurb">2-D MOSFET cross-section — lateral S/D diffusion shortens the channel (L_eff), not V_t.</p>
+            <details class="expand"><summary><span class="blurb">2-D MOSFET cross-section — lateral S/D diffusion shortens the channel (L_eff), not V_t.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_device_2d</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_device_2d.py">source&nbsp;&#8599;</a>
@@ -327,7 +364,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">§5</span>
-            <p class="blurb">Ion implantation — the buried peak a predep cannot make; the honest V_t-adjust implant.</p>
+            <details class="expand"><summary><span class="blurb">Ion implantation — the buried peak a predep cannot make; the honest V_t-adjust implant.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_implant</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_implant.py">source&nbsp;&#8599;</a>
@@ -340,7 +377,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">hist·A1</span>
-            <p class="blurb">Pre-implant doping&#x27;s dose-control wall — the solubility-pinned surface can&#x27;t meter a light V_t-adjust dose; implant can.</p>
+            <details class="expand"><summary><span class="blurb">Pre-implant doping&#x27;s dose-control wall — the solubility-pinned surface can&#x27;t meter a light V_t-adjust dose; implant can.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_doping_history</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_doping_history.py">source&nbsp;&#8599;</a>
@@ -353,7 +390,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">hist·A3</span>
-            <p class="blurb">Period oxidation ambients — HCl getters mobile Na (V_t recovery); high pressure grows the same oxide for 1/P the thermal budget.</p>
+            <details class="expand"><summary><span class="blurb">Period oxidation ambients — HCl getters mobile Na (V_t recovery); high pressure grows the same oxide for 1/P the thermal budget.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_oxidation_history</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_oxidation_history.py">source&nbsp;&#8599;</a>
@@ -366,7 +403,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">hist·B6</span>
-            <p class="blurb">Aluminium junction spiking — pure Al shorts the shallow (implant-era) junction; Al–Si and barrier metals clear the wall.</p>
+            <details class="expand"><summary><span class="blurb">Aluminium junction spiking — pure Al shorts the shallow (implant-era) junction; Al–Si and barrier metals clear the wall.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_metallization_history</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_metallization_history.py">source&nbsp;&#8599;</a>
@@ -379,7 +416,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">hist·A2</span>
-            <p class="blurb">Period lithography — the wavelength/lens ladder (g-line→EUV) moves the Rayleigh floor; contact/proximity printing hits the √(λg) gap wall projection broke.</p>
+            <details class="expand"><summary><span class="blurb">Period lithography — the wavelength/lens ladder (g-line→EUV) moves the Rayleigh floor; contact/proximity printing hits the √(λg) gap wall projection broke.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_litho_history</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_litho_history.py">source&nbsp;&#8599;</a>
@@ -392,7 +429,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">hist·A4</span>
-            <p class="blurb">Period photoresist — negative-resist (KTFR) solvent swelling bridges fine lines at a floor ≈ the film thickness (optics-independent); positive/CAR don&#x27;t swell and clear it.</p>
+            <details class="expand"><summary><span class="blurb">Period photoresist — negative-resist (KTFR) solvent swelling bridges fine lines at a floor ≈ the film thickness (optics-independent); positive/CAR don&#x27;t swell and clear it.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_resist_history</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_resist_history.py">source&nbsp;&#8599;</a>
@@ -405,7 +442,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">hist·B5</span>
-            <p class="blurb">LOCOS isolation — oxidant under the nitride mask grows the bird&#x27;s beak that eats active area; opposing beaks merge and pinch off below a min pitch (∝ field-oxide thickness); STI&#x27;s vertical walls clear it.</p>
+            <details class="expand"><summary><span class="blurb">LOCOS isolation — oxidant under the nitride mask grows the bird&#x27;s beak that eats active area; opposing beaks merge and pinch off below a min pitch (∝ field-oxide thickness); STI&#x27;s vertical walls clear it.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_locos_history</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_locos_history.py">source&nbsp;&#8599;</a>
@@ -418,7 +455,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">hist·B7</span>
-            <p class="blurb">Silicide / contact resistance — the source series-R is two terms with different R_sh exponents (access linear + TLM contact sublinear); salicide shunts the sheet so access collapses and the bottleneck flips to the contact.</p>
+            <details class="expand"><summary><span class="blurb">Silicide / contact resistance — the source series-R is two terms with different R_sh exponents (access linear + TLM contact sublinear); salicide shunts the sheet so access collapses and the bottleneck flips to the contact.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_silicide_history</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_silicide_history.py">source&nbsp;&#8599;</a>
@@ -431,7 +468,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">hist·B8</span>
-            <p class="blurb">High-κ gate dielectric — one thickness feeds two currencies: SiO₂ scales into a tunnelling wall at EOT ≈ 1.5 nm, and HfO₂ clears it with a 6.4× thicker barrier at the SAME electrical gate (V_t / C_ox byte-identical).</p>
+            <details class="expand"><summary><span class="blurb">High-κ gate dielectric — one thickness feeds two currencies: SiO₂ scales into a tunnelling wall at EOT ≈ 1.5 nm, and HfO₂ clears it with a 6.4× thicker barrier at the SAME electrical gate (V_t / C_ox byte-identical).</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_highk_history</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_highk_history.py">source&nbsp;&#8599;</a>
@@ -444,7 +481,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">hist·B9</span>
-            <p class="blurb">BEOL interconnect — τ_wire ∝ 1/W² climbs past a transistor that never moved, so a +3% device buys a +0.7% part; copper bought 0.64 of a node, the bulk-ρ axis ran out of metals — and then the axis changed, and barrierless ruthenium wins below ~13 nm with 4× copper&#x27;s bulk ρ.</p>
+            <details class="expand"><summary><span class="blurb">BEOL interconnect — τ_wire ∝ 1/W² climbs past a transistor that never moved, so a +3% device buys a +0.7% part; copper bought 0.64 of a node, the bulk-ρ axis ran out of metals — and then the axis changed, and barrierless ruthenium wins below ~13 nm with 4× copper&#x27;s bulk ρ.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_beol_history</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_beol_history.py">source&nbsp;&#8599;</a>
@@ -457,7 +494,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">hist·B10</span>
-            <p class="blurb">Strained silicon — µ was the one I_Dsat factor with no process owner, and the only drive lever that spends no second currency (thinning the oxide buys +20% drive for ≳0.9 decades of gate leakage; strain buys it for a structural zero); the two carriers want opposite strain signs, and a long-channel model infers I ∝ µ where the same paper measured half of it — the delivered gain is a cited bracket (1.07–1.10× for +20% µ) that decays as L shrinks, while this model&#x27;s elasticity is 1 at every L, which is why the axis had to change.</p>
+            <details class="expand"><summary><span class="blurb">Strained silicon — µ was the one I_Dsat factor with no process owner, and the only drive lever that spends no second currency (thinning the oxide buys +20% drive for ≳0.9 decades of gate leakage; strain buys it for a structural zero); the two carriers want opposite strain signs, and a long-channel model infers I ∝ µ where the same paper measured half of it — the delivered gain is a cited bracket (1.07–1.10× for +20% µ) that decays as L shrinks, while this model&#x27;s elasticity is 1 at every L, which is why the axis had to change.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_strain_history</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_strain_history.py">source&nbsp;&#8599;</a>
@@ -470,7 +507,7 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </a>
           <div class="body">
             <span class="tag">hist·B11</span>
-            <p class="blurb">CMP / planarity — copper cannot be plasma-etched, so the line is cut, flooded and polished back: the polish defines the wire, and B9&#x27;s copper era does not exist without it. Clearing everywhere forces over-polishing somewhere — s/(1−s) overburdens, no house constant, exactly 0 at s = 0 — so the wire gains a spread of its own (one transistor, many delays) and the polish is caught in a window that closes at s_crit = L/(2+L). At this pitch the loss is all erosion (dishing is exactly zero), a product of two levers — uniformity, which has to be pressure because V ≡ ω·d at matched speeds, and pattern density — and polishing less is neither.</p>
+            <details class="expand"><summary><span class="blurb">CMP / planarity — copper cannot be plasma-etched, so the line is cut, flooded and polished back: the polish defines the wire, and B9&#x27;s copper era does not exist without it. Clearing everywhere forces over-polishing somewhere — s/(1−s) overburdens, no house constant, exactly 0 at s = 0 — so the wire gains a spread of its own (one transistor, many delays) and the polish is caught in a window that closes at s_crit = L/(2+L). At this pitch the loss is all erosion (dishing is exactly zero), a product of two levers — uniformity, which has to be pressure because V ≡ ω·d at matched speeds, and pattern density — and polishing less is neither.</span></summary></details>
             <div class="links">
               <code>python -m chip.demo_cmp_history</code>
               <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_cmp_history.py">source&nbsp;&#8599;</a>

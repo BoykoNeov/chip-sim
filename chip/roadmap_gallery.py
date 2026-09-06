@@ -287,7 +287,7 @@ def render_html(local: bool = False) -> str:
   <title>{title}</title>
   {head_meta(title, "The planned-but-unbuilt slices of chip-sim, each with a schematic preview (stamped "
                     "in-image as not simulator output) and the named consumer that gates its build.",
-             local)}
+             local, canonical_slug="roadmap")}
   <style>
 {_STYLE}
   </style>

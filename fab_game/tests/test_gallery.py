@@ -13,6 +13,10 @@ All import + file-existence only — no matplotlib — so they ride the fast lan
 is viz-free: each imports matplotlib lazily inside its ``save_figure``). The cross-link tests pin the
 two-gallery split (ADR 0005): the public edition keeps GitHub links, the local edition is all-localhost.
 """
+import html
+
+from chip.gallery import _PAGES_URL
+
 from fab_game import gallery
 
 
@@ -56,6 +60,11 @@ def test_local_edition_is_all_local_no_github():
     """The local edition's whole point: every link is local (a running JupyterLab), none to GitHub."""
     local = gallery.render_html(local=True)
     assert "github.com" not in local, "the local fab-game gallery must not link to GitHub anywhere"
+    assert _PAGES_URL not in local, (
+        "the local fab-game gallery must name no remote origin at all — the Pages URL is a github.IO "
+        "host, so the github.com assert above does not catch it (rel=canonical would have walked "
+        "straight through)."
+    )
     assert f"http://localhost:{gallery._LOCAL_PORT}/lab/tree/fab_game/fab_game.ipynb" in local, (
         "the notebook card must be a click->live-notebook launch into the running JupyterLab"
     )
@@ -73,3 +82,19 @@ def test_galleries_cross_link():
     assert 'href="index.local.html"' in gallery.render_html(local=True), (
         "local fab-game gallery must link back to the physics gallery's local edition"
     )
+
+
+def test_blurbs_survive_the_clamp_verbatim():
+    """The clamp is visual only: every manifest blurb must still appear, character for character, in
+    both editions. Escaped, because ``_card`` (shared with the physics gallery) escapes first."""
+    for page in (gallery.render_html(), gallery.render_html(local=True)):
+        for demo in gallery.ALL_DEMOS:
+            assert html.escape(demo.blurb) in page, (
+                f"{demo.module}: blurb text no longer appears verbatim in the page"
+            )
+
+
+def test_public_canonical_names_the_file_it_is_served_as():
+    """``rel=canonical`` must point at this page's own Pages URL, not the physics gallery's."""
+    public = gallery.render_html()
+    assert f'<link rel="canonical" href="{_PAGES_URL}/{gallery.OUTPUT_HTML.name}">' in public

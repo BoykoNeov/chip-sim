@@ -213,7 +213,7 @@ def render_html(local: bool = False) -> str:
   <title>{title}</title>
   {head_meta(title, "The fab-line game layered on chip-sim: the whole line from sand to a binned, packaged "
                     "chip, scored as a roguelike. Recipe in, yield out, and you can see why a die died.",
-             local, og_image="figures/fab-game-journey.png")}
+             local, og_image="figures/fab-game-journey.png", canonical_slug="fab-game")}
   <style>
 {_STYLE}
   </style>
