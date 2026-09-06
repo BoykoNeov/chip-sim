@@ -36,7 +36,20 @@ Two additions to the docs surface:
 
 **The graduation rule:** when a slice ships, its card comes OFF the roadmap (remove from
 `SLICES` + `FIGURES`, delete the `roadmap-*.png`) and its real demo joins the galleries — the
-manifest↔registry sync test forces this to happen together.
+manifest↔registry sync test forces this to happen together. **Fired four times:** F3 (2026-07-17),
+F4 and F5 (both 2026-08-10), F8 (2026-09-06).
+
+**THE PROMOTABLE SECTION IS NOW EMPTY (2026-09-06), and it RENDERS its emptiness** — `render_html`
+emits the heading + sub-text with no card grid rather than dropping the section, because a roadmap
+that silently loses its "ready to build" heading reads as if the question was never asked. Nothing
+left on the page has *both* a released gate and a named consumer, so the next slice is a
+**re-triage**, not a pick off the top.
+
+**The gate-vs-reality rule has now fired THREE times** — F8's own card (found 2026-08-19), F5's
+(2026-08-10), and F8's again at build. Every time it was found by someone *going to build the
+slice*, never by a test: nothing pins gate↔reality (the manifest guard pins card↔schematic and the
+golden tests pin page↔renderer, so between them they confirm the prose did not CHANGE, never that
+it is still TRUE). ⇒ **re-check a slice's gate against the tree before building it.**
 
 Related: [[scope-edge-backlog]] (B1 gates F9), [[historical-modes-b5]] (F7's built half),
 [[historical-modes-b7]] (F2 already built → not on the roadmap), [[gallery-local-edition]].

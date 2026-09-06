@@ -98,8 +98,10 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
    from the bin-out. A polished wire adds a strictly positive term with no `I_Dsat` in it, so the rescue
    can be cancelled. On one wafer: **2** bin-outs under the old drive-current policy → **0** under F4's
    currency → **8** with a real polisher (yield 0.978 → 1.000 → 0.910). Neither the transistor tail nor
-   the polisher costs a part alone, every part lost was a below-nominal transistor at the rim, and the
-   polisher does not add a signature alongside the transistor's — it **reverses** the wafer's speed
+   the polisher costs a part alone. And only **1** of those 8 was the rescue being withdrawn — the other
+   **7 were sellable under both prior policies**, one of them graded *typical*, so the polished wire
+   creates bin-outs **no** grading policy had rather than merely clawing back F4's margin. Nor does it
+   add a signature alongside the transistor's — it **reverses** the wafer's speed
    gradient (radius vs delay −0.09 → +0.45), so the parts it costs sit where the transistor said the dies
    were fast. At the knob's default spread it still costs nothing: the sign is structural, the threshold
    is a house number, and the figure draws the curve rather than quoting the point. The card graduated

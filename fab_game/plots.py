@@ -1807,12 +1807,16 @@ def _policy_bars_panel(ax, result) -> None:
     ax.set_xlim(0, result.n_dies * 1.42)
     ax.set_xlabel("dies")
     ax.set_title("The same silicon, three grading policies\n"
-                 "F4's true currency RESCUES the slow tail — the polisher takes it back", fontsize=10)
+                 "F4's true currency rescues the slow tail — the polisher rejects parts NO policy had",
+                 fontsize=10)
     ax.legend(fontsize=7.5, loc="upper right", framealpha=0.9, ncol=4)
+    n_new = result.n_lost - result.n_lost_rescued_then_taken_back
     ax.text(0.98, 0.045,
             f"one die carries all three legs — {result.story_site}, r = {result.story_radius:.2f}, "
             f"I_Dsat {result.story_i_dsat_mA:.2f} mA:\nbinned out  →  rescued to 'value'  →  "
-            f"binned out again, for where it sat",
+            f"binned out again, for where it sat.\nBut it is the only one: the other {n_new} lost parts "
+            f"were sellable under BOTH prior policies\n(the best of them graded "
+            f"'{result.best_prior_grade_lost}') — these are bin-outs no policy had.",
             transform=ax.transAxes, ha="right", va="bottom", fontsize=8, color="0.2",
             bbox=dict(boxstyle="round,pad=0.4", facecolor="#fdf3e7", edgecolor="0.75", linewidth=0.8))
 
@@ -1821,9 +1825,9 @@ def _bin_out_sweep_panel(ax, result) -> None:
     """Bin-outs vs the polish spread: zero for either mechanism alone, and the threshold flagged as house."""
     s = np.asarray(result.s_sweep) * 100.0
     ax.plot(s, result.rejects_loose, color="#b4451f", lw=2.2,
-            label=f"loose transistors (σ_CD = {7.0:.0f} nm)")
+            label=f"loose transistors (σ_CD = {result.loose_sigma_nm:g} nm)")
     ax.plot(s, result.rejects_tight, color="#1f77b4", lw=2.2,
-            label=f"tight transistors (σ_CD = {1.5:.1f} nm)")
+            label=f"tight transistors (σ_CD = {result.tight_sigma_nm:g} nm)")
     ax.axhline(result.rejects_loose_no_cmp, color="#b4451f", lw=1.3, ls=":",
                label="no polisher at all (F4) — both flat at 0")
     ax.axhline(result.rejects_tight_no_cmp, color="#1f77b4", lw=1.3, ls=":")

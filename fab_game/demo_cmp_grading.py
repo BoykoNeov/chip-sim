@@ -30,10 +30,16 @@ that last column is the wafer yield the line reports. The wire now costs parts, 
 
 **Neither mechanism does it alone** — the F4-S4 shape one slice on. A *tight* transistor spread under the
 same polish loses nothing (0 bin-outs to ``s`` = 0.22); a *loose* spread with no polisher loses nothing
-either (F4 rescues both of its bin-outs). Only the two together lose parts, and every part lost was
-already a below-nominal transistor sitting out at the rim: **the polisher never rejects a fast die — it
-withdraws the rescue from a slow one.** Die ``(2, 6)`` carries the whole story alone: binned out under
-drive current, rescued to *value* by F4's ideal wire, rejected again by where it sat on the polisher.
+either (F4 rescues both of its bin-outs). Only the two together lose parts, and every part lost was a
+below-nominal transistor sitting out at the rim — though **neither condition selects them**: 37 dies are
+below nominal and 60 sit that far out, so the loss lives *inside* that intersection, not at it.
+
+**And it is not only F4's rescue being taken back.** Of the 8 parts lost, **1** was a bin-out under the
+drive-current policy too — that one is the rescue withdrawn, and die ``(2, 6)`` carries all three legs
+alone: binned out on drive current, rescued to *value* by F4's ideal wire, rejected again by where it sat
+on the polisher. The **other 7 were sellable under both prior policies**, and one of them
+(site ``(5, 10)``) was graded *typical*. So the polished wire does not merely claw back the margin F4's
+wire gave: **it creates bin-outs no grading policy had**, out of parts the old policy called good.
 
 **And it is not extra spread on top of the transistor's — it is the opposite sign.** The transistor has a
 weak radial trend of its own here (the focus bowl and the furnace's oxide trend leave the rim marginally
@@ -44,7 +50,7 @@ sit exactly where the transistor said the dies were fast.
 
 **The threshold is a house number, and is reported as one.** At the knob's default spread
 (``nonuniformity`` = 0.10) *no* part is lost even with the loose process — the first one goes at
-``s ≈ 0.13``. The *sign* is structural (a strictly positive, uncompensated term cannot rescue anything);
+``s ≈ 0.14``. The *sign* is structural (a strictly positive, uncompensated term cannot rescue anything);
 *where* it starts to bite rides the flagged radial amplitude, so the sweep panel draws the whole curve
 rather than quoting a number from one point on it.
 
@@ -66,7 +72,6 @@ from pathlib import Path
 import numpy as np
 
 from chip import cmp
-from chip import interconnect as ic
 
 from .pipeline import diagnose, run_line, wafer_yield
 from .recipe import CmpKnobs, DeviceKnobs, Recipe
@@ -125,6 +130,8 @@ class DemoResult:
     story_trail: str
     # The sweep — bin-outs vs the polish spread, for both process tightnesses (closed form, same calls).
     s_sweep: tuple[float, ...]
+    tight_sigma_nm: float                         # the two process tightnesses the curves are cut at
+    loose_sigma_nm: float
     rejects_loose: tuple[int, ...]
     rejects_tight: tuple[int, ...]
     rejects_loose_no_cmp: int                     # the F4 reference (flat, s-independent)
@@ -137,6 +144,9 @@ class DemoResult:
     first_reject_radius: float
     n_outside_first_reject_radius: int
     n_lost: int
+    n_lost_rescued_then_taken_back: int           # lost parts the drive-current policy had ALSO rejected
+    lost_prior_grades: dict                       # the lost parts' grades under the drive-current policy
+    best_prior_grade_lost: str                    # the highest grade the polisher took off the ladder
     # The wafer's speed gradient, before and after the polisher (the sign the transistor set).
     corr_r_idsat: float                           # radius vs drive current — the transistor's own trend
     corr_r_tau_f4: float                          # radius vs delay, ideal wire
@@ -252,6 +262,13 @@ def compute() -> DemoResult:
     #    parts on its own — the intersection does.
     lost = [d for d in w_f8.dies if d.bin == "reject"]
     r_first = min((d.radius_frac for d in lost), default=1.0)
+    # …and what the lost parts were worth BEFORE the polisher existed. Only the ones the drive-current
+    # policy had also rejected are "F4's rescue, taken back"; the rest are bin-outs no grading policy had.
+    prior = {}
+    for d in lost:
+        prior[b_i[d.site].bin] = prior.get(b_i[d.site].bin, 0) + 1
+    order = [b.label for b in SPEED_BINS.bins] + [SPEED_BINS.reject_label]
+    best_prior = min((g for g in prior), key=order.index, default=SPEED_BINS.reject_label)
 
     # 6. The wafer's speed gradient. The transistor has a weak radial trend of its OWN here (the focus
     #    bowl and the oxide trend leave the rim marginally faster), and it points the other way, so on the
@@ -270,7 +287,8 @@ def compute() -> DemoResult:
         yield_idsat=wafer_yield(w_idsat), yield_f4=wafer_yield(w_f4), yield_f8=wafer_yield(w_f8),
         story_site=story.site, story_radius=story.radius_frac, story_i_dsat_mA=story.i_dsat_mA,
         story_trail=diagnose(story),
-        s_sweep=S_SWEEP, rejects_loose=sweeps["loose"][0], rejects_tight=sweeps["tight"][0],
+        s_sweep=S_SWEEP, tight_sigma_nm=TIGHT_SIGMA, loose_sigma_nm=LOOSE_SIGMA,
+        rejects_loose=sweeps["loose"][0], rejects_tight=sweeps["tight"][0],
         rejects_loose_no_cmp=sweeps["loose"][1], rejects_tight_no_cmp=sweeps["tight"][1],
         first_loss_s_loose=_first_loss(sweeps["loose"][0]),
         first_loss_s_tight=_first_loss(sweeps["tight"][0]),
@@ -280,6 +298,8 @@ def compute() -> DemoResult:
         first_reject_radius=r_first,
         n_outside_first_reject_radius=sum(1 for d in w_f8.dies if d.radius_frac >= r_first),
         n_lost=len(lost),
+        n_lost_rescued_then_taken_back=prior.get(SPEED_BINS.reject_label, 0),
+        lost_prior_grades=prior, best_prior_grade_lost=best_prior,
         corr_r_idsat=_corr(radii, [d.i_dsat_mA for d in w_f8.dies]),
         corr_r_tau_f4=_corr([d.radius_frac for d in w_f4.dies], [d.delay_ps for d in w_f4.dies]),
         corr_r_tau_f8=_corr(radii, [d.delay_ps for d in w_f8.dies]),
@@ -313,12 +333,22 @@ def print_summary(r: DemoResult) -> None:
     print(f"     polisher, tight transistors       : {r.rejects_tight[r.s_sweep.index(r.s_shown)]} bin-outs "
           f"at s = {r.s_shown:.2f}")
     print(f"     both                              : {r.n_lost} bin-outs")
-    print(f"     → and every part lost was already below nominal AND out past r = "
-          f"{r.first_reject_radius:.2f}: "
-          f"{r.n_below_nominal} dies are below nominal, {r.n_outside_first_reject_radius} are out that far,")
-    print("       and the intersection is what the polisher costs. It never rejects a FAST die.\n")
+    print(f"     → every part lost was below nominal AND out past r = {r.first_reject_radius:.2f}, but "
+          f"neither condition selects them:")
+    print(f"       {r.n_below_nominal} dies are below nominal and {r.n_outside_first_reject_radius} sit "
+          f"that far out, so the loss lives INSIDE that intersection.")
+    print("       It never rejects a FAST die.\n")
 
-    print("  3. It is not extra spread on top of the transistor's — it is the OPPOSITE sign:")
+    grades = ", ".join(f"{n}× {g}" for g, n in sorted(r.lost_prior_grades.items(),
+                                                      key=lambda kv: -kv[1]))
+    print(f"  3. And it is not only F4's rescue being taken back. Under the OLD drive-current policy the "
+          f"{r.n_lost} lost parts graded: {grades}.")
+    print(f"     → {r.n_lost_rescued_then_taken_back} of them was the rescue withdrawn; the other "
+          f"{r.n_lost - r.n_lost_rescued_then_taken_back} were sellable under BOTH prior policies")
+    print(f"       (the best of them graded '{r.best_prior_grade_lost}'). The polished wire creates "
+          f"bin-outs NO grading policy had.\n")
+
+    print("  4. It is not extra spread on top of the transistor's — it is the OPPOSITE sign:")
     print(f"     radius vs drive current       : {r.corr_r_idsat:+.2f}  (the transistor's own trend — the "
           f"rim is marginally FASTER)")
     print(f"     radius vs delay, ideal wire   : {r.corr_r_tau_f4:+.2f}  (so the unpolished wafer is, if "
@@ -328,13 +358,13 @@ def print_summary(r: DemoResult) -> None:
     print("     → the parts it costs sit where the transistor said the dies were fast. Two radial")
     print("       signatures, opposite signs, and the one with no transistor in it wins.\n")
 
-    print(f"  4. The one die that carries it alone — site {r.story_site}, r = {r.story_radius:.2f}, "
+    print(f"  5. The one die that carries it alone — site {r.story_site}, r = {r.story_radius:.2f}, "
           f"I_Dsat {r.story_i_dsat_mA:.3f} mA:")
     print("     " + r.story_trail.replace("\n", "\n     ") + "\n")
 
     loose_first = "none in the sweep" if r.first_loss_s_loose is None else f"s ≈ {r.first_loss_s_loose:.2f}"
     tight_first = "none in the sweep" if r.first_loss_s_tight is None else f"s ≈ {r.first_loss_s_tight:.2f}"
-    print(f"  5. Where it starts to bite is a HOUSE NUMBER, so here is the whole curve, not a point:")
+    print(f"  6. Where it starts to bite is a HOUSE NUMBER, so here is the whole curve, not a point:")
     print(f"     loose process — first part lost at {loose_first};  tight process — {tight_first}.")
     print(f"     At the knob's own default (s = {S_HOUSE:.2f}) the polisher still costs NO part. The SIGN")
     print("     is structural (a strictly positive term with no I_Dsat in it cannot rescue anything);")

@@ -83,15 +83,34 @@ def test_neither_mechanism_alone_loses_a_part(r):
     assert r.rejects_loose[i_shown] == r.n_lost > 0                    # both: parts lost
 
 
-def test_the_polisher_never_rejects_a_fast_die_it_withdraws_a_rescue(r):
-    """Every part lost was already below the nominal transistor AND out past the first-lost radius — and
-    neither condition selects them on its own (both counts are far larger than the loss)."""
+def test_the_polisher_never_rejects_a_fast_die_and_the_loss_sits_inside_an_intersection(r):
+    """Every part lost was below the nominal transistor AND out past the first-lost radius — but neither
+    condition *selects* them: both sets are far larger than the loss, so it is a subset of the
+    intersection, never the intersection itself."""
     lost = [d for d in r.wafer_f8.dies if d.bin == "reject"]
     assert len(lost) == r.n_lost
     for d in lost:
         assert d.i_dsat_mA < r.i_dsat_nom_mA                           # never a fast die
         assert d.radius_frac >= r.first_reject_radius                  # always out at the rim
     assert r.n_below_nominal > r.n_lost and r.n_outside_first_reject_radius > r.n_lost
+
+
+def test_most_of_the_loss_is_not_f4s_rescue_being_withdrawn(r):
+    """The sharper half of the finding, and the one the first draft of this slice got wrong: only the parts
+    the OLD drive-current policy also rejected are "the rescue taken back". The rest were sellable under
+    both prior policies, so the polished wire does not merely claw back F4's margin — it creates bin-outs
+    no grading policy had, out of parts the old policy called good."""
+    by_site = {d.site: d for d in r.wafer_idsat.dies}
+    lost = [d for d in r.wafer_f8.dies if d.bin == "reject"]
+    withdrawn = [d for d in lost if by_site[d.site].bin == "reject"]
+    assert len(withdrawn) == r.n_lost_rescued_then_taken_back
+    assert 0 < len(withdrawn) < len(lost)                              # some, but far from all
+    assert sum(r.lost_prior_grades.values()) == r.n_lost               # the grades partition the loss
+    assert r.best_prior_grade_lost != "reject"                         # at least one was a graded part…
+    assert r.lost_prior_grades.get(r.best_prior_grade_lost, 0) > 0
+    # …and every one of them was sellable under F4's currency, which is the policy F8 actually modifies.
+    f4 = {d.site: d for d in r.wafer_f4.dies}
+    assert all(f4[d.site].bin != "reject" for d in lost)
 
 
 def test_the_polisher_reverses_the_wafers_speed_gradient(r):
@@ -143,17 +162,16 @@ def test_the_trail_names_the_currency_that_graded_not_the_transistor(r):
 
 def test_the_figure_says_what_is_structural_and_what_is_a_house_number(r):
     """The words test — the golden pages confirm the prose did not CHANGE, never that it is still TRUE."""
-    pytest.importorskip("matplotlib")
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")                           # headless, as save_figure does
     from fab_game.plots import cmp_grading_figure
 
-    fig = cmp_grading_figure(r)
-    text = fig._suptitle.get_text()
+    text = cmp_grading_figure(r)._suptitle.get_text()
     assert "SIGN IS STRUCTURAL" in text and "HOUSE NUMBER" in text
     assert "anchored on the nominal part" in text
 
 
 def test_figure_builds(r):
-    pytest.importorskip("matplotlib")
-    from fab_game.plots import cmp_grading_figure
-
-    assert cmp_grading_figure(r) is not None
+    pytest.importorskip("matplotlib")               # the figure is not in the correctness path (ADR 0002)
+    from fab_game.demo_cmp_grading import save_figure
+    assert save_figure(r).is_file()

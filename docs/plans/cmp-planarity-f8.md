@@ -330,9 +330,17 @@ literally does not exist without F8. Period → wall → successor, glob-anchore
   randomness), so one `I_Dsat` histogram produces three outcomes.
 * **Neither mechanism alone loses a part** — the F4-S4 shape one slice on. Tight transistors under the
   same polish: 0 bin-outs (to `s = 0.22`). Loose transistors with no polisher: 0 (F4 rescues them). Only
-  the two together. And every part lost was **already below nominal** *and* out past `r = 0.61`, while 37
-  dies are below nominal and 60 are out that far — the intersection is the loss. **The polisher never
-  rejects a fast die; it withdraws the rescue from a slow one.**
+  the two together. Every part lost was **below nominal** *and* out past `r = 0.61` — but neither
+  condition **selects** them: 37 dies are below nominal and 60 sit that far out, so the loss is a
+  **subset of** that intersection, not the intersection itself. **The polisher never rejects a fast die.**
+* **And most of the loss is not F4's rescue being withdrawn — the first draft of this slice said it was,
+  and the wafer says otherwise.** Of the 8 parts lost, **1** had also been a bin-out under the
+  drive-current policy; that one is the rescue taken back (die `(2, 6)`, which carries all three legs
+  alone). The **other 7 were sellable under both prior policies**, and one — site `(5, 10)` — had graded
+  **`typical`**. So the polished wire does not merely claw back the margin F4's wire gave: **it creates
+  bin-outs no grading policy had**, out of parts the old policy called good. The test that pins this is
+  named for what its body checks, after the first version asserted only "below nominal, out at the rim"
+  under a name claiming the withdrawal.
 * **It is not extra spread on top of the transistor's — it is the opposite sign.** The transistor has a
   weak radial trend of its own here (focus bowl + oxide trend leave the rim marginally *faster*: radius vs
   `I_Dsat` **+0.25**), so the unpolished wafer's delay is, if anything, faster outward (**−0.09**).
