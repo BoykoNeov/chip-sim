@@ -200,7 +200,74 @@ loose-coupling currency (ADR 0002). No existing module is touched.
 Tests: the two identities; the short-base asymptote; the three monotonicities; the seam (module
 unimported by anything on the default path).
 
-### S2 — the game knob: latchup as a graded wafer failure
+### S2 — the game knob: latchup is a **wafer** property, not a die one — ✅ **BUILT 2026-09-06**
+
+**As built.** `IsolationKnobs` (`scheme=None` seam, `"locos"`/`"sti"`) → `isolation_step` (per-die,
+inert) → a wafer-level `StepRecord` → one clause in `SpecSet.verdict` on the flatness-scrap precedent →
+a failure-trail line that names the wafer number that killed the part *and* the die number that did
+not. 17 legs in `fab_game/tests/test_isolation.py`.
+
+**The era result, and it is a number rather than a sign.** Because `β ≈ 2L²/W_B²`, a *ratio* of two
+schemes' loop gains is the inverse square of their base-width ratio — the diffusion length cancels, so
+the ratio is independent of lifetime, of `D`, of the γ=1 idealization, and of the flagged tap geometry
+(which does not appear in it at all). Where the absolute gain is a useless bound, the ratio is pure
+geometry:
+
+| | device-to-well spacing | parasitic base | loop gain | vs LOCOS |
+|---|---|---|---|---|
+| LOCOS (must leave room for the beak) | 3.00 µm | 3.00 µm | 6.40e11 | — |
+| STI, trench ignored | 2.00 µm | 2.00 µm | 1.44e12 | **2.25× = (3.0/2.0)²** |
+| STI, trench counted | 2.00 µm | 2.70 µm | 7.90e11 | **1.235× = (3.0/2.7)²** |
+
+**The trench pays back 81 % of the density penalty — and no more.** That is the honest era sentence:
+the successor did not merely trade one wall for another, it *partly* paid for what it took, and the
+remainder is the bill. Both halves are asserted (the trench helps; it does not get back under LOCOS),
+because either alone misrepresents it.
+
+**The cancellation's precision, stated at the level it is true.** "L cancels" is exact only in the
+short-base limit. At τ = 1e-7 s (diffusion length ~19 µm against a 3 µm base) the cosh corrections stop
+vanishing, and across four orders of magnitude of lifetime the ratio drifts by **< 0.05 %** — near-
+invariant, not invariant. The test pins the drift rather than the overclaim.
+
+*The build's reasoning, retained:*
+
+> ### S2 — the game knob: latchup is a **wafer** property, not a die one
+
+**The plan's expectation here was tested and failed, and the correction is the slice.** What follows in
+italics is what this section said before the build; it is kept because the measurement that overturned
+it is the finding.
+
+Measured on a real 21-die wafer run (`Recipe()`, seed 3, variation on): the minority-carrier lifetime is
+**identical on every die** (contamination is a wafer-level vector), the substrate resistivity is a
+**wafer-level number**, and the only genuine per-die spread — the printed CD, 165.6→170.1 nm — reaches
+the spacing, which reaches the **gain**. The gain is the condition S1 showed does not discriminate.
+
+So: **the discriminating condition is wafer-uniform, and the per-die axis reaches only the inert one.**
+Latchup here is all dies or none. It is built on the precedent already in the tree — the flatness scrap
+(`SpecSet.verdict`'s `geometry_reason`) is computed once per wafer and applied to every die.
+
+**What was explicitly refused.** Grading it would have meant giving the substrate a radial resistivity
+profile. That is new, uncited physics introduced *specifically* to produce a gradient the plan expected
+— the fudge the standing `gradual-failure-preferred` rule warns against, not the honest move it
+endorses (which is non-uniformity of the offending quantity *when the quantity is really non-uniform*).
+The offending quantity is genuinely uniform here.
+
+**What is reported instead, and why it is stronger.** The per-die loop gain *is* recorded, along with
+the fact that it costs nothing: the isolation change moves a quantity that cannot bin out a die, and
+the substrate moves the one that can. That is the finding S4 then pays off.
+
+**The drift direction, stated because it inverts the house pattern.** Boron's segregation coefficient
+is below 1, so concentration *rises* down the boule, resistivity falls, and the trigger current rises:
+51.5 mA at `z=0.0` → 74.0 mA at `z=0.9`. **The first wafers off the boule are the vulnerable ones** —
+the opposite of the direction every other knob in this game teaches (later slices are worse for `V_t`).
+
+**Not tuned to fail.** At the default recipe the trigger is 51 mA against a 2 mA disturbance — a ~25×
+margin, no failure, and it stays that way. The sign is structural; the threshold rides the flagged tap
+geometry, so the figure draws the curve rather than quoting a crossing point (F8 S4's precedent).
+
+*The original sketch, retained:*
+
+> ### S2 — the game knob: latchup as a graded wafer failure
 
 `IsolationKnobs` in `fab_game/recipe.py` → the pipeline. The wafer already carries per-die
 non-uniformity (`fab_game/variation.py`) and substrate doping already varies down the boule (the G2

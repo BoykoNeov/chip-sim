@@ -240,21 +240,26 @@ def test_latches_needs_both_conditions():
 # --------------------------------------------------------------------------- #
 # tight — the seam, asserted by reading the tree (not by prose)
 # --------------------------------------------------------------------------- #
-def test_seam_nothing_on_the_default_path_imports_this_module():
-    """Slice 1 is additive: no existing module imports :mod:`chip.latchup`, so every other result in
-    the suite is byte-identical. Checked against the **source tree**, because "additive" is a claim
-    about what else changed, and only the tree can answer that.
+def test_seam_no_physics_module_depends_on_latchup():
+    """The seam, at slice 2. It moved exactly as slice 1's version of this test said it would: the game
+    now imports :mod:`chip.latchup` (that is what the knob *is*), so "nothing imports it" is retired
+    and replaced by the two claims that still have to hold.
 
-    This test is expected to be *edited* when slice 2 wires the game knob — at which point the seam
-    moves from "nothing imports it" to "the knob defaults off". It is not expected to be deleted.
+    **(1) Nothing in `chip/` depends on it.** The physics library must be unchanged by this slice —
+    every existing chip result is byte-identical because no chip module reads latchup. Checked against
+    the source tree, because "additive" is a claim about what else changed and only the tree can
+    answer it.
+
+    **(2) The game's dependency is off by default** — asserted where it belongs, in
+    `fab_game/tests/test_isolation.py` (`scheme=None` ⇒ no step, no record, no verdict clause).
     """
     root = pathlib.Path(__file__).resolve().parents[2]
     importers = []
-    for path in sorted(root.glob("*/*.py")):
-        if path.name == "latchup.py" or "tests" in path.parts:
+    for path in sorted((root / "chip").glob("*.py")):
+        if path.name == "latchup.py":
             continue
         text = path.read_text(encoding="utf-8")
         if re.search(r"^\s*(from\s+\S*\s+import\s+[^\n]*\blatchup\b|import\s+\S*\blatchup\b)",
                      text, re.MULTILINE):
             importers.append(path.relative_to(root).as_posix())
-    assert importers == [], f"chip.latchup is no longer additive — imported by {importers}"
+    assert importers == [], f"a chip/ physics module now depends on chip.latchup — {importers}"

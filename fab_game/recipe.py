@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from chip import cmp
+from chip import cmp, latchup
 from chip import interconnect as ic
 from chip.czochralski import Boule
 from chip.diffusion_dopant import ThermalProgram
@@ -671,6 +671,89 @@ class CmpKnobs:
         return cmp.shorted_radius_frac(self.nonuniformity, self.mean_removal_um, self.overburden_um)
 
 
+
+# The two isolation schemes B12 contrasts: the period scheme (LOCOS, whose beak costs pitch) and
+# its successor (STI, which keeps the drawn width and interrupts the lateral parasitic path).
+ISOLATION_SCHEMES: frozenset[str] = frozenset({"locos", "sti"})
+
+@dataclass(frozen=True)
+class IsolationKnobs:
+    """Device isolation → :mod:`chip.latchup` (F7 remainder / historical mode B12) — the step that
+    gives the line a failure the transistor cannot have.
+
+    B5 built the LOCOS bird's beak and the packing floor it sets; ``chip.locos_history`` already
+    reports the successor's active width (:attr:`chip.locos_history.LocosCrossSection.sti_active_um`
+    — the drawn width itself, because a trench has no lateral oxidant path). This knob picks which
+    scheme the line ran, and the price of the tighter one is a parasitic four-layer structure that can
+    latch supply to ground.
+
+    **The seam.** ``scheme = None`` (the default) ⇒ **no isolation step runs at all**: no per-die
+    record, no latchup field set, no verdict clause consulted, and the whole existing suite is
+    byte-identical. ``"locos"`` and ``"sti"`` both engage it.
+
+    **What differs between the two schemes — one number.** ``locos`` must leave room for the beak, so
+    its device-to-well spacing is the drawn spacing *plus* the encroachment it cannot avoid; ``sti``
+    keeps the drawn spacing and additionally interrupts the lateral path with a trench
+    (:data:`chip.latchup.STI_DEPTH_UM`, cited). Tighter packing is exactly what raises the parasitic
+    gain — the density B5's successor bought is the parasitic transistor's base width.
+
+    **The per-die axis is the printed CD, and it is not invented.** What lithography adds to a line it
+    takes from the space beside it: a die whose gates print wide has a *narrower* gap to the well. The
+    line already varies ``cd_nm`` per die (focus bowl + line-width roughness, :mod:`fab_game.variation`),
+    so the spacing — and therefore the margin — varies across the wafer without a new random draw.
+    Deterministic given the existing perturbations; the determinism contract holds.
+
+    ``drawn_spacing_um`` the layout n⁺-to-well spacing; ``beak_allowance_um`` what LOCOS must add to it;
+    ``injected_current_a`` the disturbance the part is asked to survive (an I/O overshoot or a radiation
+    hit — **given**, never modelled, per the module's named scope edge).
+    """
+
+    scheme: str | None = None              # None = no isolation step (the seam); "locos" | "sti"
+    drawn_spacing_um: float = 2.0          # layout n⁺-to-well spacing
+    beak_allowance_um: float = 1.0         # what LOCOS must leave for the encroachment it cannot avoid
+    injected_current_a: float = 2.0e-3     # the disturbance the part must survive (given, not modelled)
+
+    def __post_init__(self) -> None:
+        if self.scheme is not None and self.scheme not in ISOLATION_SCHEMES:
+            raise ValueError(f"scheme must be None or one of {sorted(ISOLATION_SCHEMES)}, "
+                             f"got {self.scheme!r}")
+        if self.drawn_spacing_um <= 0.0:
+            raise ValueError(f"drawn_spacing_um must be > 0, got {self.drawn_spacing_um}")
+        if self.beak_allowance_um < 0.0:
+            raise ValueError(f"beak_allowance_um must be ≥ 0, got {self.beak_allowance_um}")
+        if self.injected_current_a <= 0.0:
+            raise ValueError(f"injected_current_a must be > 0, got {self.injected_current_a}")
+
+    @property
+    def engaged(self) -> bool:
+        """Whether the isolation step runs at all (``scheme`` set). ``False`` ⇒ the seam: no step."""
+        return self.scheme is not None
+
+    @property
+    def nominal_spacing_um(self) -> float:
+        """The scheme's device-to-well spacing before any per-die CD excursion.
+
+        LOCOS pays the beak allowance it cannot avoid; STI keeps the drawn spacing — which is the
+        density win B5's successor delivered, and the reason its parasitic base is narrower.
+        """
+        if self.scheme == "locos":
+            return self.drawn_spacing_um + self.beak_allowance_um
+        return self.drawn_spacing_um
+
+    @property
+    def trench_depth_um(self) -> float:
+        """The trench that interrupts the lateral path — cited STI depth, or 0 for LOCOS."""
+        return latchup.STI_DEPTH_UM if self.scheme == "sti" else 0.0
+
+    def spacing_for_cd_um(self, cd_nm: float, nominal_cd_nm: float) -> float:
+        """This die's spacing: what the printed line gained over nominal, the space beside it lost.
+
+        Floored just above zero — a die whose lines print wider than the whole gap is a layout that
+        never existed, not a negative spacing; the floor makes it the worst case rather than a crash.
+        """
+        excursion_um = (cd_nm - nominal_cd_nm) * 1.0e-3
+        return max(self.nominal_spacing_um - excursion_um, 1.0e-3)
+
 @dataclass(frozen=True)
 class DeviceKnobs:
     """Device-read knobs → :func:`chip.device.threshold_voltage` / :func:`chip.device.saturation_current`.
@@ -832,6 +915,7 @@ class Recipe:
     litho: LithoKnobs = field(default_factory=LithoKnobs)
     etch_deposition: EtchDepositionKnobs = field(default_factory=EtchDepositionKnobs)
     cmp: CmpKnobs = field(default_factory=CmpKnobs)          # F8 — off by default (no step runs; the seam)
+    isolation: IsolationKnobs = field(default_factory=IsolationKnobs)  # F7/B12 — off by default (no step; the seam)
     device: DeviceKnobs = field(default_factory=DeviceKnobs)
     packaging: PackagingKnobs = field(default_factory=PackagingKnobs)
 

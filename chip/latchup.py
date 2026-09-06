@@ -255,6 +255,27 @@ def resistivity_ohm_cm(N_sub: float, dopant: str = SUBSTRATE_DOPANT) -> float:
     return 1.0 / (Q_ELEMENTARY * N_sub * junction.mobility(N_sub, dopant))
 
 
+def substrate_resistance_from_resistivity_ohm(rho_ohm_cm: float, *,
+                                              path_um: float = SUBSTRATE_TAP_PATH_UM,
+                                              area_um2: float = TAP_CROSS_SECTION_UM2) -> float:
+    """``R_sub = ρ · path / area`` (Ω) from a resistivity that has **already been computed**.
+
+    The entry point for a consumer that already holds ρ — the fab line derives
+    ``Recipe.substrate_resistivity_ohm_cm`` from its own Scheil doping, and recomputing it here from
+    ``N`` would be a second, silently-divergent path to the same number.
+    :func:`substrate_resistance_ohm` is the doping-side convenience that delegates to this.
+    """
+    if rho_ohm_cm <= 0.0:
+        raise ValueError(f"rho_ohm_cm must be > 0, got {rho_ohm_cm}")
+    if path_um <= 0.0:
+        raise ValueError(f"path_um must be > 0, got {path_um}")
+    if area_um2 <= 0.0:
+        raise ValueError(f"area_um2 must be > 0, got {area_um2}")
+    path_cm = path_um / UM_PER_CM
+    area_cm2 = area_um2 / (UM_PER_CM ** 2)
+    return rho_ohm_cm * path_cm / area_cm2
+
+
 def substrate_resistance_ohm(N_sub: float, *, path_um: float = SUBSTRATE_TAP_PATH_UM,
                              area_um2: float = TAP_CROSS_SECTION_UM2,
                              dopant: str = SUBSTRATE_DOPANT) -> float:
@@ -267,13 +288,8 @@ def substrate_resistance_ohm(N_sub: float, *, path_um: float = SUBSTRATE_TAP_PAT
     **Silent on spacing by construction** (see the module docstring): no argument here is the
     device-to-well spacing, and that is deliberate.
     """
-    if path_um <= 0.0:
-        raise ValueError(f"path_um must be > 0, got {path_um}")
-    if area_um2 <= 0.0:
-        raise ValueError(f"area_um2 must be > 0, got {area_um2}")
-    path_cm = path_um / UM_PER_CM
-    area_cm2 = area_um2 / (UM_PER_CM ** 2)
-    return resistivity_ohm_cm(N_sub, dopant) * path_cm / area_cm2
+    return substrate_resistance_from_resistivity_ohm(
+        resistivity_ohm_cm(N_sub, dopant), path_um=path_um, area_um2=area_um2)
 
 
 def trigger_current_a(R_sub_ohm: float, *, v_be: float = BE_TURN_ON_V) -> float:
@@ -341,7 +357,8 @@ class LatchupMargin:
         return self.i_trigger_a / injected_current_a
 
 
-def latchup_margin(spacing_um: float, N_sub: float, tau_s: float, *,
+def latchup_margin(spacing_um: float, N_sub: float | None, tau_s: float, *,
+                   rho_ohm_cm: float | None = None,
                    trench_depth_um: float = 0.0, well_depth_um: float = WELL_DEPTH_UM,
                    path_um: float = SUBSTRATE_TAP_PATH_UM,
                    area_um2: float = TAP_CROSS_SECTION_UM2,
@@ -350,13 +367,21 @@ def latchup_margin(spacing_um: float, N_sub: float, tau_s: float, *,
     """Evaluate both latchup conditions for one geometry / substrate / lifetime.
 
     The two chains stay separate all the way down, which is the module's point: ``spacing`` (and the
-    trench) reach only the gain; ``N_sub`` reaches only the resistance; ``tau_s`` reaches only the
+    trench) reach only the gain; the substrate reaches only the resistance; ``tau_s`` reaches only the
     gain (via ``L = √(D·τ)``). Nothing couples them.
+
+    Give the substrate **either** way, not both: ``N_sub`` (doping, resistivity derived here) or
+    ``rho_ohm_cm`` (a resistivity the caller already holds — the fab line's route, so the game's own
+    Scheil-derived number is not silently recomputed by a second path).
     """
+    if (N_sub is None) == (rho_ohm_cm is None):
+        raise ValueError("give exactly one of N_sub or rho_ohm_cm (the substrate, one way only)")
     base_w = lateral_base_width_um(spacing_um, trench_depth_um=trench_depth_um)
     gain = loop_gain(spacing_um, tau_s, trench_depth_um=trench_depth_um,
                      well_depth_um=well_depth_um, D=D)
-    r_sub = substrate_resistance_ohm(N_sub, path_um=path_um, area_um2=area_um2, dopant=dopant)
+    r_sub = (substrate_resistance_from_resistivity_ohm(rho_ohm_cm, path_um=path_um, area_um2=area_um2)
+             if rho_ohm_cm is not None
+             else substrate_resistance_ohm(N_sub, path_um=path_um, area_um2=area_um2, dopant=dopant))
     return LatchupMargin(
         spacing_um=spacing_um, base_width_um=base_w, loop_gain=gain,
         r_sub_ohm=r_sub, i_trigger_a=trigger_current_a(r_sub),

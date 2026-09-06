@@ -301,16 +301,22 @@ class SpecSet:
     #                                         (it carries no delay to grade). See DelayBins.
     require_resolved: bool = True
 
-    def verdict(self, die: Die, geometry_reason: str | None = None) -> Verdict:
+    def verdict(self, die: Die, geometry_reason: str | None = None,
+                latchup_reason: str | None = None) -> Verdict:
         """Score one die: wafer-geometry scrap → defect/resolve functional gates → parametric windows.
 
-        ``geometry_reason`` (computed once per wafer) scraps every die when set. A killer-defect or
+        ``geometry_reason`` and ``latchup_reason`` (each computed once per wafer) scrap every die when
+        set — the second on the same precedent as the first: F7/B12 latchup is a **wafer** property,
+        because the only condition that discriminates rides the substrate resistivity, which is one
+        number per wafer. All dies or none. A killer-defect or
         an unresolved image then short-circuits — neither has a meaningful parametric bin. Otherwise
         every window (NILS printability, CD, I_Dsat, V_t) is checked and *all* failing reasons are
         collected (so the trail shows everything out of spec, not just the first).
         """
         if geometry_reason is not None:
             return Verdict(False, (f"{geometry_reason} — wafer scrapped (functional fail)",))
+        if latchup_reason is not None:                         # F7/B12 — the parasitic pnpn latched
+            return Verdict(False, (f"{latchup_reason} — wafer scrapped (functional fail)",))
         if die.killed_by_defect is True:
             n = len(die.defects)
             return Verdict(False, (f"killer particle defect ×{n} (functional fail)",))

@@ -18,6 +18,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
+from chip import latchup, lifetime
 from chip.cmp import DAMASCENE_METALS
 from chip.czochralski import Boule
 from chip.wafer_prep import prep_geometry
@@ -26,7 +27,7 @@ from .defects import scatter_defects
 from .recipe import DEFAULT_RECIPE, Recipe
 from .spec import DEFAULT_SPECS, SpecSet
 from .state import Die, StepRecord, Verdict, WaferState, build_die_map
-from .steps import (
+from .steps import (isolation_step, 
     cmp_step,
     device_step,
     diffusion_junction,
@@ -309,6 +310,50 @@ def run_line(
         StepRecord("device", {"gate": recipe.device.gate, "width_um": recipe.device.width_um},
                    _aggregate(dies, "V_t")), dies)
 
+    # 4b. Isolation & latchup (F7 remainder / historical mode B12) — ONLY when engaged (scheme set; the
+    #     seam is "no step at all"). B5 built LOCOS's bird's beak and the packing floor it sets; STI
+    #     cleared that floor, and this is the bill. Two cited conditions, deliberately uncoupled: the
+    #     parasitic loop gain (per die — the printed CD sets the spacing, since what a line gains the
+    #     space beside it loses) and the trigger current (per WAFER — V_be / R_sub, and R_sub rides the
+    #     substrate resistivity, which is one number for the wafer).
+    #
+    #     THE SHAPE OF THIS STEP IS THE FINDING: the per-die quantity is the one that does NOT
+    #     discriminate (chip.latchup slice 1: γ=1 with W_B ≪ L puts every β orders above the criterion),
+    #     and the discriminating one is wafer-uniform. So latchup is all dies or none — a wafer scrap on
+    #     the same precedent as the TTV/bow flatness scrap, not a graded per-die kill. Runs after the
+    #     device step because it reads that step's τ. Deterministic; no RNG draw.
+    if recipe.isolation.engaged:
+        iso = recipe.isolation
+        cds = [d.cd_nm for d in dies if d.cd_nm is not None]
+        reference_cd = sum(cds) / len(cds) if cds else 0.0
+        taus = [d.tau for d in dies if d.tau is not None]
+        tau_s = taus[0] if taus else lifetime.TAU_BULK
+        dies = tuple(isolation_step(d, iso, reference_cd, tau_s) for d in dies)
+        margin = latchup.latchup_margin(
+            iso.nominal_spacing_um, None, tau_s,
+            rho_ohm_cm=recipe.substrate_resistivity_ohm_cm,
+            trench_depth_um=iso.trench_depth_um,
+        )
+        latched = margin.latches(iso.injected_current_a)
+        gains = [d.history[-1].outputs["loop_gain"] for d in dies]
+        wafer = wafer.with_step(
+            StepRecord("isolation",
+                       {"scheme": iso.scheme, "drawn_spacing_um": iso.drawn_spacing_um,
+                        "nominal_spacing_um": iso.nominal_spacing_um,
+                        "trench_depth_um": iso.trench_depth_um,
+                        "injected_current_a": iso.injected_current_a},
+                       {"r_sub_ohm": margin.r_sub_ohm,
+                        "i_trigger_ma": margin.i_trigger_ma,
+                        "margin_ratio": margin.margin_ratio(iso.injected_current_a),
+                        "latched": latched,
+                        # The per-die spread, recorded WITH the fact that it grades nothing.
+                        "loop_gain_min": min(gains), "loop_gain_max": max(gains),
+                        "loop_gain_grades_nothing": True,
+                        "latchup_reason": (
+                            f"latchup: {iso.injected_current_a*1e3:.1f} mA injected ≥ the "
+                            f"{margin.i_trigger_ma:.1f} mA trigger (R_sub {margin.r_sub_ohm:.1f} Ω)"
+                            if latched else None)}), dies)
+
     # 5. Test — apply the spec windows → the front-end (wafer-sort) verdicts + the running yield.
     wafer = _test_wafer(wafer, specs)
 
@@ -408,15 +453,20 @@ def _test_wafer(wafer: WaferState, specs: SpecSet) -> WaferState:
     parametric checks then run for each die.
     """
     geometry_reason = specs.geometry.check(wafer.geometry)
-    dies = tuple(_verdict_die(d, specs, geometry_reason) for d in wafer.dies)
+    # F7/B12 — a wafer-level functional scrap, read off the isolation step's own record (the same
+    # "walk the trail" idiom the failure explanations use). None when the step did not run (the seam).
+    iso_rec = next((r for r in wafer.provenance if r.step == "isolation"), None)
+    latchup_reason = iso_rec.summary.get("latchup_reason") if iso_rec is not None else None
+    dies = tuple(_verdict_die(d, specs, geometry_reason, latchup_reason) for d in wafer.dies)
     n_good = sum(d.verdict.passed for d in dies)
     summary = {"yield": n_good / len(dies), "n_good": n_good, "n_total": len(dies),
                "geometry_scrap": geometry_reason}
     return wafer.with_step(StepRecord("test", {"specs": repr(specs)}, summary), dies)
 
 
-def _verdict_die(die: Die, specs: SpecSet, geometry_reason: str | None = None) -> Die:
-    verdict = specs.verdict(die, geometry_reason)
+def _verdict_die(die: Die, specs: SpecSet, geometry_reason: str | None = None,
+                 latchup_reason: str | None = None) -> Die:
+    verdict = specs.verdict(die, geometry_reason, latchup_reason)
     return die.record("test", {"specs": "applied"},
                       {"passed": verdict.passed, "reasons": verdict.reasons},
                       verdict=verdict)
@@ -538,6 +588,19 @@ def diagnose(die: Die) -> str:
     # functional short, graded by radius — the slow centre of a non-uniform polish), a runaway over-polish
     # that removed the trench (no conductor), or an over-polish that merely thinned the copper (a slower
     # wire — named only when it actually cost thickness, so a polish that exactly cleared is silent).
+    # The isolation fingerprint (F7/B12) — a wafer-level kill, so the line names the wafer number that
+    # did it (the trigger current) rather than anything about this die. The die's own parasitic gain is
+    # printed beside it precisely because it did NOT decide anything: the honest trail says which
+    # quantity killed the part and which one merely varied.
+    iso = next((r for r in die.history if r.step == "isolation"), None)
+    if iso is not None and die.verdict is not None and any("latchup" in r for r in die.verdict.reasons):
+        lines.append(f"    ↳ isolation ({iso.knobs_in.get('scheme')}): the parasitic pnpn LATCHED — a "
+                     f"WAFER-level kill (the trigger rides the substrate resistivity, one number for "
+                     f"the wafer, so every die goes). This die's own loop gain "
+                     f"{iso.outputs.get('loop_gain', float('nan')):.2e} at spacing "
+                     f"{iso.outputs.get('spacing_um', float('nan')):.2f} µm graded nothing — raise the "
+                     f"substrate doping (lower R_sub) or lower the injected disturbance; widening the "
+                     f"spacing moves only the gain, which never decides")
     polish = next((r for r in die.history if r.step == "cmp"), None)
     if polish is not None:
         k, o = polish.knobs_in, polish.outputs

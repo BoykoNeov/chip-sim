@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 
 from chip import breakdown as bd
-from chip import cmp
+from chip import cmp, latchup
 from chip import contact_resistance as cr
 from chip import diffusion_dopant as dd
 from chip import etch_deposition as ed
@@ -36,7 +36,7 @@ from chip.junction import analyze_junction
 from chip.purification import Contamination, getter_metals, sodium_oxide_charge
 from chip.wafer_prep import WaferGeometry
 
-from .recipe import (
+from .recipe import (IsolationKnobs, 
     CmpKnobs,
     DeviceKnobs,
     DiffusionKnobs,
@@ -288,6 +288,34 @@ def cmp_step(die: Die, knobs: CmpKnobs) -> Die:
         metal_thickness_nm=p.thickness_um * 1.0e3, shorted=not p.cleared, polished_out=False,
     )
 
+
+
+def isolation_step(die: Die, knobs: IsolationKnobs, reference_cd_nm: float, tau_s: float) -> Die:
+    """Record this die's parasitic loop gain (F7/B12) — **and record that it costs nothing**.
+
+    The per-die half of the isolation step. What lithography adds to a printed line it takes from the
+    space beside it, so a die whose gates run wide has a narrower gap to the well and a *narrower*
+    parasitic base — a higher loop gain. ``reference_cd_nm`` is the wafer's own mean printed CD: the
+    spread is what is physical here, so the reference is the wafer's centre rather than an absolute
+    that would need a second litho pass to establish.
+
+    **This die field is deliberately inert.** :mod:`chip.latchup` slice 1 established that the gain
+    condition does not discriminate (γ = 1 with ``W_B ≪ L`` puts every β orders above the criterion),
+    so no verdict reads this number. It is recorded because the honest statement of the slice is that
+    the isolation change moves a real per-die quantity **which cannot bin out a die** — the wafer-level
+    trigger current is what can, and that is set by the substrate. Showing the spread and showing it is
+    inert is the finding; hiding it would leave the reader to assume it matters.
+    """
+    spacing = knobs.spacing_for_cd_um(die.cd_nm, reference_cd_nm) if die.cd_nm else knobs.nominal_spacing_um
+    base_w = latchup.lateral_base_width_um(spacing, trench_depth_um=knobs.trench_depth_um)
+    gain = latchup.loop_gain(spacing, tau_s, trench_depth_um=knobs.trench_depth_um)
+    return die.record(
+        "isolation",
+        {"scheme": knobs.scheme, "nominal_spacing_um": knobs.nominal_spacing_um,
+         "trench_depth_um": knobs.trench_depth_um},
+        {"spacing_um": spacing, "base_width_um": base_w, "loop_gain": gain,
+         "grades_nothing": True},
+    )
 
 def device_step(
     die: Die, knobs: DeviceKnobs, channel_N_A: float, contamination: Contamination | None = None,
