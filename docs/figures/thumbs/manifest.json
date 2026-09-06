@@ -84,7 +84,7 @@
   "width": 760
  },
  "chip-latchup-history.webp": {
-  "digest": "c301c59b533f3283",
+  "digest": "5bc9434e2d8e35e1",
   "height": 200,
   "source": "chip-latchup-history.png",
   "width": 760
@@ -279,6 +279,12 @@
   "digest": "ffb46caaee3c6d65",
   "height": 1140,
   "source": "fab-game-journey.png",
+  "width": 760
+ },
+ "fab-game-latchup-trap.webp": {
+  "digest": "b7819fbef7c0aea2",
+  "height": 428,
+  "source": "fab-game-latchup-trap.png",
   "width": 760
  },
  "fab-game-s4.webp": {

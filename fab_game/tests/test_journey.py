@@ -28,6 +28,7 @@ from fab_game.journey import (
     diffusion_trajectory,
     finish,
     forecast,
+    substrate_trajectory,
     new_journey,
     oxidation_trajectory,
     refining_trajectory,
@@ -617,3 +618,124 @@ def test_process_cost_is_gated_and_zero_at_the_seam():
     # A fresh journey (effort 0, no diffusion) pays nothing — only the passes/dose it chooses cost.
     fresh = JourneyState(grade="solar", effort=0.0)
     assert process_cost(fresh.current_recipe).total == 0.0
+
+# --------------------------------------------------------------------------- #
+# Phase 7 — the substrate class + the isolation scheme: the deliberate wafer kill
+# --------------------------------------------------------------------------- #
+# The shape of this phase is a POLICY, not a shortfall. The house preference is graded failure whenever
+# the physics honestly allows it, but latchup's discriminating quantity (the substrate resistivity) is one
+# number for the whole wafer, so there is no honest gradient to build. B12 refused to invent one; this
+# phase makes the resulting cliff **reachable, visible in advance, and attributable** — which is what turns
+# a total loss into a lesson instead of a gotcha. See docs/plans/latchup-isolation-f7.md.
+
+
+def test_the_two_phase_7_levers_are_true_seams():
+    """Neither lever touched → the recipe is byte-identical to phases 1-6 and latchup cannot happen."""
+    from fab_game.recipe import DEFAULT_RECIPE
+    base = JourneyState(grade="EGS", effort=0.0)
+    assert base.current_recipe.czochralski == DEFAULT_RECIPE.czochralski
+    assert base.current_recipe.isolation.scheme is None          # no isolation step at all
+    # grow() without the substrate argument must ALSO leave the doping alone (the lever is opt-in inside
+    # an already-existing stage, so this is the seam that is easiest to break).
+    grown = base.grow(2.0)
+    assert grown.n_seed is None
+    assert grown.current_recipe.czochralski.N_seed == DEFAULT_RECIPE.czochralski.N_seed
+
+
+def test_substrate_trajectory_shows_the_cliff_before_it_is_committed():
+    """The 'see it coming' half: the margin is a visible ladder, and the crossing is inside it.
+
+    Every rung is an ordinary substrate — the *default* (1e17) is the heavy end, not the middle — so the
+    player is not being warned off an exotic choice. That is the lesson: the wafer-killing decision looks
+    like a reasonable one, and it is made three stages before it kills anything.
+    """
+    st = JourneyState(grade="EGS", effort=0.0).isolate("sti")
+    rungs = substrate_trajectory(st)
+    margins = [ratio for _n, _rho, _ma, ratio, _latch in rungs]
+    assert all(a < b for a, b in zip(margins, margins[1:]))       # heavier substrate is monotonically safer
+    assert any(latch for *_x, latch in rungs)                     # the cliff is inside the ladder ...
+    assert not all(latch for *_x, latch in rungs)                 # ... and so is the safe side
+    # The crossing is bracketed by two ordinary wafers, and the game default sits far on the safe side.
+    latching = [n for n, _rho, _ma, _r, latch in rungs if latch]
+    surviving = [n for n, _rho, _ma, _r, latch in rungs if not latch]
+    assert max(latching) < min(surviving)                         # a single crossing, not a ragged one
+    assert min(surviving) < 1.0e17                                # the default is NOT the marginal choice
+
+
+def test_a_light_substrate_kills_the_whole_wafer_and_the_forecast_names_the_decision():
+    """The kill itself: total, un-graded, and attributed to the stage that caused it.
+
+    ``dead`` with a zero yield is the *correct* outcome here, not a failure of the grading model — and the
+    channel string must name **grow**, because the isolation stage the player was standing on when the
+    wafer died is not where the decision was made.
+    """
+    killed = JourneyState(grade="EGS", effort=0.0).grow(2.0, N_seed=1.0e15).isolate("sti").commit()
+    f = forecast(killed)
+    assert f.band == "dead"
+    assert f.yield_ == 0.0                                        # all dies, no gradient, nothing to rework
+    assert "LATCHUP" in f.channel
+    assert "GROW" in f.channel                                    # the root, not just the symptom
+    assert all(not d.verdict.passed for d in f.result.wafer.dies)
+
+
+def test_on_the_LOGIC_product_the_latchup_cliff_is_masked_by_the_V_t_window():
+    """The finding that decides where this lesson can be taught at all — written down so it stays found.
+
+    The obvious test to write here is "the light substrate is harmless until isolation is engaged". It is
+    **false**, and the reason is worth more than the test would have been: on the default fast-logic
+    product the threshold-voltage window is stricter than the latchup condition *everywhere*. Every
+    substrate light enough to latch (below ~2.7e15) has already been rejected for a native ``V_t`` under
+    the logic floor, so on this product latchup can never be the thing that kills you.
+
+    That is why the deliberate-kill demonstration lives with the **high-resistivity** product family
+    (``fab_game.demo_latchup_trap``), whose window deliberately opens on the light substrates logic
+    rejects — and whose window the latchup crossing runs straight through. It is also why
+    ``forecast`` banding against ``DEFAULT_SPECS`` (its documented choice) is not a gap to close.
+    """
+    for n_seed in (1.0e15, 2.0e15, 2.5e15):
+        light = JourneyState(grade="EGS", effort=0.0).grow(2.0, N_seed=n_seed)
+        assert forecast(light.commit()).band == "dead"            # already dead WITHOUT any isolation ...
+        assert "V_t" in forecast(light.commit()).channel          # ... on threshold, not on latchup
+        # Engaging isolation does not make it survivable, and now names the harsher root: a V_t reject is
+        # a spec miss (re-target it), a latchup scrap is a physical kill (nothing re-targets it).
+        killed = forecast(light.isolate("sti").commit())
+        assert killed.band == "dead" and "LATCHUP" in killed.channel
+
+
+def test_the_isolation_scheme_cannot_rescue_a_wafer_the_substrate_condemned():
+    """B12's central refusal, at the player surface: the scheme moves a quantity that cannot cost a part."""
+    light = JourneyState(grade="EGS", effort=0.0).grow(2.0, N_seed=1.0e15)
+    assert forecast(light.isolate("locos").commit()).band == "dead"
+    assert forecast(light.isolate("sti").commit()).band == "dead"
+
+
+def test_bad_phase_7_inputs_raise():
+    base = JourneyState(grade="EGS", effort=0.0)
+    with pytest.raises(ValueError):
+        base.grow(2.0, N_seed=0.0)
+    with pytest.raises(ValueError):
+        base.isolate("soi")
+
+def test_the_other_wafer_level_root_the_flatness_scrap_is_named_too():
+    """The second wafer-level branch, which the phase-7 tests above never reach.
+
+    It matches on the geometry window's **label** ("TTV (µm)" / "bow (µm)"), not on a field name, so it
+    would silently become dead code if those labels were ever reworded — and dead code here means the
+    forecast falls back to the raw scrap string, naming no decision. Unlike latchup this root is **not**
+    journey-reachable (the flatness knobs are on ``WaferPrepKnobs`` and no stage sets them), so the
+    recipe is built directly.
+    """
+    from dataclasses import replace as _replace
+
+    from fab_game.journey import _dominant_channel
+    from fab_game.pipeline import LineResult, run_line
+    from fab_game.recipe import DEFAULT_RECIPE
+
+    recipe = _replace(DEFAULT_RECIPE,
+                      wafer_prep=_replace(DEFAULT_RECIPE.wafer_prep, slice_ttv_um=40.0))
+    wafer = run_line(recipe, seed=0, grid_n=5)
+    result = LineResult.of("flatness scrap", wafer)
+    assert result.yield_ == 0.0
+    channel = _dominant_channel(result, recipe)
+    assert "FLATNESS" in channel, f"the flatness branch did not fire — got {channel!r}"
+

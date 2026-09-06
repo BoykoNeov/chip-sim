@@ -62,3 +62,45 @@ disturbance*, never the house geometry.
 **Card REWRITTEN not graduated:** the STI *process* is still unbuilt, but its gate is now sharper —
 a trench recipe adds **no observable B12 has not delivered**. **F6 trigger RECORDED** (one sentence,
 not argued): latchup trigger current reads substrate resistance ⇒ re-check F6's gate.
+
+## The 2026-09-06 follow-on batch — the player surface, and a live bug it exposed
+
+Asked for two things: an F6 re-check (the trigger B12 recorded) and a **deliberate wafer-kill moment**.
+The user's standing policy was amended first — a whole-wafer kill is now explicitly WELCOME when the
+physics really is all-or-nothing, which retroactively blesses S2's refusal to grade
+([[gradual-failure-preferred]]).
+
+**A LIVE BUG, and the most valuable thing in the batch.** `targets.regrade` carried the wafer-level
+**flatness** scrap into a sibling target's verdict but **not the latchup one** — B12 added the second
+scrap on the explicitly-stated "same precedent" as the first and never updated the re-grade path. At
+`N_seed = 2.5e15` a wafer the line scrapped on latchup re-graded as the high-res part to **37/37 passing**
+— a shorted wafer sold whole. Masked at most other dopings only because some *other* window happened to
+catch the die, which is why no test saw it. Fixed (read off the isolation step's own record, exactly as
+`pipeline._test_wafer` does) + pinned. **The rule:** flatness is target-relative (a part may tolerate more
+bow) so `regrade` re-checks it; latchup is a pass/fail the LINE computed — target-INVARIANT, like the
+assembly scrap.
+
+**THE TRAP — where the kill actually lives.** The kill could NOT be homed on the default logic product:
+its `V_t` window rejects every substrate light enough to latch, so latchup is masked there *everywhere*
+(pinned as a test, since the obvious "harmless until isolation" test is FALSE). It belongs to the
+**high-res** family, whose window deliberately opens on the light substrates logic rejects: the window
+runs **2.5e15 → 1e16** and the latchup crossing at **~2.7e15 falls INSIDE it**. So the lightest sliver of
+a legitimate published spec passes every one of its own criteria and is still scrap — and the player is
+*pulled* there, because lighter buys both the native low `V_t` and `BV ∝ N_A^-3/4`. `demo_latchup_trap.py`
+(gallery B12, 21st fab-game demo) + `journey.substrate_trajectory` (see it coming) + the forecast naming
+**GROW** not the isolation stage (attribute it afterwards).
+
+**Journey levers added:** `grow(pull_rate, N_seed=...)` (doping is committed AT growth) and a new
+`isolate(scheme)` stage — both true seams. `_dominant_channel` learned the two wafer-level roots; before,
+it fell through to the reason verbatim, which says *what* happened but never *which decision* armed it.
+
+**The F6 re-check verdict — NOT the house released-gate pattern.** 5th card pickup, but unlike the
+previous four the stated gate was **not** found released: it was aimed at only one of three legs. Card
+split — resistance leg BUILT, retrograde-well leg STILL DEFERRED (genuinely overlaps F1), **out-diffusion
+leg PROMOTABLE**. The finding that promotes it: B12's own floor sits at **0.025 µm**, 12× below the
+thinnest layer its figure plots, so *nothing in the model stops thinning*; the limit that really binds is
+handle dopant out-diffusing up into the growing layer (`√(Dt) ≈ 0.05–0.7 µm`, from the tree's own Fair
+`D(T)` + charge-state `D(N)`). Robust claim = the **order of magnitude**, not any floor value (growth T/t
+are house numbers). Discriminator = **Sb creeps least** — which is *why* Sb is the real buried-layer
+dopant. The B12 figure caption ("thinning stops paying here") was **overstating** and was corrected as
+part of this finding. Written up in `docs/plans/future-steps.md` → "The F6 re-check".

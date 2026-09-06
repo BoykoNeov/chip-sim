@@ -208,6 +208,12 @@ def print_summary(r: LatchupHistoryResult) -> None:
           f"gain), and always falls short of it,")
     print(f"      because the handle keeps its own series term: a floor at {r.handle_floor_ma:.0f} mA "
           f"that thinning the layer cannot pass.")
+    print(f"    [but that floor is an ASYMPTOTE, not the operative limit: it is only approached at "
+          f"t_epi ~ 0.025 um, 12x thinner")
+    print(f"     than the thinnest layer swept here, so NOTHING in this model stops the thinning. "
+          f"The limit that really binds is")
+    print(f"     out-diffusion from the handle into the growing layer (~0.05-0.7 um) - promotable "
+          f"leg F6-3, not built.]")
     print(f"    [the cited OPTIMUM layer thickness is NOT reproduced — it needs the vertical pnp this "
           f"model does not carry. Monotone-thinner-is-better is what is supportable.]\n")
 
@@ -317,10 +323,11 @@ def save_figure(r: LatchupHistoryResult) -> Path:
                label=f"the SAME wafer, uniform ({ERA_WAFER_RHO_OHM_CM:g} Ω·cm): "
                      f"{r.uniform_trigger_ma:.1f} mA")
     ax.axhline(r.handle_floor_ma, color="tab:green", ls=":", lw=1.4)
-    ax.text(r.epi_um.max() * 0.95, r.handle_floor_ma * 0.35,
-            f"floor: the handle's own series term ({r.handle_floor_ma:.0f} mA)\n"
-            f"— thinning the layer stops paying here",
-            fontsize=7.2, color="tab:green", va="top", ha="right")
+    ax.text(r.epi_um.max() * 0.95, r.handle_floor_ma * 0.55,
+            f"floor: the handle's own series term ({r.handle_floor_ma:.0f} mA) - an ASYMPTOTE, not the limit:\n"
+            f"reached only at t_epi ~ 0.025 um, 12x below this axis. Out-diffusion binds first\n"
+            f"(F6 re-check, docs/plans/future-steps.md).",
+            fontsize=6.5, color="tab:green", va="top", ha="right")
     ax.axhline(r.injected_ma, color="tab:red", ls="--", lw=1.8,
                label=f"injected disturbance {r.injected_ma:.0f} mA")
     ax.fill_between(r.epi_um, r.epi_trigger_ma, r.injected_ma,
@@ -330,7 +337,7 @@ def save_figure(r: LatchupHistoryResult) -> Path:
     ax.set_title("(C) The lever: the substrate, not the isolation", fontsize=9.5)
     ax.legend(fontsize=7.0, loc="lower left")
     ax.grid(True, alpha=0.18, which="both")
-    ax.text(0.03, 0.84, "improvement ≈ tap path / t_epi — ρ cancels,\nso this is geometry, not a fitted gain",
+    ax.text(0.03, 0.62, "improvement ≈ tap path / t_epi — ρ cancels,\nso this is geometry, not a fitted gain",
             transform=ax.transAxes, ha="left", va="top", fontsize=6.9, color="0.35")
 
     fig.suptitle("Historical-modes B12 — the latchup bill: STI cleared B5's packing floor, and the density it "

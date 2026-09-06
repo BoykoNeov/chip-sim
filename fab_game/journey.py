@@ -49,7 +49,7 @@ from chip.purification import Contamination, FEEDSTOCK_GRADES, zone_refine
 
 from .game import GameConfig
 from .pipeline import LineResult, run_line
-from .recipe import DEFAULT_RECIPE, Recipe
+from .recipe import DEFAULT_RECIPE, ISOLATION_SCHEMES, Recipe
 from .scoring import ProcessCost, ScoreCard, process_cost, score_wafer
 from .spec import DEFAULT_SPECS
 from .variation import NO_VARIATION, Variation
@@ -103,6 +103,16 @@ DEFAULT_SLICE_Z = 0.5            # a representative mid-boule cut (clean on a fl
 DIFFUSION_SD_CONTACT_SQUARES = 0.15   # the flagged house n_□ = R_series/R_s (a wide W=10µm device:
 #                                       L_access/W ≈ 1.5µm/10µm); nominal R_series ≈ 12 Ω sits comfortably
 #                                       inside the I_Dsat window, an under-diffused predep walks it out
+# --- Phase 7: the substrate class + the isolation scheme (the wafer-level decisions) ---------------- #
+# The boule's seed-end doping is decided AT GROWTH, so it rides the grow() stage; the isolation scheme is
+# its own stage because the isolation step is off by default (recipe.isolation.scheme = None is the seam).
+# Both default to None here, so a journey that never touches them is byte-identical to the phases 1-6 line.
+DEFAULT_N_SEED = 1.0e17           # cm^-3 -- the incumbent low-R logic substrate = the recipe default (seam)
+DEFAULT_ISOLATION_SCHEME = "sti"  # the modern scheme; "locos" is the period one B5/B12 contrast it against
+SUBSTRATE_SWEEP: tuple[float, ...] = (   # the N_seed ladder substrate_trajectory walks -- ordinary wafers,
+    1.0e14, 3.0e14, 1.0e15, 3.0e15, 1.0e16, 3.0e16, 1.0e17, 3.0e17,   # every one of them a real substrate
+)
+
 DEFAULT_PREDEP_C = 950.0          # °C — the nominal (clean) predep temperature = the recipe default
 DEFAULT_PREDEP_MIN = 10.0         # min — the nominal predep time = the recipe default
 
@@ -236,6 +246,27 @@ def _dominant_channel(result: LineResult, recipe: Recipe) -> str | None:
         return None
     worst = max(dead, key=lambda d: d.radius_frac)
     reasons = " ".join(worst.verdict.reasons).lower()
+
+    # The two WAFER-LEVEL scraps come first, before any per-die root. Both are computed once per wafer and
+    # applied to every die, so "the worst die" is a fiction here — there is no radial story to tell and no
+    # partial yield to rework. Without this branch the fallthrough at the end returns the scrap reason
+    # verbatim, which says WHAT happened but never which committed decision armed it — and naming that
+    # decision is the whole teaching value of a self-inflicted kill (see JourneyState.isolate).
+    if "latchup" in reasons:
+        n_a = recipe.effective_channel_N_A
+        return (f"LATCHUP — the whole wafer, every die (substrate {n_a:.2e} cm⁻³ = "
+                f"{recipe.substrate_resistivity_ohm_cm:.2f} Ω·cm is too resistive to hold the "
+                f"parasitic pnpn off; you committed it at GROW, and isolation only collected the bill). "
+                f"Grow a heavier substrate — the isolation scheme cannot save this, and neither can rework")
+    # Matches the GeometrySpec window LABELS ("TTV (µm)" / "bow (µm)"), which is what SpecWindow.check
+    # puts in the reason — hence the .lower() above. NOT symmetric with the latchup branch: the flatness
+    # knobs live on WaferPrepKnobs (`slice_ttv_um` / `slice_bow_um`) and no journey stage sets them, so
+    # this root is reachable only from a directly-built recipe. It is handled here anyway because
+    # `run_line` can produce it and the fallthrough would name no decision at all.
+    if "ttv" in reasons or "bow" in reasons:
+        return ("wafer FLATNESS out of spec — the whole wafer, every die (TTV/bow from the slice/cut; "
+                "no lithography can print on it, so there is nothing to grade)")
+
     grown_in = recipe.czochralski.thermal_gradient_K_per_mm is not None   # Voronkov hot zone engaged
     oxide_root = _oxidation_root(worst, recipe.oxidation, reasons)         # phase 5: t_ox off nominal → the gate oxide
     if oxide_root is not None:
@@ -330,6 +361,37 @@ def boule_profile(state: "JourneyState", *, n_slices: int = 7, z_max: float = 0.
     return tuple(out)
 
 
+def substrate_trajectory(state: "JourneyState", *,
+                         n_seed_sweep: tuple[float, ...] = SUBSTRATE_SWEEP):
+    """The latchup margin down a substrate-doping ladder -- the phase-7 'see the cliff before you commit' view.
+
+    This is the view that makes a self-inflicted wafer kill **teachable rather than a gotcha**. Every entry
+    in the ladder is an ordinary silicon substrate; the game's default (1e17) is the *heavy* end, not the
+    middle. Lighter is better for two things the player is actively rewarded for -- a lower native ``V_t``
+    and (``BV`` proportional to ``N_A^-3/4``) a higher breakdown voltage, which is the whole premise of the
+    high-res target family -- and worse for exactly one thing, which is invisible until the wafer is dead:
+    the substrate resistance that sets the latchup trigger current.
+
+    Returns ``(N_seed, rho_ohm_cm, trigger_mA, margin_ratio, latches)`` per rung, computed straight from
+    :mod:`chip.latchup` at the journey's current isolation knobs -- **no line run**, because the trigger is
+    a wafer property that reads one number (the resistivity), which is the B12 finding this view inherits.
+    ``margin_ratio < 1`` is a dead wafer: all dies, no gradient, nothing to rework.
+    """
+    from chip import latchup as _lu
+    from chip.czochralski import resistivity as _rho
+    iso = state.current_recipe.isolation
+    injected = iso.injected_current_a
+    dopant = state.current_recipe.czochralski.dopant
+    out = []
+    for n in n_seed_sweep:
+        rho = float(_rho(n, dopant))
+        r_sub = iso.substrate_resistance_ohm(rho)
+        i_trig = _lu.trigger_current_a(r_sub)
+        ratio = i_trig / injected
+        out.append((float(n), rho, i_trig * 1.0e3, ratio, ratio < 1.0))
+    return tuple(out)
+
+
 DEMO_PREDEP_C = 900.0            # the representative predep temperature the demo sweeps the TIME (dose) at
 #                                  (a wide graded I_Dsat band lives in the predep-time lever here; cf. the
 #                                  T lever, whose graded edge at a full 10-min predep is narrower)
@@ -404,6 +466,10 @@ class JourneyState:
     predep_min: float = DEFAULT_PREDEP_MIN  # predep time (min) — only meaningful once predep_C is set
     oxide_min: float | None = None   # oxidation lever — gate-oxide time (min); None = recipe NOMINAL (the seam,
     #                                  i.e. the lever at nominal — not an off switch; a MOSFET always has a gate oxide)
+    n_seed: float | None = None      # phase-7 substrate lever — the boule's seed-end doping (cm⁻³), decided AT
+    #                                  GROWTH; None = the recipe default (1e17, the low-R logic wafer) = the seam
+    iso_scheme: str | None = None    # phase-7 isolation lever — "locos" | "sti"; None = no isolation step at all
+    #                                  (the recipe's own seam: latchup is not computed, exactly as phases 1-6)
     seed: int = 0
     grid_n: int = DEFAULT_GRID_N
     log: tuple[str, ...] = ()
@@ -427,8 +493,12 @@ class JourneyState:
                          radial_gradient_boost=GROWTH_RADIAL_BOOST)
         if self.slice_z is not None:
             cz = replace(cz, slice_z=self.slice_z)
+        if self.n_seed is not None:                           # phase 7: the substrate class, set at growth
+            cz = replace(cz, N_seed=self.n_seed)
         if cz is not recipe.czochralski:                      # only touch the recipe when a lever is engaged
             recipe = replace(recipe, czochralski=cz)
+        if self.iso_scheme is not None:                       # phase 7: engage the isolation step (latchup)
+            recipe = replace(recipe, isolation=replace(recipe.isolation, scheme=self.iso_scheme))
         if self.predep_C is not None:                         # diffusion stage engaged → overlay the predep
             recipe = replace(recipe, diffusion=replace(           # dose + turn on the series-R consumer (n_□)
                 recipe.diffusion, T_predep_C=self.predep_C, t_predep_min=self.predep_min,
@@ -449,6 +519,10 @@ class JourneyState:
             s += f" · predep {self.predep_C:g}°C/{self.predep_min:g}min"
         if self.oxide_min is not None:
             s += f" · oxide {self.oxide_min:g}min"
+        if self.n_seed is not None:
+            s += f" · substrate {self.n_seed:.1e}cm⁻³"
+        if self.iso_scheme is not None:
+            s += f" · {self.iso_scheme.upper()} isolation"
         return s
 
     @property
@@ -472,7 +546,8 @@ class JourneyState:
         return replace(nxt, log=self.log + (f"refine +{step:g} → effort {nxt.effort:g}: "
                                             f"Na {c.Na:.2e} cm⁻³",))
 
-    def grow(self, pull_rate: float = DEFAULT_PULL_MM_MIN) -> "JourneyState":
+    def grow(self, pull_rate: float = DEFAULT_PULL_MM_MIN,
+             N_seed: float | None = None) -> "JourneyState":
         """Set (or recalibrate) the boule pull rate — the crystal-growth lever (mm/min).
 
         The pull rate rides the fixed radial hot zone (:data:`GROWTH_G_CENTER_K_PER_MM` /
@@ -482,9 +557,39 @@ class JourneyState:
         is the named deferred Level-2)."""
         if pull_rate <= 0:
             raise ValueError(f"pull rate must be > 0 mm/min, got {pull_rate}")
-        return replace(self, pull_rate=pull_rate,
-                       log=self.log + (f"grow: pull {pull_rate:g} mm/min "
-                                       f"(ξ_centre = {pull_rate / GROWTH_G_CENTER_K_PER_MM:.3f})",))
+        if N_seed is not None and N_seed <= 0:
+            raise ValueError(f"N_seed must be > 0 cm⁻³, got {N_seed}")
+        entry = (f"grow: pull {pull_rate:g} mm/min "
+                 f"(ξ_centre = {pull_rate / GROWTH_G_CENTER_K_PER_MM:.3f})")
+        nxt = replace(self, pull_rate=pull_rate)
+        if N_seed is not None:
+            nxt = replace(nxt, n_seed=N_seed)
+            entry += f"; substrate doped to {N_seed:.2e} cm⁻³ — COMMITTED for the whole boule"
+        return replace(nxt, log=self.log + (entry,))
+
+    def isolate(self, scheme: str = DEFAULT_ISOLATION_SCHEME) -> "JourneyState":
+        """Engage device isolation — the phase-7 lever that turns the **latchup** verdict on (B12).
+
+        Until this is called the isolation step does not run at all (the recipe's own seam), and latchup
+        is simply not a thing that can happen to the wafer — which is why phases 1-6 never met it. Calling
+        it puts the parasitic pnpn structure into the line and asks the wafer to survive the recipe's
+        injected disturbance (``IsolationKnobs.injected_current_a``, a *given* — the module never models
+        where the disturbance comes from).
+
+        **This is the stage where a decision three stages back becomes fatal.** The scheme itself barely
+        matters: B12's finding is that the per-die quantity the scheme moves (the parasitic loop gain)
+        never discriminates, and the one that does — the trigger current — rides the **substrate
+        resistivity**, one number for the whole wafer, set by :meth:`grow`. So the isolation stage is
+        where the substrate decision is *collected*, not where the outcome is chosen. Consult
+        :func:`substrate_trajectory` **before** committing: the margin is visible in advance, and a wafer
+        that latches is a total loss — all dies, no gradient, no rework (:func:`consequence_band` reads
+        ``"dead"``). That the cliff is real and un-graded is the point, not a modelling shortfall.
+        """
+        if scheme not in ISOLATION_SCHEMES:
+            raise ValueError(f"scheme must be one of {sorted(ISOLATION_SCHEMES)}, got {scheme!r}")
+        return replace(self, iso_scheme=scheme,
+                       log=self.log + (f"isolate: {scheme.upper()} — the latchup verdict is now live "
+                                       f"(the substrate you grew decides it)",))
 
     def cut(self, slice_z: float = DEFAULT_SLICE_Z) -> "JourneyState":
         """Slice a wafer from the boule at axial fraction ``slice_z`` ∈ [0, 1) — the phase-3 wafer-prep lever.

@@ -380,7 +380,8 @@ POWER_FAMILY: tuple[DeviceTarget, ...] = (POWER_RECTIFIER,)
 # --------------------------------------------------------------------------- #
 # Re-grading — score a FINISHED wafer against a different target (zero new physics)
 # --------------------------------------------------------------------------- #
-def _regrade_die(die: Die, target: DeviceTarget, geometry_reason: str | None) -> Die:
+def _regrade_die(die: Die, target: DeviceTarget, geometry_reason: str | None,
+                 latchup_reason: str | None = None) -> Die:
     """Re-grade one finished die against ``target`` — its physics is fixed; only the windows/bins change.
 
     Mirrors the pipeline's front-end verdict (:meth:`SpecSet.verdict`) **then** the back-end packaging
@@ -392,6 +393,11 @@ def _regrade_die(die: Die, target: DeviceTarget, geometry_reason: str | None) ->
       (the whole point), while a physical functional kill stays dead under every target (it short-circuits).
     * An **assembly scrap** (``assembled is False`` — a cracked/lifted-bond die) is irreversible: it stays
       dead under every target (re-grading cannot un-crack a die).
+    * A **latchup scrap** (F7/B12) is likewise irreversible and, unlike the flatness scrap above it, is
+      **not** re-evaluated per target: the flatness windows are a target's own (a target may tolerate more
+      bow), but latchup is a pass/fail the *line* already computed against the injected disturbance, and no
+      product definition makes a latched pnpn stop latching. So the reason is read off the fabricated
+      wafer's isolation record and carried through unchanged.
     * A die that the *declared* target front-end-failed (so it never reached assembly, ``assembled is None``)
       but **passes** this sibling's front end is treated as having **survived** assembly. This is **exact**
       at the default lossless back end (``assembly_yield = 1`` ⇒ every front-end-good die assembles); only a
@@ -404,7 +410,7 @@ def _regrade_die(die: Die, target: DeviceTarget, geometry_reason: str | None) ->
     ``verdict``/``bin`` are what :func:`fab_game.scoring.score_wafer` reads to price the re-graded wafer.
     """
     knobs_in = {"target": target.name}
-    verdict = target.specs.verdict(die, geometry_reason)
+    verdict = target.specs.verdict(die, geometry_reason, latchup_reason)
     if verdict.failed:                                       # front-end fail under this target — not shipped
         return die.record("disposition", knobs_in, {"target": target.name, "passed": False, "bin": None},
                           verdict=verdict, bin=None)
@@ -431,7 +437,13 @@ def regrade(wafer: WaferState, target: DeviceTarget) -> WaferState:
     change *physics-irrelevant* outcomes). Score the result with ``target.prices`` (see :func:`grade_for`).
     """
     geometry_reason = target.specs.geometry.check(wafer.geometry)
-    dies = tuple(_regrade_die(d, target, geometry_reason) for d in wafer.dies)
+    # F7/B12 — the wafer-level latchup scrap, read off the isolation step's own record exactly as
+    # `pipeline._test_wafer` does. Target-INVARIANT (see `_regrade_die`): re-grading cannot un-latch a
+    # wafer, so without this a scrapped wafer could be sold whole under a sibling target whose windows
+    # its (perfectly good) per-die parameters happen to satisfy. `None` when the step never ran (seam).
+    iso_rec = next((r for r in wafer.provenance if r.step == "isolation"), None)
+    latchup_reason = iso_rec.summary.get("latchup_reason") if iso_rec is not None else None
+    dies = tuple(_regrade_die(d, target, geometry_reason, latchup_reason) for d in wafer.dies)
     return replace(wafer, dies=dies)
 
 

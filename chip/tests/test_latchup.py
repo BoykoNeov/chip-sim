@@ -326,6 +326,41 @@ def test_thinning_the_epi_helps_monotonically_but_runs_into_the_handles_own_floo
         assert r_epi - floor_r == pytest.approx(vertical, rel=1e-12)
 
 
+def test_the_handles_floor_is_an_asymptote_that_never_binds_in_the_swept_range():
+    """The F6 re-check (2026-09-06), pinned as an *embarrassment* the way S1's gain condition was.
+
+    The test above proves the handle's term is a real floor. This one proves it is **operationally
+    vacuous**: it is only approached at ``t_epi = rho_handle*path/rho_epi``, which at the era numbers is
+    0.025 um -- more than an order of magnitude below the thinnest layer any figure here plots, and
+    several below anything a fab grows. So "thinner is monotonically better down to the floor" describes
+    a reward that is, within this model, **unopposed everywhere it matters**.
+
+    That matters because it locates the missing physics: what really stops the thinning is the handle's
+    dopant out-diffusing up into the growing layer (sqrt(Dt) ~ 0.05-0.7 um at growth conditions, from the
+    tree's own Fair D(T) / charge-state D(N)) -- the promotable third leg of the split F6 card, and
+    explicitly NOT built. If someone ever builds it, this test should start failing on its last
+    assertion, which is the point of writing it down.
+    """
+    rho_epi, rho_handle = 10.0, 0.01
+    path_cm = latchup.SUBSTRATE_TAP_PATH_UM / latchup.UM_PER_CM
+
+    # Where the two terms are equal -- the only place the floor is genuinely in play.
+    t_crossover_um = (rho_handle * path_cm / rho_epi) * latchup.UM_PER_CM
+    assert t_crossover_um == pytest.approx(0.025, rel=1e-9)
+
+    # The thinnest layer demo_latchup_history plots. The floor is 12x further down still.
+    t_thinnest_plotted_um = 0.3
+    assert t_thinnest_plotted_um / t_crossover_um == pytest.approx(12.0, rel=0.01)
+
+    # ... and at that thinnest plotted point the trigger has reached under a tenth of the floor-limited
+    # value, so the curve on the figure never comes near the line drawn beside it.
+    floor_trigger = latchup.trigger_current_a(
+        latchup.substrate_resistance_from_resistivity_ohm(rho_handle))
+    thinnest_trigger = latchup.trigger_current_a(
+        latchup.epi_substrate_resistance_ohm(rho_epi, t_thinnest_plotted_um, rho_handle))
+    assert thinnest_trigger / floor_trigger < 0.10
+
+
 def test_the_epi_lever_is_still_silent_on_spacing_and_on_the_gain():
     """S4 changes one resistance and nothing else — the module's central refusal survives the finale."""
     a = latchup.latchup_margin(1.0, None, 1e-6, rho_ohm_cm=10.0)

@@ -205,3 +205,83 @@ def test_seam_a_negative_v_t_window_scores_correctly():
     too_low = replace(in_band, V_t=-0.30)
     v = HIGH_RES.specs.verdict(too_low, None)
     assert v.failed and any("V_t" in r for r in v.reasons)
+
+# --------------------------------------------------------------------------- #
+# The latchup trap — the high-res window and the F7/B12 wafer scrap overlap
+# --------------------------------------------------------------------------- #
+def test_a_latched_wafer_cannot_be_regraded_back_to_life():
+    """A wafer-level latchup scrap survives re-grading against every target. **This was a live bug.**
+
+    Found 2026-09-06 while wiring the deliberate-kill journey stage. ``regrade`` carried the wafer-level
+    *flatness* scrap into the sibling verdict but not the *latchup* one, which B12 had added later on the
+    explicitly-stated "same precedent as the TTV/bow flatness scrap". At ``N_seed = 2.5e15`` the effect was
+    not subtle: the line scrapped the wafer on latchup, and re-grading it as the high-res part returned
+    **every die passing** — a shorted wafer sold whole. It was masked at most other dopings only because
+    some *other* window happened to catch the die.
+
+    Why latchup is target-INVARIANT while flatness is not: a flatness window belongs to a target (a part
+    may tolerate more bow), so ``regrade`` honestly re-checks it. Latchup is a pass/fail the **line**
+    already computed against the injected disturbance — a physical property of the fabricated wafer, like
+    the assembly scrap beside it. No product definition makes a latched pnpn stop latching.
+    """
+    from dataclasses import replace as _replace
+
+    from fab_game.pipeline import run_line
+    from fab_game.recipe import DEFAULT_RECIPE
+    from fab_game.targets import HIGH_RES, regrade
+
+    # The exact resurrection case: light enough to latch, heavy enough to satisfy every high-res window.
+    n_seed = 2.5e15
+    base_cz = _replace(DEFAULT_RECIPE.czochralski, N_seed=n_seed)
+
+    # Without the isolation step (the seam) this wafer is a PERFECT high-res part — that is what makes the
+    # bug dangerous rather than academic: there is nothing else wrong with it.
+    clean = regrade(run_line(_replace(DEFAULT_RECIPE, czochralski=base_cz), seed=0, grid_n=7), HIGH_RES)
+    assert all(d.verdict.passed for d in clean.dies)
+
+    # Engage isolation: the same wafer latches, and the scrap must survive the re-grade.
+    latched = run_line(_replace(DEFAULT_RECIPE, czochralski=base_cz,
+                                isolation=_replace(DEFAULT_RECIPE.isolation, scheme="sti")),
+                       seed=0, grid_n=7)
+    assert all(not d.verdict.passed for d in latched.dies)
+    regraded = regrade(latched, HIGH_RES)
+    assert all(not d.verdict.passed for d in regraded.dies), "a latched wafer was resurrected by re-grading"
+    assert all("latchup" in " ".join(d.verdict.reasons).lower() for d in regraded.dies),         "the wafer stayed dead, but for the wrong reason — the latchup scrap was still dropped"
+
+
+def test_the_latchup_crossing_falls_INSIDE_the_high_res_acceptance_window():
+    """The trap itself: the lightest corner of this part's own window is a wafer that cannot be built.
+
+    The high-res part exists *because* a light substrate is the right engineering choice — it buys the
+    native low ``V_t`` and (``BV`` proportional to ``N_A^-3/4``) the breakdown voltage the logic substrate
+    cannot reach, so the player is rewarded all the way down. The latchup crossing sits **inside** that
+    reward gradient: the part's window opens at ~2.5e15 and the wafer starts latching at ~2.7e15, so the
+    lightest sliver of a perfectly legitimate spec is unbuildable on a uniform wafer.
+
+    This is the one place in the line where a decision that satisfies every published window still costs
+    the whole wafer, which is exactly why it is worth a demo (``fab_game.demo_latchup_trap``).
+    """
+    from dataclasses import replace as _replace
+
+    from chip import latchup as _lu
+    from chip.czochralski import resistivity as _rho
+    from fab_game.pipeline import run_line
+    from fab_game.recipe import DEFAULT_RECIPE
+    from fab_game.targets import HIGH_RES, regrade
+
+    def _passes_window(n_seed: float) -> bool:      # the part's own spec, isolation not engaged
+        cz = _replace(DEFAULT_RECIPE.czochralski, N_seed=n_seed)
+        w = regrade(run_line(_replace(DEFAULT_RECIPE, czochralski=cz), seed=0, grid_n=7), HIGH_RES)
+        return all(d.verdict.passed for d in w.dies)
+
+    def _latches(n_seed: float) -> bool:            # the wafer property, independent of any window
+        iso = _replace(DEFAULT_RECIPE.isolation, scheme="sti")
+        r_sub = iso.substrate_resistance_ohm(float(_rho(n_seed, DEFAULT_RECIPE.czochralski.dopant)))
+        return _lu.trigger_current_a(r_sub) < iso.injected_current_a
+
+    assert not _passes_window(2.0e15)               # below the window: native V_t under the floor
+    assert _passes_window(2.5e15) and _latches(2.5e15)      # IN the window — and a dead wafer
+    assert _passes_window(3.0e15) and not _latches(3.0e15)  # in the window and buildable
+    assert _passes_window(1.0e16) and not _latches(1.0e16)  # the safe body of the window
+    assert not _passes_window(3.0e16)               # above the window: BV under the floor
+

@@ -11,7 +11,7 @@ prose moved into the topic file (this index has a hard read limit).
 ## Ways of working
 
 - [Commit at end of batch](commit-at-end-of-batch.md) — **feedback (2026-06-10):** always commit AND push at batch end unasked; chip-sim → direct `git push origin main` (solo repo). Conventional msg + Co-Authored-By, fast lane green first; PRs still ask-first.
-- [Gradual failure preferred](gradual-failure-preferred.md) — **feedback (2026-06-14):** model graded failure over a cliff when realistic; honest move = spatial non-uniformity of the offending quantity, the fudge = inflating an unrelated variable.
+- [Gradual failure preferred](gradual-failure-preferred.md) — **feedback (2026-06-14, +exception 2026-09-06):** graded failure when realistic (honest move = spatial non-uniformity; fudge = inflating an unrelated variable) — but a **whole-wafer kill is welcome** when the physics really is all-or-nothing.
 - [Chip notebook flake](chip-notebook-flake.md) — **project:** the slow `chip.ipynb` smoke test hangs ~80% in CI — an nbclient↔ipykernel-7.x race. THE PIN = `-n auto` fast lane only, full gate serial (never the notebook under xdist). Don't re-explore fewer workers.
 
 ## Engine & physics library
@@ -39,7 +39,7 @@ prose moved into the topic file (this index has a hard read limit).
 - [High-κ gate F3](high-k-gate-f3.md) — **project (COMPLETE 2026-07-17, 4 slices; card PULLED):** one thickness, two currencies — `C_ox` LINEAR in EOT vs `J_g` EXPONENTIAL in `t_phys`. `device.py` untouched: `ε_SiO₂/EOT ≡ ε₀κ/t_phys` is an IDENTITY. S4 = the IL ⇒ floor `EOT>t_IL`.
 - [Strained silicon F5](strained-silicon-f5.md) — **project (COMPLETE 2026-08-10, 4 slices; card GRADUATED):** `µ` = the one `I_Dsat` factor no process ever moved; seam predates the slice. Enhancement factors, nMOS tensile leg, drive read an UPPER BOUND. S2 = 1st non-additive knob; S4 = bracket-not-a-curve.
 - [CMP / planarity F8](cmp-planarity-f8.md) — **project (COMPLETE 2026-09-06, 4 slices; card GRADUATED):** upstream of F4's wire. `s/(1−s)` forced overpolish ⇒ the fix is UNIFORMITY; sub-micron loss is EROSION. S4 = the 2nd F4 clause to go — the polished wire costs PARTS and REVERSES the speed gradient.
-- [Latchup / isolation F7→B12](latchup-isolation-f7.md) — **project (COMPLETE 2026-09-06, 4 slices; card REWRITTEN):** the bill STI's density came with. Gate half-open (4th time). Gain condition **never discriminates** ⇒ trigger binding; latchup is a **WAFER** property (grading REFUSED as a fudge). Trench pays back **85%**; boule drift **inverts**. S4 = the substrate lever.
+- [Latchup / isolation F7→B12](latchup-isolation-f7.md) — **project (2026-09-06, 4 slices + a follow-on batch; card REWRITTEN):** the bill STI's density came with. Gain condition **never discriminates** ⇒ trigger binding; latchup is a **WAFER** property (grading REFUSED as a fudge). Trench pays back **85%**; boule drift **inverts**. Follow-on: a **live `regrade` bug** (a latched wafer re-graded to 37/37 saleable), the **trap** (the crossing falls INSIDE the high-res window), and the **F6 re-check** (card split 3 ways; the modelled floor is 12× too thin to bind).
 - [Historical-modes H0](historical-modes-h0.md) — **project (2026-07-10):** the **era-timeline display surface** (`history_gallery.py` → `docs/history.html`+`.local`, the 3rd gallery) — `demo_*_history.py` figures re-cut period→wall→successor; glob-anchored.
 
 ## Implant (F1)

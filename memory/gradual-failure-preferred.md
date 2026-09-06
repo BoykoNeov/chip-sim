@@ -1,6 +1,6 @@
 ---
 name: gradual-failure-preferred
-description: standing policy — model graded/gradual failure over cliff (all-or-nothing) failure whenever it is physically realistic
+description: standing policy — model graded/gradual failure over cliff failure whenever it is physically realistic; EXCEPTION (2026-09-06) a whole-wafer kill is welcome when the physics really is all-or-nothing
 metadata:
   type: feedback
 ---
@@ -15,6 +15,21 @@ the slope.
 problems/rework → outright-failure spectrum (their message-4 brief). A cliff (a knob
 that flips the whole wafer 0%↔100%) collapses that spectrum to a coin flip and kills
 the "marginal feedstock → rework" middle band that makes the decisions interesting.
+
+**EXCEPTION — the whole-wafer kill is WELCOME (user, 2026-09-06).** "Committing an error
+(or intentionally) that kills the whole wafer is ok, it has teaching and game value." So the
+preference above is *not* a requirement that every consequence be survivable. When the honest
+physics is all-or-nothing — one number per wafer, no real spatial handle on the offending
+quantity — ship the cliff, and ship it as a total loss. A run-ending scrap teaches the lesson
+the slope cannot, and a player who deliberately drives the wafer into the wall should get to
+watch it die.
+
+**How it composes with the policy:** the ordering is unchanged — *look for* the realistic slope
+first, and never manufacture one. What changed is the fallback: when the search comes up empty
+the answer is a clean, loud, total kill, not a reluctantly-softened gradient. The refusal in
+[[latchup-isolation-f7]] S2 (latchup is a wafer property — τ identical on every die, ρ one
+number per wafer — so grading it would have been invented physics) is the canonical case, and
+this exception says that outcome was the *right* one, not a shortfall.
 
 **How to apply:** when a stage's consequence comes out binary, look for the *realistic*
 mechanism that makes it graded before accepting the cliff — and distinguish it from a

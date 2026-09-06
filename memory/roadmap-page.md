@@ -53,3 +53,13 @@ it is still TRUE). ⇒ **re-check a slice's gate against the tree before buildin
 
 Related: [[scope-edge-backlog]] (B1 gates F9), [[historical-modes-b5]] (F7's built half),
 [[historical-modes-b7]] (F2 already built → not on the roadmap), [[gallery-local-edition]].
+
+**5th pickup (F6, 2026-09-06) — the pattern has an exception, and it matters.** The first four cards
+picked up were found with their gate already **released**. F6 was not: its stated reason ("retrograde
+profile overlaps implant F1") was still true, but it turned out to cover **only one of three legs** the
+card silently bundled. So the honest outcome was a **card split** — one leg built, one still deferred on
+the original reason, one promotable — not a graduation and not a released gate. **The lesson to carry:**
+when re-checking a gate against the tree, first ask what the stated reason actually *covers*. A gate can
+be perfectly valid and still leave most of its card unguarded, and calling that "the gate was open" would
+overclaim in exactly the direction this repo keeps refusing. See `docs/plans/future-steps.md` → "The F6
+re-check" and [[latchup-isolation-f7]].

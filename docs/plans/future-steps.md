@@ -32,7 +32,7 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
 | **F3** | **High-κ gate dielectric** | 2007 (45nm): SiO₂ → HfO₂ | **gate tunneling leakage** (exp in `t_phys`) vs **`C_ox`** (linear in EOT) — one thickness, two currencies | **✅ BUILT (2026-07-17 — all 4 slices) as historical-mode B8** (`chip/high_k.py` + the `dielectric` knob + `demo_highk_history.py`); EOT identity (`device.py` untouched), per-material WKB tunneling, and the interfacial layer on **both** currencies → the honest EOT floor. **Roadmap card graduated** |
 | **F4** | **BEOL interconnect (RC delay)** | Al → **Cu damascene (1997)** → Ru (3nm) | **new output: chip speed limited by wire RC, not the transistor** | **✅ BUILT (2026-08-10 — all 4 slices) as historical-mode B9** (`chip/interconnect.py` + the `interconnect` knob + `spec.DelayBins` + `demo_beol_history.py`); two terms with no shared variable ⇒ `∂ln f/∂ln I_Dsat = 1 − wire_share`; Cu bought 0.64 of a node; then the **axis changed** — size effect + an unscalable barrier put barrierless Ru ahead below ~13 nm with 4× Cu's bulk ρ. **Roadmap card graduated** |
 | **F5** | **Strained silicon** (card: SiGe S/D) | 2003–04 (90nm): strain era | **mobility → `I_Dsat`** — the one factor in `I_Dsat` no process step has ever moved | **✅ BUILT (2026-08-10 — all 4 slices) as historical-mode B10** (`chip/strain.py` + the `strain` knob + `demo_strain_history.py`); `device.py` untouched (`mu_eff` defaulted since P4 — the seam predates the slice); carrier-generic enhancement factors with the hole leg **refused** on the n-channel device; the first game knob that re-grades the wafer on its own; and the era's ending — a delivered-drive **bracket** between two cited endpoints, decaying with `L`, against a model whose elasticity is 1 at every `L`. **Roadmap card graduated** |
-| **F6** | **Epitaxy (buried layer / retrograde well)** | bipolar epi; CMOS wells | retrograde profile — **overlaps implant F1** | COUPLED to F1 — defer standalone. **TRIGGER RECORDED (2026-09-06):** latchup trigger current reads substrate resistance ⇒ re-check F6's gate. |
+| **F6** | **Epitaxy (buried layer / retrograde well)** | bipolar epi; CMOS wells | **SPLIT THREE WAYS on re-check (2026-09-06)** — see below | **① resistance leg BUILT** (B12's `epi_substrate_resistance_ohm`, under-claimed by its own disclaimer); **② retrograde-well leg STILL DEFERRED** (genuinely overlaps F1 — the stated gate holds); **③ out-diffusion leg PROMOTABLE** — the handle's dopant diffuses up into the growing layer over `√(Dt) ≈ 0.05–0.7 µm`, while B12's modelled floor sits at **0.025 µm**, 12× thinner than the thinnest layer it sweeps ⇒ **out-diffusion is the only floor that can bind**. |
 | **F7** | **Isolation: LOCOS → STI** | LOCOS (1970s) → STI (1998) | bird's-beak narrows active width → geometry; latchup | **✅ BUILT — bird's beak (2026-07-10) as B5, and the latchup observable (2026-09-06) as B12** (`chip/latchup.py` + the `isolation` knob + `demo_latchup_history.py`; `latchup-isolation-f7.md`). The STI *process* (trench etch/fill) remains named-not-built: it would add no observable this does not already deliver. |
 | **F8** | **CMP / planarity** | enables Cu damascene | post-CMP thickness → `R ∝ 1/(W·H)` → `τ_wire` → the delay bins — **the reader F4 built** | **✅ BUILT (2026-08-19 → 2026-09-06 — all 4 slices) as historical-mode B11** (`chip/cmp.py` + the `cmp` knob + `demo_cmp_history.py` + `fab_game/demo_cmp_grading.py`; `cmp-planarity-f8.md`): the `s/(1−s)` forced overpolish, the wire's first per-die spread (one transistor, many delays), the damascene-only refusal, the short graded by radius, the window closing at `s_crit = L/(2+L)`, and — S4 — the **second** F4 clause to go: a per-die wire withdraws the rescue F4's common-mode wire gave the slow tail, so the wire now costs **parts**, not just grades. The published gate was **false on re-check** (the geometry was already an argument). **Roadmap card graduated** |
 | **F9** | **FinFET / GAA** | 2011 / 2022: 3-D channel | needs the **3-D engine** (deferred B1) + `device_2d` extension | DEFERRED — no 3-D consumer yet |
@@ -121,13 +121,78 @@ been in `locos_history.py` since B5, so the LOCOS→STI *geometry* contrast need
 gate on this page found open by someone going to build, and the fourth found by a person rather than a
 test. What was genuinely missing was the electrical observable, and that is what B12 built.
 
-**The list's honest state now:** F6 is coupled to F1 but **carries a recorded trigger** (B12's trigger
-current reads substrate resistance — a consumer that has nothing to do with profile shape; whether F6's
-stated deferral reason survives it is for whoever picks the card up to settle against the tree, and this
-plan makes no claim about it). F7's remainder is **built**; only the trench *process* is left, and it
+**The list's honest state now:** F6's recorded trigger was **settled on 2026-09-06** — see the F6
+re-check section below; the card is now split three ways (one leg built, one still deferred on the
+original reason, one promotable). F7's remainder is **built**; only the trench *process* is left, and it
 adds no observable. F9 still wants the 3-D engine — checked against the tree on 2026-09-06 and the gate
 **genuinely stands** (`engines/diffusion/` holds only `diffusion1d.py` and `diffusion2d.py`). F10 still
 adds no observable litho lacks.
+
+## The F6 re-check (2026-09-06) — the trigger settled, and the card split three ways
+
+B12 recorded a trigger against F6 ("latchup trigger current reads substrate resistance ⇒ re-check F6's
+gate") without arguing it. This is that argument. **The verdict is not the house released-gate pattern**
+— this is the fifth time a card has been picked up, but unlike F8's and F7's, F6's *stated* gate was
+**not** found released. It was found to be **aimed at only one of three legs**.
+
+### The gate holds where it was aimed
+
+F6's stated deferral reason is *"retrograde profile — **overlaps implant F1**"*. B12's consumer reads
+**resistance**, not profile — and `chip/latchup.py:325` already says so in its own words ("It is not an
+epitaxy *process* and it is not F6. Nothing about the doping profile the device sees changes"). Two
+different quantities. So the recorded trigger fires on something the stated gate never covered, and the
+**retrograde-well leg stays deferred on its original, still-correct reason**. Nothing here promotes it.
+
+### What the re-check actually found — the floor B12 asserted cannot bind
+
+`epi_substrate_resistance_ohm` keeps two terms, `ρ_epi·t_epi/A + ρ_handle·path/A`, and B12's finding was
+that the second is a **floor**: thinning the grown layer stops paying. That is true, and it is derived,
+not asserted. But **where** it stops paying was never computed. Setting the two terms equal:
+
+    ρ_epi·t_epi = ρ_handle·path   ⇒   t_epi = 0.01 Ω·cm × 25 µm / 10 Ω·cm = **0.025 µm**
+
+`EPI_SWEEP_UM` runs 0.3 → 40 µm. The floor sits **12× below the thinnest layer the figure plots**, and at
+that thinnest point the trigger current (77.5 mA) is still only **7.7 % of the floor-limited value**
+(1008 mA). So across the entire range anyone would grow, the reward for thinning is steep, monotone and
+**unopposed** — the model contains no mechanism that stops a player from asking for an arbitrarily thin
+layer and collecting the immunity.
+
+**The demo caption overstates this, and is corrected as part of this finding.** Panel C of
+`demo_latchup_history.py` annotates the floor line with *"thinning the layer stops paying here"* — a
+horizontal line the plotted curve never comes within a factor of 13 of. Not an error (the floor is real
+and the asymptotic claim is right); an annotation that reads as though the floor were the operative limit
+inside the plotted window, when it is 12× outside it.
+
+### The promotable leg: out-diffusion is the only floor that can bind
+
+Real epitaxy cannot deliver the thin layer the model rewards, and the reason is a *doping-profile* effect
+with a *resistance* consumer — which is why it belongs to neither existing leg. While the layer grows at
+~1050–1150 °C, the heavily-doped handle underneath is a near-infinite dopant source diffusing **up** into
+it. Using the tree's own Fair Arrhenius `D(T)` (`chip/diffusion_dopant.py`) and the v1.3 charge-state
+`D(N)` for a handle at 1e19–1e20 cm⁻³ (`chip/diffusion_highconc.py`):
+
+| handle dopant | `√(Dt)` over 1050–1150 °C, 10–30 min, N = 1e19–1e20 |
+|---|---|
+| **Sb** (the real buried-layer dopant) | **0.013 – 0.27 µm** |
+| **B** | **0.055 – 0.69 µm** |
+
+**What is robust here is the gap, not any single number.** The growth temperature and time are house
+choices, and a floor value quoted from them would be a fitted number dressed as a derived one. The claim
+that survives that objection is the **order of magnitude**: out-diffusion reaches 0.05–0.7 µm while the
+modelled floor is 0.025 µm, and *no* plausible T/t closes 12×. The **dopant split is the discriminator**
+and it is self-validating — antimony out-diffuses least, which is precisely why antimony is the dopant
+real fabs use for buried layers. A model that reproduces "Sb barely creeps, B creeps far more" is reading
+the physics that chose the process, not fitting the answer.
+
+**Consumer:** the existing latchup trigger current, unchanged. **New observable:** a *minimum usable
+grown-layer thickness* — and with it the honest ceiling on substrate-borne latchup immunity that B12's
+own figure currently shows as unbounded. **Overlap with F1: none.** An implant puts a buried peak into a
+uniform wafer; this is up-diffusion from a semi-infinite source into a **growing** layer (a moving
+boundary, the shape `chip/coupling.py` already handles for oxidation), and its consumer is a *thickness
+floor*, not a profile shape.
+
+**Still gated, and honestly:** no source is cited for epi out-diffusion yet, and the growth T/t need a
+citation before they stop being house numbers. **This section promotes the leg; it does not build it.**
 
 ## The historical/educational spine (the game's timeline)
 

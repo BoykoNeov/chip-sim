@@ -322,11 +322,21 @@ def epi_substrate_resistance_ohm(rho_epi_ohm_cm: float, t_epi_um: float,
     thins, and it does not: the heavily-doped substrate's own term is a **floor**, which is why thinning
     the layer stops helping. That floor is derived here, not asserted.
 
-    **What this is not.** It is not an epitaxy *process* and it is not F6. Nothing about the doping
+    **What this is not.** It is not an epitaxy *process* and it is not F6's retrograde-well leg. Nothing about the doping
     profile the device sees changes — no buried layer, no retrograde well, no ``V_t`` shift. This
     function changes one resistance. The cited **optimum** epi thickness (a real effect) is **not**
     reproduced: it involves the vertical pnp this model does not carry, so what is supportable here is
     only that thinner is monotonically better down to the floor.
+
+    **And that floor does not bind (F6 re-check, 2026-09-06).** Setting the two terms equal puts it at
+    ``t_epi = rho_handle*path/rho_epi`` = **0.025 um** at the era numbers -- 12x below the thinnest layer
+    :mod:`chip.demo_latchup_history` sweeps, where the trigger is still only 7.7 % of the floor-limited
+    value. So "monotonically better down to the floor" is true and *operationally vacuous*: across every
+    thickness anyone actually grows, the reward for thinning is unopposed **in this model**. What stops
+    it in a real fab is the handle's dopant **out-diffusing up into the growing layer**
+    (``sqrt(Dt) ~ 0.05-0.7 um``) -- a doping-profile effect with a resistance consumer, which is why it
+    belongs to neither leg named above and is the promotable third leg of the split F6 card. See
+    ``docs/plans/future-steps.md`` -> "The F6 re-check". **Not built here.**
     """
     if rho_epi_ohm_cm <= 0.0:
         raise ValueError(f"rho_epi_ohm_cm must be > 0, got {rho_epi_ohm_cm}")

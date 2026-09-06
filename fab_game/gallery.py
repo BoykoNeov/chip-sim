@@ -123,6 +123,10 @@ DEEPENINGS = [
     Demo("demo_reverse_recovery", "S5",
          "The lifetime inversion: reverse recovery t_rr ∝ τ reads the SAME lifetime the leakage does, "
          "opposite way — a short τ is a leaky logic reject but a fast power rectifier (the killer is the feature)."),
+    Demo("demo_latchup_trap", "B12",
+         "The deliberate wafer kill: the latchup crossing falls INSIDE the high-res part's own window, so "
+         "the lightest sliver of a legitimate spec is a wafer that passes every published criterion and is "
+         "still scrap — all dies or none, because the resistivity that decides it is one number per wafer."),
     Demo("demo_cmp_grading", "F8",
          "One wafer graded three ways: the polished wire withdraws the rescue F4's ideal wire gave the "
          "slow tail, so parts stop shipping — a yield loss neither the transistor spread nor the polisher "

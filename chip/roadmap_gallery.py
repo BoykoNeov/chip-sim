@@ -123,13 +123,20 @@ class Slice:
 SLICES = [
     Slice(
         fid="F6", era="bipolar epi · CMOS wells", title="Epitaxy (buried layer / retrograde well)",
-        status="Coupled to F1", badge="part",
+        status="Split 3 ways (re-checked 2026-09-06)", badge="part",
         blurb="An epitaxial layer over a doped substrate makes buried layers and retrograde "
-              "wells — profiles a surface predep cannot reach.",
-        would_add="The retrograde/buried-peak profile — but ion implantation (F1, BUILT) already "
-                  "delivers exactly that contrast.",
-        gate="Overlaps F1's consumer: a standalone epi slice stays deferred until it would "
-             "discriminate something implant does not.",
+              "wells — profiles a surface predep cannot reach. Re-checking B12's recorded trigger "
+              "found this card had been bundling three separate legs behind one gate. NOTE: the "
+              "schematic above depicts the retrograde-well leg, which is the leg that stays deferred; "
+              "the promotable leg is a different mechanism the picture does not show.",
+        would_add="One leg is already BUILT (the layer as a latchup resistance, B12-S4). The "
+                  "retrograde/buried-peak profile leg adds nothing implant (F1) does not. The third "
+                  "leg — out-diffusion from the doped handle into the growing layer — is PROMOTABLE: "
+                  "it sets a minimum usable layer thickness, and so the ceiling on substrate-borne "
+                  "latchup immunity that B12's own figure currently shows as unbounded.",
+        gate="The F1 overlap still gates the retrograde-well leg, and only that leg. The promotable "
+             "leg is gated instead on a citation: epi out-diffusion, and the growth temperature and "
+             "time it rides, are house numbers until sourced.",
     ),
     Slice(
         fid="F7", era="1998 · STI", title="Isolation remainder: the STI process itself",
