@@ -450,6 +450,19 @@ python -m chip.demo_junction   <span class="c"># prints the table, banks docs/fi
           </div>
         </article>
         <article class="card">
+          <a class="shot" href="figures/chip-latchup-history.png" title="open the full figure">
+            <img src="figures/thumbs/chip-latchup-history.webp" width="760" height="270" alt="hist·B12 — demo_latchup_history figure" loading="lazy" decoding="async">
+          </a>
+          <div class="body">
+            <span class="tag">hist·B12</span>
+            <details class="expand"><summary><span class="blurb">CMOS latchup — the bill STI&#x27;s density came with: the device-to-well spacing it saved is a parasitic transistor&#x27;s base width, so packing tighter raises the loop gain (the trench detour buys back ~85% of it, and no more). But the gain is not what decides — the trigger condition I·R_sub &gt; 0.7 V rides the substrate resistivity, one number per wafer, so latchup is all dies or none and the lever is the substrate (a thin lightly-doped layer on a heavily-doped one), never the isolation.</span></summary></details>
+            <div class="links">
+              <code>python -m chip.demo_latchup_history</code>
+              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/chip/demo_latchup_history.py">source&nbsp;&#8599;</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
           <a class="shot" href="figures/chip-silicide-history.png" title="open the full figure">
             <img src="figures/thumbs/chip-silicide-history.webp" width="760" height="270" alt="hist·B7 — demo_silicide_history figure" loading="lazy" decoding="async">
           </a>

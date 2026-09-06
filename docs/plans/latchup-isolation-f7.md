@@ -215,11 +215,17 @@ geometry:
 
 | | device-to-well spacing | parasitic base | loop gain | vs LOCOS |
 |---|---|---|---|---|
-| LOCOS (must leave room for the beak) | 3.00 µm | 3.00 µm | 6.40e11 | — |
-| STI, trench ignored | 2.00 µm | 2.00 µm | 1.44e12 | **2.25× = (3.0/2.0)²** |
-| STI, trench counted | 2.00 µm | 2.70 µm | 7.90e11 | **1.235× = (3.0/2.7)²** |
+| LOCOS (drawn 2.0 + **B5's computed beak** 0.926) | 2.926 µm | 2.926 µm | 6.73e11 | — |
+| STI, trench ignored | 2.00 µm | 2.00 µm | 1.44e12 | **2.140× = (2.926/2.0)²** |
+| STI, trench counted | 2.00 µm | 2.70 µm | 7.90e11 | **1.174× = (2.926/2.7)²** |
 
-**The trench pays back 81 % of the density penalty — and no more.** That is the honest era sentence:
+**LOCOS's spacing is not a house constant.** It is the drawn width plus the bird's beak
+:mod:`chip.locos_history` already computes at its reference recipe (0.926 µm, the beak eating active
+area from both edges), pinned as `chip.latchup.LOCOS_BEAK_ALLOWANCE_UM` so the game need not run a 2-D
+solve per wafer, with a test asserting it still matches B5. **That is what makes B12 the second half of
+B5 rather than a module beside it** — the spacing LOCOS gives up is the beak B5 computed.
+
+**The trench pays back 85 % of the density penalty — and no more.** That is the honest era sentence:
 the successor did not merely trade one wall for another, it *partly* paid for what it took, and the
 remainder is the bill. Both halves are asserted (the trench helps; it does not get back under LOCOS),
 because either alone misrepresents it.
@@ -283,7 +289,31 @@ may not be the same dies. Whether the new failure is **correlated or independent
 costs yield or merely re-labels dies already lost — the question F8's S4 asked of the wire, asked of
 the substrate.
 
-### S3 — B12: the era figure on the timeline
+### S3 — B12: the era figure on the timeline — ✅ **BUILT 2026-09-06**
+
+`chip/demo_latchup_history.py` + `chip/tests/test_demo_latchup_history.py` (11 legs), picked up by the
+existing `demo_*_history.py` glob, and a `HistoryMode` rung placed **immediately after B5** rather than
+in tag order — the timeline should read the isolation arc as one story, not two topics separated by
+five unrelated rungs. The thumbnail manifest guard fired on the new figure exactly as designed
+(`no thumbnail for figures/chip-latchup-history.png — run python -m chip.thumbnails`), so the figure,
+its thumbnail and both gallery editions are regenerated and committed together.
+
+**The figure's structure is the finding, restated visually: the panel that moves is not the panel that
+decides.** Left, the parasitic gain against base width, with the three era points on one curve and the
+between-scheme *ratios* labelled (they are coefficient-free; the axis is labelled as a bound and the
+absolute values are explicitly not a claim). Right, the trigger current against substrate resistivity,
+with the disturbance drawn as a line and the isolation scheme **absent from the panel entirely**.
+
+**The demo composes from B5 rather than restating it.** It calls `locos_history.birds_beak_length_um`
+for LOCOS's allowance, and a test asserts that chain — because if it broke, the figure would silently
+become two house numbers being compared, which is exactly the failure the rung exists to avoid.
+
+**Two things the panels deliberately refuse.** The right panel quotes **no crossing point** (it rides
+the flagged tap geometry) and the band it draws for this simulator's own boule sits comfortably on the
+safe side — asserted, so the figure cannot drift into implying this line is in danger. The left panel
+labels its y-axis as an upper bound in the axis text itself, not in a footnote.
+
+### S3 — the original sketch, retained
 
 `chip/demo_latchup_history.py`, picked up by the existing `demo_*_history.py` glob in
 `chip/history_gallery.py` (H0's shared consumer — no gallery machinery changes). The rung reads

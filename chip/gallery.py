@@ -115,6 +115,13 @@ DEEPENINGS = [
          "Period photoresist — negative-resist (KTFR) solvent swelling bridges fine lines at a floor ≈ the film thickness (optics-independent); positive/CAR don't swell and clear it."),
     Demo("demo_locos_history", "hist·B5",
          "LOCOS isolation — oxidant under the nitride mask grows the bird's beak that eats active area; opposing beaks merge and pinch off below a min pitch (∝ field-oxide thickness); STI's vertical walls clear it."),
+    Demo("demo_latchup_history", "hist·B12",
+         "CMOS latchup — the bill STI's density came with: the device-to-well spacing it saved is a "
+         "parasitic transistor's base width, so packing tighter raises the loop gain (the trench detour "
+         "buys back ~85% of it, and no more). But the gain is not what decides — the trigger condition "
+         "I·R_sub > 0.7 V rides the substrate resistivity, one number per wafer, so latchup is all dies "
+         "or none and the lever is the substrate (a thin lightly-doped layer on a heavily-doped one), "
+         "never the isolation."),
     Demo("demo_silicide_history", "hist·B7",
          "Silicide / contact resistance — the source series-R is two terms with different R_sh exponents (access linear + TLM contact sublinear); salicide shunts the sheet so access collapses and the bottleneck flips to the contact."),
     Demo("demo_highk_history", "hist·B8",

@@ -83,6 +83,12 @@
   "source": "chip-junction.png",
   "width": 760
  },
+ "chip-latchup-history.webp": {
+  "digest": "f722916f5ee90821",
+  "height": 270,
+  "source": "chip-latchup-history.png",
+  "width": 760
+ },
  "chip-lateral-diffusion.webp": {
   "digest": "0cbfc4c21842db15",
   "height": 351,

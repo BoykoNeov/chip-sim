@@ -134,6 +134,32 @@ MODES = [
         "the litho floor.",
     ),
     HistoryMode(
+        module="demo_latchup_history", tag="B12", stage="Isolation — the bill", era="≈1980s–90s",
+        period="The rung above ends with STI clearing LOCOS's packing floor: no beak, so the active width "
+        "is the drawn width and devices can finally sit as close as lithography allows. This rung is what "
+        "that density cost — because the spacing between an n-channel device and its neighbouring well is "
+        "not only a layout dimension, it is the base width of a parasitic transistor nobody drew.",
+        wall="Between the two devices sits a four-layer pnpn structure — a lateral npn cross-coupled with a "
+        "vertical pnp — which can latch into a self-sustaining short from supply to ground and destroy the "
+        "part. Two conditions must both hold, and they are moved by different processes: the loop gain "
+        "β_npn·β_pnp must exceed 1 (set by spacing, so packing tighter makes it worse), and enough current "
+        "must flow through the substrate to the nearest tap to forward-bias a junction, I·R_sub > 0.7 V "
+        "(set by substrate doping, which the spacing does not touch). Pulling the devices together raises "
+        "the first and leaves the second alone. The trench itself helps — an injected carrier must detour "
+        "down one wall and up the other, lengthening the base — but it buys back only ~85 % of what the "
+        "density took, and the remainder is the bill.",
+        successor="The substrate, not the isolation. A lightly-doped wafer makes the current run a long way "
+        "sideways to reach a tap; growing a thin lightly-doped layer on a heavily-doped substrate replaces "
+        "that lateral run with a short vertical hop into what is nearly a short circuit, collapsing R_sub "
+        "and raising the trigger current — together with guard rings and dense substrate taps, all of them "
+        "measures on the same resistive condition. That is the era's real answer: the lever that moves the "
+        "condition which decides is the substrate, and every knob on the isolation moves the one that does "
+        "not. [In this model the gain condition never discriminates at all — with ideal emitters and a base "
+        "far shorter than a diffusion length it sits orders above the criterion at every geometry, which is "
+        "what an unbounded gain must give and is not a finding. Only its *ratios* between schemes are "
+        "quoted, and those are coefficient-free.]",
+    ),
+    HistoryMode(
         module="demo_highk_history", tag="B8", stage="Gate dielectric", era="≈2000s",
         period="Thermal SiO₂ as the gate dielectric, scaled thinner at every node — the electrical gate "
         "(the capacitance) and the physical tunnel barrier are the same single layer.",

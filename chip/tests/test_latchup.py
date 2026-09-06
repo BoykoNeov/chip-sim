@@ -256,10 +256,23 @@ def test_seam_no_physics_module_depends_on_latchup():
     root = pathlib.Path(__file__).resolve().parents[2]
     importers = []
     for path in sorted((root / "chip").glob("*.py")):
-        if path.name == "latchup.py":
+        # latchup.py itself, and its own banked demo, are the module — not dependents of it.
+        if path.name in {"latchup.py", "demo_latchup_history.py"}:
             continue
         text = path.read_text(encoding="utf-8")
         if re.search(r"^\s*(from\s+\S*\s+import\s+[^\n]*\blatchup\b|import\s+\S*\blatchup\b)",
                      text, re.MULTILINE):
             importers.append(path.relative_to(root).as_posix())
     assert importers == [], f"a chip/ physics module now depends on chip.latchup — {importers}"
+
+
+def test_the_locos_allowance_still_matches_the_beak_b5_computes():
+    """:data:`chip.latchup.LOCOS_BEAK_ALLOWANCE_UM` is B5's bird's beak, pinned so the game need not run
+    a 2-D solve per wafer. This is the test that stops the pin drifting away from the module it came
+    from — which is what makes B12 the second half of B5 rather than a module beside it.
+
+    Imports :mod:`chip.locos_history` (a 2-D solve), so it is the one slow leg in this file.
+    """
+    from chip import locos_history as lh
+    beak = lh.birds_beak_length_um(lh.field_oxide_thickness_um())
+    assert latchup.LOCOS_BEAK_ALLOWANCE_UM == pytest.approx(2.0 * beak, rel=0.01)

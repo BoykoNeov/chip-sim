@@ -710,7 +710,7 @@ class IsolationKnobs:
 
     scheme: str | None = None              # None = no isolation step (the seam); "locos" | "sti"
     drawn_spacing_um: float = 2.0          # layout n⁺-to-well spacing
-    beak_allowance_um: float = 1.0         # what LOCOS must leave for the encroachment it cannot avoid
+    beak_allowance_um: float = latchup.LOCOS_BEAK_ALLOWANCE_UM   # B5's computed beak, both edges — not a house guess
     injected_current_a: float = 2.0e-3     # the disturbance the part must survive (given, not modelled)
 
     def __post_init__(self) -> None:

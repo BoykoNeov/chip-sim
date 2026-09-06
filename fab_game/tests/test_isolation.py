@@ -203,9 +203,11 @@ def test_the_between_scheme_gain_ratio_is_coefficient_free():
     changes between schemes. ``L`` cancels, which means the ratio is independent of the lifetime, of
     ``D``, of the γ=1 idealization, and of the flagged tap geometry (which is not in it at all).
 
-    So where the absolute loop gain is a useless upper bound (10⁴–10¹²), this ratio is pure geometry:
-    STI without a trench is (3.0/2.0)² = **2.25×** LOCOS, and the trench brings it to
-    (3.0/2.7)² = **1.235×** — the trench paying back ~81 % of the density penalty and no more.
+    So where the absolute loop gain is a useless upper bound (10⁴–10¹²), this ratio is pure geometry.
+    LOCOS's spacing is not a house guess — it is the drawn 2.0 µm plus the bird's beak B5 computes
+    (0.926 µm, both edges), so 2.926 µm. STI without a trench would be (2.926/2.0)² = **2.14×** LOCOS,
+    and the trench brings it to (2.926/2.7)² = **1.174×** — the trench paying back ~85 % of the density
+    penalty and no more.
 
     The cancellation is exact only in the **short-base limit**, and the second assertion below pins it
     at the precision it is really true rather than the one that sounds better: across four orders of
