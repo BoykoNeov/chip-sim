@@ -276,3 +276,77 @@ def test_the_locos_allowance_still_matches_the_beak_b5_computes():
     from chip import locos_history as lh
     beak = lh.birds_beak_length_um(lh.field_oxide_thickness_um())
     assert latchup.LOCOS_BEAK_ALLOWANCE_UM == pytest.approx(2.0 * beak, rel=0.01)
+
+
+# --------------------------------------------------------------------------- #
+# S4 — the substrate lever: an epi layer on a heavily-doped handle
+# --------------------------------------------------------------------------- #
+def test_the_epi_substrate_is_dominated_by_the_thickness_ratio_but_is_not_exactly_it():
+    """The claim is **dominated by** ``t_epi / L_tap``, not equal to it — and the difference is the point.
+
+    A uniform lightly-doped wafer runs the current the whole tap path sideways through high
+    resistivity; an epi layer on a heavily-doped handle replaces that with a short vertical hop. With
+    the layer's resistivity equal to the old wafer's, ρ cancels and the improvement is *close to*
+    ``L_tap / t_epi`` — but not equal, because the heavily-doped handle still contributes its own
+    series term. The gap between the two IS that term, and asserting equality would erase it.
+    """
+    rho_epi, rho_handle = 10.0, 0.01
+    uniform = latchup.substrate_resistance_from_resistivity_ohm(rho_epi)
+    for t_um in (10.0, 5.0, 2.0):
+        r_epi = latchup.epi_substrate_resistance_ohm(rho_epi, t_um, rho_handle)
+        geometric = latchup.SUBSTRATE_TAP_PATH_UM / t_um
+        improvement = uniform / r_epi
+        assert improvement == pytest.approx(geometric, rel=0.02)   # dominated by it ...
+        assert improvement < geometric                              # ... and always short of it.
+
+
+def test_thinning_the_epi_helps_monotonically_but_runs_into_the_handles_own_floor():
+    """Thinner is monotonically better — and stops paying, which is why the model does not pretend to
+    reproduce the literature's *optimum* thickness (that needs the vertical pnp it does not carry).
+
+    The floor is derived, not asserted: as ``t_epi → 0`` the resistance tends to the handle's own
+    lateral term, so the trigger current cannot exceed what that term allows.
+    """
+    rho_epi, rho_handle = 10.0, 0.01
+    triggers = [latchup.trigger_current_a(latchup.epi_substrate_resistance_ohm(rho_epi, t, rho_handle))
+                for t in (20.0, 10.0, 5.0, 2.0, 1.0, 0.2)]
+    assert all(a < b for a, b in zip(triggers, triggers[1:]))       # monotone ...
+
+    floor_r = latchup.substrate_resistance_from_resistivity_ohm(rho_handle)
+    ceiling = latchup.trigger_current_a(floor_r)
+    assert max(triggers) < ceiling                                  # ... and bounded by the handle.
+
+    # The floor is not merely respected, it is exactly the handle's own term: everything above it is
+    # the vertical hop through the layer, which is an identity rather than a limit to sneak up on.
+    # (A 1 nm "epi" would approach the floor numerically but means nothing physically, so the identity
+    # is the honest way to pin it.)
+    for t_um in (5.0, 1.0, 0.2):
+        r_epi = latchup.epi_substrate_resistance_ohm(rho_epi, t_um, rho_handle)
+        vertical = rho_epi * (t_um / latchup.UM_PER_CM) / (latchup.TAP_CROSS_SECTION_UM2 / latchup.UM_PER_CM ** 2)
+        assert r_epi - floor_r == pytest.approx(vertical, rel=1e-12)
+
+
+def test_the_epi_lever_is_still_silent_on_spacing_and_on_the_gain():
+    """S4 changes one resistance and nothing else — the module's central refusal survives the finale."""
+    a = latchup.latchup_margin(1.0, None, 1e-6, rho_ohm_cm=10.0)
+    b = latchup.latchup_margin(9.0, None, 1e-6, rho_ohm_cm=10.0)
+    assert a.r_sub_ohm == b.r_sub_ohm            # spacing still cannot move the resistance
+    assert a.loop_gain != b.loop_gain            # and the gain is still the only thing it moves
+
+
+def test_latchup_margin_refuses_two_substrates_or_none():
+    """The substrate goes in exactly one way — doping or resistivity, never both, never neither."""
+    with pytest.raises(ValueError):
+        latchup.latchup_margin(2.0, 1e15, 1e-6, rho_ohm_cm=10.0)
+    with pytest.raises(ValueError):
+        latchup.latchup_margin(2.0, None, 1e-6)
+
+
+@pytest.mark.parametrize("call", [
+    lambda: latchup.epi_substrate_resistance_ohm(0.0, 5.0, 0.01),
+    lambda: latchup.epi_substrate_resistance_ohm(10.0, 0.0, 0.01),
+    lambda: latchup.epi_substrate_resistance_ohm(10.0, 5.0, 0.0),
+])
+def test_bad_epi_input_raises(call):
+    with pytest.raises(ValueError):
+        call()

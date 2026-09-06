@@ -484,6 +484,20 @@ mode**. Full plan: [`docs/plans/microchip-fabrication.md`](../../docs/plans/micr
   (loose)* = the O(1) operating-point factor `ln(1+I_F/I_R)`, flagged. The transit-limited **fall time** `t_f`
   (does not scale with `τ`), constant-`I_R` switching, and high-injection ambipolar effects are named scope
   edges. Reads the same `τ` the G4b leakage does, opposite way. Cited: `[[reverse-recovery-source]]`.
+- **Roadmap slice F7 remainder — CMOS latchup (historical-mode B12): all 4 slices BUILT** (2026-09-06).
+  `latchup.py` — the two cited conditions, deliberately **uncoupled**: the sustaining loop gain
+  `β_npn·β_pnp > 1` (moved by spacing) and the triggering drop `I·R_sub > 0.7 V` (moved by substrate
+  doping). `R_sub` is the tap path, the spacing is n⁺-to-well: different lengths, and the module asserts
+  the decoupling mechanically in both directions. The gain rides `L = √(Dτ)` from `lifetime.py` and a
+  base-transport closed form with **no fitted prefactor** — and the module states plainly that it is an
+  upper bound so loose it never discriminates (γ = 1, `W_B ≪ L`), because recombination is not what limits
+  these parasitics, geometry is. So only its *ratios* are quoted, and those are coefficient-free. The
+  trigger is the binding condition, and the game's `IsolationKnobs` makes latchup a **wafer-level** scrap
+  (the only discriminating quantity is one number per wafer) with the per-die gain recorded *and* recorded
+  as grading nothing. LOCOS's spacing is B5's computed beak, not a house number
+  (`LOCOS_BEAK_ALLOWANCE_UM`, pinned against `locos_history`). + `demo_latchup_history.py`
+  (`docs/figures/chip-latchup-history.png`), the B12 timeline rung. Plan and findings:
+  `docs/plans/latchup-isolation-f7.md`. Cited: `[[latchup-source]]`.
 - **Roadmap slice F8 — CMP / planarity (historical-mode B11): S1–S3 BUILT** (2026-08-19 → 2026-09-02).
   `cmp.py` — Preston removal, the clear-everywhere requirement as a closed form (`overpolish/t_over =
   s/(1−s)`, no house constant, exactly zero for a uniform polish), the two-sided window and its collapse at

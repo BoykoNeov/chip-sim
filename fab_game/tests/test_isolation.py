@@ -234,3 +234,71 @@ def test_the_between_scheme_gain_ratio_is_coefficient_free():
         return latchup.bipolar_gain(sti_w, L) / latchup.bipolar_gain(locos_w, L)
     assert ratio(1.0e-3) == pytest.approx(ratio(1.0e-7), rel=1.0e-3)
     assert abs(ratio(1.0e-3) / ratio(1.0e-7) - 1.0) < 5.0e-4
+
+
+# --------------------------------------------------------------------------- #
+# S4 — the substrate is the lever the isolation cannot be
+# --------------------------------------------------------------------------- #
+def test_the_epi_substrate_rescues_a_wafer_the_isolation_could_not_save():
+    """The finale, as a composition: **the same wafer, the same disturbance, the same isolation.**
+
+    Only the substrate changes — a uniform wafer becomes a thin lightly-doped layer on a heavily-doped
+    handle — and the part that was scrapped survives. Nothing about the isolation scheme could have
+    done this, which is the rung's whole claim.
+    """
+    trigger_ma = _iso_summary(_run("sti"))["i_trigger_ma"]
+    hit = 2.0 * trigger_ma * 1e-3                     # a disturbance this line cannot take
+
+    doomed = _run("sti", injected_current_a=hit)
+    assert _iso_summary(doomed)["latched"] is True
+    assert not any(d.verdict.passed for d in doomed.dies)
+
+    rescued = _run("sti", injected_current_a=hit, epi_thickness_um=2.0)
+    assert _iso_summary(rescued)["latched"] is False
+    assert all(d.verdict.passed for d in rescued.dies)
+
+
+def test_the_rescue_is_the_substrate_and_provably_not_the_geometry():
+    """The rescue moves the resistance and leaves the gain **exactly** untouched — so it cannot be
+    mistaken for the isolation change doing the work."""
+    hit = dict(injected_current_a=0.1)
+    uniform = _iso_summary(_run("sti", **hit))
+    epi = _iso_summary(_run("sti", epi_thickness_um=2.0, **hit))
+    assert epi["r_sub_ohm"] < uniform["r_sub_ohm"]
+    assert epi["i_trigger_ma"] > uniform["i_trigger_ma"]
+    assert epi["loop_gain_max"] == uniform["loop_gain_max"]      # the gain did not move at all
+    assert epi["loop_gain_min"] == uniform["loop_gain_min"]
+
+
+def test_the_substrate_lever_changes_no_device_measurement():
+    """It is one resistance, not an epitaxy process. Every per-die number the transistor produces is
+    identical — which is exactly why this slice is **not** F6 (that would change the profile the
+    device sits in, and this does not)."""
+    off = _run("sti")
+    on = _run("sti", epi_thickness_um=2.0)
+    for a, b in zip(off.dies, on.dies):
+        assert (a.cd_nm, a.V_t, a.i_dsat, a.tau, a.j_leak) == (b.cd_nm, b.V_t, b.i_dsat, b.tau, b.j_leak)
+
+
+def test_thinner_epi_is_monotonically_safer_through_the_whole_pipeline():
+    """The module's direction, asserted end-to-end rather than in isolation."""
+    triggers = [_iso_summary(_run("sti", epi_thickness_um=t))["i_trigger_ma"]
+                for t in (20.0, 10.0, 5.0, 2.0)]
+    assert all(a < b for a, b in zip(triggers, triggers[1:]))
+
+
+@pytest.mark.parametrize("kwargs", [
+    dict(scheme="sti", epi_thickness_um=0.0),
+    dict(scheme="sti", epi_thickness_um=-1.0),
+    dict(scheme="sti", handle_resistivity_ohm_cm=0.0),
+])
+def test_bad_substrate_knobs_raise(kwargs):
+    with pytest.raises(ValueError):
+        IsolationKnobs(**kwargs)
+
+
+def test_the_seam_still_holds_with_the_substrate_lever_present():
+    """``epi_thickness_um=None`` is the default: the uniform wafer the rest of the sim models."""
+    assert IsolationKnobs().epi_thickness_um is None
+    assert IsolationKnobs(scheme="sti").substrate_resistance_ohm(10.0) == \
+        latchup.substrate_resistance_from_resistivity_ohm(10.0)

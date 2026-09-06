@@ -156,6 +156,16 @@ LOOP_GAIN_CRITICAL: float = 1.0
 # CITED — shallow-trench isolation depth, 250–400 nm for 0.25/0.18 µm-generation STI. Mid-band.
 STI_DEPTH_UM: float = 0.35
 
+# DERIVED FROM B5, pinned as a constant — twice the bird's-beak length chip.locos_history computes at
+# its reference field-oxidation recipe (2 × birds_beak_length_um(field_oxide_thickness_um()) = 0.926 µm,
+# the beak eating active area from BOTH edges of the isolation region). It is a *pinned* number rather
+# than a live call because the beak costs a 2-D solve and the game would pay it per wafer; a test asserts
+# it still matches chip.locos_history, so the two modes cannot drift apart silently.
+#
+# This is what makes B12 the second half of B5 rather than a module beside it: the spacing LOCOS gives
+# up is not a house guess, it is the beak B5 already computed.
+LOCOS_BEAK_ALLOWANCE_UM: float = 0.926
+
 # FLAGGED — the vertical pnp's base width is the well depth, and this sim has no well. A period
 # n-well is a few µm deep; this stands in for the structure. Enters β_pnp only.
 WELL_DEPTH_UM: float = 3.0
@@ -290,6 +300,45 @@ def substrate_resistance_ohm(N_sub: float, *, path_um: float = SUBSTRATE_TAP_PAT
     """
     return substrate_resistance_from_resistivity_ohm(
         resistivity_ohm_cm(N_sub, dopant), path_um=path_um, area_um2=area_um2)
+
+
+def epi_substrate_resistance_ohm(rho_epi_ohm_cm: float, t_epi_um: float,
+                                 rho_substrate_ohm_cm: float, *,
+                                 path_um: float = SUBSTRATE_TAP_PATH_UM,
+                                 area_um2: float = TAP_CROSS_SECTION_UM2) -> float:
+    """``R_sub`` (Ω) for a lightly-doped **epitaxial layer on a heavily-doped substrate** — the lever.
+
+    The cited prevention measure (TU Graz: *"EPI layer is more lightly doped than the substrate that is
+    highly doped"*), as the only thing it is in this model: a **resistance in two series pieces**.
+
+    A uniform lightly-doped wafer makes the current run the whole tap path *sideways* through high
+    resistivity. Grow a thin lightly-doped layer on a heavily-doped substrate and the current instead
+    hops **straight down** through the thin layer into what is nearly a short, then travels the tap path
+    through the low-resistivity substrate::
+
+        R = ρ_epi·t_epi/A   (down through the layer)  +  ρ_sub·path/A   (sideways underneath)
+
+    Both terms are kept. Dropping the second would make the resistance fall without limit as the layer
+    thins, and it does not: the heavily-doped substrate's own term is a **floor**, which is why thinning
+    the layer stops helping. That floor is derived here, not asserted.
+
+    **What this is not.** It is not an epitaxy *process* and it is not F6. Nothing about the doping
+    profile the device sees changes — no buried layer, no retrograde well, no ``V_t`` shift. This
+    function changes one resistance. The cited **optimum** epi thickness (a real effect) is **not**
+    reproduced: it involves the vertical pnp this model does not carry, so what is supportable here is
+    only that thinner is monotonically better down to the floor.
+    """
+    if rho_epi_ohm_cm <= 0.0:
+        raise ValueError(f"rho_epi_ohm_cm must be > 0, got {rho_epi_ohm_cm}")
+    if t_epi_um <= 0.0:
+        raise ValueError(f"t_epi_um must be > 0, got {t_epi_um}")
+    if rho_substrate_ohm_cm <= 0.0:
+        raise ValueError(f"rho_substrate_ohm_cm must be > 0, got {rho_substrate_ohm_cm}")
+    area_cm2 = area_um2 / (UM_PER_CM ** 2)
+    vertical = rho_epi_ohm_cm * (t_epi_um / UM_PER_CM) / area_cm2
+    lateral = substrate_resistance_from_resistivity_ohm(
+        rho_substrate_ohm_cm, path_um=path_um, area_um2=area_um2)
+    return vertical + lateral
 
 
 def trigger_current_a(R_sub_ohm: float, *, v_be: float = BE_TURN_ON_V) -> float:

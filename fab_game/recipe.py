@@ -712,6 +712,8 @@ class IsolationKnobs:
     drawn_spacing_um: float = 2.0          # layout n⁺-to-well spacing
     beak_allowance_um: float = latchup.LOCOS_BEAK_ALLOWANCE_UM   # B5's computed beak, both edges — not a house guess
     injected_current_a: float = 2.0e-3     # the disturbance the part must survive (given, not modelled)
+    epi_thickness_um: float | None = None  # None = a uniform wafer (the seam); set = epi on a doped handle
+    handle_resistivity_ohm_cm: float = 0.01   # the heavily-doped handle under the epi (p+, ~0.01 Ω·cm)
 
     def __post_init__(self) -> None:
         if self.scheme is not None and self.scheme not in ISOLATION_SCHEMES:
@@ -723,6 +725,11 @@ class IsolationKnobs:
             raise ValueError(f"beak_allowance_um must be ≥ 0, got {self.beak_allowance_um}")
         if self.injected_current_a <= 0.0:
             raise ValueError(f"injected_current_a must be > 0, got {self.injected_current_a}")
+        if self.epi_thickness_um is not None and self.epi_thickness_um <= 0.0:
+            raise ValueError(f"epi_thickness_um must be > 0 (or None for a uniform wafer), "
+                             f"got {self.epi_thickness_um}")
+        if self.handle_resistivity_ohm_cm <= 0.0:
+            raise ValueError(f"handle_resistivity_ohm_cm must be > 0, got {self.handle_resistivity_ohm_cm}")
 
     @property
     def engaged(self) -> bool:
@@ -744,6 +751,25 @@ class IsolationKnobs:
     def trench_depth_um(self) -> float:
         """The trench that interrupts the lateral path — cited STI depth, or 0 for LOCOS."""
         return latchup.STI_DEPTH_UM if self.scheme == "sti" else 0.0
+
+    def substrate_resistance_ohm(self, wafer_rho_ohm_cm: float) -> float:
+        """``R_sub`` (Ω) for this line's substrate — the **only** quantity that decides latchup here.
+
+        ``epi_thickness_um = None`` ⇒ the uniform wafer the rest of the sim models: the current runs
+        the whole tap path sideways through the wafer's own resistivity. Set it, and the wafer becomes
+        a thin lightly-doped layer on a heavily-doped handle — the cited prevention measure — so the
+        current hops straight down through the layer into what is nearly a short
+        (:func:`chip.latchup.epi_substrate_resistance_ohm`).
+
+        **This is not epitaxy as a process, and it is not F6.** Nothing about the doping profile the
+        device sees changes: ``V_t``, ``I_Dsat`` and every other per-die number are untouched, because
+        the layer's resistivity *is* the wafer's. One resistance moves. A real epi step would also
+        change the profile the transistor sits in, and that is a different slice.
+        """
+        if self.epi_thickness_um is None:
+            return latchup.substrate_resistance_from_resistivity_ohm(wafer_rho_ohm_cm)
+        return latchup.epi_substrate_resistance_ohm(
+            wafer_rho_ohm_cm, self.epi_thickness_um, self.handle_resistivity_ohm_cm)
 
     def spacing_for_cd_um(self, cd_nm: float, nominal_cd_nm: float) -> float:
         """This die's spacing: what the printed line gained over nominal, the space beside it lost.

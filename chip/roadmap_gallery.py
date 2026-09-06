@@ -132,14 +132,16 @@ SLICES = [
              "discriminate something implant does not.",
     ),
     Slice(
-        fid="F7", era="1998 · STI", title="Isolation remainder: STI process + latchup",
-        status="Partly built (B5)", badge="part",
-        blurb="LOCOS's bird's beak and the min-active-pitch wall are BUILT (history-mode B5, the "
-              "2-D engine's 2nd consumer); the successor's own process is not.",
-        would_add="The STI trench etch/fill step itself and a latchup electrical observable — "
-                  "the two named leftovers of the isolation arc.",
-        gate="A consumer for trench geometry / a latchup observable; the beak physics already "
-             "shipped, so only the remainder is on the roadmap.",
+        fid="F7", era="1998 · STI", title="Isolation remainder: the STI process itself",
+        status="Latchup BUILT (B12); process deferred", badge="part",
+        blurb="Both electrical halves of the isolation arc have shipped: LOCOS's bird's beak and the "
+              "min-active-pitch wall (B5), and now the bill its successor came with — CMOS latchup "
+              "(B12), the parasitic pnpn the density STI bought can light.",
+        would_add="Only the STI trench etch/fill step itself — as a *process*. Nothing electrical: "
+                  "B12 already delivers the observable the arc was fenced behind.",
+        gate="No consumer, for a sharper reason than before. A trench recipe would add no observable "
+             "B12 has not already delivered — the trench enters latchup as a depth that lengthens the "
+             "parasitic base, and enters geometry as the absence of a beak, and both are built.",
     ),
     Slice(
         fid="F9", era="2011 FinFET · 2022 GAA", title="FinFET / gate-all-around",

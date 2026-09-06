@@ -12,11 +12,11 @@ prose moved into the topic file (this index has a hard read limit).
 
 - [Commit at end of batch](commit-at-end-of-batch.md) — **feedback (2026-06-10):** always commit AND push at batch end unasked; chip-sim → direct `git push origin main` (solo repo). Conventional msg + Co-Authored-By, fast lane green first; PRs still ask-first.
 - [Gradual failure preferred](gradual-failure-preferred.md) — **feedback (2026-06-14):** model graded failure over a cliff when realistic; honest move = spatial non-uniformity of the offending quantity, the fudge = inflating an unrelated variable.
-- [Chip notebook flake](chip-notebook-flake.md) — **project:** the slow `chip.ipynb` smoke test hangs ~80% in CI — an nbclient↔ipykernel-7.x race. `skipif(CI)` stays; THE PIN = `-n auto` fast lane only, full gate serial (never the notebook under xdist). Don't re-explore fewer workers.
+- [Chip notebook flake](chip-notebook-flake.md) — **project:** the slow `chip.ipynb` smoke test hangs ~80% in CI — an nbclient↔ipykernel-7.x race. THE PIN = `-n auto` fast lane only, full gate serial (never the notebook under xdist). Don't re-explore fewer workers.
 
 ## Engine & physics library
 
-- [Engine unfrozen](engine-unfrozen.md) — **project (2026-06-10; framing RETIRED 2026-06-14):** `engines.diffusion` UNFROZEN (ADR 0004), then contract/seal ceremony DROPPED → plain tested library. Amendments: v1.5 `D(u)` Picard, v1.6 explicit θ=0, v1.8 2-D. 3-D = only deferred regime.
+- [Engine unfrozen](engine-unfrozen.md) — **project (2026-06-10; framing RETIRED 2026-06-14):** `engines.diffusion` UNFROZEN (ADR 0004), contract/seal ceremony DROPPED → plain tested library. Amendments: v1.5 `D(u)`, v1.6 θ=0, v1.8 2-D. 3-D = only deferred regime.
 - [Engine explicit stepping v1.6](engine-explicit-stepping-v16.md) — **project (2026-06-11):** explicit `forward_euler` (θ=0) — real content = conditional-CFL invariant `dt_crit=1/max|diagᵢ|` (NOT textbook Δx²/2D). Advisor: build explicit, not 2-D (anti-over-build).
 - [Lateral diffusion 2-D v1.8](lateral-diffusion-2d.md) — **project (2026-06-12):** the 2-D regime — `diffusion2d.py`, BE-only 5-point FV, the engine's LAST deferred regime. Additive; 34 invariants unmodified. Lateral/vertical ratio = LOOSE.
 - [Chip coupling v1.2](chip-coupling-v12.md) — **project (v1.2):** Phase 1↔2 back-coupling (OED + dopant segregation) — both fit WITHIN the engine (OED=`D(t)`; segregation=Neumann flux). Swept-sliver edge retired via consumer-side receding mesh.
@@ -29,29 +29,30 @@ prose moved into the topic file (this index has a hard read limit).
 
 ## Roadmap slices (F) & historical modes
 
-- [Historical-modes A1](historical-modes-a1.md) — **project (2026-07-10):** the NEW *backward* axis (period modes explain why the modern step won); 3-tier consumer bar; order A1→A3→B6→H0→A2→A4→B5. A1 = pre-implant **dose-control wall** (solubility-pinned `N_s` can't meter a light dose; NOT depth).
-- [Historical-modes A2](historical-modes-a2.md) — **project (2026-07-10):** `litho_history.py`, the 1st Tier-2. §A wavelength ladder g-line→EUV, tight = `R=k₁λ/NA` ratio-monotone. §B proximity `√(λg)` blur rides `peb_blur` **BE** (Gibbs-ring trap); the wall is contrast/NILS **not** CD.
-- [Historical-modes A3](historical-modes-a3.md) — **project (2026-07-10):** `oxidation_history.py`. §A HCl gettering → mobile-Na `Q_ox`↓ → `V_t` recovery (polarity INVERTED vs A1). §B high-pressure → **exact** `1/P` collateral `∫D dt` budget (equal exponent=1 → `A` invariant).
+- [Historical-modes A1](historical-modes-a1.md) — **project (2026-07-10):** the NEW *backward* axis (period modes explain why the modern step won); 3-tier consumer bar. A1 = pre-implant **dose-control wall** (solubility-pinned `N_s` can't meter a light dose; NOT depth).
+- [Historical-modes A2](historical-modes-a2.md) — **project (2026-07-10):** `litho_history.py`, the 1st Tier-2. §A wavelength ladder g-line→EUV, tight = `R=k₁λ/NA` ratio-monotone. §B proximity `√(λg)` blur rides `peb_blur` **BE**; the wall is contrast/NILS **not** CD.
+- [Historical-modes A3](historical-modes-a3.md) — **project (2026-07-10):** `oxidation_history.py`. §A HCl gettering → `Q_ox`↓ → `V_t` recovery (polarity INVERTED vs A1). §B high-pressure → **exact** `1/P` collateral `∫D dt` budget (equal exponent=1 ⇒ `A` invariant).
 - [Historical-modes A4](historical-modes-a4.md) — **project (2026-07-10):** `resist_history.py` negative-resist swelling → CD floor. Swelling is **GEOMETRIC, not an engine ride**; floor ≈ thickness, **optics-independent** (⊥A2).
 - [Historical-modes B5](historical-modes-b5.md) — **project (2026-07-10; plan COMPLETE — 7 modes):** `locos_history.py` bird's beak; the 2-D engine's **2nd** consumer. Seam landmine `√Dt`≠`√Bt`. Headline: min pitch ∝ field-oxide.
 - [Historical-modes B6](historical-modes-b6.md) — **project (2026-07-10):** `metallization_history.py` — Al junction spiking; `S(T)` spikes short the **shallower** `x_j`. GRADED via shorted-**AREA** ([[gradual-failure-preferred]]). Ohmic short at CURRENT level, NOT `1/τ`.
 - [Historical-modes B7](historical-modes-b7.md) — **project (2026-07-10):** F2 silicide/contact-R (`contact_resistance.py`) — `R_series` = access LINEAR + TLM contact SUBLINEAR; salicide flips the bottleneck access→contact.
-- [High-κ gate F3](high-k-gate-f3.md) — **project (COMPLETE 2026-07-17, 4 slices; card PULLED):** one thickness, two currencies — `C_ox` LINEAR in EOT vs `J_g` EXPONENTIAL in `t_phys`. `device.py` untouched: `ε_SiO₂/EOT ≡ ε₀κ/t_phys` is an IDENTITY. Per-material `α∝√(m*φ_B)`; S4 = the IL ⇒ floor `EOT>t_IL`.
-- [Strained silicon F5](strained-silicon-f5.md) — **project (COMPLETE 2026-08-10, 4 slices; card GRADUATED):** `µ` = the one `I_Dsat` factor no process ever moved; seam predates the slice (`device.py` untouched). Enhancement factors, nMOS tensile leg, drive read an UPPER BOUND. S2 = 1st non-additive knob (win costs yield); S4 = bracket-not-a-curve.
-- [CMP / planarity F8](cmp-planarity-f8.md) — **project (COMPLETE 2026-09-06, 4 slices; card GRADUATED):** upstream of F4's wire. `s/(1−s)` forced overpolish ⇒ the fix is UNIFORMITY, never polish-less; sub-micron loss is EROSION. S4 = the 2nd F4 clause to go — the polished wire costs PARTS and REVERSES the wafer's speed gradient.
-- [Historical-modes H0](historical-modes-h0.md) — **project (2026-07-10):** the **era-timeline display surface** (`history_gallery.py` → `docs/history.html`+`.local`, the 3rd gallery) — `demo_*_history.py` figures re-cut along the spine (period→wall→successor); glob-anchored.
+- [High-κ gate F3](high-k-gate-f3.md) — **project (COMPLETE 2026-07-17, 4 slices; card PULLED):** one thickness, two currencies — `C_ox` LINEAR in EOT vs `J_g` EXPONENTIAL in `t_phys`. `device.py` untouched: `ε_SiO₂/EOT ≡ ε₀κ/t_phys` is an IDENTITY. S4 = the IL ⇒ floor `EOT>t_IL`.
+- [Strained silicon F5](strained-silicon-f5.md) — **project (COMPLETE 2026-08-10, 4 slices; card GRADUATED):** `µ` = the one `I_Dsat` factor no process ever moved; seam predates the slice. Enhancement factors, nMOS tensile leg, drive read an UPPER BOUND. S2 = 1st non-additive knob; S4 = bracket-not-a-curve.
+- [CMP / planarity F8](cmp-planarity-f8.md) — **project (COMPLETE 2026-09-06, 4 slices; card GRADUATED):** upstream of F4's wire. `s/(1−s)` forced overpolish ⇒ the fix is UNIFORMITY; sub-micron loss is EROSION. S4 = the 2nd F4 clause to go — the polished wire costs PARTS and REVERSES the speed gradient.
+- [Latchup / isolation F7→B12](latchup-isolation-f7.md) — **project (COMPLETE 2026-09-06, 4 slices; card REWRITTEN):** the bill STI's density came with. Gate half-open (4th time). Gain condition **never discriminates** ⇒ trigger binding; latchup is a **WAFER** property (grading REFUSED as a fudge). Trench pays back **85%**; boule drift **inverts**. S4 = the substrate lever.
+- [Historical-modes H0](historical-modes-h0.md) — **project (2026-07-10):** the **era-timeline display surface** (`history_gallery.py` → `docs/history.html`+`.local`, the 3rd gallery) — `demo_*_history.py` figures re-cut period→wall→successor; glob-anchored.
 
 ## Implant (F1)
 
 - [Implant Pearson-IV skew](implant-pearson-skew.md) — **project (2026-07-03):** slice 2 (`shape="pearson"` opt-in; default gaussian = seam). Boron −γ → peak DEEPER than `R_p` + surface tail; the closed form reproduces mean/var, type-IV guard.
 - [Implant channeling tail](implant-channeling-tail.md) — **project (2026-07-06):** slice 3 (`channel=None` seam). Two-population `(1−f)·primary+f·Q·tail` (dose-conserving); the deep exp deepens the ANNEALED junction; tilt suppresses `f=f0·e^(−tilt/τ)`.
-- [Implant damage→leakage](implant-damage-leakage.md) — **project (2026-07-06; slice 4 = LAST, plan COMPLETE):** displacement damage (NRT/Kinchin–Pease) → traps → `lifetime.py` leakage. Discriminator = RECOVERY (a separate Arrhenius, NOT the dopant `∫D dt`); `damage_trap_density=0` seam.
+- [Implant damage→leakage](implant-damage-leakage.md) — **project (2026-07-06; slice 4 = LAST, plan COMPLETE):** displacement damage (NRT) → traps → `lifetime.py` leakage. Discriminator = RECOVERY (a separate Arrhenius, NOT the dopant `∫D dt`); `damage_trap_density=0` seam.
 
 ## Fab-line game
 
 - [Fab-line game](fab-game.md) — **project (2026-06-12 → 2026-06-14):** gamified sand→chip fab LAYERED on chip-sim (ADR 0005; physics `chip/`+`engines/`, game `fab_game/`, one-way import). G1–G7 + CG-1/2/3 + promotions BUILT; backlog exhausted. Remaining = tycoon design.
 - [Fab journey](fab-journey.md) — **project (2026-06-14; Phase 6 BUILT 2026-06-15):** staged sand→chip journey front-end (decide→observe→forecast→commit). Phases 1–5 purify/grow/cut/diffuse/oxidize; Phase 6 = cost → net-profit max.
-- [Device targets plan](device-targets-plan.md) — **project (2026-06-15, ALL 5 SLICES BUILT — COMPLETE):** "good is application-relative" — re-score the SAME wafer vs inverted specs (`fab_game/targets.py`, never re-fabs). S1 V_t, S2 avalanche BV, S3 native substrate, S4 O gettering, S5 lifetime.
+- [Device targets plan](device-targets-plan.md) — **project (2026-06-15, ALL 5 SLICES BUILT):** "good is application-relative" — re-score the SAME wafer vs inverted specs (`fab_game/targets.py`, never re-fabs). S1 V_t, S2 avalanche BV, S3 native substrate, S4 O gettering, S5 lifetime.
 - [Scope-edge backlog](scope-edge-backlog.md) — **project (2026-06-14):** `docs/plans/scope-edge-backlog.md` triages named-but-unbuilt edges BY CONSUMER. BUILT: C1, D1, A2, A1, E1. Heat-mode FALSIFIED chip-side. Next promotable = NONE.
 - [Fab-game G1](fab-game-g1.md) — **project (2026-06-12):** the `fab_game/` harness on the validated back end, ZERO new physics. Finding: defocus's casualty = NILS not CD.
 - [Fab-game G2](fab-game-g2.md) — **project (2026-06-12):** `czochralski.py` Scheil. Fix: parameterize by seed-end `N_seed`, not melt `C_0` (float trap). Boron k=0.8 → V_t 0.55→0.75.
@@ -73,7 +74,7 @@ prose moved into the topic file (this index has a hard read limit).
 ## Doc surfaces
 
 - [Gallery local edition](gallery-local-edition.md) — **project (2026-06-12 → 2026-06-14):** TWO galleries, each public + local (4 pages) from `chip/gallery.py` + `fab_game/gallery.py`. All golden-tested; don't mix github↔localhost.
-- [Roadmap page](roadmap-page.md) — **project (2026-07-14):** `docs/roadmap.html`, PLANNED-slice schematics stamped "not simulator output". **Graduation rule = the card comes OFF when the slice ships** (manifest guard pins card↔schematic). **Nothing pins gate↔REALITY — re-check a gate against the tree before building.**
+- [Roadmap page](roadmap-page.md) — **project (2026-07-14):** `docs/roadmap.html`; PLANNED schematics stamped "not simulator output". **Card comes OFF when the slice ships** (manifest guard pins card↔schematic). **Nothing pins gate↔REALITY — re-check a gate against the tree before building.**
 
 ## Cited sources (and the claims they license)
 
@@ -96,8 +97,8 @@ prose moved into the topic file (this index has a hard read limit).
 - [Aluminium spiking source](aluminium-spiking-source.md) — **B6:** cited Al–Si eutectic **577 °C** + **~1.5 wt%** max Si solubility + the alloy→barrier→Cu fix ladder; Arrhenius `S(T)` FLAGGED.
 - [Silicide/contact source](silicide-contact-source.md) — **F2/B7:** cited TLM coth form + two limits; ρ_c bounds Al–Si ~1e-6, TiSi₂ ~1e-7–3e-7 Ω·cm². `CONTACT_LENGTH_UM` FLAGGED.
 - [High-κ dielectric source](high-k-dielectric-source.md) — **F3:** cited EOT + κ/gap/CB-offset table (Robertson); LOAD-BEARING = κ↔gap **inverse**. `m*` FLAGGED. + Ando 2012 (IL): additive `EOT=EOT_IL+EOT_HK`, ~0.4–0.5 nm practical floor. Lit matched-EOT win ~2–6 dec.
-- [BEOL interconnect source + build](beol-interconnect-source.md) — **F4 COMPLETE (4 slices, 2026-08-10; card PULLED):** cited `c_pul≈2 pF/cm` + its invariance ⇒ crossover is **R not C**. SIGN TRAP: Ru's bulk ρ is 4× *worse* than Cu. S2 = binning inversion (`∂ln f/∂ln I=1−wire_share`); S4 = two IMPOSSIBILITY RESULTS, the crossing is a BAND, the FOM **ranks but does not locate**.
-- [Strained-silicon source + S1 build](strained-silicon-source.md) — **F5 S1:** Intel 90 nm uniaxial, both legs one paper. Elasticity = ratio of FRACTIONAL gains `(I−1)/(µ−1)` = **0.500 exactly**, NOT 0.917 (the silent-failure trap); model elasticity 1 — ideal-contact path ONLY (`R_series>0` sub-linearizes).
+- [BEOL interconnect source + build](beol-interconnect-source.md) — **F4 COMPLETE (4 slices, 2026-08-10; card PULLED):** cited `c_pul≈2 pF/cm` + invariance ⇒ crossover is **R not C**. SIGN TRAP: Ru's bulk ρ is 4× *worse*. S2 = binning inversion; S4 = two IMPOSSIBILITY RESULTS, the crossing is a BAND, the FOM **ranks but does not locate**.
+- [Strained-silicon source + S1 build](strained-silicon-source.md) — **F5 S1:** Intel 90 nm uniaxial, both legs one paper. Elasticity = ratio of FRACTIONAL gains `(I−1)/(µ−1)` = **0.500 exactly**, NOT 0.917 (the silent-failure trap); model elasticity 1, ideal-contact path ONLY.
 - [Latchup source](latchup-source.md) — **F7/B12 (2026-09-06):** two INDEPENDENT cited criteria (`I·R>0.7 V` trigger; `β₁β₂>1` sustaining) — **never couple them**. SIGN TRAP: "worsens the parasitic transistor" = LOWER β. The gain condition **never discriminates** here ⇒ the trigger is binding.
 - [Avalanche breakdown source](avalanche-breakdown-source.md) — **device-targets S2:** Baliga planar `BV∝N^-3/4` + cylindrical curvature DERIVED from `∫α dr=1` (not a remembered fit); Sze 0.24 ~1%.
 - [Internal gettering source](internal-gettering-source.md) — **device-targets S4:** cited DIRECTION — O precipitates getter Fe/Cu ABOVE [O_i]~12ppma (Tan 1990); O_crit=6e17, efficiency FLAGGED.

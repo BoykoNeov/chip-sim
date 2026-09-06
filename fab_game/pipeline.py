@@ -329,10 +329,16 @@ def run_line(
         taus = [d.tau for d in dies if d.tau is not None]
         tau_s = taus[0] if taus else lifetime.TAU_BULK
         dies = tuple(isolation_step(d, iso, reference_cd, tau_s) for d in dies)
-        margin = latchup.latchup_margin(
-            iso.nominal_spacing_um, None, tau_s,
-            rho_ohm_cm=recipe.substrate_resistivity_ohm_cm,
-            trench_depth_um=iso.trench_depth_um,
+        # The substrate goes through the knob, which is where the S4 lever lives: a uniform wafer runs
+        # the tap path sideways; an epi layer on a doped handle replaces it with a vertical hop.
+        r_sub = iso.substrate_resistance_ohm(recipe.substrate_resistivity_ohm_cm)
+        margin = latchup.LatchupMargin(
+            spacing_um=iso.nominal_spacing_um,
+            base_width_um=latchup.lateral_base_width_um(iso.nominal_spacing_um,
+                                                        trench_depth_um=iso.trench_depth_um),
+            loop_gain=latchup.loop_gain(iso.nominal_spacing_um, tau_s,
+                                        trench_depth_um=iso.trench_depth_um),
+            r_sub_ohm=r_sub, i_trigger_a=latchup.trigger_current_a(r_sub),
         )
         latched = margin.latches(iso.injected_current_a)
         gains = [d.history[-1].outputs["loop_gain"] for d in dies]
@@ -341,7 +347,8 @@ def run_line(
                        {"scheme": iso.scheme, "drawn_spacing_um": iso.drawn_spacing_um,
                         "nominal_spacing_um": iso.nominal_spacing_um,
                         "trench_depth_um": iso.trench_depth_um,
-                        "injected_current_a": iso.injected_current_a},
+                        "injected_current_a": iso.injected_current_a,
+                        "epi_thickness_um": iso.epi_thickness_um},
                        {"r_sub_ohm": margin.r_sub_ohm,
                         "i_trigger_ma": margin.i_trigger_ma,
                         "margin_ratio": margin.margin_ratio(iso.injected_current_a),

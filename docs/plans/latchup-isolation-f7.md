@@ -320,7 +320,51 @@ labels its y-axis as an upper bound in the axis text itself, not in a footnote.
 period → wall → successor: LOCOS's beak sets the pitch floor → STI removes the beak and the pitch
 collapses → the loop gain crosses 1 → the fix is the substrate, not the isolation.
 
-### S4 — the finale: the substrate is the lever the geometry cannot be
+### S4 — the finale: the substrate is the lever the geometry cannot be — ✅ **BUILT 2026-09-06**
+
+`chip.latchup.epi_substrate_resistance_ohm`, an `epi_thickness_um` lever on `IsolationKnobs`, a third
+panel on the B12 figure, and the doc pass. 8 new module legs, 6 new game legs, 4 new demo legs.
+
+**The composition, as a single sentence the tests assert:** the same wafer, the same disturbance, the
+same isolation scheme — change only the substrate and the part that was scrapped survives. And the
+rescue is provably not the geometry doing the work: the loop gain is asserted **exactly** unchanged
+across it, and every per-die device number is byte-identical (which is also why this is **not** F6 — a
+real epitaxy step would change the profile the transistor sits in, and this changes one resistance).
+
+**Two series terms, and the second one is the honest part.** `R = ρ_epi·t_epi/A` (down through the
+layer) `+ ρ_handle·path/A` (sideways underneath). Dropping the second would let the resistance fall
+without limit as the layer thins, and it does not — the handle's own term is a **floor**, derived
+rather than asserted. Measured against a lightly-doped period wafer (10 Ω·cm, triggering at 1.01 mA
+against a 10 mA disturbance — it latches):
+
+| grown layer | trigger | vs uniform | geometric tap/t_epi | |
+|---|---|---|---|---|
+| 20 µm | 1.26 mA | ×1.25 | ×1.2 | still latches |
+| 10 µm | 2.51 mA | ×2.49 | ×2.5 | still latches |
+| 5 µm | 5.01 mA | ×4.98 | ×5.0 | still latches |
+| 2 µm | 12.44 mA | ×12.35 | ×12.5 | **survives** |
+| 1 µm | 24.59 mA | ×24.39 | ×25.0 | **survives** |
+
+**"Dominated by", not "equal to" — and the gap is the point.** The improvement tracks tap-path ÷ layer
+thickness (ρ cancels, so it is geometry rather than a fitted gain) and is **always short of it**,
+by exactly the handle's series term. A test asserts both halves, because equality would make the floor
+drawn in the same panel a fiction. The floor is 1008 mA here — thinning past it stops paying, which is
+also why the literature's **optimum** thickness is named and **not reproduced** (it needs the vertical
+pnp this model does not carry; monotone-thinner-is-better is what is supportable).
+
+**The F6 trigger, recorded and not argued.** One sentence on the F6 card in `future-steps.md`. Whether
+epitaxy's stated deferral reason survives it is for whoever picks that card up to settle against the
+tree; this plan makes no claim about it.
+
+**The roadmap card did not graduate — it was rewritten.** F7's electrical remainder shipped, but the
+STI *process* is genuinely still unbuilt, so removing the card would overstate. Its gate is now sharper
+than "no consumer": a trench recipe would add **no observable B12 has not already delivered**, because
+the trench enters latchup as a depth that lengthens the parasitic base and enters geometry as the
+absence of a beak, and both are built.
+
+*The original sketch, retained:*
+
+> ### S4 — the finale: the substrate is the lever the geometry cannot be
 
 The closing composition, and the one that answers "so what did they actually *do* about it."
 

@@ -5,8 +5,8 @@ rather than a new topic. B5 (:mod:`chip.demo_locos_history`) ended on the wall L
 beak eats active area from both edges, so a thick field oxide puts a floor under how tightly devices
 can be packed, and shallow-trench isolation cleared it. This figure is what clearing it cost.
 
-Two panels, one per cited condition — and the point is that **the panel that moves is not the panel
-that decides**:
+Three panels — one per cited condition, then the lever — and the point is that **the panel that moves
+is not the panel that decides**:
 
   * **Left — what the isolation change moved (and it is the inert one).** The parasitic loop gain
     against the lateral base width. The three points are the era: **LOCOS**, whose device-to-well
@@ -22,6 +22,14 @@ that decides**:
     *this simulator's own boule* sits, and the arrow marks the direction its Scheil drift travels —
     which is the era's practical answer, since the lever that moves this curve is the substrate, not
     the isolation.
+  * **Right-most — the lever, and the floor under it.** The era's actual fix: keep the light doping the
+    transistor wants, but only as a **thin grown layer on a heavily-doped handle**, so the current hops
+    straight down into what is nearly a short instead of running the tap path sideways. The improvement
+    is *dominated by* tap-path ÷ layer thickness — ρ cancels, so it is geometry rather than a fitted
+    gain — and always falls **short** of that, because the handle keeps its own series term. That term
+    is the floor drawn across the panel: thinning the layer stops paying there, which is also why the
+    literature's *optimum* thickness is named and **not** reproduced (it needs the vertical pnp this
+    model does not carry).
 
 **What the figure is careful not to claim.** The absolute loop gain is a useless upper bound (γ = 1
 with ``W_B ≪ L`` puts it 10⁴–10¹² where real parasitics are ~1–10³) — so the left panel's y-axis is
@@ -50,6 +58,13 @@ TAU_S = lifetime.TAU_BULK                  # a clean wafer — the loosest (most
 
 BASE_SWEEP_UM = np.linspace(1.2, 5.0, 240)
 RHO_SWEEP_OHM_CM = np.logspace(-2.0, 2.0, 240)
+
+# Panel C — the era's actual answer. A period bulk-CMOS wafer was LIGHTLY doped (the transistor wants
+# it that way), which is precisely the substrate that cannot take a disturbance; the fix was to keep
+# that light doping only as a thin grown layer and put a heavily-doped handle underneath.
+ERA_WAFER_RHO_OHM_CM = 10.0                # a lightly-doped period bulk wafer
+HANDLE_RHO_OHM_CM = 0.01                   # the heavily-doped handle under the grown layer (p+)
+EPI_SWEEP_UM = np.logspace(np.log10(0.3), np.log10(40.0), 240)
 
 # The simulator's own boule, in resistivity — the band drawn on the right panel (see chip-sim's
 # Scheil slice: boron k < 1, so concentration RISES down the boule and resistivity FALLS).
@@ -80,6 +95,11 @@ class LatchupHistoryResult:
     rho_ohm_cm: np.ndarray
     trigger_ma: np.ndarray
     injected_ma: float
+    # Panel C — the substrate lever
+    epi_um: np.ndarray
+    epi_trigger_ma: np.ndarray
+    uniform_trigger_ma: float              # the same wafer with no handle under it
+    handle_floor_ma: float                 # what the handle's own series term allows, at best
 
     @property
     def density_penalty(self) -> float:
@@ -118,7 +138,18 @@ def compute() -> LatchupHistoryResult:
         for r in RHO_SWEEP_OHM_CM
     ])
 
+    uniform_r = lu.substrate_resistance_from_resistivity_ohm(ERA_WAFER_RHO_OHM_CM)
+    epi_trigger_ma = np.array([
+        lu.trigger_current_a(lu.epi_substrate_resistance_ohm(
+            ERA_WAFER_RHO_OHM_CM, float(te), HANDLE_RHO_OHM_CM)) * 1.0e3
+        for te in EPI_SWEEP_UM
+    ])
+
     return LatchupHistoryResult(
+        epi_um=EPI_SWEEP_UM, epi_trigger_ma=epi_trigger_ma,
+        uniform_trigger_ma=lu.trigger_current_a(uniform_r) * 1.0e3,
+        handle_floor_ma=lu.trigger_current_a(
+            lu.substrate_resistance_from_resistivity_ohm(HANDLE_RHO_OHM_CM)) * 1.0e3,
         field_ox_um=field_ox, beak_um=beak,
         locos_spacing_um=locos_spacing, sti_spacing_um=sti_spacing, sti_base_um=sti_base,
         base_um=BASE_SWEEP_UM,
@@ -163,6 +194,23 @@ def print_summary(r: LatchupHistoryResult) -> None:
     print(f"      the trigger current RISES with z, so the FIRST wafers off the boule are the vulnerable "
           f"ones — the opposite of every other drift in this game.\n")
 
+    print("  (C) The LEVER — the substrate, and the floor under it:")
+    print(f"    A uniform {ERA_WAFER_RHO_OHM_CM:g} Ω·cm period wafer triggers at "
+          f"{r.uniform_trigger_ma:.2f} mA — below the {r.injected_ma:.0f} mA disturbance: it latches.")
+    for te in (20.0, 10.0, 5.0, 2.0, 1.0):
+        R = lu.epi_substrate_resistance_ohm(ERA_WAFER_RHO_OHM_CM, te, HANDLE_RHO_OHM_CM)
+        ma = lu.trigger_current_a(R) * 1.0e3
+        geom = lu.SUBSTRATE_TAP_PATH_UM / te
+        tag = "  survives" if ma >= r.injected_ma else "  still latches"
+        print(f"    grown layer {te:>5.1f} µm → trigger {ma:>7.2f} mA  "
+              f"(×{ma / r.uniform_trigger_ma:>5.2f} vs uniform; geometric tap/t_epi = ×{geom:.1f}){tag}")
+    print(f"    → the improvement is DOMINATED BY tap-path/t_epi (ρ cancels — geometry, not a fitted "
+          f"gain), and always falls short of it,")
+    print(f"      because the handle keeps its own series term: a floor at {r.handle_floor_ma:.0f} mA "
+          f"that thinning the layer cannot pass.")
+    print(f"    [the cited OPTIMUM layer thickness is NOT reproduced — it needs the vertical pnp this "
+          f"model does not carry. Monotone-thinner-is-better is what is supportable.]\n")
+
     print("  The era's answer: the isolation scheme moves the gain, which never decides; the substrate "
           "moves the trigger, which always does.")
     print("    [seam: scheme=None ⇒ no step at all. Flagged: the tap geometry (a calibration) — so the "
@@ -175,7 +223,7 @@ def save_figure(r: LatchupHistoryResult) -> Path:
     matplotlib.use("Agg")                            # headless
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(1, 2, figsize=(13.5, 4.8))
+    fig, axes = plt.subplots(1, 3, figsize=(18.6, 4.9))
 
     # --- Left: what the isolation change moved — the parasitic loop gain --------------------------- #
     ax = axes[0]
@@ -259,9 +307,36 @@ def save_figure(r: LatchupHistoryResult) -> Path:
                         "draws the CURVE and quotes no crossing point",
             transform=ax.transAxes, ha="right", va="bottom", fontsize=6.8, color="0.4")
 
-    fig.suptitle("Historical-modes B12 — the latchup bill: STI cleared B5's packing floor, and the density "
-                 "it bought is the parasitic base width.\nThe trench pays back part of it — the substrate "
-                 "is what actually decides.", fontsize=10.0)
+    # --- Panel C: the lever — the substrate, and the floor under it -------------------------------- #
+    ax = axes[2]
+    ax.plot(r.epi_um, r.epi_trigger_ma, "-", color="tab:green", lw=2.4,
+            label=f"grown layer on a {HANDLE_RHO_OHM_CM:g} Ω·cm handle")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.axhline(r.uniform_trigger_ma, color="0.45", ls="-.", lw=1.8,
+               label=f"the SAME wafer, uniform ({ERA_WAFER_RHO_OHM_CM:g} Ω·cm): "
+                     f"{r.uniform_trigger_ma:.1f} mA")
+    ax.axhline(r.handle_floor_ma, color="tab:green", ls=":", lw=1.4)
+    ax.text(r.epi_um.max() * 0.95, r.handle_floor_ma * 0.35,
+            f"floor: the handle's own series term ({r.handle_floor_ma:.0f} mA)\n"
+            f"— thinning the layer stops paying here",
+            fontsize=7.2, color="tab:green", va="top", ha="right")
+    ax.axhline(r.injected_ma, color="tab:red", ls="--", lw=1.8,
+               label=f"injected disturbance {r.injected_ma:.0f} mA")
+    ax.fill_between(r.epi_um, r.epi_trigger_ma, r.injected_ma,
+                    where=(r.epi_trigger_ma < r.injected_ma), color="tab:red", alpha=0.13)
+    ax.set_xlabel("grown-layer thickness  t_epi  (µm)   [← thinner is safer]")
+    ax.set_ylabel("latchup trigger current  (mA)")
+    ax.set_title("(C) The lever: the substrate, not the isolation", fontsize=9.5)
+    ax.legend(fontsize=7.0, loc="lower left")
+    ax.grid(True, alpha=0.18, which="both")
+    ax.text(0.03, 0.84, "improvement ≈ tap path / t_epi — ρ cancels,\nso this is geometry, not a fitted gain",
+            transform=ax.transAxes, ha="left", va="top", fontsize=6.9, color="0.35")
+
+    fig.suptitle("Historical-modes B12 — the latchup bill: STI cleared B5's packing floor, and the density it "
+                 "bought is the parasitic base width. The trench pays back part of it.\nBut the gain is not what "
+                 "decides — the substrate is, which is why the era's fix was a grown layer on a doped handle and "
+                 "not any change to the isolation.", fontsize=10.0)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(DOCS_FIGURE, dpi=130)

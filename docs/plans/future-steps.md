@@ -32,8 +32,8 @@ isolation is implicit; interconnect stops at the transistor terminals; the gate 
 | **F3** | **High-κ gate dielectric** | 2007 (45nm): SiO₂ → HfO₂ | **gate tunneling leakage** (exp in `t_phys`) vs **`C_ox`** (linear in EOT) — one thickness, two currencies | **✅ BUILT (2026-07-17 — all 4 slices) as historical-mode B8** (`chip/high_k.py` + the `dielectric` knob + `demo_highk_history.py`); EOT identity (`device.py` untouched), per-material WKB tunneling, and the interfacial layer on **both** currencies → the honest EOT floor. **Roadmap card graduated** |
 | **F4** | **BEOL interconnect (RC delay)** | Al → **Cu damascene (1997)** → Ru (3nm) | **new output: chip speed limited by wire RC, not the transistor** | **✅ BUILT (2026-08-10 — all 4 slices) as historical-mode B9** (`chip/interconnect.py` + the `interconnect` knob + `spec.DelayBins` + `demo_beol_history.py`); two terms with no shared variable ⇒ `∂ln f/∂ln I_Dsat = 1 − wire_share`; Cu bought 0.64 of a node; then the **axis changed** — size effect + an unscalable barrier put barrierless Ru ahead below ~13 nm with 4× Cu's bulk ρ. **Roadmap card graduated** |
 | **F5** | **Strained silicon** (card: SiGe S/D) | 2003–04 (90nm): strain era | **mobility → `I_Dsat`** — the one factor in `I_Dsat` no process step has ever moved | **✅ BUILT (2026-08-10 — all 4 slices) as historical-mode B10** (`chip/strain.py` + the `strain` knob + `demo_strain_history.py`); `device.py` untouched (`mu_eff` defaulted since P4 — the seam predates the slice); carrier-generic enhancement factors with the hole leg **refused** on the n-channel device; the first game knob that re-grades the wafer on its own; and the era's ending — a delivered-drive **bracket** between two cited endpoints, decaying with `L`, against a model whose elasticity is 1 at every `L`. **Roadmap card graduated** |
-| **F6** | **Epitaxy (buried layer / retrograde well)** | bipolar epi; CMOS wells | retrograde profile — **overlaps implant F1** | COUPLED to F1 — defer standalone |
-| **F7** | **Isolation: LOCOS → STI** | LOCOS (1970s) → STI (1998) | bird's-beak narrows active width → geometry; latchup | **✅ bird's-beak BUILT (2026-07-10) as historical-mode B5** (`locos_history.py`); STI/latchup still deferred |
+| **F6** | **Epitaxy (buried layer / retrograde well)** | bipolar epi; CMOS wells | retrograde profile — **overlaps implant F1** | COUPLED to F1 — defer standalone. **TRIGGER RECORDED (2026-09-06):** latchup trigger current reads substrate resistance ⇒ re-check F6's gate. |
+| **F7** | **Isolation: LOCOS → STI** | LOCOS (1970s) → STI (1998) | bird's-beak narrows active width → geometry; latchup | **✅ BUILT — bird's beak (2026-07-10) as B5, and the latchup observable (2026-09-06) as B12** (`chip/latchup.py` + the `isolation` knob + `demo_latchup_history.py`; `latchup-isolation-f7.md`). The STI *process* (trench etch/fill) remains named-not-built: it would add no observable this does not already deliver. |
 | **F8** | **CMP / planarity** | enables Cu damascene | post-CMP thickness → `R ∝ 1/(W·H)` → `τ_wire` → the delay bins — **the reader F4 built** | **✅ BUILT (2026-08-19 → 2026-09-06 — all 4 slices) as historical-mode B11** (`chip/cmp.py` + the `cmp` knob + `demo_cmp_history.py` + `fab_game/demo_cmp_grading.py`; `cmp-planarity-f8.md`): the `s/(1−s)` forced overpolish, the wire's first per-die spread (one transistor, many delays), the damascene-only refusal, the short graded by radius, the window closing at `s_crit = L/(2+L)`, and — S4 — the **second** F4 clause to go: a per-die wire withdraws the rescue F4's common-mode wire gave the slow tail, so the wire now costs **parts**, not just grades. The published gate was **false on re-check** (the geometry was already an argument). **Roadmap card graduated** |
 | **F9** | **FinFET / GAA** | 2011 / 2022: 3-D channel | needs the **3-D engine** (deferred B1) + `device_2d` extension | DEFERRED — no 3-D consumer yet |
 | **F10** | **EUV / multipatterning** | 2019 (7nm) | extends litho; **no new observable** (litho already rich) | DEFERRED — no discriminating consumer |
@@ -115,10 +115,19 @@ work was a die field and a call-site change. That is the **third** roadmap gate 
 released by someone picking the slice up, and never by a test — the standing instruction to re-check a
 gate against the tree before building comes from exactly this pattern.
 
-**Nothing on this list now has *both* a released gate and a named consumer**, which is why the promotable
-section of `docs/roadmap.html` is empty rather than deleted. The next slice is a **re-triage**, not a pick
-off the top: F6 is still coupled to F1, F7's remainder still wants a latchup observable, F9 still wants
-the 3-D engine, and F10 still adds no observable litho lacks.
+**That was true on 2026-09-06 — for about an hour.** The re-triage happened, the user picked F7's
+remainder off it, and going to build **again** found half the gate already released: `sti_active_um` had
+been in `locos_history.py` since B5, so the LOCOS→STI *geometry* contrast needed no code. The **fourth**
+gate on this page found open by someone going to build, and the fourth found by a person rather than a
+test. What was genuinely missing was the electrical observable, and that is what B12 built.
+
+**The list's honest state now:** F6 is coupled to F1 but **carries a recorded trigger** (B12's trigger
+current reads substrate resistance — a consumer that has nothing to do with profile shape; whether F6's
+stated deferral reason survives it is for whoever picks the card up to settle against the tree, and this
+plan makes no claim about it). F7's remainder is **built**; only the trench *process* is left, and it
+adds no observable. F9 still wants the 3-D engine — checked against the tree on 2026-09-06 and the gate
+**genuinely stands** (`engines/diffusion/` holds only `diffusion1d.py` and `diffusion2d.py`). F10 still
+adds no observable litho lacks.
 
 ## The historical/educational spine (the game's timeline)
 
@@ -148,7 +157,14 @@ the sim actually runs, not narrated decoration.
   quantity" — **was false when re-checked against the tree**: `delay()` already took the geometry as an
   argument. Kept written down because the pattern is the lesson: a released gate is worth as much as a
   set one, and **both** of this entry's gates were found released by someone going to build, never by a test.
-- **LOCOS/STI (F7) — bird's-beak now BUILT (2026-07-10) as historical-mode B5** (`locos_history.py`): under
+- **LOCOS/STI (F7) — COMPLETE (2026-09-06).** The latchup observable shipped as B12, and with it the
+  reason the remainder sat here at all. What the build settled that the prose above did not: latchup is a
+  **wafer** property in this model, not a die one — the only condition that discriminates rides substrate
+  resistivity, one number per wafer — and the *gain* condition never discriminates at all, so the
+  isolation scheme moves a quantity that cannot cost a part. **Still deferred:** the STI trench
+  etch/fill process itself, now for a sharper reason than "no consumer" — it would add no observable
+  B12 has not already delivered. Original entry:
+- **LOCOS/STI (F7) — bird's-beak BUILT (2026-07-10) as historical-mode B5** (`locos_history.py`): under
   the 2026-07-03 pedagogical-consumer reframing, the **active-pitch wall** (min active pitch ∝ field-oxide;
   STI clears it) *is* the consumer that the "geometry-only" framing had marked as too weak. The 2-D engine's
   2nd consumer. **Still deferred:** the STI process itself and a latchup electrical observable.

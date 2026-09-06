@@ -137,3 +137,40 @@ def test_summary_prints(r, capsys):
     assert "SUSTAINING" in out and "TRIGGERING" in out
     assert "coefficient-free" in out
     assert "upper bound" in out
+
+
+# --------------------------------------------------------------------------- #
+# panel C — the lever, and the floor under it
+# --------------------------------------------------------------------------- #
+def test_the_era_wafer_latches_and_the_grown_layer_is_what_rescues_it(r):
+    """The panel only tells the era's story if the uniform period wafer actually fails and the layer
+    actually saves it — otherwise it draws a fix for a problem it never showed."""
+    assert r.uniform_trigger_ma < r.injected_ma          # the period bulk wafer cannot take the hit ...
+    assert r.epi_trigger_ma.max() > r.injected_ma        # ... and a thin enough layer survives it.
+
+
+def test_thinner_is_monotonically_safer(r):
+    """The only direction this model supports. EPI_SWEEP_UM ascends, so the trigger must descend."""
+    assert np.all(np.diff(r.epi_um) > 0.0)
+    assert np.all(np.diff(r.epi_trigger_ma) < 0.0)
+
+
+def test_the_improvement_is_dominated_by_the_thickness_ratio_and_always_short_of_it(r):
+    """The caption's exact phrasing, asserted as written: *dominated by*, never *equal to*.
+
+    Equality would mean the heavily-doped handle contributed nothing, which would make the floor in
+    the same panel a fiction.
+    """
+    for t_um in (10.0, 5.0, 2.0):
+        R = lu.epi_substrate_resistance_ohm(demo.ERA_WAFER_RHO_OHM_CM, t_um, demo.HANDLE_RHO_OHM_CM)
+        improvement = (lu.trigger_current_a(R) * 1.0e3) / r.uniform_trigger_ma
+        geometric = lu.SUBSTRATE_TAP_PATH_UM / t_um
+        assert improvement == pytest.approx(geometric, rel=0.02)
+        assert improvement < geometric
+
+
+def test_the_floor_is_real_and_the_curve_stays_under_it(r):
+    """The drawn floor must bound the drawn curve over the whole sweep — a floor the curve crossed
+    would be a drawing error, and one nothing approaches would be decoration."""
+    assert r.handle_floor_ma > r.epi_trigger_ma.max()
+    assert r.handle_floor_ma > r.uniform_trigger_ma
