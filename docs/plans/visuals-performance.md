@@ -66,42 +66,146 @@ so they still hold exactly.
 **Workflow change for maintainers:** after re-banking any figure, run `python -m chip.thumbnails`
 and commit `docs/figures/thumbs/` alongside the PNG (the guard tells you so).
 
+### 1e. The second batch (2026-09-06) — the journey demo, and two items closed by measurement
+
+Working N1 and N2 top-down produced one optimization and **two negative results**, all three written
+back into §2 in place rather than deleted:
+
+* **N1 shipped** — `abbe_image` and `junction_breakdown` are memoized on their exact arguments. The
+  journey demo does **1.43× less CPU work** (22.5 → 15.7 s cpu, interleaved). Both are bit-identical
+  by construction and guarded by tests. The plan's two named targets were *not* the top two, and its
+  ≤ 3 s goal is retired as unreachable without changing what the demo computes.
+* **N2 was already done** — the 2-D engine has cached its operator and its per-`dt` factorization
+  since v1.8. 97% of its wall is the sparse back-solve itself. *This is the fourth gate in this repo
+  found already-released by someone going to build it* (`future-steps.md` records the other three) —
+  and, as with those, no test would ever have told us; only reading the file did.
+* **N6 is not worth building** — the `march()` ceiling is 19%, not the ~70% the item assumed.
+
+The lesson worth keeping: **a work order written from a profile is a hypothesis, not a task list.**
+Every number in §2 that was carried over rather than re-measured turned out to be wrong, in both
+directions. Re-measure the item before you build it.
+
 ## 2. Next — the remaining work, in priority order
 
 Each item: *why → what → where → test → measure*. Work them top-down; each is independent.
 
-### N1. The journey demo is still the slowest thing in the suite (~6 s; 25–33 s before)
+### N1. The journey demo is still the slowest thing in the suite — **DONE 2026-09-06 (1.43× less CPU work), and the plan's two named targets were the wrong two**
 
 *Why:* `fab_game/tests/test_demo_journey.py`'s module fixture runs `demo_journey.compute()` — 103
 full line runs (`pipeline.run_line`) plus 56 `journey.forecast` calls. It is the fast lane's Amdahl
 floor now.
-*What:* profile with
-```
-python -c "import cProfile,pstats; from fab_game.demo_journey import compute; cProfile.run('compute()','p'); pstats.Stats('p').sort_stats('tottime').print_stats(15)"
-```
-and attack the top two entries, which today are (a) `dataclasses._replace` — 61 k calls from
-per-die state updates in `fab_game/pipeline.py` / `state.py` (batch the per-die updates into one
-`replace` per wafer, or keep per-die scalars in NumPy arrays and build the dataclasses once at the
-end); (b) `chip/breakdown.py::_ionization_integral` — 95 k calls through `scipy.optimize.brentq`
-(`f_raise`): the breakdown voltage is solved per die although the die's doping is one of a handful
-of distinct values per wafer — memoize `breakdown_voltage` on its float inputs (`functools.lru_cache`
-on a thin wrapper, keyed on rounded inputs is NOT acceptable — key on the exact floats).
-*Test:* the whole `fab_game/tests/` tree; nothing may change numerically (compare
-`demo_journey.compute()` results before/after with `array_equal` on every array field).
-*Measure:* `demo_journey.compute()` wall; target ≤ 3 s.
 
-### N2. The 2-D engine has no fast path yet (`engines/diffusion/diffusion2d.py`)
+**What the profile actually said.** The two entries this item named — `dataclasses._replace` (61 k
+calls) and the breakdown root-find (95 k `_ionization_integral` calls) — are real, but they are not
+the top two. Ranked by cumulative time in `cProfile` on `compute()`:
 
-*Why:* the same rebuild-and-solve-per-step pattern; consumers are `chip/device_2d.py` (the 4.2 s
-`test_demo_device_2d` fixture), `chip/lateral_diffusion*`, `chip/locos_history.py`.
-*What:* mirror 1a — detect autonomy in `__init__`, cache the assembled sparse operator, and cache
-the factorization per `dt` (`scipy.sparse.linalg.splu` on the 5-point matrix; keep the current
-solver for the general path). Verify bit-identity is NOT guaranteed here (a different sparse
-solver reorders); if `splu` is not what the current path uses, assert `allclose(rtol=1e-12)` and
-say so in the test docstring, mirroring `test_fast_path.py`.
-*Test:* `engines/diffusion/tests/test_diffusion2d.py` + a new `test_fast_path_2d.py`; the v1.8/v1.11/B5
-chip tests.
-*Measure:* `chip.demo_device_2d.compute()` wall (4.2 s today).
+| | cumtime | calls |
+|---|---|---|
+| `chip/litho.py::abbe_image` | **2.05 s** | 6 527 |
+| `engines/diffusion` `step` + `flux` | 2.51 s | 152 400 |
+| `dataclasses._replace` | 1.08 s | 61 394 |
+| the breakdown `brentq` solve | ~0.73 s | 95 037 integrals |
+
+The engine's share turned out to have almost no headroom (see the closed N6 below — 19%, measured),
+so the whole of the win is in the **first** row, which this item never mentioned.
+
+**The finding under it: the journey asks the same questions over and over.** Instrumenting the run:
+
+```
+abbe_image          6527 calls ->  694 distinct argument sets   (9.4x redundancy)
+junction_breakdown  6527 calls ->   37 distinct argument sets   (176x redundancy)
+```
+
+Both are **pure functions**: the line is run 103 times over one wafer's dies, and most dies re-ask
+for an image of the same grating through the same lens, and for a breakdown reading at one of a
+handful of doping/depth pairs. Nothing was wrong with either computation — they were simply being
+recomputed.
+
+*What shipped:*
+
+* `chip/litho.py` — `abbe_image` is memoized on its **exact** arguments (bytes for the two arrays, the
+  frozen `Imaging`/`Aberrations` dataclasses as themselves, `orders` normalized to a tuple of
+  `(float, complex)`), LRU 1024. The cached master is read-only and **every call returns a fresh
+  copy**, so a consumer that normalizes its image in place (`litho.py` §9 does exactly that) cannot
+  reach another caller's hit. `abbe_image.cache_clear()` / `.cache_info()` are exposed on the public
+  name. Guarded by `chip/tests/test_abbe_cache.py`: bit-identity against the uncached body on every
+  keyed axis, the in-place-mutation isolation test, and that the v1.4/v1.10 degenerate seams (`z=0`,
+  `aberrations=None`) still land on the *same* cache entry as the plain call.
+* `chip/breakdown.py` — `junction_breakdown` is `lru_cache`d on its exact `(N_B, x_j_um)` floats
+  (**not** rounded; rounding would make a hit a different root-find). `JunctionBreakdown` is a frozen
+  dataclass, so the shared instance needs no copy. Three tests added to `test_breakdown.py`.
+
+*Measure.* Wall clock on this box is unusable right now — the machine sat at 100% CPU from other
+processes, and the same unchanged `compute()` measured anywhere from 6.2 s to 23 s. **CPU time is the
+machine-state-independent number**, taken interleaved (base / cached / base / cached in one process,
+so drift cancels):
+
+```
+base (both caches bypassed)      22.5 s cpu   1.00x
++ abbe_image memoized            16.6 s cpu   1.36x
++ junction_breakdown memoized    15.7 s cpu   1.43x
+```
+
+Reproduce with `M:\claud_projects\temp\chip-sim-perf\ab4.py`. Scaled onto the 6.2 s wall this demo
+showed on a quiet box, that is **~4.3 s**.
+
+**The ≤ 3 s target is retired, not met.** It assumed one or two dominant costs; after the caches the
+run has no dominant cost left — the largest remaining single line is the engine march at ~15% with a
+measured 19% ceiling (N6). Getting materially below ~4 s means changing *what the demo computes*
+(fewer line runs, fewer forecast points), which is a content decision, not a performance one.
+
+*Left on the table, deliberately:* `dataclasses._replace` (61 k calls, ~1.08 s cumulative in the
+profile ⇒ well under 1 s real). The plan's suggestion — batch the per-die updates into one `replace`
+per wafer, or hold per-die scalars in NumPy arrays and build the dataclasses at the end — is a
+refactor of `fab_game/pipeline.py` + `state.py`, i.e. game logic, for a fraction of a second. Not
+worth the regression risk against the two caches already banked; revisit only if the die count grows.
+
+### ~~N2. The 2-D engine has no fast path yet~~ — **PREMISE FALSE (checked 2026-09-06). Nothing to do.**
+
+This item was written from the assumption that `diffusion2d.py` repeats the 1-D module's
+rebuild-and-solve-per-step pattern. **It never did.** The 2-D engine has had the whole of item 1a
+since it was built (v1.8), by construction rather than as an optimization:
+
+* `Diffusion2D.__init__` assembles the sparse 5-point operator **once** into `self._A` — it is
+  backward-Euler-only with a time-independent `D`, so there is no per-step operator to rebuild and no
+  autonomy test to write. Only the inhomogeneous `b` (Dirichlet values, Neumann fluxes, source) is
+  rebuilt per step, which is what a time-dependent BC requires.
+* `_factor(dt)` already caches `splu(I − dt·A)` in `self._lu_cache`, keyed by `dt` — exactly the
+  "factorize once per dt, back-solve per step" shape 1a added to the 1-D module.
+
+So there is no cache to add. Where the time actually goes (`cProfile` on
+`chip.demo_device_2d.compute()`, 180×140 grid, 150 steps × 14 solver instances = 2100 steps):
+
+| | tottime | calls |
+|---|---|---|
+| `SuperLU.solve` (the back-solve itself) | **4.56 s** | 2100 |
+| `_superlu.gstrf` (the 14 factorizations) | 0.93 s | 14 |
+| all engine Python (`step`, `_b_vector`, `_edge_cells`, …) | **0.19 s** | — |
+
+The Python overhead this item wanted to remove is **3% of the wall**. The cost is the sparse
+back-solve, which is real numerical work.
+
+**The one lever that is left, and why it is not taken here.** `splu` defaults to `permc_spec="COLAMD"`,
+a fill-reducing ordering for *unsymmetric* matrices; this matrix has a symmetric sparsity pattern.
+Measured on the demo's own operator:
+
+```
+COLAMD          factor  48.6 ms   solve  1.51 ms   nnz(L+U) 2,029,664   (today)
+MMD_AT_PLUS_A   factor  30.6 ms   solve  0.93 ms   nnz(L+U) 1,096,444   (1.6x, 1.85x less fill)
+MMD_ATA         factor  50.7 ms   solve  1.44 ms   nnz(L+U) 1,953,632
+NATURAL         factor 310.4 ms   solve  9.29 ms   nnz(L+U) 7,067,478
+```
+
+`MMD_AT_PLUS_A` would take the demo from ~5.9 s to ~4.5 s. It is **not** bit-identical — a different
+elimination order is a different rounding — and the 2-D consumers carry tight absolute tolerances
+(`test_diffusion2d.py` asserts the x/y isotropy of a spreading blob to `1e-12`, and the 2-D↔1-D
+reduction to `1e-12`). Those are *physics* pins, not cache pins, so loosening them to buy 1.4 s is a
+bad trade and this plan does not authorize it. If someone wants the 1.4 s: change the ordering, run
+`engines/diffusion/tests/`, and if a `1e-12` trips, the honest move is to leave the ordering alone —
+not to widen the tolerance.
+
+*Status:* closed, no code change. The 4.2 s quoted below was a `--durations` line, not a
+`compute()` wall; measured directly the demo is ~5.9 s (min of 3), on a box that was 100% busy.
 
 ### N3. Blurbs on the later gallery cards are paragraphs
 
@@ -139,15 +243,29 @@ system fonts for a fallback.
 *Test:* none needed; *Measure:* `python -X importtime -c "import matplotlib.pyplot"` and the time
 of the first `fig.savefig` in a fresh process (`chip/demo_junction` end to end).
 
-### N6. `engines/diffusion` step overhead for tiny grids is now Python, not LAPACK
+### ~~N6. `engines/diffusion` step overhead for tiny grids is now Python, not LAPACK~~ — **NOT WORTH BUILDING (measured 2026-09-06).**
 
-*Why:* after 1a a 400-cell step is ~7 µs, of which ~5 µs is Python (`np.asarray`, shape checks,
-the `flux()` diagnostic that `chip.diffusion_dopant._diffuse` calls every step).
-*What (only if N1/N2 are done and the lane still floors on diffusion):* add
-`Diffusion1D.march(state, dt, n_steps)` that runs the loop in one call, accumulating the boundary
-flux without re-validating per step, and switch `_diffuse` to it. Same bit-identity test pattern
-as `test_fast_path.py`.
-*Measure:* `chip.demo_junction.compute()` wall.
+The premise was "a 400-cell step is ~7 µs, of which ~5 µs is Python", so a `march()` that hoists the
+validation and the per-step `flux()` out of the loop would recover most of it. The 7 µs is right; the
+**5 µs is not**. Measured against a hand-hoisted loop that keeps only the three lines that do work
+(`rhs = u + dt·b`; the `gttrs` back-solve; the closed-form Dirichlet flux), on 600 steps × 400 cells:
+
+```
+step() + flux() loop, as _diffuse runs it     7.24 us/step
+step() only (flux removed entirely)           6.34 us/step
+fully hoisted (the march() ceiling)           5.85 us/step   -> 19%, bit-identical
+```
+
+**19% is the entire ceiling**, and half of it is deleting the `flux()` call that the consumer actually
+needs (`_diffuse` returns `Σ dt·flux(left)` as `surface_flux_dose` — the conservation diagnostic the
+predep dose identity is checked against, so it is load-bearing, not a diagnostic that can be dropped).
+The remaining ~1.4 µs/step is `np.asarray`, the shape check and the cache lookups. What the 7 µs
+mostly *is*: the `rhs` allocation and the f2py call into `gttrs` — real work and scipy's own call
+overhead, neither of which a `march()` removes.
+
+On the fab-line journey (152,400 engine steps, the largest call count in the profile) 19% of the
+engine's share is **~0.25 s of a ~6 s wall**. That does not pay for a new public engine method whose
+signature has to carry the flux accumulation. *Closed: measured, negative, no code change.*
 
 ### N7. Gallery pages — small polish items (do in one pass)
 
@@ -182,3 +300,20 @@ python -c "import time; from fab_game.demo_journey import compute; t=time.perf_c
 # page weight: serve docs/ and read the Network panel, or in the console:
 #   performance.getEntriesByType('resource').filter(e=>e.initiatorType==='img').reduce((a,e)=>a+e.encodedBodySize,0)
 ```
+
+**Measure CPU time, interleaved, when the box is not idle.** Every wall number above is only
+meaningful on a quiet machine. During the 2026-09-06 batch the box sat at 100% CPU from unrelated
+processes and the *same unchanged* `compute()` measured 6.2 s, 11.9 s and 23.3 s across the session —
+a spread far larger than any optimization being evaluated, which briefly made a real 1.36× win look
+like 1.03×. Two rules that made the numbers trustworthy again:
+
+1. **`time.process_time()`, not `time.perf_counter()`.** CPU time counts the work this process did,
+   so a busy neighbour no longer lands in the measurement. (It is not perfectly immune — a downclocked
+   core inflates it too — which is why rule 2 matters.)
+2. **Interleave A and B in one process** (`base, cached, base, cached, …`, `min` over reps) rather
+   than timing two separate runs. Drift then cancels between neighbouring samples instead of being
+   attributed to the change. `M:\claud_projects\temp\chip-sim-perf\ab4.py` is the harness; it patches
+   the cache off and on and prints wall and cpu side by side, which is also how you *see* that the box
+   is lying to you (wall and cpu disagreeing by 2× is the tell).
+
+Before trusting any before/after in this document, check `(Get-CimInstance Win32_Processor).LoadPercentage`.

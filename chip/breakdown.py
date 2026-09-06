@@ -92,6 +92,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from functools import lru_cache
 
 from .device import EPS_SI
 from .diffusion_dopant import CM_PER_UM
@@ -252,6 +253,7 @@ class JunctionBreakdown:
         return self.bv / self.bv_pp
 
 
+@lru_cache(maxsize=4096)
 def junction_breakdown(N_B: float, x_j_um: float) -> JunctionBreakdown:
     """Read a junction's avalanche breakdown off its body doping ``N_B`` (cm⁻³) and depth ``x_j_um`` (µm).
 
@@ -260,6 +262,13 @@ def junction_breakdown(N_B: float, x_j_um: float) -> JunctionBreakdown:
     as the curvature radius ``r_j``); ``N_B`` is the p-body/substrate ``effective_channel_N_A`` (the
     lighter-doped side the drain–body junction breaks down into). *A shallow junction in, a low breakdown
     out — the device consequence the junction depth could not previously reach.*
+
+    **Memoized on the exact ``(N_B, x_j_um)`` floats.** The reading costs a bracketed ``brentq`` root-find
+    over :func:`_ionization_integral`, and the fab-line game asks for it **per die** although a wafer's
+    dies share a handful of distinct doping/depth pairs — 95 k integral evaluations for a few hundred
+    distinct answers. The key is the exact floats (no rounding, so a hit is the same root-find) and
+    :class:`JunctionBreakdown` is frozen, so the shared instance cannot be mutated by a caller.
+    ``junction_breakdown.cache_clear()`` empties it.
     """
     bv = cylindrical_breakdown(N_B, x_j_um * CM_PER_UM)
     return JunctionBreakdown(bv=bv, bv_pp=plane_parallel_breakdown(N_B), N_B=N_B, x_j_um=x_j_um)

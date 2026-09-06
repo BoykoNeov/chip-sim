@@ -519,12 +519,53 @@ def abbe_image(x_nm, orders, imaging: Imaging, source_fs=None, n_source: int = 2
     conventional disk of ``n_source`` points from ``imaging.sigma`` is used. The explicit-source design
     is deliberate: a uniform σ-disk cannot express extreme off-axis, so ``k₁=0.25`` needs the off-axis
     point handed in (a σ-disk conventional source tops out near ``k₁≈0.35–0.5``).
+
+    **Memoized.** The image is a pure function of its arguments, and its consumers re-ask for the
+    *same* one many times over — the fab-line journey images one grating per line run and runs the
+    line 103 times, so 6527 calls carry only 694 distinct argument sets. The whole image is therefore
+    cached on the exact arguments (:func:`_abbe_cached`), and the result is **copied out on every
+    call**, so a caller that scales or normalizes the array in place can never reach another caller's
+    hit. Every returned number is bit-for-bit what the uncached computation gives
+    (``test_abbe_cache.py``); the cache buys wall-clock and nothing else. ``abbe_image.cache_clear()``
+    empties it (tests, long-running sessions).
     """
+    x = np.ascontiguousarray(x_nm, dtype=float)
+    # Key on the exact bytes/values of every argument — no rounding, so a hit is the same
+    # computation. ``Imaging`` and ``Aberrations`` are frozen dataclasses (hashable); ``orders`` is
+    # normalized to a tuple of plain (float, complex) pairs so a list and a tuple key alike.
+    src_bytes = None if source_fs is None else np.ascontiguousarray(
+        np.atleast_1d(np.asarray(source_fs, dtype=float))).tobytes()
+    return _abbe_cached(
+        x.tobytes(), x.shape, tuple((float(f), complex(c)) for f, c in orders), imaging,
+        src_bytes, int(n_source), float(defocus_nm), aberrations,
+    ).copy()
+
+
+@lru_cache(maxsize=1024)
+def _abbe_cached(x_bytes: bytes, x_shape: tuple, orders: tuple, imaging: Imaging,
+                 source_bytes: "bytes | None", n_source: int, defocus_nm: float,
+                 aberrations: "Aberrations | None") -> np.ndarray:
+    """The body of :func:`abbe_image`, memoized on its (hashable, exact) arguments.
+
+    Keyed on bytes for the two arrays — hashable and exact, no float rounding in the key, the same
+    rule :func:`_carrier` uses one level down. The cached array is made read-only; ``abbe_image``
+    hands out a fresh copy, so the master can never be mutated through a caller.
+    """
+    x = np.frombuffer(x_bytes, dtype=float).reshape(x_shape)
+    source_fs = None if source_bytes is None else np.frombuffer(source_bytes, dtype=float)
+    I = _abbe_uncached(x, orders, imaging, source_fs, n_source, defocus_nm, aberrations)
+    I.flags.writeable = False
+    return I
+
+
+def _abbe_uncached(x, orders, imaging: Imaging, source_fs, n_source: int,
+                   defocus_nm: float, aberrations: "Aberrations | None") -> np.ndarray:
+    """The uncached Abbe sum itself — the physics of :func:`abbe_image`, one image per call."""
     if source_fs is None:
         source_fs = conventional_source(imaging, n_source)
     source_fs = np.atleast_1d(np.asarray(source_fs, dtype=float))
     cutoff = imaging.f_cut * (1.0 + _F_TOL)
-    x = np.asarray(x_nm, dtype=float)
+    x = np.asarray(x, dtype=float)
     n_s = len(source_fs)
     if len(orders) == 0:
         return np.zeros(x.shape, dtype=float)
@@ -549,6 +590,12 @@ def abbe_image(x_nm, orders, imaging: Imaging, source_fs=None, n_source: int = 2
     E = amp @ carrier                                                  # (n_s, n_x)
     total = np.einsum("ij,ij->j", E.real, E.real) + np.einsum("ij,ij->j", E.imag, E.imag)
     return (total / n_s).reshape(x.shape)
+
+
+# The cache is part of abbe_image's contract (see its docstring) — expose the standard handles on
+# the public name so callers never have to know the private one.
+abbe_image.cache_clear = _abbe_cached.cache_clear
+abbe_image.cache_info = _abbe_cached.cache_info
 
 
 def transmitted_power(orders, imaging: Imaging, source_fs=None, n_source: int = 21) -> float:

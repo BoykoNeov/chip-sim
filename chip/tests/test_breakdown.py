@@ -126,3 +126,39 @@ def test_ionization_coefficient_is_flagged_order_of_magnitude():
     assert 1.0e-36 < bd.A_IONIZATION < 1.0e-34
     # Steeply field-dependent: doubling the field raises α by 2^7 = 128× (why breakdown tracks the peak field).
     assert bd.ionization_coefficient(2.0e5) / bd.ionization_coefficient(1.0e5) == pytest.approx(128.0, rel=1e-9)
+
+
+# --------------------------------------------------------------------------- #
+# The memoization — a wall-clock optimization that must change no number
+# --------------------------------------------------------------------------- #
+def test_the_cached_reading_is_the_uncached_root_find_bit_for_bit():
+    # junction_breakdown is memoized on its exact (N_B, x_j_um) floats because the fab-line game asks
+    # for it per die while a wafer carries a handful of distinct doping/depth pairs. It must return
+    # exactly what the underlying root-find gives — the cache buys wall-clock, never a different BV.
+    bd.junction_breakdown.cache_clear()
+    N_B, x_j = 3.7e16, 0.42
+    got = bd.junction_breakdown(N_B, x_j)
+    assert got.bv == bd.cylindrical_breakdown(N_B, x_j * bd.CM_PER_UM)     # exact, no re-derivation
+    assert got.bv_pp == bd.plane_parallel_breakdown(N_B)
+
+
+def test_a_repeat_reading_is_served_from_the_cache_and_is_the_same_object():
+    # The reading is a frozen dataclass, so the shared instance cannot be mutated by a caller — which
+    # is what makes handing out the same object (rather than a copy) safe.
+    bd.junction_breakdown.cache_clear()
+    first = bd.junction_breakdown(1.0e15, 1.0)
+    second = bd.junction_breakdown(1.0e15, 1.0)
+    assert first is second
+    info = bd.junction_breakdown.cache_info()
+    assert (info.hits, info.misses) == (1, 1)
+    with pytest.raises(Exception):                       # frozen — a caller cannot write through it
+        first.bv = 0.0
+
+
+def test_a_different_doping_or_depth_is_a_different_entry():
+    bd.junction_breakdown.cache_clear()
+    a = bd.junction_breakdown(1.0e15, 1.0)
+    b = bd.junction_breakdown(1.0e15, 2.0)               # deeper junction → toward the planar ceiling
+    c = bd.junction_breakdown(2.0e15, 1.0)               # heavier body → lower BV
+    assert b.bv > a.bv > c.bv
+    assert bd.junction_breakdown.cache_info().misses == 3
