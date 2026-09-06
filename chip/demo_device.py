@@ -55,7 +55,6 @@ OVERDRIVE_V = 1.0              # V_GS − V_t for I_Dsat
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-device.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-device.png"
 
 
 @dataclass(frozen=True)
@@ -140,9 +139,8 @@ def save_figure(r: FlowResult) -> Path:
     from .plots import device_figure
 
     fig = device_figure(r)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

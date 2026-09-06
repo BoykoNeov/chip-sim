@@ -70,7 +70,6 @@ PITCH_DENSE_NM = 145.0
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-peb.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-peb.png"
 
 
 def _offset_grid(pitch_nm: float, n_x: int) -> np.ndarray:
@@ -207,9 +206,8 @@ def save_figure(data) -> Path:
 
     fig = peb_figure(data, wavelength_nm=WAVELENGTH_NM, NA=NA, sigma_src=SIGMA_SRC,
                      pitch_nm=PITCH_NM, n_resist=N_RESIST, keep_floor=KEEP_FLOOR)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

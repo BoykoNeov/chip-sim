@@ -45,7 +45,6 @@ GAP_MARKS_UM = (0.0, 10.0, 25.0, 40.0)  # annotated points
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-litho-history.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-litho-history.png"
 
 
 @dataclass(frozen=True)
@@ -194,9 +193,8 @@ def save_figure(r: LithoHistoryResult) -> Path:
     fig.suptitle("Historical-modes A2 — period lithography: the wavelength race broke the Rayleigh floor, "
                  "projection broke the √(λg) proximity wall", fontsize=11.5)
     fig.tight_layout()
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

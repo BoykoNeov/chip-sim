@@ -45,7 +45,6 @@ GATE = "n+poly"
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-thin-oxide.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-thin-oxide.png"
 
 
 def compute():
@@ -118,9 +117,8 @@ def save_figure(t_min, curves, rates, gate) -> Path:
         gate_massoud_nm=gate["massoud"].t_ox_nm, gate_v1_nm=gate["v1"].t_ox_nm,
         T_celsius=T_GATE, orientation=ORIENTATION,
     )
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

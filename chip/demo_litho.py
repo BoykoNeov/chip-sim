@@ -59,7 +59,6 @@ TABLE_PITCHES = (600.0, 350.0, 240.0, 180.0, 150.0)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-litho.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-litho.png"
 
 
 def _assembling_orders():
@@ -143,9 +142,8 @@ def save_figure(data) -> Path:
         pitch_coherent=data["pitch_coherent"], pitch_two_beam=data["pitch_two_beam"],
         wavelength_nm=WAVELENGTH_NM, NA=NA, sigma=SIGMA,
     )
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

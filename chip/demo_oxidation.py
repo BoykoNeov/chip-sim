@@ -44,7 +44,6 @@ PUBLISHED_WET_UM = 0.64
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-oxidation.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-oxidation.png"
 
 
 def compute():
@@ -90,9 +89,8 @@ def save_figure(t_hours, curves) -> Path:
     from .plots import oxidation_figure
 
     fig = oxidation_figure(t_hours, curves, T_celsius=T_OX, orientation=ORIENTATION)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

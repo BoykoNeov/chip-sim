@@ -64,7 +64,6 @@ SPHERICAL_PITCHES_NM = (290.0, 340.0, 390.0)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-zernike.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-zernike.png"
 
 
 def _on_axis(img: "litho.Imaging"):
@@ -190,9 +189,8 @@ def save_figure(data) -> Path:
     from .plots import zernike_figure
 
     fig = zernike_figure(data, wavelength_nm=WAVELENGTH_NM, NA=NA, pitch_nm=PITCH_NM)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

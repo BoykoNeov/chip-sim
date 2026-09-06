@@ -56,7 +56,6 @@ R_SH_SWEEP = np.logspace(np.log10(3.0), np.log10(120.0), 160)   # Ω/□ — sil
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-silicide-history.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-silicide-history.png"
 
 
 @dataclass(frozen=True)
@@ -174,9 +173,8 @@ def save_figure(r: SilicideHistoryResult) -> Path:
     fig.suptitle("Historical-modes B7 — silicide / contact resistance: salicide solves the ACCESS "
                  "resistance so well that the CONTACT becomes the next-era bottleneck", fontsize=11)
     fig.tight_layout()
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

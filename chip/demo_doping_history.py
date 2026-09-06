@@ -55,7 +55,6 @@ IMPLANT_ENERGY_KEV = 15.0          # keV — the shallow V_t-adjust energy (dept
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-doping-history.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-doping-history.png"
 
 
 @dataclass(frozen=True)
@@ -197,9 +196,8 @@ def save_figure(r: DopingHistoryResult) -> Path:
     fig.suptitle("Historical-modes A1 — the dose-control wall: light doses belonged to ion implantation",
                  fontsize=12)
     fig.tight_layout()
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

@@ -46,7 +46,6 @@ THICKNESSES_NM = np.linspace(200.0, 2200.0, 100)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-resist-history.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-resist-history.png"
 
 
 @dataclass(frozen=True)
@@ -208,9 +207,8 @@ def save_figure(r: ResistHistoryResult) -> Path:
     fig.suptitle("Historical-modes A4 — period photoresist: negative-resist swelling set a CD floor "
                  "≈ the film thickness that no wavelength could clear (positive & CAR did)", fontsize=11.0)
     fig.tight_layout()
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

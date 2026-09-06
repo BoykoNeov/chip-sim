@@ -63,7 +63,6 @@ N_SEED_SWEEP = tuple(float(n) for n in np.logspace(15.3, 17.2, 16))
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "fab-game-s5.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "fab-game-s5.png"
 
 
 @dataclass(frozen=True)
@@ -194,9 +193,8 @@ def save_figure(r: DemoResult) -> Path:
     from .plots import reverse_recovery_figure
 
     fig = reverse_recovery_figure(r)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

@@ -55,7 +55,6 @@ OX_SLOPE_MIN = 5.5                                     # (≈ centres V_t across
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "fab-game-g7.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "fab-game-g7.png"
 
 
 def adaptive_recipe(z: float) -> Recipe:
@@ -179,9 +178,8 @@ def save_figure(r: DemoResult) -> Path:
     from .plots import game_figure
 
     fig = game_figure(r)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

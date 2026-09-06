@@ -50,7 +50,6 @@ LEAK_SPEC_NA = 1.0             # nA/cm² — an illustrative reverse-leakage spe
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-metallization-history.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-metallization-history.png"
 
 
 @dataclass(frozen=True)
@@ -172,9 +171,8 @@ def save_figure(r: MetallizationHistoryResult) -> Path:
     fig.suptitle("Historical-modes B6 — aluminium junction spiking: pure Al shorts the shallow "
                  "(implant-era) junction; Al–Si and barrier metals clear the wall", fontsize=11)
     fig.tight_layout()
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

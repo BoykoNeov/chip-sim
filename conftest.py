@@ -44,8 +44,8 @@ except ImportError:
 def _bank_test_figures_in_tmp(request, monkeypatch, tmp_path):
     """Keep the test suite from re-banking figures into the repo tree.
 
-    A demo's ``save_figure`` writes to its module-level ``DOCS_FIGURE`` / ``OUTPUT_FIGURE`` paths —
-    the committed ``docs/figures/*.png`` the galleries display. The ``test_demo_*`` modules that call
+    A demo's ``save_figure`` writes to its module-level ``DOCS_FIGURE`` path — the committed
+    ``docs/figures/*.png`` the galleries display. The ``test_demo_*`` modules that call
     ``save_figure`` (a "the figure builds" smoke test) were therefore rewriting committed PNGs on every
     run (a dirty tree after ``pytest``, and — since the thumbnail drift guard hashes those PNGs —
     an order-dependent red). For those modules only, every ``*FIGURE*`` path attribute of every

@@ -108,7 +108,6 @@ OX_SHOWCASE_Z = 0.5              # the oxide window is shown on a representative
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "fab-game-journey.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "fab-game-journey.png"
 
 
 @dataclass(frozen=True)
@@ -434,9 +433,8 @@ def save_figure(r: JourneyDemoResult) -> Path:
     from .plots import journey_figure
 
     fig = journey_figure(r)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

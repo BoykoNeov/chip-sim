@@ -93,7 +93,6 @@ RAD_GRID_N = 9
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "fab-game-a1.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "fab-game-a1.png"
 
 
 @dataclass(frozen=True)
@@ -242,9 +241,8 @@ def save_figure(r: DemoResult) -> Path:
     from .plots import dislocation_figure
 
     fig = dislocation_figure(r)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

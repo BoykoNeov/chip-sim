@@ -85,13 +85,9 @@ DAMAGE_DOSE_ANNEAL_T = 700.0   # °C — a fixed INCOMPLETE anneal for the dose 
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-implant.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-implant.png"
 DOCS_FIGURE_PEARSON = _REPO_ROOT / "docs" / "figures" / "chip-implant-pearson.png"
-OUTPUT_FIGURE_PEARSON = _REPO_ROOT / "outputs" / "chip-implant-pearson.png"
 DOCS_FIGURE_CHANNEL = _REPO_ROOT / "docs" / "figures" / "chip-implant-channeling.png"
-OUTPUT_FIGURE_CHANNEL = _REPO_ROOT / "outputs" / "chip-implant-channeling.png"
 DOCS_FIGURE_DAMAGE = _REPO_ROOT / "docs" / "figures" / "chip-implant-damage.png"
-OUTPUT_FIGURE_DAMAGE = _REPO_ROOT / "outputs" / "chip-implant-damage.png"
 
 
 @dataclass(frozen=True)
@@ -236,9 +232,8 @@ def save_pearson_figure(p: PearsonResult) -> Path:
     ax.text(0.98, 0.60, f"γ, β flagged (β={p.beta:.1f} pinned\ninto the type-IV branch);\nthe SIGN of γ is the cited part",
             transform=ax.transAxes, ha="right", va="top", fontsize=7.5, color="0.35")
     fig.tight_layout()
-    for target in (DOCS_FIGURE_PEARSON, OUTPUT_FIGURE_PEARSON):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE_PEARSON.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE_PEARSON, dpi=130)
     return DOCS_FIGURE_PEARSON
 
 
@@ -352,9 +347,8 @@ def save_channel_figure(c: ChannelResult) -> Path:
     fig.suptitle("Ion implantation §5 slice 3 — the channeling tail deepens the junction (punchthrough)",
                  fontsize=12)
     fig.tight_layout()
-    for target in (DOCS_FIGURE_CHANNEL, OUTPUT_FIGURE_CHANNEL):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE_CHANNEL.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE_CHANNEL, dpi=130)
     return DOCS_FIGURE_CHANNEL
 
 
@@ -474,9 +468,8 @@ def save_damage_figure(d: DamageResult) -> Path:
     fig.suptitle("Ion implantation §5 slice 4 — displacement damage → junction leakage (the incomplete anneal)",
                  fontsize=12)
     fig.tight_layout()
-    for target in (DOCS_FIGURE_DAMAGE, OUTPUT_FIGURE_DAMAGE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE_DAMAGE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE_DAMAGE, dpi=130)
     return DOCS_FIGURE_DAMAGE
 
 
@@ -512,9 +505,8 @@ def save_figure(r: ContrastResult) -> Path:
 
     fig.suptitle("Ion implantation §5 — the buried peak a predep cannot make", fontsize=12)
     fig.tight_layout()
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

@@ -47,7 +47,6 @@ HP_T_REDUCTION_P = 20.0        # atm — the pressure for the flagged T-reductio
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-oxidation-history.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-oxidation-history.png"
 
 
 @dataclass(frozen=True)
@@ -179,9 +178,8 @@ def save_figure(r: OxidationHistoryResult) -> Path:
     fig.suptitle("Historical-modes A3 — period oxidation ambients: HCl getters mobile Na (V_t), "
                  "pressure buys thermal budget (∫D dt)", fontsize=11.5)
     fig.tight_layout()
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

@@ -190,7 +190,6 @@ LITERATURE_CROSSING_NM = 20.0                     # cited: barrierless Ru has th
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-beol-history.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-beol-history.png"
 
 
 @dataclass(frozen=True)
@@ -692,9 +691,8 @@ def save_figure(r: BeolHistoryResult) -> Path:
                  "   ·   an UN-REPEATED global wire: real chips\ninsert repeaters, which make delay ∝ L and not L²",
                  fontsize=10.0)
     fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.945))
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

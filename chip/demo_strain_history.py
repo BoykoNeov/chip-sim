@@ -123,7 +123,6 @@ MU_FACTOR_AXIS = np.linspace(1.0, 2.10, 200)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-strain-history.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-strain-history.png"
 
 
 @dataclass(frozen=True)
@@ -570,9 +569,8 @@ def save_figure(r: StrainHistoryResult) -> Path:
                  "read is an UPPER BOUND, what strain DELIVERS is a cited bracket that decays with L, and this model's elasticity is 1 at every L",
                  fontsize=10.0)
     fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.905))
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

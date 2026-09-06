@@ -57,7 +57,6 @@ SWEEP_SEEDS = 60                             # realizations averaged at each den
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "fab-game-g3.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "fab-game-g3.png"
 
 
 @dataclass(frozen=True)
@@ -147,9 +146,8 @@ def save_figure(r: DemoResult) -> Path:
     from .plots import wafer_prep_figure
 
     fig = wafer_prep_figure(r)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

@@ -59,7 +59,6 @@ CD_SPEC = 0.10                        # ±10 % of target CD = the process-window
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-defocus.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-defocus.png"
 
 
 def _defocus_axis() -> np.ndarray:
@@ -173,9 +172,8 @@ def save_figure(data) -> Path:
 
     fig = defocus_figure(data, wavelength_nm=WAVELENGTH_NM, NA=NA, sigma=SIGMA,
                          pitch_nm=PITCH_NM, dose_fractions=DOSE_FRACTIONS, cd_spec=CD_SPEC)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

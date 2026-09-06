@@ -38,7 +38,6 @@ DRAWN_WIDTHS_UM = np.linspace(1.2, 8.0, 90)       # the wall sweep — spans pin
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-locos-history.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-locos-history.png"
 
 
 @dataclass(frozen=True)
@@ -177,9 +176,8 @@ def save_figure(r: LocosHistoryResult) -> Path:
     fig.suptitle("Historical-modes B5 — LOCOS: the bird's beak eats active area and merges below a "
                  "min pitch (∝ field-oxide thickness); STI's vertical walls cleared it", fontsize=11.0)
     fig.tight_layout()
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

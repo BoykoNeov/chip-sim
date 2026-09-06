@@ -58,7 +58,6 @@ L_DRAWN_SWEEP_UM = (0.75, 0.65, 0.55, 0.50, 0.45, 0.40, 0.35, 0.30, 0.25, 0.22, 
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-device-2d.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-device-2d.png"
 
 
 @dataclass(frozen=True)
@@ -141,9 +140,8 @@ def save_figure(r: CrossSectionResult) -> Path:
     from .plots import device_2d_figure
 
     fig = device_2d_figure(r)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

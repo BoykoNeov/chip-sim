@@ -279,14 +279,47 @@ signature has to carry the flux accumulation. *Closed: measured, negative, no co
   "local has no remote reference" tests green).
 *Test:* regenerate the eight pages; golden tests. Check both themes in a browser.
 
-### N8. Retire the `outputs/` duplicate write
+### ~~N8. Retire the `outputs/` duplicate write~~ — **DONE 2026-09-06, and the second write was costing more than this item claimed**
 
-*Why:* every demo writes each figure twice (`DOCS_FIGURE` and `OUTPUT_FIGURE` under the git-ignored
-`outputs/`); the second write costs ~0.4 s per figure for the larger ones and nothing reads it.
-*What:* grep `OUTPUT_FIGURE` across `chip/demo_*.py`, `fab_game/demo_*.py`; drop the second target
-and the constant; update `docs/decisions/0002-visualization-and-ux.md` if it names `outputs/`.
-Check `.gitignore` and the READMEs for `outputs/` mentions.
-*Test:* the `test_demo_*` figure tests (they assert `save_figure(...)` returns an existing file).
+*Why:* every demo wrote each figure twice — `DOCS_FIGURE` (committed, displayed by the galleries) and
+`OUTPUT_FIGURE` under the git-ignored `outputs/`, which **nothing reads**: no test, no gallery, no
+notebook, no README. The duplicate was a leftover from before `docs/figures/` became the bank.
+
+**What it actually cost.** This item estimated "~0.4 s per figure for the larger ones". Timed on the
+`savefig` calls alone (the figure build excluded, matplotlib warm), one write of the larger figures is:
+
+| figure | one write | size |
+|---|---|---|
+| `fab-journey.png` | 0.89 s | 583 kB |
+| `chip-cmp-history.png` | 1.37 s | 437 kB |
+| `chip-beol-history.png` | 1.05 s | 472 kB |
+| `chip-junction.png` (a small one) | 0.37 s | 135 kB |
+
+and the second write costs **the same again** — repeated `savefig` of the *same* `Figure` object
+measured 0.46–1.8 s per call with no downward trend, because `savefig` re-renders the canvas through
+the Agg backend every time. It is not a file copy, so there was no caching to make the duplicate cheap.
+The estimate was low by roughly 2–3× on the big figures; the honest figure is **~0.4 s (small) to
+~1.4 s (large) per demo**, paid by every demo run and every figure re-bank.
+
+*What was done:* 48 `OUTPUT_FIGURE*` constants and their 48 two-target save loops removed across 45
+demo modules (`chip/demo_*.py`, `fab_game/demo_*.py`), each loop collapsed to the single write it was
+already returning. `chip/demo_implant.py` carries **four** figures and was checked individually. All 48
+loops were byte-identical in shape and every `savefig` used `dpi=130`, so the collapse is mechanical
+with nothing per-file to decide.
+
+*What was deliberately left alone:*
+* `conftest.py`'s `_bank_test_figures_in_tmp` matches attribute names by the **pattern** `"FIGURE" in
+  attr`, not by a list of names, so it needed no change — only its docstring, which named the retired
+  constant. That pattern is why the removal could not silently un-protect the committed PNGs.
+* `.gitignore`'s `outputs/` line stays: the directory is still git-ignored local state, and an ignore
+  rule for a path nothing writes costs nothing.
+* `docs/plans/historical-modes-a1.md` mentions `outputs/` twice — a **historical plan record** of what
+  A1 did at the time. Left verbatim; this repo annotates its history rather than rewriting it.
+* No ADR or README named `outputs/` (grepped), so nothing else moved.
+
+*Test:* the `test_demo_*` figure tests pass (215 selected by `-k demo_`). The discriminating check is `git status` afterwards
+showing **no** `docs/figures/*.png` — the demos were never run by hand, only under the conftest
+redirect, so no committed PNG was rewritten and the thumbnail drift guard stayed green.
 
 ## 3. Numbers to keep honest
 

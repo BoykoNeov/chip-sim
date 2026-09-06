@@ -57,7 +57,6 @@ N_STEPS = 800
 # NB: repo root is parents[1] for a file in chip/ (post the standalone-chip-sim flatten).
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-highconc.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-highconc.png"
 
 
 def compute() -> dict:
@@ -134,9 +133,8 @@ def save_figure(case: dict) -> Path:
     from .plots import highconc_figure
 
     fig = highconc_figure(case)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

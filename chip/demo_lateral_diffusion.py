@@ -70,7 +70,6 @@ RATIO_BAND = (0.75, 0.85)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-lateral-diffusion.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-lateral-diffusion.png"
 
 
 def _analytic_vertical_um(frac: float, D: float, t: float) -> float:
@@ -137,9 +136,8 @@ def save_figure(data) -> Path:
     from .plots import lateral_diffusion_figure
 
     fig = lateral_diffusion_figure(data)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

@@ -65,7 +65,6 @@ SPEED_BINS = SpeedBins(bins=(
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "fab-game-g6.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "fab-game-g6.png"
 
 
 @dataclass(frozen=True)
@@ -187,9 +186,8 @@ def save_figure(r: DemoResult) -> Path:
     from .plots import packaging_figure
 
     fig = packaging_figure(r)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

@@ -128,7 +128,6 @@ DENSITY_AXIS = np.linspace(0.05, 0.95, 181)     # pattern density at the house p
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-cmp-history.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-cmp-history.png"
 
 
 @dataclass(frozen=True)
@@ -523,9 +522,8 @@ def save_figure(r: CmpHistoryResult) -> Path:
                  "the seam, the monotone shapes and the V ≡ ω·d identity are the claims",
                  fontsize=10.0)
     fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.905))
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

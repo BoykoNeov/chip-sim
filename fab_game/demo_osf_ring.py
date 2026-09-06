@@ -80,7 +80,6 @@ _DEFECTS_ONLY = Variation(enabled=True, focus_tilt_nm=0.0, t_ox_edge_frac=0.0,
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "fab-game-a2.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "fab-game-a2.png"
 
 
 @dataclass(frozen=True)
@@ -199,9 +198,8 @@ def save_figure(r: DemoResult) -> Path:
     from .plots import osf_ring_figure
 
     fig = osf_ring_figure(r)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

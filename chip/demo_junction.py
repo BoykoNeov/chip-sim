@@ -52,7 +52,6 @@ PUBLISHED_RS_OHM_SQ = (50.0, 300.0)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "chip-junction.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "chip-junction.png"
 
 
 def compute():
@@ -106,9 +105,8 @@ def save_figure(predep, drivein, junction, morph) -> Path:
     from .plots import junction_figure
 
     fig = junction_figure(predep, drivein, junction, morph=morph, dopant_label="boron")
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 

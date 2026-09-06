@@ -68,7 +68,6 @@ OXYGEN_SWEEP_CM3 = tuple(float(o) for o in np.logspace(17.0, 18.2, 60))   # the 
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "fab-game-c1.png"
-OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "fab-game-c1.png"
 
 
 @dataclass(frozen=True)
@@ -175,9 +174,8 @@ def save_figure(r: DemoResult) -> Path:
     from .plots import thermal_donor_figure
 
     fig = thermal_donor_figure(r)
-    for target in (DOCS_FIGURE, OUTPUT_FIGURE):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(target, dpi=130)
+    DOCS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(DOCS_FIGURE, dpi=130)
     return DOCS_FIGURE
 
 
