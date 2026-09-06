@@ -81,9 +81,25 @@ def test_a_cache_hit_is_bit_identical_to_the_miss_that_filled_it(name):
 
 def test_a_list_and_a_tuple_of_orders_hit_the_same_entry():
     """Orders are normalized into the key, so the caller's container type is not a cache axis."""
-    L.abbe_image(X, list(ORDERS), IMG)
-    L.abbe_image(X, tuple(ORDERS), IMG)
-    assert L.abbe_image.cache_info() == (1, 1, 1024, 1)      # hits, misses, maxsize, currsize
+    first = L.abbe_image(X, list(ORDERS), IMG)
+    second = L.abbe_image(X, tuple(ORDERS), IMG)
+    info = L.abbe_image.cache_info()
+    assert (info.hits, info.misses, info.currsize) == (1, 1, 1)   # not maxsize — that is tunable
+    assert np.array_equal(first, second)
+
+
+def test_a_scalar_source_point_and_its_one_element_array_agree():
+    """``source_fs=0.0`` and ``np.array([0.0])`` are the same source, and give the same image.
+
+    The key normalizes through ``atleast_1d``, so the two collapse onto one entry. That is only safe
+    because the uncached body normalizes them identically too — asserted here against the body, so a
+    future change to either normalization cannot silently make them share a wrong answer.
+    """
+    scalar = L.abbe_image(X, ORDERS, IMG, source_fs=0.0)
+    array = L.abbe_image(X, ORDERS, IMG, source_fs=np.array([0.0]))
+    assert np.array_equal(scalar, array)
+    assert np.array_equal(scalar, _uncached(source_fs=0.0))
+    assert np.array_equal(scalar, _uncached(source_fs=np.array([0.0])))
 
 
 # --------------------------------------------------------------------------- #
