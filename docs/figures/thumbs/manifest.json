@@ -215,6 +215,12 @@
   "source": "fab-game-e1.png",
   "width": 760
  },
+ "fab-game-f8.webp": {
+  "digest": "71739ee15d46209a",
+  "height": 384,
+  "source": "fab-game-f8.png",
+  "width": 760
+ },
  "fab-game-g1.webp": {
   "digest": "3118302210f83d0c",
   "height": 684,
@@ -297,12 +303,6 @@
   "digest": "f129ee9d1438a2a4",
   "height": 301,
   "source": "roadmap-f7.png",
-  "width": 760
- },
- "roadmap-f8.webp": {
-  "digest": "bbe647c6c4a009f9",
-  "height": 301,
-  "source": "roadmap-f8.png",
   "width": 760
  },
  "roadmap-f9.webp": {

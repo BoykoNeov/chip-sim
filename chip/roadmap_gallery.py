@@ -104,6 +104,22 @@ class Slice:
 # prose did not CHANGE, never that it is still TRUE (F4-S4's named failure mode). ⇒ when a slice is
 # picked up, RE-CHECK ITS GATE AGAINST THE TREE FIRST. Corrections land here and in roadmap_figures.py
 # together, since the stale claims are stamped into the schematic too.
+#
+# F8 (CMP planarity) GRADUATED 2026-09-06 with its slice 4, and its card's gate was the THIRD on this page
+# found already released when someone went to build it: the card said "F4's wire geometry is a
+# module-level house line, so a per-die CMP variation needs the cross-section to become a per-die quantity
+# first", but delay() had always TAKEN the geometry as an argument and Die already carried radius_frac —
+# a die field and a call-site change, not the refactor the card described. That correction was deliberately
+# NOT made in flight (docs/plans/cmp-planarity-f8.md, "Decisions taken" #2): the card was about to be
+# deleted, and regenerating a schematic to fix prose that is coming off the page is work spent on a
+# promise instead of on the build. Built work now lives on history-mode B11 + chip.cmp + the fab-game F8
+# card. Do not re-add this card, or F3's, F4's or F5's.
+#
+# WITH F8 GONE THE PROMOTABLE SECTION IS EMPTY, AND THAT IS THE PAGE'S HONEST STATE — not a rendering
+# bug to paper over. future-steps.md says the same in prose: nothing on the list currently has BOTH a
+# clear gate and a named consumer, so the next slice is a re-triage rather than a pick off the top. The
+# section renders its emptiness rather than being deleted, because a roadmap that silently drops its
+# "ready to build" heading reads as if the question was never asked.
 SLICES = [
     Slice(
         fid="F6", era="bipolar epi · CMOS wells", title="Epitaxy (buried layer / retrograde well)",
@@ -124,21 +140,6 @@ SLICES = [
                   "the two named leftovers of the isolation arc.",
         gate="A consumer for trench geometry / a latchup observable; the beak physics already "
              "shipped, so only the remainder is on the roadmap.",
-    ),
-    Slice(
-        fid="F8", era="enables Cu damascene", title="CMP / dishing / planarity",
-        status="Head of the queue — unblocked by F4", badge="ok",
-        blurb="Preston-class removal with pattern-density dishing and erosion — post-CMP "
-              "thickness non-uniformity.",
-        would_add="Post-CMP layer-thickness non-uniformity, now with somewhere to land: F4 made "
-                  "the wire cross-section electrical (R ∝ 1/(W·H) → τ_wire → the delay bins), so "
-                  "dishing and erosion finally reach an observable.",
-        gate="Its old gate is RELEASED — the F4 build gave layer thickness its first reader, which "
-             "is exactly the trigger recorded for backlog D2, and F5's graduation left it at the head "
-             "of the queue by default rather than by strength. What remains is narrower and "
-             "structural: F4's wire geometry is a module-level house line and its game knob is "
-             "metal-only, so a per-die CMP variation needs the cross-section to become a per-die "
-             "quantity first.",
     ),
     Slice(
         fid="F9", era="2011 FinFET · 2022 GAA", title="FinFET / gate-all-around",
@@ -166,10 +167,12 @@ SLICES = [
 # The page's sections, in the plan's own order: consumer strength first, the honest NO's last.
 SECTIONS = [
     ("Promotable — the consumer is named",
-     "Each of these already has a device observable waiting to read it. F3 (high-κ), F4 (BEOL "
-     "interconnect) and F5 (strained silicon) have all shipped and their cards came off; F8 now heads "
-     "the queue, promoted from the deferred list — F4&rsquo;s build gave layer thickness its first "
-     "reader, which is the trigger that card was fenced behind.",
+     "<strong>Empty, and that is the finding.</strong> F3 (high-κ), F4 (BEOL interconnect), F5 (strained "
+     "silicon) and now F8 (CMP planarity) have all shipped, and each card came off with its last slice. "
+     "Nothing left on this page has <em>both</em> a released gate and a device observable waiting to read "
+     "it, so the next slice is a re-triage rather than a pick off the top of a queue. The heading stays "
+     "because a roadmap that quietly drops its &ldquo;ready to build&rdquo; section reads as if the "
+     "question was never asked.",
      [s for s in SLICES if s.badge == "ok"]),
     ("Coupled &amp; partly built",
      "Real physics whose consumer is (partly) already served — built where the consumer exists, "
@@ -265,13 +268,15 @@ def render_html(local: bool = False) -> str:
         physics = "index.html"
     sections = []
     for heading, sub, slices in SECTIONS:
-        cards = "\n".join(_card(s, plan) for s in slices)
+        # A section can legitimately be EMPTY (the promotable list is, since F8 graduated 2026-09-06) —
+        # its heading and sub-text then carry the whole statement, and no card grid is emitted.
+        grid = ("" if not slices else
+                "\n      <div class=\"grid\">\n"
+                + "\n".join(_card(s, plan) for s in slices)
+                + "\n      </div>")
         sections.append(f"""    <section>
       <h2>{heading}</h2>
-      <p class="sub">{sub}</p>
-      <div class="grid">
-{cards}
-      </div>
+      <p class="sub">{sub}</p>{grid}
     </section>""")
     sections_html = "\n\n".join(sections)
     return f"""<!DOCTYPE html>

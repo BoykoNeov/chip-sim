@@ -1,12 +1,12 @@
 """Roadmap schematic previews — the banked figures for the PLANNED, not-yet-built slices.
 
 Draws one figure per unbuilt roadmap slice of ``docs/plans/future-steps.md`` (F6 epitaxy,
-F7 STI remainder, F8 CMP, F9 FinFET/GAA, F10 EUV) into ``docs/figures/roadmap-*.png``, for the
+F7 STI remainder, F9 FinFET/GAA, F10 EUV) into ``docs/figures/roadmap-*.png``, for the
 ``docs/roadmap.html`` page (:mod:`chip.roadmap_gallery`) to display.
 
 A slice that **ships** loses its schematic here and its card on the page (F3 high-κ graduated
-2026-07-17; **F4 BEOL interconnect and F5 strained silicon, both 2026-08-10**) — the drawing is a
-promise, and once the real demo
+2026-07-17; **F4 BEOL interconnect and F5 strained silicon, both 2026-08-10; F8 CMP planarity,
+2026-09-06**) — the drawing is a promise, and once the real demo
 exists the banked artifact on the history gallery is the honest picture. Deleting the draw function
 is what keeps the two in step: the manifest guard pins ``FIGURES`` against the page's ``SLICES``.
 
@@ -158,42 +158,6 @@ def _draw_f7(fig) -> None:
 
 
 # --------------------------------------------------------------------------------------------- #
-# F8 — CMP / dishing / erosion (its gate was RELEASED by the F4 build, 2026-08-10)
-# --------------------------------------------------------------------------------------------- #
-def _draw_f8(fig) -> None:
-    import numpy as np
-    _chrome(fig, "F8 — CMP planarity: dishing & erosion — the thickness now has a reader (F4 shipped)")
-    ax = _bare(fig.add_axes((0.02, 0.02, 0.96, 0.84)), xlim=(0, 12), ylim=(0, 6.4))
-
-    # the polished stack: a dense Cu array (left) + one wide Cu line (right) in oxide
-    _rect(ax, 0.8, 1.0, 10.4, 2.2, SI_GRAY)
-    ax.text(1.35, 1.35, "oxide", ha="center", va="center", fontsize=8.5, color=MUTED)
-    for i in range(6):
-        _rect(ax, 1.9 + i * 0.75, 1.9, 0.45, 1.3, ORANGE, z=3)    # dense array
-    _rect(ax, 7.6, 1.9, 2.9, 1.3, ORANGE, z=3)                    # wide line
-    ax.text(3.9, 1.55, "dense Cu array", ha="center", va="center", fontsize=8.5, color=INK2)
-    ax.text(9.05, 1.55, "wide Cu line", ha="center", va="center", fontsize=8.5, color=INK2)
-
-    # ideal flat vs the actual post-CMP surface (erosion over dense, dishing over wide)
-    xs = np.linspace(0.8, 11.2, 500)
-    ideal = np.full_like(xs, 3.2)
-    erosion = -0.35 * np.exp(-((xs - 3.9) / 1.3) ** 2)
-    dishing = -0.55 * np.exp(-((xs - 9.05) / 1.1) ** 2)
-    ax.plot(xs, ideal, color=MUTED, lw=1.2, ls=(0, (5, 3)))
-    ax.plot(xs, ideal + erosion + dishing, color=BLUE, lw=2.2)
-    ax.text(11.15, 3.32, "ideal flat", ha="right", va="bottom", fontsize=8.5, color=MUTED)
-    ax.text(3.9, 3.42, "erosion (dense pattern\npolishes faster)", ha="center", va="bottom",
-            fontsize=9, color=INK)
-    ax.text(9.05, 2.5, "dishing (the soft wide\nCu bows out)", ha="center", va="top",
-            fontsize=9, color=INK, zorder=5,
-            bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="none", alpha=0.75))
-    ax.text(6.0, 5.9, "the consumer that was missing now exists: BEOL (F4, BUILT) made the wire cross-section\n"
-                      "electrical — R ∝ 1/(W·H) → τ_wire → the delay bins — so dishing and erosion finally reach\n"
-                      "an observable. What is left is that F4's geometry is one house line, not a per-die quantity",
-            ha="center", va="top", fontsize=9, color=INK2, style="italic")
-
-
-# --------------------------------------------------------------------------------------------- #
 # F9 — FinFET / GAA (deferred; gated on the 3-D engine, backlog B1)
 # --------------------------------------------------------------------------------------------- #
 def _draw_f9(fig) -> None:
@@ -267,12 +231,11 @@ def _draw_f10(fig) -> None:
 
 # The registry the roadmap page + drift guard anchor on: slice id → its draw function.
 FIGURES = {
-    # F4 (BEOL interconnect) and then F5 (strained silicon) GRADUATED 2026-08-10 with their slice-4 builds
-    # — see roadmap_gallery.SLICES. The manifest guard pins card ↔ schematic, so each entry and its Slice
-    # came out in one commit.
+    # F4 (BEOL interconnect) and then F5 (strained silicon) GRADUATED 2026-08-10 with their slice-4 builds,
+    # and F8 (CMP planarity) on 2026-09-06 with its own — see roadmap_gallery.SLICES. The manifest guard
+    # pins card ↔ schematic, so each entry and its Slice came out in one commit.
     "F6": _draw_f6,
     "F7": _draw_f7,
-    "F8": _draw_f8,
     "F9": _draw_f9,
     "F10": _draw_f10,
 }

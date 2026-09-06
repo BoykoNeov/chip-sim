@@ -143,30 +143,7 @@
   <main>
     <section>
       <h2>Promotable — the consumer is named</h2>
-      <p class="sub">Each of these already has a device observable waiting to read it. F3 (high-κ), F4 (BEOL interconnect) and F5 (strained silicon) have all shipped and their cards came off; F8 now heads the queue, promoted from the deferred list — F4&rsquo;s build gave layer thickness its first reader, which is the trigger that card was fenced behind.</p>
-      <div class="grid">
-        <article class="card">
-          <a class="shot" href="figures/roadmap-f8.png" title="open the full schematic (a preview, not simulator output)">
-            <span class="ribbon">planned &mdash; schematic</span>
-            <img src="figures/thumbs/roadmap-f8.webp" width="760" height="301" alt="F8 — CMP / dishing / planarity schematic preview (planned, not simulator output)" loading="lazy" decoding="async">
-          </a>
-          <div class="body">
-            <div class="tagrow">
-              <span class="tag">F8 &middot; enables Cu damascene</span>
-              <span class="status ok">Head of the queue — unblocked by F4</span>
-            </div>
-            <p class="blurb"><strong>CMP / dishing / planarity.</strong> Preston-class removal with pattern-density dishing and erosion — post-CMP thickness non-uniformity.</p>
-            <div class="facts">
-              <div class="row"><span class="k would">Would add</span><p class="v">Post-CMP layer-thickness non-uniformity, now with somewhere to land: F4 made the wire cross-section electrical (R ∝ 1/(W·H) → τ_wire → the delay bins), so dishing and erosion finally reach an observable.</p></div>
-              <div class="row"><span class="k gate">Gated on</span><p class="v">Its old gate is RELEASED — the F4 build gave layer thickness its first reader, which is exactly the trigger recorded for backlog D2, and F5&#x27;s graduation left it at the head of the queue by default rather than by strength. What remains is narrower and structural: F4&#x27;s wire geometry is a module-level house line and its game knob is metal-only, so a per-die CMP variation needs the cross-section to become a per-die quantity first.</p></div>
-            </div>
-            <div class="links">
-              <code>docs/plans/future-steps.md</code>
-              <a class="src" href="https://github.com/BoykoNeov/chip-sim/blob/main/docs/plans/future-steps.md">the triage&nbsp;&#8599;</a>
-            </div>
-          </div>
-        </article>
-      </div>
+      <p class="sub"><strong>Empty, and that is the finding.</strong> F3 (high-κ), F4 (BEOL interconnect), F5 (strained silicon) and now F8 (CMP planarity) have all shipped, and each card came off with its last slice. Nothing left on this page has <em>both</em> a released gate and a device observable waiting to read it, so the next slice is a re-triage rather than a pick off the top of a queue. The heading stays because a roadmap that quietly drops its &ldquo;ready to build&rdquo; section reads as if the question was never asked.</p>
     </section>
 
     <section>

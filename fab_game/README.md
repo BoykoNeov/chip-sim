@@ -452,8 +452,8 @@ a market-segmentation slice, so it lives in the scope-edge promotions above, not
   `demo_etch` (g5) · `demo_packaging` (g6) · `demo_game` (g7) · `demo_crystal_growth` (cg1) ·
   `demo_voronkov` (cg2) · `demo_stefan` (cg3) · `demo_thermal_donors` (c1) · `demo_under_etch` (d1) ·
   `demo_osf_ring` (a2) · `demo_dislocation` (a1) · `demo_thermal_budget` (e1) ·
-  `demo_internal_gettering` (s4) · `demo_reverse_recovery` (device-targets s5) · `demo_journey` (the
-  staged-journey playthrough).
+  `demo_internal_gettering` (s4) · `demo_reverse_recovery` (device-targets s5) · `demo_cmp_grading`
+  (F8-S4) · `demo_journey` (the staged-journey playthrough).
 - **`fab_game.ipynb`** — the thin notebook skin (the §9 dashboard section + the interactive skin; not
   in the correctness path).
 
@@ -533,6 +533,7 @@ python -m fab_game.demo_dislocation       # A1 two-sided window: slow pull → l
 python -m fab_game.demo_thermal_budget    # E1 spike/RTA budget collapse → shallow x_j, banks fab-game-e1.png
 python -m fab_game.demo_internal_gettering # S4 oxygen dual-use: Goldilocks [O_i], banks fab-game-s4.png
 python -m fab_game.demo_reverse_recovery  # device-targets S5 t_rr ∝ τ (lifetime killer is the feature), banks fab-game-s5.png
+python -m fab_game.demo_cmp_grading       # F8-S4 one wafer, three grading policies — the polished wire costs PARTS, banks fab-game-f8.png
 python -m fab_game.demo_journey           # the staged sand→chip journey playthrough (decide → observe → commit), banks fab-game-journey.png
 
 python -m fab_game.tui                    # the Textual TUI (dashboard + roguelike screen; needs the [tui] extra)

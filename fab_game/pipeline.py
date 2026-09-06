@@ -639,8 +639,26 @@ def diagnose(die: Die) -> str:
         lines.append(f"    ↳ packaging: assembly scrap — a back-end functional kill "
                      f"(dicing/wire-bond; cracked die = scrap, irreversible)")
     elif die.bin is not None and any("binned out" in r for r in die.verdict.reasons):
-        lines.append(f"    ↳ final test: binned out — I_Dsat too low for the slowest sellable speed bin "
-                     f"(a working but out-of-grade part — tighten the process spread)")
+        # Name the currency that ACTUALLY graded (F4/F8). Under delay binning the part is out of grade on
+        # τ_total, which reads the wire as well as the transistor — and once CMP has run, the wire is this
+        # die's own. Printing "I_Dsat too low" there would credit the transistor with a failure it did not
+        # cause, which is the precise inverse of what F8-S4 measures; the packaging record's `tau_total_ps`
+        # (written only by the delay branch of `packaging_step`) is what says which policy graded.
+        pack = next((r for r in die.history if r.step == "packaging"), None)
+        graded_on_delay = pack is not None and "tau_total_ps" in pack.outputs
+        polished = die.metal_thickness_nm is not None
+        if graded_on_delay:
+            cause = (" — the grade reads the WIRE as well as the transistor, so the CMP line above is a "
+                     "candidate cause, not the I_Dsat below it" if polished else
+                     " — graded on the delay the chip actually switches at, not on drive current")
+            lines.append(f"    ↳ final test: binned out — τ_total {die.delay_ps:.1f} ps outside every "
+                         f"sellable grade (a working but out-of-grade part{cause})")
+        elif die.delay_ps is None and any("no chip delay" in r for r in die.verdict.reasons):
+            lines.append("    ↳ final test: binned out — delay grading with no τ_total to grade (the "
+                         "`interconnect` knob is off): a misconfiguration, not a slow part")
+        else:
+            lines.append(f"    ↳ final test: binned out — I_Dsat too low for the slowest sellable speed bin "
+                         f"(a working but out-of-grade part — tighten the process spread)")
     return "\n".join(lines)
 
 

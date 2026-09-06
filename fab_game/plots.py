@@ -1768,3 +1768,124 @@ def fab_game_figure(result):
                  + trail, fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
     return fig
+
+
+# --------------------------------------------------------------------------- #
+# F8-S4 — the grade map with no transistor behind it, and the yield clause
+# --------------------------------------------------------------------------- #
+def _policy_bars_panel(ax, result) -> None:
+    """The same silicon graded three ways — one bar per policy, segmented by grade (bin-outs at the right)."""
+    labels = [b.label for b in result.ladder.bins] + [result.ladder.reject_label]
+    rows = (("drive current\n(the pre-1997 proxy)", result.hist_idsat, result.yield_idsat),
+            ("chip delay,\nideal wire (F4)", result.hist_f4, result.yield_f4),
+            (f"chip delay,\npolished wire (s={result.s_shown:.2f})", result.hist_f8, result.yield_f8))
+    colors = {"premium": _OUTCOME_COLORS["premium"], "typical": _OUTCOME_COLORS["typical"],
+              "value": _OUTCOME_COLORS["value"], "reject": _OUTCOME_COLORS["bin-out"]}
+    seen = set()
+    for i, (name, hist, y) in enumerate(rows):
+        left = 0.0
+        for label in labels:
+            n = hist.get(label, 0)
+            if n == 0:
+                continue
+            ax.barh(i, n, left=left, height=0.62, color=colors.get(label, "0.6"),
+                    edgecolor="white", linewidth=0.8,
+                    label=("bin-out" if label == "reject" else label) if label not in seen else None)
+            if n >= 4:
+                ax.text(left + n / 2, i, str(n), ha="center", va="center", fontsize=8,
+                        color="white", fontweight="bold")
+            seen.add(label)
+            left += n
+        n_rej = hist.get(result.ladder.reject_label, 0)
+        ax.text(left + 1.5, i, f"{n_rej} bin-out{'' if n_rej == 1 else 's'}  ·  yield {y:.1%}",
+                va="center", fontsize=8.5,
+                fontweight="bold" if n_rej else "normal",
+                color=_OUTCOME_COLORS["bin-out"] if n_rej else "0.35")
+    ax.set_yticks(range(len(rows)))
+    ax.set_yticklabels([name for name, _, _ in rows], fontsize=8.5)
+    ax.set_ylim(3.05, -0.85)                       # inverted, with room for the legend and the story box
+    ax.set_xlim(0, result.n_dies * 1.42)
+    ax.set_xlabel("dies")
+    ax.set_title("The same silicon, three grading policies\n"
+                 "F4's true currency RESCUES the slow tail — the polisher takes it back", fontsize=10)
+    ax.legend(fontsize=7.5, loc="upper right", framealpha=0.9, ncol=4)
+    ax.text(0.98, 0.045,
+            f"one die carries all three legs — {result.story_site}, r = {result.story_radius:.2f}, "
+            f"I_Dsat {result.story_i_dsat_mA:.2f} mA:\nbinned out  →  rescued to 'value'  →  "
+            f"binned out again, for where it sat",
+            transform=ax.transAxes, ha="right", va="bottom", fontsize=8, color="0.2",
+            bbox=dict(boxstyle="round,pad=0.4", facecolor="#fdf3e7", edgecolor="0.75", linewidth=0.8))
+
+
+def _bin_out_sweep_panel(ax, result) -> None:
+    """Bin-outs vs the polish spread: zero for either mechanism alone, and the threshold flagged as house."""
+    s = np.asarray(result.s_sweep) * 100.0
+    ax.plot(s, result.rejects_loose, color="#b4451f", lw=2.2,
+            label=f"loose transistors (σ_CD = {7.0:.0f} nm)")
+    ax.plot(s, result.rejects_tight, color="#1f77b4", lw=2.2,
+            label=f"tight transistors (σ_CD = {1.5:.1f} nm)")
+    ax.axhline(result.rejects_loose_no_cmp, color="#b4451f", lw=1.3, ls=":",
+               label="no polisher at all (F4) — both flat at 0")
+    ax.axhline(result.rejects_tight_no_cmp, color="#1f77b4", lw=1.3, ls=":")
+    house = result.s_sweep[min(range(len(result.s_sweep)),
+                               key=lambda i: abs(result.s_sweep[i] - 0.10))]
+    peak = max(result.rejects_loose) or 1
+    ax.axvline(house * 100.0, color="0.45", lw=1.2, ls="--")
+    ax.text(house * 100.0 - 0.8, peak * 0.30, "the knob's own default spread\n— still costs no part",
+            fontsize=8, color="0.3", ha="right", va="center")
+    if result.first_loss_s_loose is not None:
+        ax.plot([result.first_loss_s_loose * 100.0], [1], marker="o", ms=7, mfc="none",
+                mec="#b4451f", mew=1.8)
+        ax.annotate(f"first part lost, s ≈ {result.first_loss_s_loose:.2f}\n"
+                    f"(FLAGGED — the radial amplitude\nis a house number, so the curve is\n"
+                    f"the claim, never this point)",
+                    xy=(result.first_loss_s_loose * 100.0, 1.4),
+                    xytext=(result.first_loss_s_loose * 100.0 + 0.8, peak * 0.52),
+                    fontsize=8, color="#b4451f",
+                    arrowprops=dict(arrowstyle="->", color="#b4451f", lw=1.0))
+    ax.set_xlabel("across-wafer polish non-uniformity  s  (%)")
+    ax.set_ylabel("bin-outs (parts that no longer ship)")
+    ax.set_title("The clause that goes: 'a grading loss, NEVER a yield loss'\n"
+                 "zero for either mechanism alone — the loss needs both", fontsize=10)
+    ax.set_xlim(0, max(s))
+    ax.set_ylim(bottom=0)
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=8, loc="upper left", framealpha=0.9)
+
+
+def cmp_grading_figure(result):
+    """Assemble the F8-S4 artifact from a :class:`~fab_game.demo_cmp_grading.DemoResult` (4 panels)."""
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure(figsize=(17.0, 8.6), layout="constrained")
+    gs = fig.add_gridspec(2, 3, width_ratios=(0.94, 1.30, 1.36))
+    ax_top = fig.add_subplot(gs[0, 0])
+    ax_bot = fig.add_subplot(gs[1, 0])
+    _outcome_map_panel(ax_top, result.wafer_idsat,
+                       "Graded on DRIVE CURRENT\n"
+                       f"the transistor's own trend runs the OTHER way\n"
+                       f"(r vs I_Dsat {result.corr_r_idsat:+.2f} — the rim is faster)")
+    _outcome_map_panel(ax_bot, result.wafer_f8,
+                       "Same wafer, graded on CHIP DELAY\n"
+                       f"r vs delay {result.corr_r_tau_f4:+.2f} → {result.corr_r_tau_f8:+.2f}:\n"
+                       "the polisher REVERSES the gradient")
+    # The ring at the innermost lost part. `radius_frac` is normalized to the edge-exclusion boundary,
+    # not to the plotted wafer radius, so convert through the map's own scale rather than assuming 1.0.
+    xs, ys = _die_xy(result.wafer_f8)
+    fracs = np.array([d.radius_frac for d in result.wafer_f8.dies])
+    scale = float(np.hypot(xs, ys)[fracs > 0].max() / fracs.max())
+    ax_bot.add_patch(plt.Circle((0, 0), result.first_reject_radius * scale, fill=False,
+                                color="#b4451f", linewidth=1.4, linestyle="--", zorder=5))
+    ax_bot.text(0.0, -1.11, f"every part lost lies outside r = {result.first_reject_radius:.2f}",
+                ha="center", va="center", fontsize=8, color="#b4451f")
+    _policy_bars_panel(fig.add_subplot(gs[:, 1]), result)
+    _bin_out_sweep_panel(fig.add_subplot(gs[:, 2]), result)
+    fig.suptitle(
+        "F8 (S4) — the grade map with no transistor behind it: F4's wire could only ever pull a die "
+        "TOWARD typical; a polished one pushes it off the ladder\n"
+        "THE SIGN IS STRUCTURAL — the rim term is strictly positive and has no I_Dsat in it, so nothing "
+        "compensates it  ·  THE THRESHOLD IS A HOUSE NUMBER (the radial amplitude s)\n"
+        "the grade ladder is G6's, anchored on the nominal part — which at the clear-everywhere polish "
+        "time IS this wafer's centre die",
+        fontsize=10.5)
+    return fig

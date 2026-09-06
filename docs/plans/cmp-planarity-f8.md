@@ -1,6 +1,6 @@
 # Plan — F8 CMP / planarity (the step that gave the wire a spread of its own)
 
-> **STATUS: IN BUILD — S1 ✅ 2026-08-19, S2 ✅ 2026-09-02, S3 ✅ 2026-09-02 (S4 open; the card graduates with it).** Chosen off the post-F5 re-triage. Historical mode reserved: **B11**
+> **STATUS: COMPLETE — S1 ✅ 2026-08-19, S2 ✅ 2026-09-02, S3 ✅ 2026-09-02, S4 ✅ 2026-09-06 (the roadmap card graduated with it).** Chosen off the post-F5 re-triage. Historical mode: **B11**
 > (B10 = F5 strain is the current highest — `chip/demo_strain_history.py`). Roadmap card `F8` graduates
 > on the last slice, on the F3/F4/F5 reading of "shipped".
 
@@ -310,7 +310,55 @@ What it settled beyond the plan:
 plasma-etched* ⇒ damascene ⇒ CMP is **not an optimisation, it is the enabling step** — F4's Cu era
 literally does not exist without F8. Period → wall → successor, glob-anchored per H0.
 
-**S4 — not pre-committed.** Candidates, to be chosen from what S1–S3 actually turn up: the wall (why
+**S4 — the grading composition, and the second F4 clause. ✅ BUILT 2026-09-06** (`fab_game/demo_cmp_grading.py`
+→ `docs/figures/fab-game-f8.png`; `fab_game/plots.py` `cmp_grading_figure`; the `F8` card in
+`fab_game/gallery.py`; a fix in `fab_game/pipeline.py` `diagnose`; `fab_game/tests/test_demo_cmp_grading.py`,
+13 tests). Option (b) was chosen over (a). What it settled beyond the plan:
+
+* **The clause that goes is "a grading loss, never a yield loss."** F4's `DelayBins.from_speed_bins`
+  proves in its own docstring that the true currency compresses the distribution **symmetrically** — a die
+  at a bin edge sits `τ_wire·(1 − I_nom/I_edge)` off it, *positive* above nominal and **negative below**,
+  so the slow tail is **rescued** from the bin-out. That was derived under the clause S2 already ended.
+  The polished rim carries `τ_wire·(R/R_nom − 1)`: strictly positive, no `I_Dsat` in it, nothing to
+  compensate it — so the rescue can be cancelled outright. **The sign is structural; only the size is a
+  house number.** Same shape as S2 one layer up: S2 ended "the wire contributes no spread of its own",
+  S4 ends "…and it can only cost a grade."
+* **Measured on one wafer, three policies, and a bin-out is a yield fail here** (`packaging_step` flips
+  the verdict; `wafer_yield` counts verdicts). Loose CD control, 89 dies: drive-current grading **2**
+  bin-outs (yield 0.978) → F4's true currency **0** (1.000, it rescues both) → the polished wire at
+  `s = 0.20` **8** (0.910). The transistors are byte-identical across all three (CMP draws no
+  randomness), so one `I_Dsat` histogram produces three outcomes.
+* **Neither mechanism alone loses a part** — the F4-S4 shape one slice on. Tight transistors under the
+  same polish: 0 bin-outs (to `s = 0.22`). Loose transistors with no polisher: 0 (F4 rescues them). Only
+  the two together. And every part lost was **already below nominal** *and* out past `r = 0.61`, while 37
+  dies are below nominal and 60 are out that far — the intersection is the loss. **The polisher never
+  rejects a fast die; it withdraws the rescue from a slow one.**
+* **It is not extra spread on top of the transistor's — it is the opposite sign.** The transistor has a
+  weak radial trend of its own here (focus bowl + oxide trend leave the rim marginally *faster*: radius vs
+  `I_Dsat` **+0.25**), so the unpolished wafer's delay is, if anything, faster outward (**−0.09**).
+  Polished: **+0.45**. The polisher **reverses the wafer's speed gradient**, and the parts it costs sit
+  where the transistor said the dies were fast. Not predicted by the plan; found by measuring.
+* **The threshold is a house number and is drawn as a curve, not quoted as a point.** At the knob's own
+  default spread (`s = 0.10`) the polisher still costs **no** part; the first goes at `s ≈ 0.14` loose,
+  `s ≈ 0.24` tight. Cranking `s` until a part fell off would have been the `DISH_SCALE` / F5-S3
+  flattering-direction trap; the panel sweeps `s` instead and the sign is the claim.
+* **The anchor dissolves at the clear time.** `from_speed_bins` warns that hand-picked ps edges can
+  manufacture the collapse out of a threshold choice, so the ladder is G6's own grade fractions anchored on
+  the **nominal part** — and at the clear-everywhere polish time that part **is** this wafer's centre die
+  (S2's seam), byte-for-byte. The two candidate anchors are the same object, so there is no choice to make.
+* **Live finding, fixed in this slice.** `pipeline.diagnose` hardcoded every bin-out as *"I_Dsat too low
+  for the slowest sellable speed bin"* — under delay grading that credits the **transistor** with a
+  failure the **wire** caused, the precise inverse of this slice's thesis. It now forks on the currency
+  that actually graded (the packaging record's `tau_total_ps`) and points at the CMP line above it.
+* **The sweep is a closed form, pinned against the pipeline.** 60 wafer runs for one curve is ~15 s of
+  fast lane; instead each die's recorded `τ_gate`/`τ_wire` are re-read at the polished thickness, which is
+  exact because `τ_wire` is linear in `R` and `C` never reads `H` (F4's cited invariance). The test pins
+  the shortcut against the real line at two spreads.
+* **Nothing in `chip/` moved.** `device.py` and `interconnect.py` untouched for the **fifth** consecutive
+  slice; `chip/cmp.py` untouched by S4 entirely. The slice is the game layer reading F4's `DelayBins` over
+  F8's per-die wire.
+
+*Original plan text for S4 (not pre-committed):* Candidates, to be chosen from what S1–S3 actually turn up: the wall (why
 polishing longer cannot close the window); the scale gap (what the sub-micron regime the source could not
 measure would change); or the composition with F4's `wire_share`. *After S3 (2026-09-02):* the wall and
 the composition are now both on the B11 figure (the window's closure; `τ_gate` fixed while `τ_wire`
